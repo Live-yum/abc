@@ -1,0 +1,209 @@
+name: Fixed-source Native WRITE AOT paired diagnostic
+
+on:
+  push:
+    branches: [codex/native-write-paired-diagnostic-661]
+    paths:
+      - .github/workflows/native-write-paired-diagnostic.yml
+      - tool/perf/native_write_paired/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-write-paired-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  DART_SUPPRESS_ANALYTICS: 'true'
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  ABC_PERF_COMMIT: 661f9f17531e87f0b3f9f7028d70a94814c21234
+
+jobs:
+  paired:
+    name: Complete BAABBA / unchanged native engine / AOT host wrappers
+    if: github.repository == 'Live-yum/abc' && github.ref == 'refs/heads/codex/native-write-paired-diagnostic-661'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Initialize evidence before checkout or setup can fail
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime, json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'native-write-paired'
+          (root / 'evidence').mkdir(parents=True)
+          value = {'status': 'incomplete', 'reason': 'not finished',
+                   'workflowCommit': os.environ['GITHUB_SHA'],
+                   'runId': os.environ['GITHUB_RUN_ID'], 'attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                   'startedUtc': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+          (root / 'evidence/status.json').write_text(json.dumps(value, indent=2) + '\n')
+          for name in ('xdg', 'analyzer', 'tmp', 'logs'):
+              (root / name).mkdir()
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('XDG_CONFIG_HOME=' + str(root / 'xdg') + '\n')
+              output.write('ANALYZER_STATE_LOCATION_OVERRIDE=' + str(root / 'analyzer') + '\n')
+              output.write('TMPDIR=' + str(root / 'tmp') + '\n')
+          PY
+
+      - name: Check out reviewed diagnostic definitions
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check out only the fixed product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 661f9f17531e87f0b3f9f7028d70a94814c21234
+          path: .native-write-product
+          persist-credentials: false
+
+      - name: Install the official native build prerequisites
+        timeout-minutes: 10
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config zlib1g-dev
+
+      - uses: ./.native-write-product/.github/actions/setup-flutter
+
+      - name: Verify source pins, runner contracts and fixed public inputs
+        id: inputs
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .native-write-product rev-parse HEAD)" = "$ABC_PERF_COMMIT"
+          test "$(git -C .native-write-product rev-parse 'HEAD^{tree}')" = "9ff4ca286afa3e545901c498de167ee0c5dfc61d"
+          python3 tool/perf/native_write_paired/verify_sources.py
+          python3 -m unittest discover -s tool/perf/native_write_paired/tests -v 2>&1 | tee "$RUNNER_TEMP/native-write-paired/logs/contracts.log"
+          (cd .native-write-product && flutter pub get --enforce-lockfile)
+          test -z "$(git -C .native-write-product status --porcelain --untracked-files=normal)"
+          python3 .native-write-product/tool/computerraria_inputs.py --output "$RUNNER_TEMP/native-write-paired/inputs"
+          python3 tool/perf/native_write_paired/paired.py candidate --baseline .native-write-product --output "$RUNNER_TEMP/native-write-paired/candidate"
+          flutter --version --machine > "$RUNNER_TEMP/native-write-paired/logs/flutter-version.json"
+          dart --version > "$RUNNER_TEMP/native-write-paired/logs/dart-version.txt" 2>&1
+          clang --version > "$RUNNER_TEMP/native-write-paired/logs/clang-version.txt"
+          cmake --version > "$RUNNER_TEMP/native-write-paired/logs/cmake-version.txt"
+          ninja --version > "$RUNNER_TEMP/native-write-paired/logs/ninja-version.txt"
+
+      - name: Build unchanged fixed-source native engine once with counters OFF
+        id: native
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S .native-write-product/native -B "$RUNNER_TEMP/native-write-paired/native-build" -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Profile '-DCMAKE_C_FLAGS_PROFILE=-O3 -DNDEBUG' \
+            -DABC_PERF_COUNTERS=OFF 2>&1 | tee "$RUNNER_TEMP/native-write-paired/logs/native-configure.log"
+          cmake --build "$RUNNER_TEMP/native-write-paired/native-build" --parallel 2 \
+            2>&1 | tee "$RUNNER_TEMP/native-write-paired/logs/native-build.log"
+          (cd .native-write-product && python3 tool/perf/computerraria_provenance.py \
+            --artifact "$RUNNER_TEMP/native-write-paired/native-build/libabc_engine.so" \
+            --cmake-cache "$RUNNER_TEMP/native-write-paired/native-build/CMakeCache.txt" \
+            --ninja-build "$RUNNER_TEMP/native-write-paired/native-build/build.ninja" \
+            --output "$RUNNER_TEMP/native-write-paired/native-build.json")
+
+      - name: Verify the 20 new WRITE contracts against the actual candidate package
+        id: contracts
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          diagnostic="$GITHUB_WORKSPACE/tool/perf/native_write_paired"
+          candidate="$RUNNER_TEMP/native-write-paired/contracts-product"
+          python3 "$diagnostic/prepare_contracts.py" materialize --baseline .native-write-product --output "$candidate"
+          (cd "$candidate" && flutter pub get --offline --enforce-lockfile)
+          python3 "$diagnostic/prepare_contracts.py" verify-package --output "$candidate"
+          set +e
+          (cd "$candidate" && dart format --output=none --set-exit-if-changed \
+            lib/engine/native_world_circuit_bindings.dart test/native_world_circuit_write_test.dart \
+            test/native_world_circuit_write_owner_test.dart) \
+            2>&1 | tee "$RUNNER_TEMP/native-write-paired/logs/write-format.log"
+          format_status=$?
+          set -e
+          if test "$format_status" -ne 0; then
+            for source in lib/engine/native_world_circuit_bindings.dart test/native_world_circuit_write_test.dart test/native_world_circuit_write_owner_test.dart; do
+              if ! (cd "$candidate" && dart format --output=show --summary=none "$source") \
+                > "$RUNNER_TEMP/native-write-paired/logs/format-${source##*/}.txt" \
+                2> "$RUNNER_TEMP/native-write-paired/logs/format-${source##*/}.stderr.txt"; then
+                echo "Official formatter could not emit $source; see retained stderr." >> "$RUNNER_TEMP/native-write-paired/logs/write-format.log"
+              fi
+            done
+            exit "$format_status"
+          fi
+          (cd "$candidate" && flutter analyze --no-pub) \
+            2>&1 | tee "$RUNNER_TEMP/native-write-paired/logs/write-analysis.log"
+          (cd "$candidate" && TERRAFORGE_ENGINE_LIBRARY="$RUNNER_TEMP/native-write-paired/native-build/libabc_engine.so" \
+            flutter test --no-pub --concurrency=1 --reporter=json \
+            test/native_world_circuit_write_test.dart test/native_world_circuit_write_owner_test.dart) \
+            | tee "$RUNNER_TEMP/native-write-paired/logs/write-contracts.jsonl"
+          python3 "$diagnostic/prepare_contracts.py" verify-results --output "$RUNNER_TEMP/native-write-paired/logs/write-contracts.jsonl"
+          python3 "$diagnostic/prepare_contracts.py" verify-package --output "$candidate"
+          test -z "$(git -C .native-write-product status --porcelain --untracked-files=normal)"
+
+      - name: Freeze complete BAABBA study and compile each actual Dart wrapper once
+        id: aot
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_dart="$RUNNER_TEMP/flutter-3.47.6/bin/cache/dart-sdk/bin/dart"
+          python3 tool/perf/native_write_paired/paired.py prepare --order BAABBA \
+            --output "$RUNNER_TEMP/native-write-paired/state" \
+            --baseline .native-write-product --candidate "$RUNNER_TEMP/native-write-paired/candidate" \
+            --world "$RUNNER_TEMP/native-write-paired/inputs/computerraria.wld" \
+            --library "$RUNNER_TEMP/native-write-paired/native-build/libabc_engine.so" \
+            --native-provenance "$RUNNER_TEMP/native-write-paired/native-build.json" \
+            --dart "$sdk_dart" --pub-cache "$PUB_CACHE"
+          python3 tool/perf/native_write_paired/paired.py build --output "$RUNNER_TEMP/native-write-paired/state"
+          python3 tool/perf/native_write_paired/paired.py check --output "$RUNNER_TEMP/native-write-paired/state"
+
+      - name: Run only the complete bounded internally paired study
+        id: measurement
+        timeout-minutes: 62
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tool/perf/native_write_paired/paired.py run \
+            --output "$RUNNER_TEMP/native-write-paired/state" --timeout-seconds 600
+
+      - name: Preserve partial or complete evidence and explicit terminal status
+        if: always()
+        timeout-minutes: 3
+        env:
+          INPUTS_OUTCOME: ${{ steps.inputs.outcome }}
+          NATIVE_OUTCOME: ${{ steps.native.outcome }}
+          AOT_OUTCOME: ${{ steps.aot.outcome }}
+          CONTRACTS_OUTCOME: ${{ steps.contracts.outcome }}
+          MEASUREMENT_OUTCOME: ${{ steps.measurement.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f tool/perf/native_write_paired/finalize.py; then
+            python3 tool/perf/native_write_paired/finalize.py --root "$RUNNER_TEMP/native-write-paired"
+          else
+            echo 'Diagnostic checkout unavailable; initialized evidence/status.json remains incomplete.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload only raw reports, logs and provenance, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-write-paired-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-write-paired/evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Reject any incomplete or unsuccessful study
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          status = json.loads((Path(os.environ['RUNNER_TEMP']) / 'native-write-paired/evidence/status.json').read_text())
+          assert status['status'] == 'passed', status
+          PY

@@ -1,0 +1,131 @@
+{
+  "schema": 2,
+  "scope": "Diagnostic-only complete WRITE BAABBA; fixed product checkout remains unchanged",
+  "productCommit": "661f9f17531e87f0b3f9f7028d70a94814c21234",
+  "productTree": "9ff4ca286afa3e545901c498de167ee0c5dfc61d",
+  "productTrackedFiles": 828,
+  "baselineBindingSha256": "424ef0660b6a9363a1957f058a6cf5ec34be9946154370acff2657bd566bae09",
+  "candidateBindingSha256": "7b423084073971f6f1c903093be1554e168015b704c2bcadf265bde27f7cc014",
+  "productSourceFilesSha256": {
+    "lib/engine/native_world_circuit_bindings.dart": "424ef0660b6a9363a1957f058a6cf5ec34be9946154370acff2657bd566bae09",
+    "lib/engine/engine.dart": "1d158ad421811e0ebd1888e29aaef8f35e7b599370652e01f88126f7aff4ce9b",
+    "lib/engine/world_circuit_backend.dart": "30d69b4be26e0e2a48fbbc4a2c97ae8ff226fa90fd51818244fe63841c17633d",
+    "lib/domain/computerraria_computer.dart": "6c082e96e96e17fce3088763fcdfce009b3cf4577d3e2aa5c7198033279af142"
+  },
+  "contractFixtureSha256": {
+    "native_world_circuit_write_fixture.c": "59afa0ea67c1986ef15e14c3d240ec9d52150be3193ae71db9e1b93a27288795",
+    "native_world_circuit_write_owner_test.dart": "5ef7e945de256fbe6d7d000724a01d8e7d477fa8f5f67edd9b753db5ea3f14bf",
+    "native_world_circuit_write_test.dart": "35e40c848b9488b47d50f86765bf084ea418929f2b2877887fea834d5da0cf5c"
+  },
+  "protocol": {
+    "order": "BAABBA",
+    "processes": 6,
+    "scenariosPerProcess": [
+      "OFF/reset",
+      "ON/reset",
+      "OFF/save-reopen",
+      "ON/save-reopen"
+    ],
+    "cyclesPerProcess": 4,
+    "measuredOpensPerProcess": 8,
+    "savesPerProcess": 2,
+    "separateHashCancellationRecoveryPerProcess": 1,
+    "sampleIntervalMilliseconds": 100,
+    "progressIntervalMilliseconds": 20,
+    "quietMilliseconds": 1200,
+    "timeoutSecondsPerProcess": 600,
+    "jobTimeoutMinutes": 95,
+    "failure": "stop immediately; preserve all raw; attempt original source rehash; do not resume or replace arms"
+  },
+  "nativeBuild": {
+    "source": "fixed product native/CMakeLists.txt unchanged",
+    "buildType": "Profile",
+    "compiler": "clang",
+    "generator": "Ninja",
+    "flags": "-O3 -DNDEBUG",
+    "ABC_PERF_COUNTERS": "OFF",
+    "builds": 1,
+    "sharedAcrossArms": true
+  },
+  "aotBuildsPerArm": 1,
+  "contractGate": {
+    "stub": 19,
+    "realOwner": 1,
+    "skipAllowed": false,
+    "format": true,
+    "analysis": true,
+    "packageRootVerified": true
+  },
+  "files": [
+    {
+      "path": ".github/workflows/native-write-paired-diagnostic.yml",
+      "bytes": 10932,
+      "sha256": "b4c5f48678bfaac17bf0fb1e593cb0dac5679c655c0236c982be895d646a0aa7"
+    },
+    {
+      "path": "tool/perf/native_write_paired/README.md",
+      "bytes": 9478,
+      "sha256": "834c784a1881d9caf956436ace09f3cae064d5c4b962bde77084bb2226c794b4"
+    },
+    {
+      "path": "tool/perf/native_write_paired/bin/benchmark.dart",
+      "bytes": 25641,
+      "sha256": "ea5b3e66ff4491b93002f828a946b89b13592e6b5d89d1988b1290af720d6b06"
+    },
+    {
+      "path": "tool/perf/native_write_paired/candidate_binding.dart.txt",
+      "bytes": 34805,
+      "sha256": "7b423084073971f6f1c903093be1554e168015b704c2bcadf265bde27f7cc014"
+    },
+    {
+      "path": "tool/perf/native_write_paired/contracts/native_world_circuit_write_fixture.c.txt",
+      "bytes": 4022,
+      "sha256": "59afa0ea67c1986ef15e14c3d240ec9d52150be3193ae71db9e1b93a27288795"
+    },
+    {
+      "path": "tool/perf/native_write_paired/contracts/native_world_circuit_write_owner_test.dart.txt",
+      "bytes": 9597,
+      "sha256": "5ef7e945de256fbe6d7d000724a01d8e7d477fa8f5f67edd9b753db5ea3f14bf"
+    },
+    {
+      "path": "tool/perf/native_write_paired/contracts/native_world_circuit_write_test.dart.txt",
+      "bytes": 13139,
+      "sha256": "35e40c848b9488b47d50f86765bf084ea418929f2b2877887fea834d5da0cf5c"
+    },
+    {
+      "path": "tool/perf/native_write_paired/finalize.py",
+      "bytes": 4775,
+      "sha256": "40de7d2025d3321eda3ff1df770546616e3763c4766f482c3fea19243e074ee8"
+    },
+    {
+      "path": "tool/perf/native_write_paired/paired.py",
+      "bytes": 46961,
+      "sha256": "87db0585e8b2d1d6d5a85727280516ff6c4879d6c04ee642840ec432404b22a5"
+    },
+    {
+      "path": "tool/perf/native_write_paired/prepare_contracts.py",
+      "bytes": 5938,
+      "sha256": "dfe69e4098e5e0c8ae96b2f822af89f2dd69c61cd5b4b89ea7f805f190662354"
+    },
+    {
+      "path": "tool/perf/native_write_paired/standalone.pubspec.lock",
+      "bytes": 1023,
+      "sha256": "39717eb2427f15aa33da119f5ae520156af725c4406132ea411ded4f3274c096"
+    },
+    {
+      "path": "tool/perf/native_write_paired/tests/test_ci_contract.py",
+      "bytes": 10042,
+      "sha256": "97afab276286dbd9c8f74d33fe680faccca8e527894d21efb91d47bcee5931b5"
+    },
+    {
+      "path": "tool/perf/native_write_paired/tests/test_paired.py",
+      "bytes": 20013,
+      "sha256": "cec763655f70be17596ecd5b66db362e65ef7d594b17e3fc2c6e2bedc0b61b7f"
+    },
+    {
+      "path": "tool/perf/native_write_paired/verify_sources.py",
+      "bytes": 933,
+      "sha256": "2bb6e811e1fc3957a491d726e6e438ea5ab4f19f1a50b08a9c2e2f2ae510a756"
+    }
+  ]
+}

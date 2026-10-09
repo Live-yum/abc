@@ -1,0 +1,241 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:terraforge/engine/native_engine.dart';
+import 'package:terraforge/engine/world_circuit_backend.dart';
+
+int _torchFrame(WorldCircuitResult result) {
+  expect(result.resultKind, 1);
+  expect(result.records, hasLength(16));
+  final data = ByteData.sublistView(result.records);
+  expect(data.getUint32(0, Endian.little), 3);
+  expect(data.getUint32(4, Endian.little), 10);
+  return data.getUint32(12, Endian.little) & 0xffff;
+}
+
+void main() {
+  final library = Platform.environment['TERRAFORGE_ENGINE_LIBRARY'];
+  test(
+    'real native owner preserves writes and results across queued saves, '
+    'close, and reopen',
+    () async {
+      final engine = createTerraEngine();
+      expect(createTerraEngine(), same(engine));
+      final backend = engine as WorldCircuitSourceBackend;
+      final input = File('assets/qa/synthetic-circuit.wld').absolute;
+      final original = await input.readAsBytes();
+      final originalHash = sha256.convert(original).toString();
+      final source = WorldCircuitSource.file(
+        path: input.path,
+        length: original.length,
+        name: 'synthetic-circuit.wld',
+      );
+      final sessions = <int>{};
+      final leases = <WorldCircuitSource>[];
+
+      Future<WorldCircuitResult> rememberOpen(
+        Future<WorldCircuitResult> pending,
+      ) async {
+        final result = await pending;
+        sessions.add(result.session);
+        return result;
+      }
+
+      Future<void> close(int session) async {
+        await backend.closeWorldCircuit(session);
+        sessions.remove(session);
+      }
+
+      Future<WorldCircuitResult> save(int session) async {
+        final result = await backend.commandWorldCircuit(
+          session,
+          WorldCircuitCommand.save(),
+        );
+        final lease = result.worldSource;
+        if (lease != null) leases.add(lease);
+        return result;
+      }
+
+      Future<WorldCircuitResult> viewport(int session) =>
+          backend.commandWorldCircuit(
+            session,
+            WorldCircuitCommand.viewport(3, 10, 1, 1),
+          );
+
+      Future<WorldCircuitResult> pulse(int session) =>
+          backend.commandWorldCircuit(
+            session,
+            WorldCircuitCommand.trigger(2, 10, mask: 1, hitSwitch: false),
+          );
+
+      addTearDown(() async {
+        try {
+          for (final session in sessions.toList()) {
+            await close(session);
+          }
+        } finally {
+          for (final lease in leases) {
+            await backend.releaseWorldCircuitSource(lease);
+          }
+        }
+      });
+
+      // The byte API exercises the synchronous pump and supplies independent
+      // byte-for-byte save and viewport expectations for the streamed pump.
+      final byteOpened = await rememberOpen(backend.openWorldCircuit(original));
+      final byteSession = byteOpened.session;
+      expect(_torchFrame(await viewport(byteSession)), 0);
+      await pulse(byteSession);
+      final litView = await viewport(byteSession);
+      expect(_torchFrame(litView), 66);
+      final litRecords = Uint8List.fromList(litView.records);
+      final litRecordsHash = sha256.convert(litRecords).toString();
+      final byteLitSave = await save(byteSession);
+      expect(byteLitSave.worldSource, isNull);
+      final litBytes = Uint8List.fromList(byteLitSave.world!);
+      final litHash = sha256.convert(litBytes).toString();
+      expect(litBytes, isNotEmpty);
+
+      await pulse(byteSession);
+      final darkView = await viewport(byteSession);
+      expect(_torchFrame(darkView), 0);
+      final darkRecords = Uint8List.fromList(darkView.records);
+      final byteDarkSave = await save(byteSession);
+      final darkBytes = Uint8List.fromList(byteDarkSave.world!);
+      final darkHash = sha256.convert(darkBytes).toString();
+      expect(darkBytes, isNotEmpty);
+      expect(darkHash, isNot(litHash));
+      await close(byteSession);
+
+      final opened = await rememberOpen(backend.openWorldCircuitSource(source));
+      expect(opened.sourceSha256, originalHash);
+      final session = opened.session;
+      await pulse(session);
+      final completions = <String>[];
+      Future<T> observe<T>(String label, Future<T> pending) =>
+          pending.then((result) {
+            completions.add(label);
+            return result;
+          });
+
+      // Submit every request in the same turn, without awaiting an earlier
+      // result. Only createTerraEngine's production worker owns the FIFO.
+      // A small fixture cannot guarantee an active-operation cancellation
+      // handshake, so this test makes no timing-based cancellation claim.
+      final firstSave = observe('save-lit', save(session));
+      final firstView = observe('view-lit', viewport(session));
+      final toggle = observe('pulse', pulse(session));
+      final secondSave = observe('save-dark', save(session));
+      final secondView = observe('view-dark', viewport(session));
+      final closing = observe('close', close(session));
+      final reopening = observe(
+        'reopen',
+        rememberOpen(backend.openWorldCircuitSource(source)),
+      );
+      // Attach error handlers to every pending request before yielding and
+      // drain all replies even on failure, so teardown owns each live handle.
+      await Future.wait<void>([
+        firstSave.then<void>((_) {}),
+        firstView.then<void>((_) {}),
+        toggle.then<void>((_) {}),
+        secondSave.then<void>((_) {}),
+        secondView.then<void>((_) {}),
+        closing,
+        reopening.then<void>((_) {}),
+      ]);
+      expect(completions, [
+        'save-lit',
+        'view-lit',
+        'pulse',
+        'save-dark',
+        'view-dark',
+        'close',
+        'reopen',
+      ]);
+      final savedLit = await firstSave;
+      final savedDark = await secondSave;
+      final queuedLitView = await firstView;
+      final queuedDarkView = await secondView;
+      final reopened = await reopening;
+
+      void expectSaved(
+        WorldCircuitResult saved,
+        Uint8List expected,
+        String hash,
+      ) {
+        expect(saved.session, session);
+        expect(saved.resultKind, 6);
+        expect(saved.resultCount, expected.length);
+        expect(saved.world, isNull);
+        expect(saved.sourceSha256, originalHash);
+        final lease = saved.worldSource!;
+        expect(lease.token, isNotNull);
+        expect(lease.length, expected.length);
+        expect(lease.sha256, hash);
+        final actual = File(lease.path!).readAsBytesSync();
+        expect(actual, expected, reason: 'Leased bytes survive queued close.');
+        expect(sha256.convert(actual).toString(), lease.sha256);
+      }
+
+      expectSaved(savedLit, litBytes, litHash);
+      expectSaved(savedDark, darkBytes, darkHash);
+      final litLease = savedLit.worldSource!;
+      final darkLease = savedDark.worldSource!;
+      expect(litLease.token, isNot(darkLease.token));
+      expect(litLease.path, isNot(darkLease.path));
+      expect(_torchFrame(queuedLitView), 66);
+      expect(_torchFrame(queuedDarkView), 0);
+      expect(queuedLitView.records, litRecords);
+      expect(queuedDarkView.records, darkRecords);
+      expect(reopened.sourceSha256, originalHash);
+      expect(_torchFrame(await viewport(reopened.session)), 0);
+      await pulse(reopened.session);
+      expect(_torchFrame(await viewport(reopened.session)), 66);
+      await close(reopened.session);
+
+      // Decode both completed candidates independently. Commands on their
+      // new sessions must not alter either immutable leased output.
+      for (final entry in [
+        (lease: litLease, frame: 66, bytes: litBytes, hash: litHash),
+        (lease: darkLease, frame: 0, bytes: darkBytes, hash: darkHash),
+      ]) {
+        final loaded = await rememberOpen(
+          backend.openWorldCircuitSource(entry.lease),
+        );
+        expect(loaded.sourceSha256, entry.hash);
+        expect(_torchFrame(await viewport(loaded.session)), entry.frame);
+        await pulse(loaded.session);
+        expect(_torchFrame(await viewport(loaded.session)), 66 - entry.frame);
+        await close(loaded.session);
+        expect(File(entry.lease.path!).readAsBytesSync(), entry.bytes);
+      }
+
+      await backend.releaseWorldCircuitSource(litLease);
+      expect(File(litLease.path!).existsSync(), isFalse);
+      expect(File(litLease.path!).parent.existsSync(), isFalse);
+      await backend.releaseWorldCircuitSource(litLease);
+      expect(File(darkLease.path!).readAsBytesSync(), darkBytes);
+      await backend.releaseWorldCircuitSource(darkLease);
+      expect(File(darkLease.path!).existsSync(), isFalse);
+      expect(File(darkLease.path!).parent.existsSync(), isFalse);
+
+      // Retain actual returned byte arrays, not only copied expectations,
+      // through later ACKs, handle destruction, reopen, and lease release.
+      expect(byteLitSave.world, litBytes);
+      expect(byteDarkSave.world, darkBytes);
+      expect(litView.records, litRecords);
+      expect(darkView.records, darkRecords);
+      expect(queuedLitView.records, litRecords);
+      expect(queuedDarkView.records, darkRecords);
+      expect(sha256.convert(queuedLitView.records).toString(), litRecordsHash);
+      final originalAfter = await input.readAsBytes();
+      expect(originalAfter, original);
+      expect(sha256.convert(originalAfter).toString(), originalHash);
+    },
+    skip: library == null || library.isEmpty
+        ? 'Requires TERRAFORGE_ENGINE_LIBRARY with the real native engine.'
+        : false,
+  );
+}

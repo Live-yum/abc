@@ -1,0 +1,398 @@
+import 'dart:ffi';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:terraforge/engine/engine.dart';
+import 'package:terraforge/engine/native_world_circuit_bindings.dart';
+import 'package:terraforge/engine/world_circuit_backend.dart';
+
+void main() {
+  group('native borrowed WRITE and owned RESULT', () {
+    late Directory build;
+    late _Stub stub;
+    setUpAll(() async {
+      build = await Directory.systemTemp.createTemp('abc-write-contract-');
+      final path = '${build.path}/write.so';
+      final result = await Process.run('cc', [
+        '-std=c11',
+        '-O2',
+        '-Wall',
+        '-Wextra',
+        '-Werror',
+        '-Wno-unused-parameter',
+        '-shared',
+        '-fPIC',
+        'test/native_world_circuit_write_fixture.c',
+        '-o',
+        path,
+      ]);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      stub = _Stub(DynamicLibrary.open(path));
+    });
+    tearDownAll(() => build.delete(recursive: true));
+
+    for (final streamed in [false, true]) {
+      test('compile borrows multiple offset writes (streamed: $streamed)',
+          () async {
+        await _withFixture(stub, streamed, (fixture) async {
+          await fixture.open();
+          expect(fixture.io.positions, [11, 0, 29]);
+          expect(fixture.io.lengths, [7, 17, 9]);
+          expect(fixture.io.borrowProbes, 3);
+          expect(fixture.io.realFile(fixture.io.scratchPath!).readAsBytesSync(),
+              _expectedFile());
+          expect(stub.metric(3), 3);
+          expect(stub.metric(9), 0);
+          fixture.close();
+          fixture.expectReleased();
+        });
+      });
+
+      test('save writes complete before ack and retain bytes '
+          '(streamed: $streamed)', () async {
+        await _withFixture(stub, streamed, (fixture) async {
+          await fixture.open();
+          fixture.io.clearWrites();
+          final saved = await fixture.command(WorldCircuitCommand.save());
+          expect(fixture.io.positions, [11, 0, 29]);
+          expect(fixture.io.borrowProbes, 3);
+          expect(stub.metric(11), 6);
+          final bytes = fixture.savedBytes(saved);
+          expect(bytes, _expectedFile());
+          expect(saved['resultCount'], bytes.length);
+          fixture.close();
+          if (streamed) {
+            final source = saved['worldSource'] as Map;
+            expect(source['sha256'], sha256.convert(bytes).toString());
+            expect(fixture.io.realFile(source['path'] as String).existsSync(),
+                isTrue);
+            fixture.api.dispatch('worldCircuitReleaseSource', [source['token']]);
+            expect(fixture.io.realFile(source['path'] as String).existsSync(),
+                isFalse);
+          }
+          expect(bytes, _expectedFile());
+          fixture.expectReleased();
+        });
+      });
+
+      test('RESULT owns both chunks after ack, reuse, close and reopen '
+          '(streamed: $streamed)', () async {
+        await _withFixture(stub, streamed, (fixture) async {
+          await fixture.open();
+          final result = await fixture.command(
+            WorldCircuitCommand.viewport(0, 0, 1, 1),
+          );
+          final records = result['records'] as Uint8List;
+          final expected = [..._payload(0, 16), ..._payload(1, 16)];
+          expect(records, expected);
+          expect(stub.metric(2), 2);
+          expect(stub.metric(3), 5);
+          await fixture.command(WorldCircuitCommand.save());
+          fixture.close();
+          await fixture.open();
+          expect(records, expected,
+              reason: 'C overwrites its single buffer on every ack/close.');
+          fixture.close();
+          fixture.expectReleased();
+        });
+      });
+
+      for (final partial in [false, true]) {
+        test('failed ${partial ? 'partial' : 'pre-write'} save never acks '
+            'or steps again (streamed: $streamed)', () async {
+          await _withFixture(stub, streamed, (fixture) async {
+            await fixture.open();
+            fixture.io.clearWrites();
+            fixture.io.failAt = 2;
+            fixture.io.partialFailure = partial;
+            final steps = stub.metric(0), acks = stub.metric(3);
+            await expectLater(
+              fixture.command(WorldCircuitCommand.save()),
+              throwsA(same(fixture.io.failure)),
+            );
+            expect(fixture.io.positions, [11, 0]);
+            expect(stub.metric(0) - steps, 2);
+            expect(stub.metric(3) - acks, 1);
+            expect(stub.metric(4), 1);
+            expect(stub.pending(), 0);
+            expect(stub.metric(9), 0);
+            fixture.io.failAt = null;
+            fixture.close();
+            await fixture.open();
+            expect(fixture.savedBytes(
+              await fixture.command(WorldCircuitCommand.save()),
+            ), _expectedFile());
+            fixture.close();
+            fixture.expectReleased();
+          });
+        });
+      }
+
+      for (final invalid in [1, 2, 3, 4]) {
+        test('invalid WRITE $invalid is rejected before write/ack '
+            '(streamed: $streamed)', () async {
+          await _withFixture(stub, streamed, (fixture) async {
+            stub.configure(invalid);
+            await expectLater(fixture.open(), throwsA(isA<EngineException>()));
+            expect(fixture.io.positions, isEmpty);
+            expect(stub.metric(3), 0);
+            expect(stub.metric(0), 1);
+            fixture.expectReleased();
+          });
+        });
+      }
+    }
+
+    test('async cancellation completes current synchronous WRITE only',
+        () async {
+      await _withFixture(stub, true, (fixture) async {
+        await fixture.open();
+        fixture.io.clearWrites();
+        fixture.io.afterWrite = () {
+          fixture.api.dispatch('worldCircuitCancelOperation', []);
+        };
+        final steps = stub.metric(0), acks = stub.metric(3);
+        await expectLater(
+          fixture.command(WorldCircuitCommand.save()),
+          throwsA(isA<EngineException>().having(
+            (error) => error.message,
+            'diagnostic',
+            contains('cancelled'),
+          )),
+        );
+        expect(fixture.io.positions, [11]);
+        expect(stub.metric(0) - steps, 1);
+        expect(stub.metric(3) - acks, 1);
+        expect(stub.metric(4), 1);
+        expect(stub.pending(), 0);
+        fixture.io.afterWrite = null;
+        fixture.close();
+        await fixture.open();
+        expect(fixture.savedBytes(
+          await fixture.command(WorldCircuitCommand.save()),
+        ), _expectedFile());
+        fixture.close();
+        fixture.expectReleased();
+      });
+    });
+  }, skip: !Platform.isLinux);
+}
+
+List<int> _payload(int index, int length) =>
+    List.generate(length, (i) => index * 37 + i + 3);
+
+Uint8List _expectedFile() {
+  final bytes = Uint8List(38);
+  for (var i = 0; i < 3; i++) {
+    bytes.setAll([11, 0, 29][i], _payload(i, [7, 17, 9][i]));
+  }
+  return bytes;
+}
+
+Future<void> _withFixture(
+  _Stub stub,
+  bool streamed,
+  Future<void> Function(_Fixture) body,
+) async {
+  final directory = await Directory.systemTemp.createTemp('abc-write-case-');
+  final fixture = _Fixture(stub, streamed, directory);
+  stub.configure(0);
+  fixture.source.writeAsBytesSync([1, 2, 3]);
+  try {
+    await IOOverrides.runWithIOOverrides(() async {
+      try {
+        await body(fixture);
+      } finally {
+        fixture.dispose();
+      }
+    }, fixture.io);
+    expect(fixture.source.readAsBytesSync(), [1, 2, 3]);
+  } finally {
+    directory.deleteSync(recursive: true);
+  }
+}
+
+class _Stub {
+  final DynamicLibrary library;
+  _Stub(this.library);
+  late final configure = library
+      .lookupFunction<Void Function(Uint32), void Function(int)>(
+        'write_test_configure',
+      );
+  late final metric = library
+      .lookupFunction<Uint32 Function(Uint32), int Function(int)>(
+        'write_test_metric',
+      );
+  late final pending = library
+      .lookupFunction<Uint32 Function(), int Function()>(
+        'write_test_pending',
+      );
+  late final mutate = library
+      .lookupFunction<Void Function(Uint32, Uint32), void Function(int, int)>(
+        'write_test_mutate',
+      );
+}
+
+class _Fixture {
+  final _Stub stub;
+  final bool streamed;
+  final Directory directory;
+  late final io = _WriteOverrides(directory, stub);
+  late final api = NativeWorldCircuitBindings(stub.library);
+  late final source = File('${directory.path}/source.wld');
+  final tokens = <String>[];
+  int? session;
+  _Fixture(this.stub, this.streamed, this.directory);
+  Future<void> open() async {
+    final result = await Future<Object?>.value(
+      streamed
+          ? api.dispatch('worldCircuitOpenSource', [
+              {'path': source.path, 'length': 3, 'name': 'source.wld'},
+            ])
+          : api.dispatch('worldCircuitOpen', [Uint8List.fromList([1, 2, 3])]),
+    ) as Map;
+    session = result['session'] as int;
+  }
+
+  Future<Map> command(WorldCircuitCommand command) async {
+    final result = await Future<Object?>.value(
+      api.dispatch('worldCircuitCommand', [
+        session, command.words, command.records,
+      ]),
+    ) as Map;
+    if (result['worldSource'] case final Map source) {
+      tokens.add(source['token'] as String);
+    }
+    return result;
+  }
+
+  Uint8List savedBytes(Map saved) => streamed
+      ? io.realFile((saved['worldSource'] as Map)['path'] as String)
+          .readAsBytesSync()
+      : saved['world'] as Uint8List;
+
+  void close() {
+    api.dispatch('worldCircuitClose', [session]);
+    session = null;
+  }
+
+  void expectReleased() {
+    expect(stub.metric(7), 0);
+    expect(stub.metric(8), 0);
+    expect(stub.metric(9), 0);
+    expect(io.handles.every((handle) => handle.closed), isTrue);
+  }
+
+  void dispose() {
+    if (session != null) close();
+    for (final token in tokens) {
+      api.dispatch('worldCircuitReleaseSource', [token]);
+    }
+    for (final handle in io.handles) {
+      if (!handle.closed) handle.closeSync();
+    }
+  }
+}
+
+final class _WriteOverrides extends IOOverrides {
+  final Directory directory;
+  final _Stub stub;
+  final handles = <_WriteHandle>[];
+  final positions = <int>[], lengths = <int>[];
+  final failure = const FileSystemException('injected WRITE failure');
+  int borrowProbes = 0;
+  int? failAt;
+  String? scratchPath;
+  bool partialFailure = false;
+  void Function()? afterWrite;
+  _WriteOverrides(this.directory, this.stub);
+  void clearWrites() {
+    positions.clear();
+    lengths.clear();
+    borrowProbes = 0;
+  }
+
+  File realFile(String path) => super.createFile(path);
+  @override
+  Directory getSystemTempDirectory() => directory;
+  @override
+  File createFile(String path) => _WriteFile(super.createFile(path), this);
+}
+
+class _WriteFile implements File {
+  final File delegate;
+  final _WriteOverrides io;
+  _WriteFile(this.delegate, this.io);
+  @override
+  String get path => delegate.path;
+  @override
+  FileStat statSync() => delegate.statSync();
+  @override
+  int lengthSync() => delegate.lengthSync();
+  @override
+  File renameSync(String path) => _WriteFile(delegate.renameSync(path), io);
+  @override
+  RandomAccessFile openSync({FileMode mode = FileMode.read}) {
+    final handle = _WriteHandle(delegate.openSync(mode: mode), io);
+    io.handles.add(handle);
+    if (path.endsWith('/2')) io.scratchPath = path;
+    return handle;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _WriteHandle implements RandomAccessFile {
+  final RandomAccessFile delegate;
+  final _WriteOverrides io;
+  bool closed = false;
+  _WriteHandle(this.delegate, this.io);
+  @override
+  void writeFromSync(List<int> buffer, [int start = 0, int? end]) {
+    final length = (end ?? buffer.length) - start;
+    io.positions.add(delegate.positionSync());
+    io.lengths.add(length);
+    expect(io.stub.pending(), 2, reason: 'Write finishes before C ack.');
+    final original = buffer[start];
+    final changed = original ^ 255;
+    io.stub.mutate(start, changed);
+    try {
+      expect(buffer[start], changed,
+          reason: 'WRITE borrows the C view rather than copying the payload.');
+      io.borrowProbes++;
+    } finally {
+      io.stub.mutate(start, original);
+    }
+    if (io.positions.length == io.failAt) {
+      if (io.partialFailure) delegate.writeFromSync(buffer, start, start + 1);
+      throw io.failure;
+    }
+    delegate.writeFromSync(buffer, start, end);
+    io.afterWrite?.call();
+  }
+
+  @override
+  Uint8List readSync(int length) => delegate.readSync(length);
+  @override
+  int readIntoSync(List<int> buffer, [int start = 0, int? end]) =>
+      delegate.readIntoSync(buffer, start, end);
+  @override
+  int lengthSync() => delegate.lengthSync();
+  @override
+  void setPositionSync(int position) => delegate.setPositionSync(position);
+  @override
+  void truncateSync(int length) => delegate.truncateSync(length);
+  @override
+  void flushSync() => delegate.flushSync();
+  @override
+  void closeSync() {
+    delegate.closeSync();
+    closed = true;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
