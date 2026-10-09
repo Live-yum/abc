@@ -7,12 +7,17 @@
 #include "terra_abi.h"
 #include "terra_world.h"
 #include "terra_plr.h"
+#include "terra_hash.h"
 #include <stdlib.h>
 #include <limits.h>
 uint32_t abc_engine_abi_version(void){ return 1; }
 const char* abc_engine_build_info(void){ return terra_build_info_json(); }
 void* abc_alloc(size_t size){ return size ? malloc(size) : NULL; }
 void abc_free(void* p){ free(p); }
+int32_t abc_sha256_create(uint32_t* h){ return terra_sha256_create(h); }
+int32_t abc_sha256_update(uint32_t h,const uint8_t* p,uint32_t n){ return terra_sha256_update(h,p,n); }
+int32_t abc_sha256_final(uint32_t h,uint8_t* p){ return terra_sha256_final(h,p); }
+int32_t abc_sha256_destroy(uint32_t h){ return terra_sha256_destroy(h); }
 static int32_t result(int32_t status,uint64_t size,uint32_t* required){
  if(required) *required=size<=UINT32_MAX?(uint32_t)size:0;
  return size>UINT32_MAX?TERRAX_WORLD_STATUS_INTERNAL_ERROR:status;

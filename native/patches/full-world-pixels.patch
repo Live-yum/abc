@@ -25,6 +25,13 @@
 @@ -154 +160 @@
 -功能预算按实际新代码单独分配；所有 wrapper 上限仍为 128 KiB，WLD Web 的 64 MiB 初始内存和 160 MiB 最大线性内存保持原值。`scripts/check-artifact-size.mjs` 对每个 profile 校验尺寸与摘要，超过各自预算仍会失败。
 +功能预算按实际新代码单独分配；所有 wrapper 上限仍为 128 KiB，本地 WLD Web 构建使用 64 MiB 初始内存，最大线性内存由构建参数指定（当前构建脚本为 256 MiB）。`scripts/check-artifact-size.mjs` 对每个 profile 校验尺寸与摘要，超过各自预算仍会失败。
+--- a/exports.wld.web.txt
++++ b/exports.wld.web.txt
+@@ -1,0 +2,4 @@
++_terra_sha256_create
++_terra_sha256_update
++_terra_sha256_final
++_terra_sha256_destroy
 --- a/include/terra_circuit_twld.h
 +++ /dev/null
 @@ -1,64 +0,0 @@

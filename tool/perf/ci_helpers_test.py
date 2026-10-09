@@ -129,6 +129,23 @@ class ExecutionTests(unittest.TestCase):
             self.assertEqual(summary['status'], 'inconclusive')
             self.assertEqual(summary['suites'][0]['status'], 'inconclusive')
 
+    def test_selected_run_commit_must_match_downloaded_reports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for number in range(1, 4):
+                write_attempt(root, number)
+            selected = root / 'selected-run.json'
+            selected.write_text(json.dumps({'id': 7, 'head_sha': 'd' * 40,
+                                            'status': 'completed', 'conclusion': 'success'}))
+            argv = ['compare_ci.py', '--candidate', str(root), '--baseline', str(root),
+                    '--baseline-requested', '--baseline-run-metadata', str(selected),
+                    '--output', str(root / 'summary')]
+            with mock.patch.object(compare_ci, 'SUITES', {'test': 3}), mock.patch.object(sys, 'argv', argv):
+                self.assertEqual(compare_ci.main(), 1)
+            summary = json.loads((root / 'summary/comparison.json').read_text())
+            self.assertEqual(summary['suites'][0]['status'], 'invalid')
+            self.assertIn('Downloaded baseline commit differs', summary['suites'][0]['reason'])
+
     def test_known_slowdown_fails_aggregate_job(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

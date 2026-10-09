@@ -43,14 +43,19 @@ function memoryStorage() {
 async function persistentStorage() {
  const directory = await root.navigator?.storage?.getDirectory?.();
  if (!directory) throw new Error('OPFS is unavailable');
- let sequence = 0;
+ let sequence = 0; const abandoned = new Set();
  const prefix = 'terra-circuit-' + (root.crypto?.randomUUID?.() || Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
  return {
   kind:'opfs', budget:{used:0, peak:0},
+  async cleanup() { for (const file of abandoned) { await file.close(); abandoned.delete(file); } },
   async create() {
    const name = prefix + '-' + (++sequence), file = await directory.getFileHandle(name, {create:true});
    let access;
-   try { access = await file.createSyncAccessHandle(); } catch (error) { await directory.removeEntry(name); throw error; }
+   try { access = await file.createSyncAccessHandle(); } catch (error) {
+    const orphan = {close:() => directory.removeEntry(name)}; abandoned.add(orphan);
+    try { await orphan.close(); abandoned.delete(orphan); } catch (cleanupError) { error.cleanupError = cleanupError; }
+    throw error;
+   }
    let closed = false, accessClosed = false, size = 0;
    return {
     get size() { return size; },
@@ -89,7 +94,7 @@ class SourceSha256 {
 }
 SourceSha256.k = new Int32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
 function createWorldCircuitBridge(loadModule, options = {}) {
- let promise, queue = Promise.resolve(), session = null, operation = null, exportedSequence = 0;
+ let promise, queue = Promise.resolve(), session = null, pendingCleanup = null, operation = null, exportedSequence = 0;
  const exported = new Map();
  let progressState = {stage:'idle', phase:0, completed:0, total:0, nativeBudgetBytes:NATIVE_BUDGET, nativeActiveBytes:0, nativePeakBytes:0, sourceReadBytes:0, sourceReadRequests:0, scratchReadBytes:0, scratchWriteBytes:0, maxReadBytes:0, maxWriteBytes:0, storageBytes:0, hostStorageBytes:0, hostStoragePeakBytes:0, wasmHeapBytes:0, storageKind:'none'};
  const worldCheck = status => { if (status !== 0) throw new Error('World decoder status ' + status); return status; };
@@ -119,12 +124,40 @@ function createWorldCircuitBridge(loadModule, options = {}) {
  async function hashSource(files, id, M, storage, stage = 'hash') {
   const owner = files.get(id); if (!owner) throw new Error('Missing circuit hash source');
   progressState.stage = stage; progressState.phase = id; progressState.completed = 0; progressState.total = owner.size;
-  const digest = new SourceSha256();
-  for (let offset = 0; offset < owner.size; offset += MiB) {
-   const bytes = await readSource(files, id, offset, Math.min(MiB, owner.size - offset));
-   digest.update(bytes); progressState.completed = offset + bytes.length; refreshMemory(M, storage); await cooperate();
+  const names = ['create','update','final','destroy'].map(name => '_terra_sha256_' + name);
+  const native = names.every(name => typeof M[name] === 'function');
+  if (!native && names.some(name => M[name] !== undefined)) throw new Error('Incomplete streaming SHA-256 API');
+  const digest = native ? null : new SourceSha256();
+  let allocation = 0, handle = 0, failed = false;
+  try {
+   if (native) {
+    // One reusable input window, a handle word, and the binary digest. Access
+    // the current heap after every call/yield because WASM memory may grow.
+    allocation = M._tx_malloc(MiB + 36);
+    if (!allocation) throw new Error('Circuit hash allocation failed');
+    M.HEAPU32[(allocation + MiB) >>> 2] = 0;
+    const status = M._terra_sha256_create(allocation + MiB);
+    handle = M.HEAPU32[(allocation + MiB) >>> 2]; worldCheck(status);
+    if (!handle) throw new Error('Missing streaming SHA-256 context');
+   }
+   for (let offset = 0; offset < owner.size; offset += MiB) {
+    const bytes = await readSource(files, id, offset, Math.min(MiB, owner.size - offset));
+    if (native) { M.HEAPU8.set(bytes, allocation); worldCheck(M._terra_sha256_update(handle, allocation, bytes.length)); }
+    else digest.update(bytes);
+    progressState.completed = offset + bytes.length; refreshMemory(M, storage); await cooperate();
+   }
+   cancelled();
+   if (!native) return digest.digest();
+   const output = allocation + MiB + 4; worldCheck(M._terra_sha256_final(handle, output));
+   return Array.from(M.HEAPU8.subarray(output, output + 32), byte => byte.toString(16).padStart(2, '0')).join('');
+  } catch (error) { failed = true; throw error; }
+  finally {
+   let cleanupError;
+   try { if (handle) worldCheck(M._terra_sha256_destroy(handle)); } catch (error) { cleanupError = error; }
+   try { if (allocation) M._tx_free(allocation); } catch (error) { cleanupError ??= error; }
+   // A cleanup failure must not hide a read, hashing, or cancellation error.
+   if (!failed && cleanupError) throw cleanupError;
   }
-  cancelled(); return digest.digest();
  }
  function buildInfo(M) {
   const p = M._terra_build_info_json?.(); if (!p) throw new Error('Missing circuit build identity');
@@ -146,16 +179,57 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   if (file.size > limit) throw new Error('Circuit output exceeds byte API budget; use the source API');
   const result = new Uint8Array(file.size); for (let offset = 0; offset < file.size; offset += MiB) result.set(await file.read(offset, Math.min(MiB, file.size - offset)), offset); return result;
  }
- async function chooseStorage(large) {
+ async function chooseStorage(large, M) {
   if (options.createStorage) return options.createStorage();
-  try { const storage = await persistentStorage(); const probe = await storage.create(); await probe.close(); return storage; }
-  catch (error) { if (large) throw new Error('Full-world import requires writable OPFS browser storage: ' + error.message); return memoryStorage(); }
+  let storage, probe;
+  try { storage = await persistentStorage(); probe = await storage.create(); await probe.close(); return storage; }
+  catch (error) {
+   if (storage) {
+    pendingCleanup = {M, files:new Map(probe ? [[2,probe]] : []), storage, closing:true};
+    // Keep a failed probe removal owned for the next explicit cleanup. If
+    // creation failed before it returned a file, the storage owns its orphan.
+    if (probe) throw error;
+    try { await disposeCurrent(pendingCleanup); } catch (cleanupError) { error.cleanupError = cleanupError; throw error; }
+   }
+   if (large) throw new Error('Full-world import requires writable OPFS browser storage: ' + error.message); return memoryStorage();
+  }
  }
  async function disposeFiles(files) {
-  const errors = []; for (const [id, file] of files) if (id !== 1) { try { await file.close(); } catch (error) { errors.push(error); } }
-  files.clear(); if (errors.length) throw errors[0];
+  const errors = []; for (const [id, file] of files) if (id !== 1) {
+   const size = file.size;
+   try { await file.close(); files.delete(id); progressState.storageBytes = Math.max(0, progressState.storageBytes - size); }
+   catch (error) { errors.push(error); }
+  }
+  if (errors.length) throw errors[0];
+  files.delete(1); // Immutable picker inputs are never closed or deleted.
+ }
+ async function disposeCurrent(current) {
+  current.closing = true;
+  const M = current.M;
+  // Do not release backing resources until their native consumer is gone.
+  // Each acknowledged resource is cleared immediately, so retries cannot
+  // double-free the VM/world or lose failed OPFS removals.
+  if (current.handle) { check(M._terra_circuit_world_close(current.handle)); current.handle = 0; }
+  if (current.task) {
+   worldCheck(current.streaming ? M._terra_world_stream_close(current.task) : M._terra_world_task_close(current.task)); current.task = 0;
+  }
+  if (current.world) { worldCheck(M._terra_world_close(current.world)); current.world = 0; }
+  if (current.input) { M._tx_free(current.input); current.input = 0; }
+  progressState.nativeActiveBytes = 0;
+  await disposeFiles(current.files);
+  await current.storage?.cleanup?.();
+  if (session === current) session = null;
+  if (pendingCleanup === current) pendingCleanup = null;
+  delete progressState.cleanupError;
+  progressState.stage = 'closed'; refreshMemory(M, current.storage);
+ }
+ async function cleanupImpl() {
+  if (session && !session.closing) throw new Error('Close the existing world circuit first');
+  if (session) await disposeCurrent(session);
+  if (pendingCleanup) await disposeCurrent(pendingCleanup);
  }
  async function openImpl(world, streaming) {
+  if (pendingCleanup || session?.closing) await cleanupImpl();
   if (session) throw new Error('Close the existing world circuit first');
   if (streaming && !blob(world)) throw new Error('Streaming import requires File/Blob sources');
   if (!streaming && (!(world instanceof Uint8Array) || !world.length || world.length > SMALL_WORLD)) throw new Error('World byte input exceeds host budget; use File/Blob import');
@@ -163,9 +237,9 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   const M = await (promise ??= loadModule());
   if (buildInfo(M).circuitWorldAbiVersion !== 2) throw new Error('World circuit ABI 2 is required');
   for (const n of ['begin','step','supply','ack','command','stats','cancel','close']) if (typeof M['_terra_circuit_world_' + n] !== 'function') throw new Error('World circuit ABI missing ' + n);
-  const storage = await chooseStorage(worldSource.size > SMALL_WORLD), files = new Map([[1,worldSource]]);
-  progressState = {...progressState, stage:'open', phase:0, completed:0, total:0, sourceReadBytes:0, sourceReadRequests:0, scratchReadBytes:0, scratchWriteBytes:0, maxReadBytes:0, maxWriteBytes:0, storageBytes:0, nativeActiveBytes:0, nativePeakBytes:0};
-  const out = M._tx_malloc(4), event = M._tx_malloc(48); let handle = 0, w = 0, task = 0, input = 0, adopted = false, sourceSha256;
+  const storage = await chooseStorage(worldSource.size > SMALL_WORLD, M), files = new Map([[1,worldSource]]);
+  progressState = {...progressState, stage:'open', phase:0, completed:0, total:0, sourceReadBytes:0, sourceReadRequests:0, scratchReadBytes:0, scratchWriteBytes:0, maxReadBytes:0, maxWriteBytes:0, storageBytes:[...exported.values()].reduce((total,file) => total + file.size, 0), nativeActiveBytes:0, nativePeakBytes:0};
+  const out = M._tx_malloc(4), event = M._tx_malloc(48); let handle = 0, w = 0, task = 0, input = 0, sourceSha256;
   try {
    if (!out || !event) throw new Error('Circuit allocation failed');
    files.set(2, await storage.create()); cancelled();
@@ -185,22 +259,24 @@ function createWorldCircuitBridge(loadModule, options = {}) {
      } else if (e[1] !== 0) throw new Error('Unexpected world stream event');
      if (++batches % 8 === 0) await cooperate();
     }
-    worldCheck(M._terra_world_stream_adopt(task, 1, out)); w = M.HEAPU32[out >>> 2]; adopted = true; worldCheck(M._terra_world_stream_close(task)); task = 0;
+    worldCheck(M._terra_world_stream_adopt(task, 1, out)); w = M.HEAPU32[out >>> 2]; worldCheck(M._terra_world_stream_close(task)); task = 0;
    } else {
     input = M._tx_malloc(world.length); if (!input) throw new Error('Circuit allocation failed'); M.HEAPU8.set(world, input);
     task = M._terra_world_open_begin(input, world.length); if (!task) throw new Error('Cannot begin world decode'); let status;
     do { cancelled(); status = M._terra_world_open_step(task, 64); if (status === 10) await cooperate(); } while (status === 10);
-    worldCheck(status); worldCheck(M._terra_world_open_finish(task, out)); w = M.HEAPU32[out >>> 2]; M._terra_world_task_close(task); task = 0;
+    worldCheck(status); worldCheck(M._terra_world_open_finish(task, out)); w = M.HEAPU32[out >>> 2]; worldCheck(M._terra_world_task_close(task)); task = 0;
     M._tx_free(input); input = 0;
    }
    cancelled(); check(M._terra_circuit_world_begin(w, 2, NATIVE_BUDGET, out)); handle = M.HEAPU32[out >>> 2];
-   session = {M, handle, world:w, files, storage, streaming, sourceSha256}; progressState.stage = 'compile';
+   session = {M, id:handle, handle, world:w, files, storage, streaming, sourceSha256, closing:false}; progressState.stage = 'compile';
    return await pump();
   } catch (error) {
-   if (handle) M._terra_circuit_world_close(handle); if (w) M._terra_world_close(w); session = null;
-   try { await disposeFiles(files); } catch (_) {} progressState.stage = error.code === 'CIRCUIT_CANCELLED' ? 'cancelled' : 'error'; throw error;
+   pendingCleanup = {M, handle, world:w, task, input, files, storage, streaming, closing:true};
+   session = null; task = 0; input = 0;
+   try { await disposeCurrent(pendingCleanup); }
+   catch (cleanupError) { error.cleanupError = cleanupError; progressState.cleanupError = String(cleanupError.message || cleanupError).slice(0,2048); }
+   progressState.stage = error.code === 'CIRCUIT_CANCELLED' ? 'cancelled' : 'error'; throw error;
   } finally {
-   if (task) { if (streaming) { if (!adopted) M._terra_world_stream_cancel(task); M._terra_world_stream_close(task); } else { M._terra_world_open_cancel(task); M._terra_world_task_close(task); } }
    if (out) M._tx_free(out); if (event) M._tx_free(event); if (input) M._tx_free(input); operation = null; refreshMemory(M, storage);
   }
  }
@@ -268,7 +344,7 @@ function createWorldCircuitBridge(loadModule, options = {}) {
  function command(id, json, recordsJson) { return serial(() => commandImpl(id, json, recordsJson)); }
  async function commandImpl(id, json, recordsJson, preserveOperation = false) {
   const commandAt = now();
-  if (!session || id !== session.handle) throw new Error('Circuit session is closed');
+  if (!session || session.closing || id !== session.handle) throw new Error('Circuit session is closed');
   const words = JSON.parse(json), records = JSON.parse(recordsJson), {M,handle,files,storage} = session;
   if (!Array.isArray(words) || !Array.isArray(records) || words.length !== 16 || words[0] !== 2 || words[1] < 1 || words[1] > 10 || words[9] !== 0 || words[14] !== 0 || words[15] !== 0 || records.length !== words[10] * 4 || records.length > 65536 * 4 || [...words,...records].some(v => !Number.isInteger(v) || v < 0 || v > 0xffffffff)) throw new Error('Invalid circuit command');
   if (words[1] === 10 && (words[7] > 1 || records.length || words[12] !== 0)) throw new Error('Invalid circuit optimization mode');
@@ -283,7 +359,7 @@ function createWorldCircuitBridge(loadModule, options = {}) {
    } else { if (records.length || words[12] > 1 || (words[12] === 1 && (words[13] !== 6 || words[4] < 32 || words[4] > 4 * MiB || words[5] < 1 || words[5] > 32768)) || (words[12] === 0 && words[13] !== 0)) throw new Error('Invalid circuit companion extraction'); if (words[12] === 1 && info.circuitWorldFragmentObjects !== 1) throw new Error('Circuit object companions are unavailable'); }
   }
   const p = M._tx_malloc(64), r = M._tx_malloc(Math.max(4, records.length * 4)); if (!preserveOperation) operation = {cancelled:false}; progressState.stage = words[1] === 6 ? 'save' : 'command';
-  const replace = async id => { const old = files.get(id); if (old) { progressState.storageBytes -= old.size; await old.close(); } files.set(id, await storage.create()); };
+  const replace = async id => { const old = files.get(id); if (old) { const size = old.size; await old.close(); files.delete(id); progressState.storageBytes = Math.max(0, progressState.storageBytes - size); } files.set(id, await storage.create()); };
   try {
    if (!p || !r) throw new Error('Circuit allocation failed'); M.HEAPU32.set(records, r >>> 2); words[9] = r; M.HEAPU32.set(words, p >>> 2);
    if (words[1] === 6) await replace(3); if (words[1] === 8) await replace(6);
@@ -320,13 +396,18 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   } finally { operation = null; }
  }); }
  function close(id) { return serial(async () => {
-  if (!session || id !== session.handle) return; const current = session; session = null;
-  try { try { check(current.M._terra_circuit_world_close(current.handle)); } finally { worldCheck(current.M._terra_world_close(current.world)); } }
-  finally { for (const [sourceId,file] of current.files) if (sourceId !== 1) progressState.storageBytes -= file.size; await disposeFiles(current.files); progressState.stage = 'closed'; progressState.nativeActiveBytes = 0; refreshMemory(current.M, current.storage); }
+  if (!session || id !== session.id) return;
+  await disposeCurrent(session);
  }); }
- function releaseSource(token) { return serial(async () => { const file = exported.get(token); if (!file) return; const size = file.size; await file.close(); exported.delete(token); progressState.storageBytes = Math.max(0, progressState.storageBytes - size); }); }
+ function releaseSource(token) { return serial(async () => {
+  const file = exported.get(token);
+  if (file) { const size = file.size; await file.close(); exported.delete(token); progressState.storageBytes = Math.max(0, progressState.storageBytes - size); }
+  // A failed import may own scratch without a public handle. A last release
+  // acknowledges idle cleanup only after that retained work also succeeds.
+  if (!session || session.closing) await cleanupImpl();
+ }); }
  const open = (world,streaming) => serial(async () => { operation={cancelled:false}; try { return await openImpl(world,streaming); } finally { operation=null; } });
- return {open:world => open(world,false), openSource:world => open(world,true), command, computerFrame, close, releaseSource,
+ return {open:world => open(world,false), openSource:world => open(world,true), command, computerFrame, close, releaseSource, cleanup:() => serial(cleanupImpl),
   progress:async () => ({...progressState, diagnostics:{...progressState}}), cancelOperation:async () => { if (operation) operation.cancelled = true; },
  };
 }

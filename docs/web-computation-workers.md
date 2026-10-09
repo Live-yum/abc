@@ -122,7 +122,33 @@ linear-memory limit leaves headroom above the 192 MiB circuit budget.
 
 The full acceptance harness defaults to OFF; pass `--optimized` for a separate
 ON run using the same newly built artifact and program fixtures. During Pong,
-it verifies an idle mode flip preserves exact native mono/color bytes, ready/RAM
+it verifies an idle mode flip preserves exact native monochrome bytes, ready/RAM
 lamps and electrical counters, runs another physical clock batch, then restores
 the requested mode. Reports separate 128-clock batch median/p95 and physical
 pulse rate by mode from program loading and pixel-query time.
+
+## World worker retirement
+
+The exclusive whole-world owner retires after a successful close or final output
+release only when every handle, output lease, queued request and control request
+has drained. Cancellation or progress timeouts veto retirement for that owner
+generation; a timeout is not a cleanup acknowledgement. Failed cleanup retains
+its resources and permits an explicit retry. Exported output sources keep their
+owner alive until released. Reopening uses a new worker generation, so stale
+handles and late events cannot target a replacement session. Other editors keep
+their independent workers.
+
+Session reset suspends and drains progress polling before closing the old owner,
+then dispatches the replacement open before polling resumes. The retirement and
+cleanup contracts exercise retry, cancellation, output leases and immediate
+reopen. These checks do not establish browser RSS recovery or prove that the
+previous Chrome Error 9 reset failure is resolved; the new release requires
+actual browser repeated-reset validation.
+
+The application also retains failed output-release tokens after the system save
+consumer settles. Close, reset and another export retry those releases before
+discarding ownership; a concurrent close waits for the save consumer. Export
+errors keep their original cause while cleanup failures remain visible. Reset
+checks cancellation after draining the old owner, so an accepted cancellation
+does not silently begin a replacement import or publish the closed world as
+ready. The immutable selected source remains available for a fresh import.

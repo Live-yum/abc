@@ -435,14 +435,16 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                       _send('worldCircuitOptimization', {'enabled': enabled}),
             contentPadding: EdgeInsets.zero,
           ),
-          const Text('关闭时采用原版像素规则。切换会暂停运行，保留当前 ROM 和显示帧；继续运行才按所选规则处理信号。'),
+          const Text(
+            '关闭时采用原版像素规则。切换会暂停运行，保留当前 ROM 和显示帧；历史显示不会重算，继续运行才按所选规则处理信号。',
+          ),
           if (s['optimizationSupported'] != true)
             const Text('此世界的像素接线拓扑暂不支持开启；同色跨轴网络尚未支持，请保持关闭。'),
           if (computer &&
               s['optimizationSupported'] == true &&
               s['optimizationEnabled'] != true)
             const Text(
-              'Computerraria 在原版规则下可能保持黑屏；开启电路优化后，继续运行可读取 WireHead 式显示的实际像素。',
+              'Computerraria 在原版规则下可能保持黑屏。请先开启电路优化，再载入程序；若程序已运行过，请重置原始世界后按此顺序开始，避免混合显示历史。',
             ),
         ],
         if (open && computer) ...[

@@ -104,6 +104,9 @@ class Workspace extends TerraController {
   String? _regionCompanionWarning;
   WorldCircuitSession? _worldCircuit;
   Future<void>? _worldCircuitClosing;
+  Future<void>? _worldCircuitExportDrained;
+  final Map<String, WorldCircuitSource> _pendingCircuitSourceReleases = {};
+  bool _circuitSourceCleanupFailed = false;
   bool _closingWorkspace = false, _disposed = false;
   WorldCircuitSource? _circuitSource;
   int _circuitImportGeneration = 0;
@@ -342,7 +345,9 @@ class Workspace extends TerraController {
       busy: _busy || (_rules?.state['busy'] == true),
       circuitRunning: _circuitTimer != null,
       circuitTick: _simulation?.tick ?? 0,
-      status: _status,
+      status: _circuitSourceCleanupFailed
+          ? '$_status 临时导出文件清理失败，已保留以便关闭、重置或下次导出时重试。'
+          : _status,
       error: _error,
       world: _worldView,
       player: _playerView,
@@ -850,7 +855,27 @@ class Workspace extends TerraController {
           if (session == null) {
             throw const EngineException('请先载入世界电路。');
           }
-          await session.reset();
+          final resetGeneration = _circuitImportGeneration;
+          session.pause();
+          await _releasePendingCircuitSources();
+          if (resetGeneration != _circuitImportGeneration) {
+            throw StateError('世界重置已取消，当前会话已暂停。');
+          }
+          try {
+            await session.reset();
+            if (resetGeneration != _circuitImportGeneration) {
+              await _closeWorldCircuit();
+              throw StateError('世界重置已取消，原始文件保留，可重新导入。');
+            }
+          } catch (_) {
+            // A cancelled/failed replacement import has no usable session.
+            // Finish its cleanup so the retained picker source can be retried.
+            if (session.result == null) await _closeWorldCircuit();
+            if (resetGeneration != _circuitImportGeneration) {
+              _status = '已取消重置，原始世界保留，可重新导入。';
+            }
+            rethrow;
+          }
           if (session.streamed) await session.verifyComputer();
           if (_circuitViewport.isNotEmpty) {
             await _viewWorldCircuit(_circuitViewport);
@@ -2567,6 +2592,11 @@ class Workspace extends TerraController {
 
   Future<void> _finishCloseWorldCircuit({required bool reopen}) async {
     final session = _worldCircuit;
+    session?.pause();
+    // An output may still be consumed by the system save dialog. Do not close
+    // its lease, or discard our last retry owner, until that export settles.
+    await _worldCircuitExportDrained;
+    await _releasePendingCircuitSources();
     if (session == null) {
       return;
     }
@@ -2587,50 +2617,18 @@ class Workspace extends TerraController {
     final session = _worldCircuit, record = _activeWorld;
     if (session == null) throw const EngineException('请先载入世界电路。');
     if (session.streamed) {
-      session.pause();
-      final result = await session.command(WorldCircuitCommand.save());
-      final output = result.worldSource;
-      final backend = worldCircuitBackend as WorldCircuitSourceBackend;
+      final saving = _saveStreamedWorldCircuit(session);
+      final drained = saving.then<void>(
+        (_) {},
+        onError: (Object _, StackTrace _) {},
+      );
+      _worldCircuitExportDrained = drained;
       try {
-        if (output == null) throw const EngineException('引擎未返回可导出的世界文件。');
-        final stem = session.source!.name.replaceFirst(
-          RegExp(r'\.wld$', caseSensitive: false),
-          '',
-        );
-        final saved = await worldCircuitFiles.save(
-          output,
-          name: '${stem}_circuit.wld',
-          protectedSources: [session.source!],
-        );
-        _status = saved ? '已导出模拟世界 WLD 副本。' : '已取消 WLD 导出，模拟状态仍保留。';
-        if (saved && session.computerVerified) {
-          if (session.programIncomplete || !session.programBaselineKnown) {
-            _status += ' 程序状态未完整核验，本次文件未登记为可续跑计算机。';
-          } else {
-            try {
-              if (output.sha256 == null) {
-                throw const EngineException('引擎未提供已导出 WLD 的完整性标识。');
-              }
-              await _computerProvenance.register(
-                ComputerProvenanceRecord(
-                  wldSha256: output.sha256!,
-                  programName: session.programName,
-                  programImage: session.programImage,
-                  physicalPulses: session.physicalPulses,
-                ),
-              );
-              session.markSaved();
-              _status += ' 已保留本机续跑来源，可重新导入此 WLD 继续运行。';
-            } catch (e) {
-              _status = 'WLD 已导出，但本机续跑记录未保存。';
-              throw EngineException('WLD 已保存；续跑来源登记失败：$e');
-            }
-          }
-        } else if (saved) {
-          session.markSaved();
-        }
+        await saving;
       } finally {
-        if (output != null) await backend.releaseWorldCircuitSource(output);
+        if (identical(_worldCircuitExportDrained, drained)) {
+          _worldCircuitExportDrained = null;
+        }
       }
       return;
     }
@@ -2656,6 +2654,89 @@ class Workspace extends TerraController {
       'fields': '真实电路状态已回读验证',
     });
     await _export('world');
+  }
+
+  Future<void> _releasePendingCircuitSources() async {
+    if (_pendingCircuitSourceReleases.isEmpty) return;
+    final backend = worldCircuitBackend as WorldCircuitSourceBackend;
+    Object? failure;
+    for (final entry in _pendingCircuitSourceReleases.entries.toList()) {
+      try {
+        await backend.releaseWorldCircuitSource(entry.value);
+        _pendingCircuitSourceReleases.remove(entry.key);
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+    if (failure != null) {
+      _circuitSourceCleanupFailed = true;
+      throw EngineException('临时导出文件清理失败，已保留待清理项；关闭、重置或下次导出时会重试：$failure');
+    }
+    _circuitSourceCleanupFailed = false;
+  }
+
+  Future<void> _saveStreamedWorldCircuit(WorldCircuitSession session) async {
+    session.pause();
+    // Resolve older failed releases before allocating another large output.
+    await _releasePendingCircuitSources();
+    final result = await session.command(WorldCircuitCommand.save());
+    final output = result.worldSource;
+    var failed = false;
+    try {
+      if (output == null) throw const EngineException('引擎未返回可导出的世界文件。');
+      final stem = session.source!.name.replaceFirst(
+        RegExp(r'\.wld$', caseSensitive: false),
+        '',
+      );
+      final saved = await worldCircuitFiles.save(
+        output,
+        name: '${stem}_circuit.wld',
+        protectedSources: [session.source!],
+      );
+      _status = saved ? '已导出模拟世界 WLD 副本。' : '已取消 WLD 导出，模拟状态仍保留。';
+      if (saved && session.computerVerified) {
+        if (session.programIncomplete || !session.programBaselineKnown) {
+          _status += ' 程序状态未完整核验，本次文件未登记为可续跑计算机。';
+        } else {
+          try {
+            if (output.sha256 == null) {
+              throw const EngineException('引擎未提供已导出 WLD 的完整性标识。');
+            }
+            await _computerProvenance.register(
+              ComputerProvenanceRecord(
+                wldSha256: output.sha256!,
+                programName: session.programName,
+                programImage: session.programImage,
+                physicalPulses: session.physicalPulses,
+              ),
+            );
+            session.markSaved();
+            _status += ' 已保留本机续跑来源，可重新导入此 WLD 继续运行。';
+          } catch (e) {
+            _status = 'WLD 已导出，但本机续跑记录未保存。';
+            throw EngineException('WLD 已保存；续跑来源登记失败：$e');
+          }
+        }
+      } else if (saved) {
+        session.markSaved();
+      }
+    } catch (_) {
+      failed = true;
+      rethrow;
+    } finally {
+      final token = output?.token;
+      if (token != null) {
+        // Only completed output descriptors enter this collection; picker
+        // inputs remain protected and are never candidates for release.
+        _pendingCircuitSourceReleases[token] = output!;
+        try {
+          await _releasePendingCircuitSources();
+        } catch (_) {
+          // Keep the export/provenance error authoritative when both fail.
+          if (!failed) rethrow;
+        }
+      }
+    }
   }
 
   void _stopCircuit() {

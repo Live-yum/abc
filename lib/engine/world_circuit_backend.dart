@@ -88,6 +88,13 @@ abstract interface class WorldCircuitBackend {
   Future<void> closeWorldCircuit(int session);
 }
 
+/// Optional retry for resources retained by a failed or cancelled open. There
+/// must be no live session. Completed exports keep their independent ownership.
+abstract interface class WorldCircuitIdleCleanupBackend
+    implements WorldCircuitBackend {
+  Future<void> cleanupWorldCircuit();
+}
+
 /// Optional transport coalescing. Both commands still execute in order in the
 /// retained circuit engine; this does not implement any CPU instruction.
 abstract interface class WorldCircuitComputerBackend

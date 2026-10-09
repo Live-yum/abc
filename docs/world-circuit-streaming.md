@@ -109,3 +109,24 @@ files and `manifest.json`, then run `node tool/record_web_engine.mjs` to capture
 capabilities from the actual instantiated artifact. The explicit reviewed patch,
 base/current hashes and diff are recorded under `native/patches/`; source and
 artifact verification includes that local-patch layer.
+
+## Streaming digest host
+
+Native and Web hosts use the existing C incremental SHA-256 implementation when
+all four lifecycle functions are available. The Web path reuses one 1 MiB input
+allocation and preserves bounded reads, yielding, cancellation and full-source
+verification. Older engines with none of these functions retain the original
+host fallback; a partial API is rejected. Outputs are published only after a
+complete verified digest, and hash contexts are released on success and error.
+An isolated Node measurement is not a browser end-to-end loading result.
+
+The identified local host-hashing build passed one full original-WLD run per
+backend and mode. Native OFF/ON imports measured 12.695 / 12.983 seconds,
+versus the earlier 16.645 / 15.653 seconds; Node WASM measured 17.907 / 17.449
+seconds, versus 22.718 / 22.577 seconds. All four old/new correctness
+projections, same-mode cross-backend display/save state, and cross-mode physical
+CPU/RAM/input projections match exactly. Full save/reopen passed and owners
+returned to zero. These are single local observations, not statistical speedup
+claims or browser loading measurements. Whole-process peaks include save and
+reopen, so they must not be compared with the older Native report's pre-save
+peak. See the [artifact-bound evidence](evidence/host-wld-regression-2026-10-09.json).

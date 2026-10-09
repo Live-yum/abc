@@ -100,7 +100,7 @@ function harness(owner, bridge, timeoutMs = 1000) {
   assert.notEqual(a,b, 'Native TCW handle reuse cannot alias closed public handles');
   await assert.rejects(tcw.client.command(a, '[]', '[]'), {code:'STALE_HANDLE'});
   const dying = tcw.client.close(b); const rejected = assert.rejects(dying, {code:'COMPUTATION_OWNER_LOST'});
-  tcw.workers[0].onerror({message:'unexpected worker exit'}); await rejected;
+  tcw.workers.at(-1).onerror({message:'unexpected worker exit'}); await rejected;
 
   let finishStream, finishCommand, releasedSource, streamCancelled = false;
   const streamResult = () => ({session:7,stats:[2,...Array(23).fill(0)],resultKind:0,resultCount:0,reserved:0,records:new Uint8Array()});

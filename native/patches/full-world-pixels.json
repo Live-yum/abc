@@ -1,19 +1,24 @@
 {
   "schema": 1,
-  "id": "full-world-pixels-v3-wld-only",
+  "id": "full-world-pixels-v4-wld-host-hashing",
   "baseSourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
   "baseDistributedManifestSha256": "9b55c8ad55a4ce8ad848c58e8c9ec80fb78285405f6a7cccc44c8c95b74dbb7a",
   "supersedes": {
-    "id": "full-world-pixels-v2-wld-only",
-    "manifestSha256": "6cffadaaa4efd8bac51b0ba381baef2281e47caf559a7f20ef3425c8be8e05cf",
-    "distributedManifestSha256": "f76b42b4434ca53cda9e489d04dd5ddb34395ff99a8b0bace15f8d809d48153e",
+    "id": "full-world-pixels-v3-wld-only",
+    "manifestSha256": "a5bb31a966d8625f16ae095c90d5d1ee0b90da5bc81e34dc481842af0cc76a48",
+    "distributedManifestSha256": "a51b6c058eb3709a5bd958c7fbde79e0d3a239b6b787a74eb4a7fa7e3749e399",
     "prior": {
-      "id": "full-world-pixels-v1",
-      "manifestSha256": "ee3bb706e7f4cd9437faaa61247182bc5943957b0a93c63dcc21082fb2efa824",
-      "distributedManifestSha256": "539e4369e9517bad5c1d2337241c51d37150eef983376c069b48947783c1cd7c"
+      "id": "full-world-pixels-v2-wld-only",
+      "manifestSha256": "6cffadaaa4efd8bac51b0ba381baef2281e47caf559a7f20ef3425c8be8e05cf",
+      "distributedManifestSha256": "f76b42b4434ca53cda9e489d04dd5ddb34395ff99a8b0bace15f8d809d48153e",
+      "prior": {
+        "id": "full-world-pixels-v1",
+        "manifestSha256": "ee3bb706e7f4cd9437faaa61247182bc5943957b0a93c63dcc21082fb2efa824",
+        "distributedManifestSha256": "539e4369e9517bad5c1d2337241c51d37150eef983376c069b48947783c1cd7c"
+      }
     }
   },
-  "reviewedPurpose": "Cumulative pure-WLD circuit-world ABI 2 with four-argument begin, bounded retained-pixel query and no sidecar parser/session/source/save or custom color mapping. Default OFF retains vanilla per-TripWire type-445 horizontal/vertical crossing XOR. ON combines device generation dedup with WireHead-style per-pixel different-colour connected-group pair parity at each shared physical gate-wave boundary; incompatible same-colour dual-axis topology rejects ON with TCW_UNSUPPORTED without mutation. This is a restricted pixel rule, not a full WireHead topology emulator or its multi-pixel dictionary-overwrite behavior. Idle switching preserves frames, ROM/RAM, input and RNG. Shared physical gate-wave VM execution remains unchanged. Cold-load compilation enumerates wired/gate rows in original order, uses inline paged DSU accessors and bounds-checked tile reads without duplicate checks; every input tile record remains decoded and validated and temporary row indexes are freed after compilation.",
+  "reviewedPurpose": "Cumulative pure-WLD circuit-world ABI 2 with four-argument begin, bounded retained-pixel query and no sidecar parser/session/source/save or custom color mapping. Default OFF retains vanilla per-TripWire type-445 horizontal/vertical crossing XOR. ON combines device generation dedup with WireHead-style per-pixel different-colour connected-group pair parity at each shared physical gate-wave boundary; incompatible same-colour dual-axis topology rejects ON with TCW_UNSUPPORTED without mutation. This is a restricted pixel rule, not a full WireHead topology emulator or its multi-pixel dictionary-overwrite behavior. Idle switching preserves frames, ROM/RAM, input and RNG. Shared physical gate-wave VM execution remains unchanged. Cold-load compilation enumerates wired/gate rows in original order, uses inline paged DSU accessors and bounds-checked tile reads without duplicate checks; every input tile record remains decoded and validated and temporary row indexes are freed after compilation. Export the four existing incremental SHA-256 functions in the WLD Web profile for bounded native hashing by the host; the existing C hash implementation is byte-identical to the frozen v3 source.",
   "runtimeContract": {
     "circuitWorldAbiVersion": 2,
     "circuitWorldWireHeadPixels": 1,
@@ -58,8 +63,8 @@
   ],
   "patch": {
     "path": "native/patches/full-world-pixels.patch",
-    "sha256": "cb0487fc1e5072115cb00e0d7969b98d22d33be928265bdf3b5e2f21f4b21392",
-    "bytes": 81804
+    "sha256": "9b698bb969fc2f0e5b40ef0f28c7cec76355bd9b340700c31c8524d132cc5009",
+    "bytes": 81960
   },
   "files": [
     {
@@ -75,6 +80,13 @@
       "beforeBytes": 21780,
       "afterSha256": "313a422441afd1ef68ab88cdfc1c0abdd9f2b48e4d2aee786263e898c5402231",
       "afterBytes": 23389
+    },
+    {
+      "path": "exports.wld.web.txt",
+      "beforeSha256": "89dd71783a62d2306d2e9465dd8f64ac7c1021ed03310f0c05a485f63c9b2d0f",
+      "beforeBytes": 2625,
+      "afterSha256": "3893755c3b53d084244ad7810b464b7bb655dd4897432841e7fceba14bda933a",
+      "afterBytes": 2709
     },
     {
       "path": "include/terra_circuit_world.h",

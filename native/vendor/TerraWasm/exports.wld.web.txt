@@ -1,4 +1,8 @@
 _terra_build_info_json
+_terra_sha256_create
+_terra_sha256_update
+_terra_sha256_final
+_terra_sha256_destroy
 _terra_world_open_begin
 _terra_world_open_step
 _terra_world_open_finish

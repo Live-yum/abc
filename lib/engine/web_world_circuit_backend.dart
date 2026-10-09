@@ -25,6 +25,7 @@ extension type _Bridge(JSObject _) implements JSObject {
     JSString pixelWords,
   );
   external JSPromise<JSAny?> close(JSNumber session);
+  external JSPromise<JSAny?> cleanup();
 }
 
 extension type _InputBlob(JSObject _) implements JSObject {
@@ -108,7 +109,10 @@ extension type _ComputerFrame(JSObject _) implements JSObject {
 }
 
 class WebWorldCircuitBackend
-    implements WorldCircuitSourceBackend, WorldCircuitExternalOwnerBackend {
+    implements
+        WorldCircuitSourceBackend,
+        WorldCircuitExternalOwnerBackend,
+        WorldCircuitIdleCleanupBackend {
   @override
   bool get completesComputerBatchFromExternalEvent => true;
   @override
@@ -148,26 +152,36 @@ class WebWorldCircuitBackend
     }
 
     final worldBlob = input(world);
-    var polling = false, finished = false;
+    final opening = _bridge.openSource(worldBlob).toDart;
+    var finished = false;
+    Future<void>? poll;
+    Future<void> readProgress() async {
+      try {
+        final progress = await worldCircuitProgress();
+        if (!finished && progress != null) onProgress?.call(progress);
+      } catch (_) {
+        // The main open future reports owner loss or decoding failures.
+      }
+    }
+
     final timer = onProgress == null
         ? null
-        : Timer.periodic(const Duration(milliseconds: 100), (_) async {
-            if (polling || finished) return;
-            polling = true;
-            try {
-              final progress = await worldCircuitProgress();
-              if (!finished && progress != null) onProgress(progress);
-            } catch (_) {
-              // The main open future reports owner loss or decoding failures.
-            } finally {
-              polling = false;
-            }
+        : Timer.periodic(const Duration(milliseconds: 100), (_) {
+            if (poll != null || finished) return;
+            final pending = readProgress();
+            poll = pending;
+            unawaited(
+              pending.then<void>((_) {
+                if (identical(poll, pending)) poll = null;
+              }),
+            );
           });
     try {
-      return (await _bridge.openSource(worldBlob).toDart).convert();
+      return (await opening).convert();
     } finally {
       finished = true;
       timer?.cancel();
+      await poll;
     }
   }
 
@@ -207,5 +221,10 @@ class WebWorldCircuitBackend
   @override
   Future<void> closeWorldCircuit(int session) async {
     await _bridge.close(session.toJS).toDart;
+  }
+
+  @override
+  Future<void> cleanupWorldCircuit() async {
+    await _bridge.cleanup().toDart;
   }
 }

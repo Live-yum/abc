@@ -12,6 +12,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--repository', required=True)
+    parser.add_argument('--expected-commit')
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
     if not re.fullmatch(r'[1-9][0-9]{0,19}', args.run_id):
@@ -26,6 +27,9 @@ def main():
         run = json.load(response)
     assert run['repository']['full_name'].lower() == args.repository.lower(), 'Cross-repository baseline forbidden'
     assert run['path'].split('@')[0] == '.github/workflows/performance.yml', 'Baseline must come from this performance workflow'
+    if args.expected_commit:
+        assert re.fullmatch(r'[0-9a-f]{40}', args.expected_commit), 'Invalid expected commit'
+        assert run['head_sha'] == args.expected_commit, 'Versioned baseline commit mismatch'
     assert run['status'] == 'completed' and run['conclusion'] == 'success', 'Baseline run must have completed successfully'
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({key: run[key] for key in

@@ -179,6 +179,7 @@ void main() {
           ),
         );
         expect(find.textContaining('后续运行结果可能不同'), findsOneWidget);
+        expect(find.textContaining('历史显示不会重算'), findsOneWidget);
         final toggle = tester.widget<SwitchListTile>(
           find.byType(SwitchListTile),
         );
@@ -186,6 +187,7 @@ void main() {
         if (supported) {
           expect(toggle.onChanged, isNotNull);
           expect(find.textContaining('原版规则下可能保持黑屏'), findsOneWidget);
+          expect(find.textContaining('请先开启电路优化，再载入程序'), findsOneWidget);
           await tester.ensureVisible(find.byType(SwitchListTile));
           await tester.tap(find.byType(SwitchListTile));
           await tester.pump();

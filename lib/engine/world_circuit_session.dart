@@ -23,7 +23,8 @@ class WorldCircuitSession extends ChangeNotifier {
   bool _computerPumpActive = false, _computerWakePending = false;
   int _computerRunGeneration = 0;
   Timer? _progressTimer;
-  bool _pollingProgress = false;
+  Future<void>? _progressPoll;
+  int _progressEpoch = 0;
   WorldCircuitProgress? progress;
   bool computerVerified = false;
   bool programIncomplete = false;
@@ -106,42 +107,76 @@ class WorldCircuitSession extends ChangeNotifier {
     }
   }
 
-  Future<T> _serial<T>(Future<T> Function() task, {bool notifyState = true}) {
+  void _startProgressPolling() {
+    if (backend is! WorldCircuitSourceBackend || _closed || _closing) return;
+    final epoch = ++_progressEpoch;
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (_progressPoll != null ||
+          epoch != _progressEpoch ||
+          _closed ||
+          _closing ||
+          !busy) {
+        return;
+      }
+      final poll = _readProgress(epoch);
+      _progressPoll = poll;
+      unawaited(
+        poll.then<void>((_) {
+          if (identical(_progressPoll, poll)) _progressPoll = null;
+        }),
+      );
+    });
+  }
+
+  Future<void> _readProgress(int epoch) async {
+    try {
+      final next = await (backend as WorldCircuitSourceBackend)
+          .worldCircuitProgress();
+      if (next != null &&
+          epoch == _progressEpoch &&
+          busy &&
+          !_closed &&
+          !_closing) {
+        progress = next;
+        notifyListeners();
+      }
+    } catch (_) {
+      // The operation reports its own failure. A settled progress Future is
+      // only a Dart drain; the transport still requires a real owner ACK.
+    }
+  }
+
+  Future<void> _stopProgressPolling() async {
+    _progressEpoch++;
+    _progressTimer?.cancel();
+    _progressTimer = null;
+    final poll = _progressPoll;
+    await poll;
+    if (identical(_progressPoll, poll)) _progressPoll = null;
+  }
+
+  Future<T> _serial<T>(
+    Future<T> Function() task, {
+    bool notifyState = true,
+    bool pollProgress = true,
+  }) {
     final queued = Stopwatch()..start();
     final work = _queue.then((_) async {
       hostStages.record('session.queueWait', queued.elapsedMicroseconds);
       if (_closed || _closing) throw StateError('Circuit session is closed');
       busy = true;
-      if (backend is WorldCircuitSourceBackend) {
-        _progressTimer = Timer.periodic(const Duration(milliseconds: 250), (
-          _,
-        ) async {
-          if (_pollingProgress || _closed || _closing || !busy) return;
-          _pollingProgress = true;
-          try {
-            final next = await (backend as WorldCircuitSourceBackend)
-                .worldCircuitProgress();
-            if (next != null && busy && !_closed && !_closing) {
-              progress = next;
-              notifyListeners();
-            }
-          } catch (_) {
-            // The authoritative operation reports its own failure.
-          } finally {
-            _pollingProgress = false;
-          }
-        });
-      }
       if (notifyState) notifyListeners();
       try {
-        return await task();
+        // Dispatch first so the first poll belongs to this operation.
+        final pending = task();
+        if (pollProgress) _startProgressPolling();
+        return await pending;
       } catch (e) {
         error = e;
         pause();
         rethrow;
       } finally {
-        _progressTimer?.cancel();
-        _progressTimer = null;
+        await _stopProgressPolling();
         busy = false;
         if (!running) _runWatch.stop();
         if (!_closed && notifyState) notifyListeners();
@@ -153,6 +188,7 @@ class WorldCircuitSession extends ChangeNotifier {
 
   Future<void> open() => _serial(() async {
     if (result != null) throw StateError('Circuit already open');
+    progress = null;
     result = await _openOriginal();
     optimizationEnabled = result!.circuitOptimizationEnabled;
     optimizationSupported = result!.circuitOptimizationSupported;
@@ -726,19 +762,29 @@ class WorldCircuitSession extends ChangeNotifier {
   }
 
   Future<void> reset() {
+    final generation = ++_programGeneration;
     pause();
     return _serial(() async {
+      await _stopProgressPolling();
       final active = result;
-      if (active != null) await backend.closeWorldCircuit(active.session);
+      if (active != null) {
+        try {
+          await backend.closeWorldCircuit(active.session);
+        } catch (_) {
+          // A partly closed owner cannot accept commands. close() can retry.
+          _closing = true;
+          rethrow;
+        }
+      }
       result = null;
+      progress = null;
       _fragments.clear();
       _indexedGeometry = null;
-      result = await _openOriginal();
       dirty = false;
       computerVerified = false;
-      optimizationEnabled = result!.circuitOptimizationEnabled;
-      optimizationSupported = result!.circuitOptimizationSupported;
-      wireHeadPixelRulesEnabled = result!.wireHeadPixelRulesEnabled;
+      optimizationEnabled = false;
+      optimizationSupported = false;
+      wireHeadPixelRulesEnabled = false;
       programIncomplete = false;
       programBaselineKnown = true;
       programName = null;
@@ -751,14 +797,28 @@ class WorldCircuitSession extends ChangeNotifier {
       _measuredFrames = 0;
       _lastDisplayMicros = 0;
       _runWatch.reset();
+      // Cancellation may arrive while an accepted batch, progress control, or
+      // close ACK is draining. Finish releasing that owner, but do not start a
+      // replacement import or keep publishing the closed world's ready state.
+      if (_closing || generation != _programGeneration) {
+        throw StateError('世界重置已取消，原始文件保留，可重新导入。');
+      }
+      final opening = _openOriginal();
+      _startProgressPolling();
+      result = await opening;
+      optimizationEnabled = result!.circuitOptimizationEnabled;
+      optimizationSupported = result!.circuitOptimizationSupported;
+      wireHeadPixelRulesEnabled = result!.wireHeadPixelRulesEnabled;
       error = null;
-    });
+    }, pollProgress: false);
   }
 
   /// Flush pending commands and stop before closing a world handle or adopting
   /// returned WLD bytes in the application's ordinary save pipeline.
   Future<void> close() => _closeFuture ??= _close().catchError((Object e) {
     _closeFuture = null;
+    error = e;
+    if (!_closed) notifyListeners();
     throw e;
   });
 
@@ -766,7 +826,7 @@ class WorldCircuitSession extends ChangeNotifier {
     pause();
     _closing = true;
     _programGeneration++;
-    _progressTimer?.cancel();
+    final progressDrained = _stopProgressPolling();
     if (result == null && busy && backend is WorldCircuitSourceBackend) {
       try {
         await (backend as WorldCircuitSourceBackend)
@@ -776,9 +836,14 @@ class WorldCircuitSession extends ChangeNotifier {
       }
     }
     await _queue;
+    await progressDrained;
     if (_closed) return;
     final active = result;
-    if (active != null) await backend.closeWorldCircuit(active.session);
+    if (active != null) {
+      await backend.closeWorldCircuit(active.session);
+    } else if (backend is WorldCircuitIdleCleanupBackend) {
+      await (backend as WorldCircuitIdleCleanupBackend).cleanupWorldCircuit();
+    }
     result = null;
     _fragments.clear();
     _indexedGeometry = null;
@@ -790,6 +855,7 @@ class WorldCircuitSession extends ChangeNotifier {
   void dispose() {
     _timer?.cancel();
     _progressTimer?.cancel();
+    _progressEpoch++;
     // Caller must await close before dispose; asynchronous engine teardown is
     // deliberately not hidden in a synchronous Widget disposal callback.
     assert(_closed, 'Await WorldCircuitSession.close before dispose');

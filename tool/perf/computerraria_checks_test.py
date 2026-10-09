@@ -284,6 +284,108 @@ class ProfileEvidenceTests(unittest.TestCase):
         self.assertEqual(metrics['frames'][0]['frameCount'], 2)
         self.assertEqual(metrics['frames'][0]['overBudgetFrames'], 1)
 
+    def test_observed_refresh_retains_strictly_derived_budget(self):
+        for refresh in (60, 120):
+            report = profile_report()
+            report.update(displayRefreshRateHz=refresh, frameBudgetUs=1000000 / refresh)
+            _, metrics = checks.validate_profile(report, COMMIT)
+            calibration = metrics['displayCalibration']
+            with self.subTest(refresh=refresh):
+                self.assertEqual(calibration['status'], 'observed')
+                self.assertEqual(calibration['observedRefreshRateHz'], refresh)
+                self.assertEqual(calibration['observedFrameBudgetUs'], 1000000 / refresh)
+                self.assertIsNone(calibration['referenceFrameBudgetUs'])
+                self.assertTrue(all(row['frameBudgetUs'] == 1000000 / refresh
+                                    and row['overBudgetFrames'] == 1 for row in metrics['frames']))
+                self.assertEqual(checks.performance_summary({'ui': metrics})['displayCalibration']['status'],
+                                 'observed')
+
+    def test_explicit_unknown_refresh_preserves_correctness_but_has_no_measured_budget(self):
+        report = profile_report()
+        expected_state, observed_metrics = checks.validate_profile(report, COMMIT)
+        report.update(displayRefreshRateHz=0.0, frameBudgetSource='explicit-60hz-fallback')
+        original = copy.deepcopy(report)
+        state, metrics = checks.validate_profile(report, COMMIT)
+        self.assertEqual(report, original)
+        self.assertEqual(state, expected_state)
+        self.assertEqual(metrics['displayCalibration'], {
+            'status': 'unavailable', 'displayRefreshRateHz': 0.0,
+            'frameBudgetSource': 'explicit-60hz-fallback',
+            'reportedFrameBudgetUs': 1000000 / 60,
+            'observedRefreshRateHz': None, 'observedFrameBudgetUs': None,
+            'referenceFrameBudgetUs': 1000000 / 60,
+            'reason': 'Display reports 0 Hz; nominal 60 Hz is a reference only.'})
+        for row, observed in zip(metrics['frames'], observed_metrics['frames']):
+            self.assertEqual(row['frameCount'], observed['frameCount'])
+            self.assertEqual(row['uiP95Us'], observed['uiP95Us'])
+            self.assertEqual(row['rasterP95Us'], observed['rasterP95Us'])
+            self.assertIsNone(row['frameBudgetUs'])
+            self.assertIsNone(row['overBudgetFrames'])
+            self.assertEqual(row['referenceFrameBudgetUs'], 1000000 / 60)
+        for field in ('inputLatencies', 'memory', 'loadingOsMemory', 'operationLatencies'):
+            self.assertEqual(metrics[field], observed_metrics[field])
+        summary = checks.performance_summary({'ui': metrics})
+        self.assertEqual(summary['displayCalibration']['status'], 'unavailable')
+        self.assertEqual(summary['displayCalibration']['unavailableReports'], 1)
+        self.assertIn('display-refresh-unavailable', summary['performanceStatus'])
+        self.assertEqual(summary['targetDeviceFluencyStatus'], 'not-established')
+        self.assertEqual(summary['historicalRegressionStatus'], 'no-historical-baseline')
+        text = checks.markdown({'status': 'passed', 'acceptedReports': 1, 'commit': COMMIT,
+                                'errors': [], 'limits': [], 'measurements': {'ui': metrics}})
+        self.assertIn('Display refresh calibration: **unavailable**', text)
+        self.assertIn('does not pass display calibration or fluency', text)
+        self.assertIn('| unavailable | 0 | explicit-60hz-fallback | unavailable | 16666.67 (reference only) |', text)
+        self.assertIn('| standard | unavailable | 2 | 4 | 1950.0 | 19075.0 | unavailable |', text)
+        mixed = checks.performance_summary({'unknown': metrics, 'observed': observed_metrics})
+        self.assertEqual(mixed['displayCalibration']['status'], 'partial')
+        self.assertEqual(mixed['displayCalibration']['observedReports'], 1)
+        self.assertEqual(mixed['displayCalibration']['unavailableReports'], 1)
+
+    def test_inconsistent_or_malformed_display_calibration_is_rejected(self):
+        # A nominal fallback must never be relabeled as an observed 60 Hz display.
+        for refresh, source in ((60, 'observed-display-refresh-rate'), (0, 'explicit-60hz-fallback')):
+            mutations = [(field, value) for field in ('displayRefreshRateHz', 'frameBudgetUs')
+                         for value in (None, True, '60', -1, float('nan'), float('inf'))]
+            mutations += [('frameBudgetUs', 0), ('frameBudgetUs', 1000000 / 120),
+                          ('frameBudgetSource', None), ('frameBudgetSource', 'unknown'),
+                          ('displayRefreshRateHz', .0001)]
+            if refresh == 0:
+                mutations += [('displayRefreshRateHz', 60),
+                              ('frameBudgetSource', 'observed-display-refresh-rate')]
+            else:
+                mutations += [('displayRefreshRateHz', 0), ('displayRefreshRateHz', 120),
+                              ('frameBudgetSource', 'explicit-60hz-fallback')]
+            for field, value in mutations:
+                report = profile_report()
+                report.update(displayRefreshRateHz=refresh, frameBudgetSource=source)
+                report[field] = value
+                with self.subTest(refresh=refresh, field=field, value=value), self.assertRaises(ValueError):
+                    checks.validate_profile(report, COMMIT)
+            for field in ('displayRefreshRateHz', 'frameBudgetUs', 'frameBudgetSource'):
+                report = profile_report()
+                report.update(displayRefreshRateHz=refresh, frameBudgetSource=source)
+                report.pop(field)
+                with self.subTest(refresh=refresh, missing=field), self.assertRaises(ValueError):
+                    checks.validate_profile(report, COMMIT)
+
+    def test_unknown_refresh_cannot_mask_missing_or_incorrect_profile_evidence(self):
+        for failure in ('cpu', 'input', 'memory', 'frames', 'source'):
+            report = profile_report()
+            report.update(displayRefreshRateHz=0, frameBudgetSource='explicit-60hz-fallback')
+            if failure == 'cpu':
+                report['observations'][1]['deterministicTrace'][3]['cpuProbe'] = 'c' * 64
+            elif failure == 'input':
+                report['inputLatencies'].pop()
+            elif failure == 'memory':
+                report['memory'][-1]['heapUsedBytes'] = None
+            elif failure == 'frames':
+                row = next(row for row in report['operations'] if row['id'] == 'computer.run-physical-program.standard')
+                row['frameCount'] += 1
+            else:
+                report['runtime']['checkedOutHead'] = 'c' * 40
+            with self.subTest(failure=failure), self.assertRaises(ValueError):
+                checks.validate_profile(report, COMMIT)
+
     def test_old_per_isolate_heap_reports_are_rejected(self):
         report = profile_report()
         report['runtime'].pop('heapMeasurementMethod')
@@ -621,6 +723,29 @@ class ManifestTests(unittest.TestCase):
             result = checks.compare(root, COMMIT)
             self.assertEqual(result['errors'], [])
             self.assertEqual(result['acceptedReports'], 15)
+            self.assertEqual(result['displayCalibration']['status'], 'observed')
+            self.assertEqual(result['statusScope'], 'report-validity-and-deterministic-correctness')
+            correctness_digests = result['correctnessDigests']
+            # Synthetic complete campaign: correctness can pass while calibration is unavailable.
+            for run in range(1, 4):
+                path = root / f'computerraria-raw-ui/computerraria-ui.run-{run}.json'
+                report = checks.load(path)
+                report.update(displayRefreshRateHz=0, frameBudgetSource='explicit-60hz-fallback')
+                write(path, report)
+                execution_path = path.with_suffix('.execution.json')
+                execution = checks.load(execution_path)
+                execution['reportSha256'] = checks.digest(path)
+                write(execution_path, execution)
+            result = checks.compare(root, COMMIT)
+            self.assertEqual(result['status'], 'passed')
+            self.assertEqual(result['errors'], [])
+            self.assertEqual(result['acceptedReports'], 15)
+            self.assertEqual(result['correctnessDigests'], correctness_digests)
+            self.assertEqual(result['displayCalibration'], {'status': 'unavailable',
+                'observedReports': 0, 'unavailableReports': 3, 'acceptedProfileReports': 3})
+            self.assertIn('display-refresh-unavailable', result['performanceStatus'])
+            self.assertEqual(result['targetDeviceFluencyStatus'], 'not-established')
+            self.assertIn('Display refresh calibration: **unavailable**', checks.markdown(result))
             path = root / 'computerraria-raw-web/computerraria-web-optimized.run-3.json'
             report = checks.load(path)
             report['correctness']['pongFinalMonoSha256'] = 'c' * 64
@@ -638,6 +763,7 @@ class ManifestTests(unittest.TestCase):
             result = checks.compare(Path(folder), COMMIT)
         self.assertEqual(result['status'], 'failed')
         self.assertEqual(result['acceptedReports'], 0)
+        self.assertEqual(result['displayCalibration']['status'], 'missing')
         self.assertIn('0/15', checks.markdown(result))
 
     def test_execution_status_and_exact_report_hash_are_required(self):

@@ -8,7 +8,7 @@
   const MAX_RESPONSE_BYTES = 160 * MiB, DEFAULT_TIMEOUT = 120000;
   const METHODS = Object.freeze({
     document: ['open', 'createPlayer', 'projectPlayer', 'inspect', 'mutate', 'save', 'preview', 'generateMap', 'close'],
-    worldCircuit: ['open', 'openSource', 'command', 'computerFrame', 'close', 'releaseSource', 'progress', 'cancelOperation'],
+    worldCircuit: ['open', 'openSource', 'command', 'computerFrame', 'close', 'releaseSource', 'cleanup', 'progress', 'cancelOperation'],
     circuit: ['propagate'],
   });
   const fail = (code, message) => Object.assign(new Error(message), {code});
@@ -34,7 +34,7 @@
   function validate(owner, method, args) {
     if (!Object.hasOwn(METHODS, owner) || !METHODS[owner].includes(method)) invalid('Unknown worker method');
     if (!Array.isArray(args)) invalid('Worker arguments must be an array');
-    const counts = owner === 'document' ? {open:2, createPlayer:1, projectPlayer:1, inspect:1, mutate:3, save:1, preview:1, generateMap:2, close:1} : owner === 'worldCircuit' ? {open:1, openSource:1, command:3, computerFrame:3, close:1, releaseSource:1, progress:0, cancelOperation:0} : {propagate:6};
+    const counts = owner === 'document' ? {open:2, createPlayer:1, projectPlayer:1, inspect:1, mutate:3, save:1, preview:1, generateMap:2, close:1} : owner === 'worldCircuit' ? {open:1, openSource:1, command:3, computerFrame:3, close:1, releaseSource:1, cleanup:0, progress:0, cancelOperation:0} : {propagate:6};
     if (args.length !== counts[method]) invalid('Invalid worker argument count');
     let size = 64;
     if (owner === 'document') {
@@ -54,7 +54,7 @@
     } else if (owner === 'worldCircuit') {
       if (method === 'open') size += bytes(args[0], 64 * MiB);
       else if (method === 'openSource') size += source(args[0]);
-      else if (!isControl(owner, method)) {
+      else if (!isControl(owner, method) && method !== 'cleanup') {
         handle(args[0]);
         if (method === 'command') size += string(args[1], 1024) + string(args[2], 4 * MiB);
         if (method === 'computerFrame') size += string(args[1], 1024) + string(args[2], 1024);
@@ -85,7 +85,7 @@
       else if (method === 'preview') bytes(value, 16 * MiB, true);
       else if (value != null) invalid('Invalid document completion response');
     } else if (owner === 'circuit') string(value, 4 * MiB);
-    else if (['close','releaseSource','cancelOperation'].includes(method)) { if (value != null) invalid('Invalid circuit completion response'); }
+    else if (['close','releaseSource','cleanup','cancelOperation'].includes(method)) { if (value != null) invalid('Invalid circuit completion response'); }
     else if (method === 'computerFrame') {
       if (!value || typeof value !== 'object') invalid('Invalid computer frame');
       validateResult(owner, 'command', value.clock);
@@ -121,14 +121,23 @@
     if (!Object.hasOwn(METHODS, owner)) invalid('Unknown worker owner');
     if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600000) invalid('Invalid worker timeout');
     let worker = null, generation = 1, sequence = 0, nextHandle = 1, nextSource = 1, queuedBytes = 0, active = null;
+    let retirementArmed = false, controlRetirementVeto = false, retirementEpoch = 0;
     const pending = new Map(), controls = new Map(), handles = new Map(), sources = new Map();
     function shutdown(error) {
       generation++;
+      retirementArmed = false; controlRetirementVeto = false;
       const old = worker; worker = null; active = null; handles.clear(); sources.clear();
       if (old) { old.onmessage = old.onerror = old.onmessageerror = null; try { old.terminate(); } catch (_) {} }
       for (const request of pending.values()) { clearTimeout(request.timer); request.reject(error); }
       for (const request of controls.values()) { clearTimeout(request.timer); request.reject(error); }
       pending.clear(); controls.clear(); queuedBytes = 0;
+    }
+    function retireIfIdle() {
+      // Only acknowledged cleanup may retire this exclusive world owner. A
+      // timeout/rejected control is not evidence that its work has drained.
+      if (owner !== 'worldCircuit' || !worker || !retirementArmed || controlRetirementVeto ||
+          handles.size || sources.size || pending.size || active || queuedBytes || controls.size) return;
+      shutdown(ownerLost('Idle world computation owner was retired'));
     }
     function ensureWorker() {
       if (worker) return worker;
@@ -141,14 +150,21 @@
         if (!data || data.generation !== generation) return;
         if (data.control === true) {
           const request = controls.get(data.id); if (!request) return; controls.delete(data.id); clearTimeout(request.timer);
-          try { if (data.ok !== true) throw fail(data.code || 'WORKER_ENGINE', data.error || 'Worker control failed'); validateResult(owner, request.method, data.value); request.resolve(data.value); } catch (error) { request.reject(error); }
+          try { if (data.ok !== true) throw fail(data.code || 'WORKER_ENGINE', data.error || 'Worker control failed'); validateResult(owner, request.method, data.value); request.resolve(data.value); }
+          catch (error) { controlRetirementVeto = true; request.reject(error); }
+          retireIfIdle();
           return;
         }
         const request = pending.get(data.id);
         if (!request || active !== request) return;
         if (data.ok !== true && data.ok !== false) { shutdown(ownerLost('Invalid worker response')); return; }
         pending.delete(data.id); queuedBytes -= request.bytes; clearTimeout(request.timer); active = null;
-        if (data.ok === false) request.reject(fail(typeof data.code === 'string' ? data.code.slice(0,80) : 'WORKER_ENGINE', typeof data.error === 'string' ? data.error.slice(0,2048) : 'Worker operation failed'));
+        if (data.ok === false) {
+          // Keep commands blocked after partial teardown, but permit an
+          // explicit close retry to finish the retained cleanup descriptor.
+          if (owner === 'worldCircuit' && request.method === 'close') { const entry = handles.get(request.publicHandle); if (entry) entry.closePromise = null; }
+          request.reject(fail(typeof data.code === 'string' ? data.code.slice(0,80) : 'WORKER_ENGINE', typeof data.error === 'string' ? data.error.slice(0,2048) : 'Worker operation failed'));
+        }
         else {
           try {
             validateResult(owner, request.method, data.value);
@@ -179,6 +195,12 @@
               value.hostStagesUs = {...value.hostStagesUs, rpcWallUs:(now() - request.queuedAt) * 1000, rpcQueueUs:(request.sentAt - request.queuedAt) * 1000};
             }
             request.resolve(value);
+            if (owner === 'worldCircuit' && ['close','releaseSource','cleanup'].includes(request.method)) {
+              retirementArmed = pending.size === 0 && request.retirementEpoch === retirementEpoch;
+              // Deliberately synchronous: awaiting close must resume only
+              // after a safe retirement, so immediate reopen gets a new heap.
+              retireIfIdle();
+            }
           } catch (error) { request.reject(error); shutdown(ownerLost('Invalid worker result')); return; }
         }
         dispatch();
@@ -189,6 +211,14 @@
     function dispatch() {
       if (active || !pending.size) return;
       const request = pending.values().next().value;
+      if (owner === 'worldCircuit' && ['open','openSource'].includes(request.method) && handles.size) {
+        // A failed close must be explicitly retried before native IDs can be
+        // reused. Otherwise an old closing public handle could close a newly
+        // opened world. Check at dispatch so close-then-open can still queue.
+        pending.delete(request.id); queuedBytes -= request.bytes; clearTimeout(request.timer);
+        request.reject(fail('WORKER_STATE', 'Close the existing world circuit successfully before reopening'));
+        dispatch(); return;
+      }
       try {
         const current = ensureWorker(); active = request; request.sentAt = now();
         current.postMessage({id:request.id, generation, method:request.method, args:request.args}, transfers(request.args));
@@ -198,11 +228,12 @@
       try {
         const size = validate(owner, method, input);
         if (isControl(owner, method)) {
+          if (method === 'cancelOperation') { retirementArmed = false; retirementEpoch++; }
           if (controls.size >= MAX_PENDING) throw fail('WORKER_LIMIT', 'Computation control queue is full');
           const current = ensureWorker(), id = ++sequence;
           return new Promise((resolve,reject) => {
             const request = {id, method, resolve, reject};
-            request.timer = setTimeout(() => { if (controls.delete(id)) reject(fail('WORKER_TIMEOUT', 'Circuit control timed out')); }, Math.min(timeoutMs, 10000));
+            request.timer = setTimeout(() => { if (controls.delete(id)) { controlRetirementVeto = true; reject(fail('WORKER_TIMEOUT', 'Circuit control timed out')); } }, Math.min(timeoutMs, 10000));
             controls.set(id, request);
             try { current.postMessage({id, generation, control:true, method, args:[]}); } catch (_) { shutdown(ownerLost('Could not send computation control')); }
           });
@@ -213,29 +244,34 @@
           throw fail('WORKER_LIMIT', 'Close a document before opening another');
         }
         const args = input.slice(); let publicHandle, publicSource;
+        if (owner === 'worldCircuit' && method === 'cleanup' && !worker) return Promise.resolve();
         if (owner === 'worldCircuit' && method === 'releaseSource') {
           publicSource = args[0]; const entry = sources.get(publicSource); if (!entry || entry.generation !== generation) return Promise.resolve(); args[0] = entry.native;
         }
         if ((owner === 'document' && !['open','createPlayer','projectPlayer'].includes(method)) || (owner === 'worldCircuit' && ['command','computerFrame','close'].includes(method))) {
           publicHandle = args[0]; const entry = handles.get(publicHandle);
-          if (!entry || entry.generation !== generation || entry.closing) {
+          if (!entry || entry.generation !== generation || (entry.closing && (method !== 'close' || owner !== 'worldCircuit'))) {
             // Cleanup after a lost owner must not prevent an explicit reopen.
             // Never forward a stale close to a new owner's reused native handle.
             if (method === 'close') return Promise.resolve();
             throw fail('STALE_HANDLE', 'Computation handle is closed or belongs to a lost owner; reopen the source');
           }
+          if (owner === 'worldCircuit' && method === 'close' && entry.closePromise) return entry.closePromise;
           args[0] = entry.native;
-          if (method === 'close') entry.closing = true;
         }
         // Snapshot now, before queueing; never transfer an application-owned buffer.
         for (let i=0;i<args.length;i++) if (args[i] instanceof Uint8Array) args[i] = Uint8Array.from(args[i]);
         const id = ++sequence;
         if (!Number.isSafeInteger(id)) throw fail('WORKER_LIMIT', 'Computation request identity space exhausted');
-        return new Promise((resolve,reject) => {
-          const request = {id, method, args, publicHandle, publicSource, bytes:size, resolve, reject, queuedAt:now()};
+        retirementArmed = false; retirementEpoch++;
+        if (method === 'close') handles.get(publicHandle).closing = true;
+        const completion = new Promise((resolve,reject) => {
+          const request = {id, method, args, publicHandle, publicSource, bytes:size, resolve, reject, queuedAt:now(), retirementEpoch};
           request.timer = setTimeout(() => { if (pending.has(id)) shutdown(ownerLost('Computation worker timed out')); }, timeoutMs);
           pending.set(id, request); queuedBytes += size; dispatch();
         });
+        if (owner === 'worldCircuit' && method === 'close') { const entry = handles.get(publicHandle); if (entry) entry.closePromise = completion; }
+        return completion;
       } catch (error) { return Promise.reject(error); }
     }
     const client = {};

@@ -65,6 +65,7 @@ def main():
     parser.add_argument('--candidate', required=True, type=Path)
     parser.add_argument('--baseline', type=Path)
     parser.add_argument('--baseline-requested', action='store_true')
+    parser.add_argument('--baseline-run-metadata', type=Path)
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
@@ -80,6 +81,12 @@ def main():
                 assert args.baseline is not None, 'Requested baseline was not downloaded'
                 baseline = load_group(args.baseline, suite, required)
                 result['baselineRuns'] = [str(row[0]) for row in baseline]
+                if args.baseline_run_metadata is not None:
+                    selected = json.loads(args.baseline_run_metadata.read_text())
+                    assert selected['status'] == 'completed' and selected['conclusion'] == 'success', 'Unverified baseline run metadata'
+                    assert all(row[2]['source']['commit'] == selected['head_sha'] for row in baseline), 'Downloaded baseline commit differs from verified run'
+                    result['baselineRunId'] = selected['id']
+                    result['baselineCommit'] = selected['head_sha']
                 assert not ({row[2]['runId'] for row in candidate} & {row[2]['runId'] for row in baseline}), 'Baseline and candidate reuse an execution'
                 assert baseline[0][2]['source']['commit'] != candidate[0][2]['source']['commit'], 'Baseline and candidate are the same revision'
                 if any(environment(row) != environment(candidate[0]) for row in candidate + baseline):

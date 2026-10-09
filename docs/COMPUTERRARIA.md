@@ -263,3 +263,34 @@ wall and actual fallback timer wait are also measured. The Web continuation
 gap has its own `runtime.ownerContinuationGap` stage; an absent timer-wait row
 means that path did not schedule per-batch host timers. Stopwatch/callback timings are
 not Flutter FrameTiming, display FPS, or presentation/input latency.
+
+### Actual pure-WLD browser baseline (2026-10-09)
+
+The exact a5612b4 CI Web build loaded the 405,983,441-byte public WLD in three
+fresh cloud Chrome processes. Source hashing through final monochrome display
+initialization took 41.050 / 41.944 / 38.646 seconds. This boundary excludes the
+file chooser and is not the first presented frame. Hashing alone took
+17.221 / 16.547 / 15.671 seconds. OS caches were not flushed.
+
+The owned Chrome process-tree PSS peaks were 680.816 / 689.459 / 690.667 MiB,
+with a maximum 268.285 MiB increase from the corresponding baseline. Renderer
+RSS peaks were 441.633 / 450.773 / 448.328 MiB; these overlap the tree metrics.
+WASM capacity was 159.313 MiB and engine allocation peak was 138.950 MiB.
+After close, active engine bytes and scratch storage reached zero, but the old
+worker retained its WASM high-water capacity. One separate reset after Pong
+crashed Chrome with Error 9; OOM has not been established as the cause.
+See the machine-readable [baseline](evidence/browser-pure-wld-baseline-2026-10-09.json).
+
+Fresh ON before loading Pong produced a paused 25,728-pulse screenshot whose
+3,072 binary pixels all match an independent physical native replay (22 lit
+pixels). OFF-to-ON switching after execution preserves existing pixels and
+does not reconstruct earlier display history. For a fresh ON result, reset to
+the original WLD, enable optimization, then load the program. The approximately
+21.9 display reads per second observed during that session are not raster FPS.
+
+On headless Linux, the platform may report a raw display refresh rate of zero.
+The profile collector retains its explicit nominal 60 Hz fallback for scheduling;
+the report validator marks refresh calibration and derived frame-budget
+acceptance unavailable. Correctness, physical input traces and memory checks
+remain required. Unknown calibration must not be presented as smoothness on a
+60 Hz device.

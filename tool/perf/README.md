@@ -147,3 +147,15 @@ the same controlled comparison. Changed operation coverage or fixture content
 requires a new comparable baseline. Reporting `passed` means the workload and
 its correctness checks completed; it does not, by itself, establish performance
 acceptance against a prior release or every hardware target.
+
+### Versioned CI baseline
+
+Automatic performance runs compare with the first complete calibration run
+37909644872, commit a5612b474fc8dc50d41b3bc6b87234d30ba97e02. A manual
+`baseline_run_id` can select another successful run of the same repository and
+workflow. The aggregate checks the selected run, the pinned default commit,
+each report digest and each downloaded execution's commit before comparison.
+Only the aggregate job uses the existing `actions: read` permission. Expired or
+missing baseline artifacts fail visibly; they do not silently become a pass.
+Runner/toolchain differences remain inconclusive. The baseline's own first
+calibration had no comparison and was not a regression acceptance result.

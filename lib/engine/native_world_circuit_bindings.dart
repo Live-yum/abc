@@ -13,6 +13,43 @@ import 'world_circuit_backend.dart';
 typedef _OneC = Int32 Function(Uint32);
 typedef _OneD = int Function(int);
 
+class _SourceSha256Api {
+  final int Function(Pointer<Uint32>) create;
+  final int Function(int, Pointer<Uint8>, int) update;
+  final int Function(int, Pointer<Uint8>) finish;
+  final _OneD destroy;
+
+  _SourceSha256Api(DynamicLibrary library)
+    : create = library
+          .lookupFunction<
+            Int32 Function(Pointer<Uint32>),
+            int Function(Pointer<Uint32>)
+          >('abc_sha256_create'),
+      update = library
+          .lookupFunction<
+            Int32 Function(Uint32, Pointer<Uint8>, Uint32),
+            int Function(int, Pointer<Uint8>, int)
+          >('abc_sha256_update'),
+      finish = library
+          .lookupFunction<
+            Int32 Function(Uint32, Pointer<Uint8>),
+            int Function(int, Pointer<Uint8>)
+          >('abc_sha256_final'),
+      destroy = library.lookupFunction<_OneC, _OneD>('abc_sha256_destroy');
+
+  static _SourceSha256Api? load(DynamicLibrary library) {
+    const names = ['create', 'update', 'final', 'destroy'];
+    final available = names
+        .where((name) => library.providesSymbol('abc_sha256_$name'))
+        .length;
+    if (available == 0) return null;
+    if (available != names.length) {
+      throw const EngineException('Incomplete streaming SHA-256 API');
+    }
+    return _SourceSha256Api(library);
+  }
+}
+
 /// Instantiated and used exclusively inside the existing owning isolate.
 /// Scratch/output use temporary random-access files, keeping the circuit's
 /// bounded working set independent of world size. Files are never user paths.
@@ -20,6 +57,10 @@ class NativeWorldCircuitBindings {
   final DynamicLibrary library;
   final Map<String, Object?> _buildInfo;
   final void Function(Directory) _deleteOutputDirectory;
+  final Allocator _hashAllocator;
+  // Older engines and focused ABI stubs need no hashing symbols to open the
+  // byte API. Resolve the optional extension only on the first ranged hash.
+  late final _SourceSha256Api? _hashApi = _SourceSha256Api.load(library);
   final Map<int, _Session> _sessions = {};
   final Map<String, Directory> _outputs = {};
   int _outputSequence = 0;
@@ -29,7 +70,9 @@ class NativeWorldCircuitBindings {
   NativeWorldCircuitBindings(
     this.library, {
     void Function(Directory)? deleteOutputDirectory,
+    Allocator? hashAllocator,
   }) : _buildInfo = _readBuildInfo(library),
+       _hashAllocator = hashAllocator ?? calloc,
        _deleteOutputDirectory =
            deleteOutputDirectory ??
            ((directory) => directory.deleteSync(recursive: true));
@@ -230,18 +273,44 @@ class NativeWorldCircuitBindings {
     int size,
     Uint8List Function(int, int) read,
   ) async {
+    const chunkSize = 1024 * 1024;
+    final api = _hashApi;
     final digest = _DigestCollector();
     // The collector and sink never retain source chunks.
-    final sink = sha256.startChunkedConversion(digest);
+    final sink = api == null ? sha256.startChunkedConversion(digest) : null;
+    Pointer<Uint8> allocation = nullptr;
+    var handle = 0;
+    var failed = false, sinkClosed = false;
     try {
+      if (api != null) {
+        // The single allocation holds one reusable input window, a uint32
+        // handle, and a 32-byte binary digest. No source-sized native buffer.
+        allocation = _hashAllocator.allocate<Uint8>(chunkSize + 36);
+        if (allocation == nullptr) {
+          throw const EngineException('Circuit hash allocation failed');
+        }
+        final out = (allocation + chunkSize).cast<Uint32>();
+        out.value = 0;
+        final status = api.create(out);
+        handle = out.value;
+        _checkWorld(status);
+        if (handle == 0) {
+          throw const EngineException('Missing streaming SHA-256 context');
+        }
+      }
       for (var offset = 0; offset < size;) {
         _checkCancelled();
-        final length = (size - offset).clamp(0, 1024 * 1024),
+        final length = (size - offset).clamp(0, chunkSize),
             bytes = read(offset, length);
         if (bytes.length != length) {
           throw const EngineException('Short hash source read');
         }
-        sink.add(bytes);
+        if (api != null) {
+          allocation.asTypedList(length).setAll(0, bytes);
+          _checkWorld(api.update(handle, allocation, length));
+        } else {
+          sink!.add(bytes);
+        }
         offset += length;
         _progress = {
           'stage': stage,
@@ -251,10 +320,40 @@ class NativeWorldCircuitBindings {
         };
         await Future<void>.delayed(Duration.zero);
       }
+      _checkCancelled();
+      if (api != null) {
+        final output = allocation + chunkSize + 4;
+        _checkWorld(api.finish(handle, output));
+        return output
+            .asTypedList(32)
+            .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+            .join();
+      }
+      sinkClosed = true;
+      sink!.close();
+      return digest.value.toString();
+    } catch (_) {
+      failed = true;
+      rethrow;
     } finally {
-      sink.close();
+      Object? cleanupError;
+      StackTrace? cleanupStack;
+      void cleanup(void Function() release) {
+        try {
+          release();
+        } catch (error, stack) {
+          cleanupError ??= error;
+          cleanupStack ??= stack;
+        }
+      }
+
+      if (!sinkClosed && sink != null) cleanup(sink.close);
+      if (handle != 0) cleanup(() => _checkWorld(api!.destroy(handle)));
+      if (allocation != nullptr) cleanup(() => _hashAllocator.free(allocation));
+      if (!failed && cleanupError != null) {
+        Error.throwWithStackTrace(cleanupError!, cleanupStack!);
+      }
     }
-    return digest.value.toString();
   }
 
   Future<Map<String, Object?>> _openSource(Map<String, Object?> source) async {

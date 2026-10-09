@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       baseline_run_id:
-        description: Completed successful run ID of this workflow in this repository; empty means first calibration
+        description: Override the versioned same-repository baseline; empty uses run 37909644872 (a5612b4)
         required: false
         type: string
 
@@ -24,6 +24,8 @@ env:
   ABC_PERF_TIER: ci
   ABC_PERF_CYCLES: '25'
   ABC_PERF_WARMUP: '5'
+  # First complete five-process calibration, verified at a5612b4.
+  ABC_PERF_BASELINE_RUN_ID: ${{ inputs.baseline_run_id || '37909644872' }}
 
 jobs:
   native:
@@ -278,18 +280,23 @@ jobs:
           pattern: perf-raw-*
           path: build/perf/candidate
       - name: Verify the optional same-repository baseline run
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_run_id != '' }}
+        if: ${{ env.ABC_PERF_BASELINE_RUN_ID != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
-        run: python3 tool/perf/verify_baseline.py --repository "$GITHUB_REPOSITORY" --run-id "$BASELINE_RUN_ID" --output build/perf/summary/baseline-run.json
+          BASELINE_RUN_ID: ${{ env.ABC_PERF_BASELINE_RUN_ID }}
+        run: |
+          options=()
+          if test "$BASELINE_RUN_ID" = '37909644872'; then
+            options+=(--expected-commit a5612b474fc8dc50d41b3bc6b87234d30ba97e02)
+          fi
+          python3 tool/perf/verify_baseline.py --repository "$GITHUB_REPOSITORY" --run-id "$BASELINE_RUN_ID" --output build/perf/summary/baseline-run.json "${options[@]}"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        if: ${{ success() && github.event_name == 'workflow_dispatch' && inputs.baseline_run_id != '' }}
+        if: ${{ success() && env.ABC_PERF_BASELINE_RUN_ID != '' }}
         with:
           pattern: perf-raw-*
           path: build/perf/baseline
           repository: ${{ github.repository }}
-          run-id: ${{ inputs.baseline_run_id }}
+          run-id: ${{ env.ABC_PERF_BASELINE_RUN_ID }}
           github-token: ${{ github.token }}
       - name: Assemble measured and declared coverage, keeping all gaps
         if: always()
@@ -297,11 +304,11 @@ jobs:
       - name: Validate every independent run and compare when a baseline was selected
         if: always()
         env:
-          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          BASELINE_RUN_ID: ${{ env.ABC_PERF_BASELINE_RUN_ID }}
         run: |
           options=()
           if test -n "$BASELINE_RUN_ID"; then
-            options+=(--baseline-requested --baseline build/perf/baseline)
+            options+=(--baseline-requested --baseline build/perf/baseline --baseline-run-metadata build/perf/summary/baseline-run.json)
           fi
           python3 tool/perf/compare_ci.py --candidate build/perf/candidate --output build/perf/summary "${options[@]}"
       - name: Publish explicit comparison status to job summary

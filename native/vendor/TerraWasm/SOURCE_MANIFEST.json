@@ -2,7 +2,7 @@
   "schema": 1,
   "sourceRepository": "Live-yum/TerraWasm",
   "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
-  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v3-wld-only patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; shared physical gate-wave VM code is unchanged. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches.",
+  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v4-wld-host-hashing patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; shared physical gate-wave VM code is unchanged. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches. The WLD Web export list additionally exposes the existing four incremental SHA-256 functions; the C hash implementation is unchanged.",
   "license": "No upstream license grant identified; inclusion is user-authorized and does not relicense upstream material.",
   "files": [
     {
@@ -37,8 +37,8 @@
     },
     {
       "path": "exports.wld.web.txt",
-      "bytes": 2625,
-      "sha256": "89dd71783a62d2306d2e9465dd8f64ac7c1021ed03310f0c05a485f63c9b2d0f"
+      "bytes": 2709,
+      "sha256": "3893755c3b53d084244ad7810b464b7bb655dd4897432841e7fceba14bda933a"
     },
     {
       "path": "include/terra_abi.h",
@@ -483,9 +483,9 @@
   ],
   "localPatches": [
     {
-      "id": "full-world-pixels-v3-wld-only",
+      "id": "full-world-pixels-v4-wld-host-hashing",
       "manifest": "native/patches/full-world-pixels.json",
-      "sha256": "a5bb31a966d8625f16ae095c90d5d1ee0b90da5bc81e34dc481842af0cc76a48"
+      "sha256": "a7331e085e0fd5714788974701d853727296ee0cb7e9d64d9a3929efc355aa7e"
     }
   ]
 }

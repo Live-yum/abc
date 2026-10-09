@@ -497,6 +497,29 @@ def validate_loading_os_memory(data, cycles):
     return data
 
 
+def validate_display_calibration(report):
+    """Retain unavailable display metadata without inventing a measured budget."""
+    refresh = number(report.get('displayRefreshRateHz'), 'reported display refresh rate')
+    budget = number(report.get('frameBudgetUs'), 'reported frame budget', .001)
+    source = report.get('frameBudgetSource')
+    if refresh > 0:
+        number(refresh, 'observed display refresh rate', .001)
+        require(source == 'observed-display-refresh-rate'
+                and math.isclose(budget, 1000000 / refresh),
+                'Refresh budget must derive from observed display metadata')
+    else:
+        require(source == 'explicit-60hz-fallback'
+                and math.isclose(budget, 1000000 / 60),
+                'Unavailable refresh requires an explicit nominal 60 Hz fallback budget')
+    return {'status': 'observed' if refresh > 0 else 'unavailable',
+            'displayRefreshRateHz': refresh, 'frameBudgetSource': source,
+            'reportedFrameBudgetUs': budget,
+            'observedRefreshRateHz': refresh if refresh > 0 else None,
+            'observedFrameBudgetUs': budget if refresh > 0 else None,
+            'referenceFrameBudgetUs': None if refresh > 0 else budget,
+            'reason': None if refresh > 0 else 'Display reports 0 Hz; nominal 60 Hz is a reference only.'}
+
+
 def validate_profile(report, commit, cycles=2):
     require(report['schema'] == 2 and report.get('inputFormat') == 'wld-only'
             and report.get('circuitAbi') == 2 and report['status'] == 'passed'
@@ -521,11 +544,8 @@ def validate_profile(report, commit, cycles=2):
     fixture = report['fixture']
     require(fixture['wldSha256'] == WLD_SHA and fixture['wldBytes'] == 405983441,
             'Profile did not use the complete pinned WLD input')
-    refresh = number(report['displayRefreshRateHz'], 'observed display refresh rate', .001)
-    budget = number(report['frameBudgetUs'], 'derived refresh frame budget', .001)
-    require(report['frameBudgetSource'] == 'observed-display-refresh-rate'
-            and math.isclose(budget, 1000000 / refresh),
-            'Refresh budget must derive from observed display metadata')
+    calibration = validate_display_calibration(report)
+    budget = calibration['observedFrameBudgetUs']
     operations = {row['id']: row for row in report['operations']}
     require(len(operations) == len(report['operations']), 'Duplicate operation summaries')
     for row in operations.values():
@@ -610,9 +630,13 @@ def validate_profile(report, commit, cycles=2):
                             'observedDisplayChanges': observed['observedDisplayChanges'],
                             'displayCompatibility': observed['displayCompatibility'],
                             'frameCount': len(ui), 'frameBudgetUs': budget,
+                            'displayCalibrationStatus': calibration['status'],
+                            'frameBudgetSource': calibration['frameBudgetSource'],
+                            'referenceFrameBudgetUs': calibration['referenceFrameBudgetUs'],
                             'uiMedianUs': statistics.median(ui), 'uiP95Us': percentile(ui, .95),
                             'rasterMedianUs': statistics.median(raster), 'rasterP95Us': percentile(raster, .95),
-                            'overBudgetFrames': sum(u > budget or r > budget for u, r in zip(ui, raster))})
+                            'overBudgetFrames': None if budget is None else
+                                sum(u > budget or r > budget for u, r in zip(ui, raster))})
     # The complete raw samples are authoritative; claimed summary counts cannot substitute.
     for mode in MODES:
         row = operations[f'computer.run-physical-program.{mode}']
@@ -667,7 +691,8 @@ def validate_profile(report, commit, cycles=2):
                 row['gc'] == 'requested-all-isolate-groups',
                 'Heap sample must use unique isolate groups after GC')
     loading_memory = validate_loading_os_memory(report.get('loadingOsMemory'), cycles)
-    return projections, {'frames': metrics, 'inputLatencies': inputs, 'memory': memory,
+    return projections, {'displayCalibration': calibration,
+                         'frames': metrics, 'inputLatencies': inputs, 'memory': memory,
                          'loadingOsMemory': loading_memory,
                          'operationLatencies': {key: [sample['latencyMs'] for sample in row['samples']]
                                                 for key, row in operations.items()}}
@@ -678,6 +703,22 @@ def percentile(values, fraction):
     at = (len(ordered) - 1) * fraction
     low, high = math.floor(at), math.ceil(at)
     return ordered[low] + (ordered[high] - ordered[low]) * (at - low)
+
+
+def performance_summary(measurements):
+    calibration = [value['displayCalibration'] for value in measurements.values()
+                   if 'displayCalibration' in value]
+    observed = sum(row['status'] == 'observed' for row in calibration)
+    unavailable = len(calibration) - observed
+    status = ('missing' if not calibration else 'partial' if observed and unavailable
+              else 'unavailable' if unavailable else 'observed')
+    return {'performanceStatus': ('first-calibration-no-historical-baseline' if status == 'observed'
+                                 else f'first-calibration-display-refresh-{status}-no-historical-baseline'),
+            'historicalRegressionStatus': 'no-historical-baseline',
+            'targetDeviceFluencyStatus': 'not-established',
+            'displayCalibration': {'status': status, 'observedReports': observed,
+                                   'unavailableReports': unavailable,
+                                   'acceptedProfileReports': len(calibration)}}
 
 
 def compare(reports, commit, require_jobs=False):
@@ -759,7 +800,8 @@ def compare(reports, commit, require_jobs=False):
         errors.append(f'Expected 15 complete process reports; accepted {len(states)}')
     return {'schema': 'abc.computerraria.comparison.v1',
             'status': 'failed' if errors else 'passed', 'commit': commit,
-            'performanceStatus': 'first-calibration-no-historical-baseline',
+            'statusScope': 'report-validity-and-deterministic-correctness',
+            **performance_summary(measurements),
             'acceptedReports': len(states), 'errors': errors,
             'measurements': measurements,
             'correctnessDigests': {name: hashlib.sha256(json.dumps(state, sort_keys=True)
@@ -769,6 +811,7 @@ def compare(reports, commit, require_jobs=False):
                        'Web compound RPC runs in a same-thread Node loopback; file-backed Blob handles use identity because Node cannot clone them. Browser File transfer and threading are not established.',
                        'Web clock-stage throughput excludes selected-display reads and loopback roundtrips; those durations are reported separately and cannot be pooled with legacy externally-awaited clock timings.',
                        'Linux Xvfb software rendering is not target-device fluidity.',
+                       'A 0 Hz display with explicit-60hz-fallback has unavailable refresh calibration; its nominal 16.67 ms reference cannot establish measured budget misses or fluency.',
                        'Sensor acknowledgement and held-input decoded paddle-state latency are reported separately; neither includes OS input or raster presentation.',
                        'Shared group cache/lazy parity operates in both modes. ON adds generation deduplication and explicitly different WireHead-style PixelBox wave pairing; OFF does not claim working Pong display.',
                        'Every first/repeat lifecycle is retained; filesystem cache state is uncontrolled.',
@@ -777,14 +820,32 @@ def compare(reports, commit, require_jobs=False):
 
 
 def markdown(result):
+    data = result['measurements']
+    performance = performance_summary(data)
+    calibration = performance['displayCalibration']
     lines = ['# Complete Computerraria acceptance', '',
-             f"Status: **{result['status']}**. Accepted process reports: {result['acceptedReports']}/15.",
+             f"Report validity and deterministic correctness: **{result['status']}**. Accepted process reports: {result['acceptedReports']}/15.",
              f"Commit: `{result['commit']}`.", '',
              'Performance: first calibration; no historical regression or target-device fluency claim.', '',
+             f'Display refresh calibration: **{calibration["status"]}** '
+             f'({calibration["observedReports"]} observed, {calibration["unavailableReports"]} unavailable accepted profile reports).', '',
              'OFF/ON compares physical CPU/RAM and input/pulse checkpoints. Pixel records and saved files compare exactly within each declared mode across repetitions and runtimes; OFF display limitations remain explicit. Timing is excluded from equality.', '']
+    if calibration['status'] != 'observed':
+        lines += ['Measured refresh budgets and budget-miss conclusions are unavailable for uncalibrated windows. '
+                  'The explicit nominal 60 Hz / 16.67 ms fallback is a reference only; accepting report correctness does not pass display calibration or fluency.', '']
     if result['errors']:
         lines += ['## Blockers', ''] + [f'- {error}' for error in result['errors']] + ['']
-    data = result['measurements']
+    lines += ['## Display refresh metadata and calibration', '',
+              '| Process | Calibration | Reported refresh Hz | Raw budget source | Observed budget µs | Nominal reference budget µs |',
+              '|---|---|---:|---|---:|---:|']
+    for name, value in data.items():
+        if 'displayCalibration' in value:
+            row = value['displayCalibration']
+            observed = 'unavailable' if row['observedFrameBudgetUs'] is None else f'{row["observedFrameBudgetUs"]:.2f}'
+            reference = 'not used' if row['referenceFrameBudgetUs'] is None else f'{row["referenceFrameBudgetUs"]:.2f} (reference only)'
+            lines.append(f'| {name} | {row["status"]} | {row["displayRefreshRateHz"]:g} | '
+                         f'{row["frameBudgetSource"]} | {observed} | {reference} |')
+    lines += ['']
     lines += ['## Declared display compatibility', '',
               '| Runtime | Mode | Pixel rule | Display result |', '|---|---|---|---|']
     for lane in ('native', 'web'):
@@ -813,15 +874,16 @@ def markdown(result):
                          f'{statistics.median(row["p95Ms"] for row in rows):.2f} |')
     frames = [row for value in data.values() for row in value.get('frames', [])]
     lines += ['', '## Actual Flutter profile frame windows', '',
-              '| Mode | Windows | Raw frames | UI p95 µs (median/window) | Raster p95 µs (median/window) | Frames over observed refresh budget |',
-              '|---|---:|---:|---:|---:|---:|']
+              '| Mode | Calibration | Windows | Raw frames | UI p95 µs (median/window) | Raster p95 µs (median/window) | Frames over observed refresh budget |',
+              '|---|---|---:|---:|---:|---:|---:|']
     for mode in MODES:
-        rows = [row for row in frames if row['mode'] == mode]
-        if rows:
-            lines.append(f'| {mode} | {len(rows)} | {sum(r["frameCount"] for r in rows)} | '
-                         f'{statistics.median(r["uiP95Us"] for r in rows):.1f} | '
-                         f'{statistics.median(r["rasterP95Us"] for r in rows):.1f} | '
-                         f'{sum(r["overBudgetFrames"] for r in rows)} |')
+        for status in ('observed', 'unavailable'):
+            rows = [row for row in frames if row['mode'] == mode and row['displayCalibrationStatus'] == status]
+            if rows:
+                misses = 'unavailable' if status == 'unavailable' else str(sum(r['overBudgetFrames'] for r in rows))
+                lines.append(f'| {mode} | {status} | {len(rows)} | {sum(r["frameCount"] for r in rows)} | '
+                             f'{statistics.median(r["uiP95Us"] for r in rows):.1f} | '
+                             f'{statistics.median(r["rasterP95Us"] for r in rows):.1f} | {misses} |')
     inputs = [row for value in data.values() for row in value.get('inputLatencies', [])]
     lines += ['', '## Flutter input to physical sensor acknowledgement', '',
               '| Mode | Actual samples | Median ms | p95 ms | Median release-to-quiescence ms |',
@@ -913,7 +975,8 @@ def main():
     options.output.mkdir(parents=True, exist_ok=True)
     (options.output / 'comparison.json').write_text(json.dumps(result, indent=2) + '\n')
     (options.output / 'comparison.md').write_text(markdown(result))
-    print(f"Computerraria acceptance: {result['status']}; {result['acceptedReports']}/15 reports")
+    print(f"Computerraria report validity/correctness: {result['status']}; {result['acceptedReports']}/15 reports; "
+          f"display calibration: {result['displayCalibration']['status']}; target-device fluency: not established")
     return result['status'] != 'passed'
 
 
