@@ -95,8 +95,8 @@ external void _revokeUrl(JSString url);
 
 class PlatformWorldCircuitFiles implements WorldCircuitFileGateway {
   @override
-  Future<WorldCircuitSource?> pick({required bool companion}) async {
-    final extension = companion ? 'twld' : 'wld';
+  Future<WorldCircuitSource?> pick() async {
+    const extension = 'wld';
     final file = await _pickFile(extension);
     if (file == null) return null;
     final name = file.name.toDart;
@@ -104,7 +104,7 @@ class PlatformWorldCircuitFiles implements WorldCircuitFileGateway {
       throw FormatException('请选择 .$extension 文件。');
     }
     final length = file.size.toDartInt;
-    final limit = (companion ? 16 : 1024) * 1024 * 1024;
+    const limit = 1024 * 1024 * 1024;
     if (length < 1 || length > limit) {
       throw FormatException('文件必须为 1 字节到 ${limit ~/ 1048576} MiB。');
     }

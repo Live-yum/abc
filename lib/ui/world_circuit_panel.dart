@@ -32,7 +32,6 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
   final _height = TextEditingController(text: '32');
   final _computerFocus = FocusNode(debugLabel: 'physical computer input');
   int _mask = 15;
-  bool get _colorDisplay => widget.state['selectedDisplay'] == 'color';
   bool _performanceExpanded = false;
   Map<String, Object?>? _performanceSnapshot;
   List<Widget> _performanceDetails(Map<String, Object?> snapshot) {
@@ -287,7 +286,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         ),
         const SizedBox(height: 8),
         const Text(
-          '导入完整 WLD 后运行真实接线。Computerraria 需配套 TWLD 恢复显示器规则，并加载 RV32I 程序；无需安装 tModLoader 或 WireHead。',
+          '导入完整 WLD 后运行真实接线。Computerraria 可加载 RV32I 程序，通过 64 × 48 黑白显示器读取实际电路状态。',
         ),
         if (!open && s['streamingAvailable'] == true) ...[
           const SizedBox(height: 12),
@@ -302,19 +301,6 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                 icon: const Icon(Icons.folder_open),
                 label: const Text('选择完整 WLD'),
               ),
-              OutlinedButton(
-                onPressed: _busy || s['sourceName'] == null
-                    ? null
-                    : () => _send('worldCircuitChooseTwld'),
-                child: const Text('选择配套 TWLD'),
-              ),
-              if (s['companionName'] != null)
-                TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => _send('worldCircuitClearTwld'),
-                  child: const Text('移除配套文件'),
-                ),
               FilledButton(
                 onPressed: _busy || s['sourceName'] == null
                     ? null
@@ -327,11 +313,6 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             Text(
               '${s['sourceName']} · ${((s['sourceBytes'] as num? ?? 0) / 1048576).toStringAsFixed(1)} MiB',
             ),
-          Text(
-            s['companionName'] == null
-                ? '未选择 TWLD：使用原版电路规则。'
-                : '配套文件：${s['companionName']}（导入后核验）',
-          ),
         ],
         const SizedBox(height: 12),
         Wrap(
@@ -443,21 +424,32 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         if (open) ...[
           SwitchListTile(
             title: const Text('电路优化'),
-            subtitle: const Text('减少无关设备的逐次清理。切换会暂停运行并保留当前状态。'),
+            subtitle: const Text('默认关闭。开启后使用设备去重和 WireHead 式像素规则；后续运行结果可能不同。'),
             value: s['optimizationEnabled'] == true,
-            onChanged: _busy && !running
+            onChanged:
+                (_busy && !running) ||
+                    (s['optimizationSupported'] != true &&
+                        s['optimizationEnabled'] != true)
                 ? null
                 : (enabled) =>
                       _send('worldCircuitOptimization', {'enabled': enabled}),
             contentPadding: EdgeInsets.zero,
           ),
-          const Text('两种模式共用分组缓存和惰性状态；此开关控制设备信号去重加速，与 TWLD 显示器兼容配置分开。'),
+          const Text('关闭时采用原版像素规则。切换会暂停运行，保留当前 ROM 和显示帧；继续运行才按所选规则处理信号。'),
+          if (s['optimizationSupported'] != true)
+            const Text('此世界的像素接线拓扑暂不支持开启；同色跨轴网络尚未支持，请保持关闭。'),
+          if (computer &&
+              s['optimizationSupported'] == true &&
+              s['optimizationEnabled'] != true)
+            const Text(
+              'Computerraria 在原版规则下可能保持黑屏；开启电路优化后，继续运行可读取 WireHead 式显示的实际像素。',
+            ),
         ],
         if (open && computer) ...[
           const SizedBox(height: 12),
-          const Text('已核验：完整 Computerraria 内容、实际存储器坐标及 TWLD 显示器。'),
+          const Text('已核验：完整 Computerraria WLD、实际存储器坐标及 64 × 48 黑白显示器。'),
           if (s['restoredFromExport'] == true)
-            const Text('已匹配本机导出的完整配对文件；保留保存时的实际 CPU、ROM 和显示器状态。'),
+            const Text('已匹配本机导出的完整 WLD；保留保存时的实际 CPU、ROM 和显示器状态。'),
           Text(
             s['programName'] == null
                 ? '原始 ROM 为空。选择从地址 0 启动的 RV32I .bin 或十六进制 .txt。'
@@ -499,26 +491,13 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                     : () => _send('worldCircuitRefreshDisplay'),
                 child: const Text('读取显示器'),
               ),
-              ChoiceChip(
-                label: const Text('黑白 64 × 48'),
-                selected: !_colorDisplay,
-                onSelected: (_) =>
-                    _send('worldCircuitSelectDisplay', {'color': false}),
-              ),
-              ChoiceChip(
-                label: const Text('彩色 176 × 96'),
-                selected: _colorDisplay,
-                onSelected: (_) =>
-                    _send('worldCircuitSelectDisplay', {'color': true}),
-              ),
+              const Chip(label: Text('黑白 64 × 48')),
             ],
           ),
           const SizedBox(height: 8),
           Builder(
             builder: (context) {
-              final region = _colorDisplay
-                  ? ComputerrariaComputer.color
-                  : ComputerrariaComputer.mono;
+              const region = ComputerrariaComputer.mono;
               final frames = s['displayFrames'] as Map? ?? const {};
               final rgba = frames[region.name];
               return Focus(
@@ -560,7 +539,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
           Text(
             '已执行 ${s['physicalPulses'] ?? 0} 个物理时钟脉冲 · 当前模式实测 ${((s['clockHz'] as num?) ?? 0).toStringAsFixed(1)} Hz · 显示读取 ${((s['displayHz'] as num?) ?? 0).toStringAsFixed(1)} 次/秒',
           ),
-          const Text('时钟脉冲不等于 CPU 指令。运行速度取决于设备；彩色视图用实际帧状态对应的平面平均色。'),
+          const Text('时钟脉冲不等于 CPU 指令。运行速度取决于设备。'),
           if (widget.hostStages != null)
             ExpansionTile(
               title: const Text('性能明细 / Performance'),

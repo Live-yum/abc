@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch only the pinned public MIT Computerraria pair for opt-in validation.
+"""Fetch only the pinned public MIT Computerraria WLD for opt-in validation.
 
 Inputs are not packaged with the application or uploaded as CI artifacts.
 Existing files with unexpected bytes are never overwritten. Extraction is
@@ -20,8 +20,6 @@ ARCHIVE = {'name': 'computerraria.tar.gz', 'bytes': 2871121,
            'sha256': '31423b4f7ebbecceeaa54f982f02980efa5b8edccede5456456d892b0452ea1a'}
 WORLD = {'name': 'computerraria.wld', 'bytes': 405983441,
          'sha256': '55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33'}
-SIDECAR = {'name': 'computerraria.twld', 'bytes': 427712,
-           'sha256': 'c6de694b3d034701513dc1ba17311213561ec359d3ecddde7bc35ea3c9611ed8'}
 CHUNK = 1024 * 1024
 
 
@@ -119,27 +117,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=Path('build/public-computerraria'))
     parser.add_argument('--local-archive', type=Path, help='Already retrieved original archive; still hash verified')
-    parser.add_argument('--local-sidecar', type=Path, help='Already retrieved original companion; still hash verified')
     args = parser.parse_args()
     archive = args.local_archive or fetch(args.output, ARCHIVE)
     if not verified(archive, ARCHIVE):
         raise ValueError('Local archive is missing')
     world = extract_world(archive, args.output)
-    if args.local_sidecar:
-        if not verified(args.local_sidecar, SIDECAR):
-            raise ValueError('Local companion is missing')
-        sidecar = args.local_sidecar
-    else:
-        sidecar = fetch(args.output, SIDECAR)
-    assert verified(world, WORLD) and verified(sidecar, SIDECAR)
-    report = {'schema': 'abc.public-computerraria-inputs.v1', 'status': 'verified',
+    assert verified(world, WORLD)
+    report = {'schema': 'abc.public-computerraria-inputs.v2', 'status': 'verified',
               'sourceRevision': REVISION, 'source': BASE, 'license': 'MIT',
-              'copyright': '2023 Xander Naumenko', 'inputs': [ARCHIVE, WORLD, SIDECAR],
+              'copyright': '2023 Xander Naumenko', 'inputs': [ARCHIVE, WORLD],
               'world': {'format': 279, 'width': 15200, 'height': 7200},
               'privacy': 'Pinned public upstream fixture; no user saves. Do not upload the input files as artifacts.'}
     (args.output / 'input-manifest.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps({'status': 'verified', 'revision': REVISION,
-                      'worldBytes': WORLD['bytes'], 'companionBytes': SIDECAR['bytes']}))
+                      'worldBytes': WORLD['bytes']}))
 
 
 if __name__ == '__main__':

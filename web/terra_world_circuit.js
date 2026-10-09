@@ -3,7 +3,7 @@
 (function(root) {
 'use strict';
 const MiB = 1024 * 1024, MAX_SOURCE = 0x7fffffff, NATIVE_BUDGET = 192 * MiB;
-const SMALL_WORLD = 64 * MiB, SMALL_TWLD = 16 * MiB, MEMORY_STORAGE = 64 * MiB;
+const SMALL_WORLD = 64 * MiB, MEMORY_STORAGE = 64 * MiB;
 const pause = () => new Promise(resolve => setTimeout(resolve, 0));
 const now = () => root.performance?.now() ?? Date.now();
 const blob = value => typeof root.Blob === 'function' && value instanceof root.Blob;
@@ -51,13 +51,13 @@ async function persistentStorage() {
    const name = prefix + '-' + (++sequence), file = await directory.getFileHandle(name, {create:true});
    let access;
    try { access = await file.createSyncAccessHandle(); } catch (error) { await directory.removeEntry(name); throw error; }
-   let closed = false, size = 0;
+   let closed = false, accessClosed = false, size = 0;
    return {
     get size() { return size; },
     async read(offset, length) { range(offset, length, size); const result = new Uint8Array(length); if (access.read(result, {at:offset}) !== length) throw new Error('Truncated circuit scratch read'); return result; },
     async write(offset, bytes) { range(offset, bytes.length); if (access.write(bytes, {at:offset}) !== bytes.length) throw new Error('Incomplete circuit scratch write'); size = Math.max(size, offset + bytes.length); },
     async snapshot() { access.flush(); return file.getFile(); },
-    async close() { if (closed) return; closed = true; access.close(); await directory.removeEntry(name); },
+    async close() { if (closed) return; if (!accessClosed) { access.close(); accessClosed = true; } await directory.removeEntry(name); closed = true; },
    };
   },
  };
@@ -113,7 +113,7 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   range(offset, length, owner.size); const bytes = await owner.read(offset, length); cancelled();
   if (bytes.length !== length) throw new Error('Truncated circuit input');
   progressState.maxReadBytes = Math.max(progressState.maxReadBytes, length);
-  if (id === 1 || id === 4) { progressState.sourceReadBytes += length; progressState.sourceReadRequests++; } else progressState.scratchReadBytes += length;
+  if (id === 1) { progressState.sourceReadBytes += length; progressState.sourceReadRequests++; } else progressState.scratchReadBytes += length;
   return bytes;
  }
  async function hashSource(files, id, M, storage, stage = 'hash') {
@@ -152,26 +152,25 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   catch (error) { if (large) throw new Error('Full-world import requires writable OPFS browser storage: ' + error.message); return memoryStorage(); }
  }
  async function disposeFiles(files) {
-  const errors = []; for (const [id, file] of files) if (id !== 1 && id !== 4) { try { await file.close(); } catch (error) { errors.push(error); } }
+  const errors = []; for (const [id, file] of files) if (id !== 1) { try { await file.close(); } catch (error) { errors.push(error); } }
   files.clear(); if (errors.length) throw errors[0];
  }
- async function openImpl(world, twld, streaming) {
+ async function openImpl(world, streaming) {
   if (session) throw new Error('Close the existing world circuit first');
-  if (streaming && (!blob(world) || (twld != null && !blob(twld)))) throw new Error('Streaming import requires File/Blob sources');
-  if (!streaming && (!(world instanceof Uint8Array) || !world.length || world.length > SMALL_WORLD || (twld?.length || 0) > SMALL_TWLD)) throw new Error('World byte input exceeds host budget; use File/Blob import');
-  const worldSource = source(world), twldSource = twld && (blob(twld) ? twld.size : twld.length) ? source(twld) : null;
+  if (streaming && !blob(world)) throw new Error('Streaming import requires File/Blob sources');
+  if (!streaming && (!(world instanceof Uint8Array) || !world.length || world.length > SMALL_WORLD)) throw new Error('World byte input exceeds host budget; use File/Blob import');
+  const worldSource = source(world);
   const M = await (promise ??= loadModule());
+  if (buildInfo(M).circuitWorldAbiVersion !== 2) throw new Error('World circuit ABI 2 is required');
   for (const n of ['begin','step','supply','ack','command','stats','cancel','close']) if (typeof M['_terra_circuit_world_' + n] !== 'function') throw new Error('World circuit ABI missing ' + n);
-  const storage = await chooseStorage(worldSource.size > SMALL_WORLD || (twldSource?.size || 0) > SMALL_TWLD), files = new Map([[1,worldSource]]);
-  if (twldSource) files.set(4, twldSource);
+  const storage = await chooseStorage(worldSource.size > SMALL_WORLD), files = new Map([[1,worldSource]]);
   progressState = {...progressState, stage:'open', phase:0, completed:0, total:0, sourceReadBytes:0, sourceReadRequests:0, scratchReadBytes:0, scratchWriteBytes:0, maxReadBytes:0, maxWriteBytes:0, storageBytes:0, nativeActiveBytes:0, nativePeakBytes:0};
-  const out = M._tx_malloc(4), event = M._tx_malloc(48); let handle = 0, w = 0, task = 0, input = 0, adopted = false, sourceSha256, twldSourceSha256 = null;
+  const out = M._tx_malloc(4), event = M._tx_malloc(48); let handle = 0, w = 0, task = 0, input = 0, adopted = false, sourceSha256;
   try {
    if (!out || !event) throw new Error('Circuit allocation failed');
    files.set(2, await storage.create()); cancelled();
    // Caller metadata, including any sha256 property, is never an import proof.
    sourceSha256 = await hashSource(files, 1, M, storage);
-   if (twldSource) twldSourceSha256 = await hashSource(files, 4, M, storage);
    progressState.stage='open'; progressState.phase=0; progressState.completed=0; progressState.total=0;
    if (streaming) {
     for (const n of ['open_begin','step','supply_source','adopt','cancel','close']) if (typeof M['_terra_world_stream_' + n] !== 'function') throw new Error('World streaming ABI missing ' + n);
@@ -194,8 +193,8 @@ function createWorldCircuitBridge(loadModule, options = {}) {
     worldCheck(status); worldCheck(M._terra_world_open_finish(task, out)); w = M.HEAPU32[out >>> 2]; M._terra_world_task_close(task); task = 0;
     M._tx_free(input); input = 0;
    }
-   cancelled(); check(M._terra_circuit_world_begin(w, 2, twldSource ? 4 : 0, twldSource?.size || 0, NATIVE_BUDGET, out)); handle = M.HEAPU32[out >>> 2];
-   session = {M, handle, world:w, files, storage, streaming, sourceSha256, twldSourceSha256, hasTwld:!!twldSource}; progressState.stage = 'compile';
+   cancelled(); check(M._terra_circuit_world_begin(w, 2, NATIVE_BUDGET, out)); handle = M.HEAPU32[out >>> 2];
+   session = {M, handle, world:w, files, storage, streaming, sourceSha256}; progressState.stage = 'compile';
    return await pump();
   } catch (error) {
    if (handle) M._terra_circuit_world_close(handle); if (w) M._terra_world_close(w); session = null;
@@ -224,10 +223,10 @@ function createWorldCircuitBridge(loadModule, options = {}) {
    if (!event || !stats) throw new Error('Circuit allocation failed');
    for (;;) {
     cancelled(); const stepAt = now(); check(M._terra_circuit_world_step(handle, 4096, event)); hostStagesUs.coreStepUs += (now() - stepAt) * 1000; const e = Array.from(M.HEAPU32.subarray(event >>> 2, (event >>> 2) + 12));
-    const [abi,kind,id,offset,length,pointer] = e; if (abi !== 1) throw new Error('Unsupported circuit ABI');
+    const [abi,kind,id,offset,length,pointer] = e; if (abi !== 2) throw new Error('Unsupported circuit ABI');
     progressState.phase = e[6]; progressState.completed = e[7]; progressState.total = e[8];
     if (kind === 4) { resultKind = e[9]; resultCount = e[10]; reserved = e[11];
-     if ((kindExpected === 10 && (reserved & 2) !== (command[7] ? 2 : 0)) || resultKind !== kindExpected || (kindExpected === 8 && resultCount * 32 !== resultBytes) || (kindExpected === 7 && resultCount < resultBytes / 32)) throw new Error('Incomplete circuit result'); break;
+     if ((kindExpected === 10 && ((reserved & 2) !== (command[7] ? 2 : 0) || (reserved & 8) !== (command[7] ? 8 : 0))) || resultKind !== kindExpected || (kindExpected === 8 && resultCount * 32 !== resultBytes) || (kindExpected === 7 && resultCount < resultBytes / 32)) throw new Error('Incomplete circuit result'); break;
     }
     range(offset, length);
     if (kind === 1) {
@@ -237,7 +236,7 @@ function createWorldCircuitBridge(loadModule, options = {}) {
      if ((!pointer && length) || pointer + length > M.HEAPU8.length) throw new Error('Invalid circuit output');
      if (kind === 2) {
       if (id === 6) { if (!withObjects || offset !== objectBytes || length > 65536 || offset + length > command[4]) throw new Error('Invalid circuit companion output'); objectBytes += length; }
-      else if (id !== 2 && !(save && (id === 3 || id === 5))) throw new Error('Unexpected circuit output source');
+      else if (id !== 2 && !(save && id === 3)) throw new Error('Unexpected circuit output source');
       const target = files.get(id); if (!target || !target.write) throw new Error('Invalid circuit target');
       // The borrowed Wasm view remains valid until ack; storage consumes it now.
       const priorSize = target.size; await target.write(offset, M.HEAPU8.subarray(pointer, pointer + length)); cancelled();
@@ -253,20 +252,17 @@ function createWorldCircuitBridge(loadModule, options = {}) {
    const records = chunks.length === 1 ? chunks[0] : new Uint8Array(resultBytes); let at = 0; if (chunks.length !== 1) for (const chunk of chunks) { records.set(chunk, at); at += chunk.length; } hostStagesUs.resultCopyUs += (now() - copyAt) * 1000;
    const objects = withObjects ? await materialize(files.get(6), command[4]) : null; if (objects) validateObjects(objects, command[4], command[5]);
    check(M._terra_circuit_world_stats(handle, stats)); const statWords = Array.from(M.HEAPU32.subarray(stats >>> 2, (stats >>> 2) + 24)); refreshMemory(M, storage, statWords);
-   let world = null, twld = null, worldSource = null, twldSource = null;
+   let world = null, worldSource = null;
    if (save) {
-    if (files.get(3).size !== resultCount || (session.hasTwld && files.get(5).size !== reserved)) throw new Error('Incomplete circuit saved files');
+    if (files.get(3).size !== resultCount || reserved !== 0) throw new Error('Incomplete circuit saved files');
     if (streaming) {
-     // Prepare both digests before publishing either lease. Until publication,
-     // the session still owns both files and cleans them together on failure.
+     // The session retains the output until its digest and snapshot are valid.
      const preparedWorld = await prepareExport(files, 3, 'circuit.wld', M, storage);
-     const preparedTwld = session.hasTwld ? await prepareExport(files, 5, 'circuit.twld', M, storage) : null;
      cancelled(); worldSource = publishExport(files.get(3), preparedWorld);
-     if (preparedTwld) twldSource = publishExport(files.get(5), preparedTwld);
-     files.delete(3); files.delete(5);
-    } else { world = await materialize(files.get(3), SMALL_WORLD); if (session.hasTwld) twld = await materialize(files.get(5), SMALL_TWLD); }
+     files.delete(3);
+    } else { world = await materialize(files.get(3), SMALL_WORLD); }
    }
-   progressState.stage = 'ready'; return {hostStagesUs, session:handle, resultKind, resultCount, reserved, objects, stats:statWords, records, world, twld, worldSource, twldSource, sourceSha256:session.sourceSha256, twldSourceSha256:session.twldSourceSha256, diagnostics:{...progressState}};
+   progressState.stage = 'ready'; return {hostStagesUs, session:handle, resultKind, resultCount, reserved, objects, stats:statWords, records, world, worldSource, sourceSha256:session.sourceSha256, diagnostics:{...progressState}};
   } finally { if (event) M._tx_free(event); if (stats) M._tx_free(stats); }
  }
  function command(id, json, recordsJson) { return serial(() => commandImpl(id, json, recordsJson)); }
@@ -274,9 +270,10 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   const commandAt = now();
   if (!session || id !== session.handle) throw new Error('Circuit session is closed');
   const words = JSON.parse(json), records = JSON.parse(recordsJson), {M,handle,files,storage} = session;
-  if (!Array.isArray(words) || !Array.isArray(records) || words.length !== 16 || words[0] !== 1 || words[1] < 1 || words[1] > 10 || words[9] !== 0 || words[14] !== 0 || words[15] !== 0 || records.length !== words[10] * 4 || records.length > 65536 * 4 || [...words,...records].some(v => !Number.isInteger(v) || v < 0 || v > 0xffffffff)) throw new Error('Invalid circuit command');
+  if (!Array.isArray(words) || !Array.isArray(records) || words.length !== 16 || words[0] !== 2 || words[1] < 1 || words[1] > 10 || words[9] !== 0 || words[14] !== 0 || words[15] !== 0 || records.length !== words[10] * 4 || records.length > 65536 * 4 || [...words,...records].some(v => !Number.isInteger(v) || v < 0 || v > 0xffffffff)) throw new Error('Invalid circuit command');
   if (words[1] === 10 && (words[7] > 1 || records.length || words[12] !== 0)) throw new Error('Invalid circuit optimization mode');
   if (words[1] === 10 && buildInfo(M).circuitWorldOptimization !== 1) throw new Error('Circuit optimization is unavailable in this engine');
+  if (words[1] === 10 && words[7] === 1 && buildInfo(M).circuitWorldWireHeadPixels !== 1) throw new Error('This engine does not support WireHead-style WLD pixel rules');
   if (words[1] === 9 && (records.length || !words[4] || !words[5] || words[4] * words[5] > 65536 || words[12] !== 0)) throw new Error('Invalid circuit pixel query');
   if (words[1] === 7 || words[1] === 8) {
    if (words[8] < 1 || words[8] > 32768) throw new Error('Circuit fragments are limited to 32768 records'); const info = buildInfo(M);
@@ -289,11 +286,13 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   const replace = async id => { const old = files.get(id); if (old) { progressState.storageBytes -= old.size; await old.close(); } files.set(id, await storage.create()); };
   try {
    if (!p || !r) throw new Error('Circuit allocation failed'); M.HEAPU32.set(records, r >>> 2); words[9] = r; M.HEAPU32.set(words, p >>> 2);
-   if (words[1] === 6) { await replace(3); if (session.hasTwld) await replace(5); } if (words[1] === 8) await replace(6);
-   cancelled(); check(M._terra_circuit_world_command(handle, p)); const result = await pump(words); result.hostStagesUs.commandWallUs = (now() - commandAt) * 1000; return result;
+   if (words[1] === 6) await replace(3); if (words[1] === 8) await replace(6);
+   cancelled(); const status = M._terra_circuit_world_command(handle, p);
+   if (words[1] === 10 && words[7] === 1 && status === -7) throw Object.assign(new Error('此世界存在同色跨轴像素网络，暂不支持开启电路优化；可继续使用原版模式。'), {code:'CIRCUIT_PIXEL_TOPOLOGY'});
+   check(status); const result = await pump(words); result.hostStagesUs.commandWallUs = (now() - commandAt) * 1000; return result;
   } catch (error) {
    M._terra_circuit_world_cancel(handle);
-   if (words[1] === 6) for (const outputId of [3,5]) {
+   if (words[1] === 6) for (const outputId of [3]) {
     const file = files.get(outputId); if (!file) continue;
     const size = file.size;
     try { await file.close(); files.delete(outputId); progressState.storageBytes = Math.max(0, progressState.storageBytes - size); } catch (_) { /* close() can retry retained cleanup. */ }
@@ -304,9 +303,9 @@ function createWorldCircuitBridge(loadModule, options = {}) {
  }
  function computerFrame(id, clockJson, pixelsJson) { return serial(async () => {
   const clockWords = JSON.parse(clockJson), pixels = JSON.parse(pixelsJson);
-  const expectedClock = [1,2,3194,153,1,1,1,8,128,0,0,0,0,0,0,0];
-  const monitor = pixels?.[2] === 6485 ? [6485,800,64,48] : [7371,1002,176,96];
-  const expectedPixels = [1,9,...monitor,1,0,0,0,0,0,0,0,0,0];
+  const expectedClock = [2,2,3194,153,1,1,1,8,128,0,0,0,0,0,0,0];
+  const monitor = [6485,800,64,48];
+  const expectedPixels = [2,9,...monitor,1,0,0,0,0,0,0,0,0,0];
   if (!Array.isArray(clockWords) || clockWords.length !== 16 || !Number.isInteger(clockWords[8]) || clockWords[8] < 32 || clockWords[8] > 128 || clockWords.some((v,i) => i !== 8 && v !== expectedClock[i]) || !Array.isArray(pixels) || pixels.length !== 16 || pixels.some((v,i) => v !== expectedPixels[i])) throw new Error('Invalid physical computer frame');
   operation = {cancelled:false}; const started = now();
   try {
@@ -323,11 +322,11 @@ function createWorldCircuitBridge(loadModule, options = {}) {
  function close(id) { return serial(async () => {
   if (!session || id !== session.handle) return; const current = session; session = null;
   try { try { check(current.M._terra_circuit_world_close(current.handle)); } finally { worldCheck(current.M._terra_world_close(current.world)); } }
-  finally { for (const [sourceId,file] of current.files) if (sourceId !== 1 && sourceId !== 4) progressState.storageBytes -= file.size; await disposeFiles(current.files); progressState.stage = 'closed'; progressState.nativeActiveBytes = 0; refreshMemory(current.M, current.storage); }
+  finally { for (const [sourceId,file] of current.files) if (sourceId !== 1) progressState.storageBytes -= file.size; await disposeFiles(current.files); progressState.stage = 'closed'; progressState.nativeActiveBytes = 0; refreshMemory(current.M, current.storage); }
  }); }
  function releaseSource(token) { return serial(async () => { const file = exported.get(token); if (!file) return; const size = file.size; await file.close(); exported.delete(token); progressState.storageBytes = Math.max(0, progressState.storageBytes - size); }); }
- const open = (world,twld,streaming) => serial(async () => { operation={cancelled:false}; try { return await openImpl(world,twld,streaming); } finally { operation=null; } });
- return {open:(world,twld) => open(world,twld,false), openSource:(world,twld) => open(world,twld,true), command, computerFrame, close, releaseSource,
+ const open = (world,streaming) => serial(async () => { operation={cancelled:false}; try { return await openImpl(world,streaming); } finally { operation=null; } });
+ return {open:world => open(world,false), openSource:world => open(world,true), command, computerFrame, close, releaseSource,
   progress:async () => ({...progressState, diagnostics:{...progressState}}), cancelOperation:async () => { if (operation) operation.cancelled = true; },
  };
 }

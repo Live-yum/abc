@@ -222,6 +222,8 @@ jobs:
           persist-credentials: false
       - name: Install real Linux profile build and display dependencies
         run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev zlib1g-dev xvfb mesa-utils
+      - name: Verify Linux QuickJS bundle installation
+        run: python3 tool/linux_bundle_test.py
       - uses: ./.github/actions/setup-performance
       - name: Record actual software renderer provenance
         run: |

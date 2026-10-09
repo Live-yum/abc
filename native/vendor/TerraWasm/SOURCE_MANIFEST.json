@@ -2,18 +2,18 @@
   "schema": 1,
   "sourceRepository": "Live-yum/TerraWasm",
   "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
-  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The explicitly recorded full-world-pixels-v1 local patch adds a read-only retained-pixel query and equivalent device-dedup generation optimization; its original/current hashes and reviewed diff are distributed under native/patches.",
+  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v3-wld-only patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; shared physical gate-wave VM code is unchanged. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches.",
   "license": "No upstream license grant identified; inclusion is user-authorized and does not relicense upstream material.",
   "files": [
     {
       "path": "CMakeLists.txt",
-      "bytes": 25671,
-      "sha256": "bc180b08dd16d190e17d2d149e3fddbb8216be6d642c6d8969ceeaeb53d8a53c"
+      "bytes": 25494,
+      "sha256": "e9d473343c337306af0e17256be7ef3a71ea18872a24144b89cd3b916a017da5"
     },
     {
       "path": "README.md",
-      "bytes": 21780,
-      "sha256": "606997a6056d091a62f86cd084dfdc7c030a9a5571596c5e73d928ff663722c8"
+      "bytes": 23389,
+      "sha256": "313a422441afd1ef68ab88cdfc1c0abdd9f2b48e4d2aee786263e898c5402231"
     },
     {
       "path": "exports.plr.txt",
@@ -81,19 +81,14 @@
       "sha256": "c2c2ef196a45487b0450aacbca9ec92417af4e689fd540c3ba7e0ec729b78456"
     },
     {
-      "path": "include/terra_circuit_twld.h",
-      "bytes": 3167,
-      "sha256": "3bdbbdb72fc4061b42381f014c43ad49e22f4ef86d879f2a015658dcc05b3843"
-    },
-    {
       "path": "include/terra_circuit_vm.h",
       "bytes": 5528,
       "sha256": "ab5a6b9de349d7ddf5b206034cafb364acdac3568f5c7eac90b00054659de2ea"
     },
     {
       "path": "include/terra_circuit_world.h",
-      "bytes": 7459,
-      "sha256": "b8fe117c8bb6ad8eb731313ec7b9fc7d1be2264f7c14d9f5579eb086ec654de9"
+      "bytes": 7405,
+      "sha256": "41bb49cd77e237dc8bd44119f2d44ff52addeda80ebd39f506647e454bc01f80"
     },
     {
       "path": "include/terra_color_data.h",
@@ -222,8 +217,8 @@
     },
     {
       "path": "src/terra_abi.c",
-      "bytes": 4452,
-      "sha256": "15bf8fd1958814f776e6957b0c270640672ed750af5ab4bdb01203054777d585"
+      "bytes": 4604,
+      "sha256": "4f98355e039052130029940cf2e10eae935995961f8ce4a9af512f7db027418c"
     },
     {
       "path": "src/terra_api.c",
@@ -242,18 +237,18 @@
     },
     {
       "path": "src/terra_circuit_compile.c",
-      "bytes": 22785,
-      "sha256": "898ac2650b453e830011debf95dd35d463a4e296fc076e4e12400cc5da2e14cb"
+      "bytes": 26672,
+      "sha256": "0952d1dc46dabadde739c858ec7c05fb1802b5548ed4b862774e402e64a83233"
     },
     {
       "path": "src/terra_circuit_devices.c",
-      "bytes": 16371,
-      "sha256": "aca9d4fef000daa33d64e1e7de5a90698ebd461d6dec13c9655acc15a1d63ac7"
+      "bytes": 18670,
+      "sha256": "4a1955f40f5f92e1718f7cd1c4003f5956056a067026a2d2b4230d3877e9964e"
     },
     {
       "path": "src/terra_circuit_fragments.inc",
-      "bytes": 21162,
-      "sha256": "3b41226db51e75819e3f03cc84d23ac7788ced0316690700c5f95fc329bd99ba"
+      "bytes": 21064,
+      "sha256": "f007bf4e99679c8f7f11857140eeb5999d200278357a49d472d7b284d3eb9557"
     },
     {
       "path": "src/terra_circuit_objects.h",
@@ -262,28 +257,18 @@
     },
     {
       "path": "src/terra_circuit_query.c",
-      "bytes": 20041,
-      "sha256": "4ada9f1d446e26d9fb8ffef8ff3b99da77de9df444430a7e123e0bc9de2aafec"
+      "bytes": 19553,
+      "sha256": "206316d613a60d309da1a05a8cfb538f3052a05dafe2e031719536f2fb259a3b"
     },
     {
       "path": "src/terra_circuit_rules.c",
-      "bytes": 13513,
-      "sha256": "00d0232156f2a24c5b1e7033433ce0edccceaf813bf98aa12cb44f39c4847e56"
+      "bytes": 13374,
+      "sha256": "35277f86b3c91afdbc3537fa7b19ffd8c0b83a47545c1ae3e78f05a6fa832829"
     },
     {
       "path": "src/terra_circuit_supports.inc",
       "bytes": 17032,
       "sha256": "af85808cd12c7994ff7efab98bb6d4254b4b9309ea45cd94ed1bc512ce2a9b13"
-    },
-    {
-      "path": "src/terra_circuit_twld.c",
-      "bytes": 27757,
-      "sha256": "ceb78d7d05e8e299e20cbac897c850d17ca9f08337adbedec28a596f23657d89"
-    },
-    {
-      "path": "src/terra_circuit_twld_session.c",
-      "bytes": 5190,
-      "sha256": "dcfdd538e09f4625519fe0e0d4d0371fd9900965b039e14579124aa9263427a4"
     },
     {
       "path": "src/terra_circuit_vm.c",
@@ -292,13 +277,13 @@
     },
     {
       "path": "src/terra_circuit_world.c",
-      "bytes": 19517,
-      "sha256": "68d8fc056acdfadee0f751031f72a7168e3049e123e29e4f366164669d61127b"
+      "bytes": 18842,
+      "sha256": "21ec49bf23773d62bf4d0515340b0250c2e395d5c3f685103053fee03531ae76"
     },
     {
       "path": "src/terra_circuit_world_internal.h",
-      "bytes": 9609,
-      "sha256": "90950c38a5ecf6e3d7cbe94ad3c9a54a6628bd00ddf2823c0639be787eb7296f"
+      "bytes": 9371,
+      "sha256": "d85f28f916e568608a309ba335941e52717503781a3fb3bc4c0fd5f04f9e8044"
     },
     {
       "path": "src/terra_commands.c",
@@ -472,8 +457,8 @@
     },
     {
       "path": "src/terra_wld.c",
-      "bytes": 105256,
-      "sha256": "587e2b89e36770fb8849fcd19a7cb7e799a13b9e1b6b71cb13b69880e6b2383e"
+      "bytes": 105514,
+      "sha256": "8b4bcec36063ff7116bfcfdf130429ea6a923bcbf959d0a9235e83a7b00ab8fc"
     },
     {
       "path": "src/terra_wld_guard.c",
@@ -498,9 +483,9 @@
   ],
   "localPatches": [
     {
-      "id": "full-world-pixels-v1",
+      "id": "full-world-pixels-v3-wld-only",
       "manifest": "native/patches/full-world-pixels.json",
-      "sha256": "ee3bb706e7f4cd9437faaa61247182bc5943957b0a93c63dcc21082fb2efa824"
+      "sha256": "a5bb31a966d8625f16ae095c90d5d1ee0b90da5bc81e34dc481842af0cc76a48"
     }
   ]
 }

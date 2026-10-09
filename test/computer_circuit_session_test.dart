@@ -26,29 +26,27 @@ void main() {
       backend.commands.clear();
       session.hostStages.reset();
       await session.stepComputer(128);
-      expect(backend.commands.map((c) => c.words[1]), [2, 9, 9]);
+      expect(backend.commands.map((c) => c.words[1]), [2, 9]);
       expect(backend.commands.first.words[8], 128);
-      expect(session.displayFrames.length, 2);
+      expect(session.displayFrames.length, 1);
       final stages = session.hostStages.snapshot()['stages'] as Map;
-      for (final key in ['physical.command', 'mono.query', 'color.query']) {
+      for (final key in ['physical.command', 'mono.query']) {
         expect((stages[key] as Map)['count'], 1);
       }
-      expect((stages['display.rgbaDecode'] as Map)['count'], 2);
-      expect((stages['display.listEquals'] as Map)['count'], 2);
+      expect((stages['display.rgbaDecode'] as Map)['count'], 1);
+      expect((stages['display.listEquals'] as Map)['count'], 1);
       await session.close();
       session.dispose();
     },
   );
 
-  test('registered derived pair restores ROM metadata without reset and clears a longer tail later', () async {
+  test('registered derived WLD restores ROM metadata without reset and clears a longer tail later', () async {
     final backend = ComputerCircuitBackend()
-      ..digest = ComputerCircuitBackend.savedWldSha
-      ..twldDigest = ComputerCircuitBackend.savedTwldSha;
+      ..digest = ComputerCircuitBackend.savedWldSha;
     final session = WorldCircuitSession.fromSource(backend, source);
     await session.open();
     final provenance = ComputerProvenanceRecord(
       wldSha256: backend.digest,
-      twldSha256: backend.twldDigest,
       programName: 'long.bin',
       programImage: Uint8List.fromList([1, 0, 0, 0, 1, 0, 0, 0]),
       physicalPulses: 5120,
@@ -70,7 +68,7 @@ void main() {
   });
 
   test(
-    'a registered WLD with a different TWLD never enables fixed controls',
+    'a different WLD never enables fixed controls with unrelated provenance',
     () async {
       final backend = ComputerCircuitBackend()
         ..digest = ComputerCircuitBackend.savedWldSha;
@@ -79,8 +77,7 @@ void main() {
       expect(
         await session.verifyComputer(
           provenance: ComputerProvenanceRecord(
-            wldSha256: backend.digest,
-            twldSha256: ComputerCircuitBackend.savedTwldSha,
+            wldSha256: 'b' * 64,
             programName: null,
             programImage: Uint8List(0),
           ),
@@ -93,13 +90,15 @@ void main() {
     },
   );
 
-  test('optimization defaults off and drains clock before preserving state on switch', () async {
+  test('mode defaults to vanilla and switching preserves the current ROM and frame snapshot', () async {
     final backend = ComputerCircuitBackend();
     final session = WorldCircuitSession.fromSource(backend, source);
     await session.open();
     await session.verifyComputer();
     await session.loadProgram('p.bin', Uint8List.fromList([1, 0, 0, 0]));
     expect(session.optimizationEnabled, isFalse);
+    expect(session.optimizationSupported, isTrue);
+    expect(session.wireHeadPixelRulesEnabled, isFalse);
     final before = Map.of(session.displayFrames);
     backend.holdClock = Completer<void>();
     session.run();
@@ -115,6 +114,7 @@ void main() {
     backend.holdClock!.complete();
     await mode;
     expect(session.optimizationEnabled, isTrue);
+    expect(session.wireHeadPixelRulesEnabled, isTrue);
     expect(session.programName, 'p.bin');
     expect(session.canRunComputer, isTrue);
     expect(session.heldKeys, {'up'});
@@ -122,9 +122,54 @@ void main() {
     expect(session.physicalPulses, 128);
     expect(backend.opens, 1);
     expect(backend.closes, 0);
+    await session.command(WorldCircuitCommand.save());
+    expect(session.result!.reserved, 0);
+    expect(session.optimizationSupported, isTrue);
+    expect(session.wireHeadPixelRulesEnabled, isTrue);
     await session.close();
     session.dispose();
   });
+
+  for (final refusal in ['unsupported capability', 'engine refusal']) {
+    test(
+      'ON rejection preserves the paused computer state: $refusal',
+      () async {
+        final backend = ComputerCircuitBackend()
+          ..optimizationSupported = refusal != 'unsupported capability'
+          ..rejectOptimization = refusal == 'engine refusal';
+        final session = WorldCircuitSession.fromSource(backend, source);
+        await session.open();
+        await session.verifyComputer();
+        await session.loadProgram('p.bin', Uint8List.fromList([1, 0, 0, 0]));
+        session.markSaved();
+        final frames = Map.of(session.displayFrames);
+        final program = session.programImage;
+        final pulses = session.physicalPulses;
+        await expectLater(session.setOptimization(true), throwsA(anything));
+        expect(session.optimizationEnabled, isFalse);
+        expect(session.wireHeadPixelRulesEnabled, isFalse);
+        expect(backend.optimized, isFalse);
+        expect(session.running, isFalse);
+        expect(session.programImage, program);
+        expect(session.displayFrames, frames);
+        expect(session.physicalPulses, pulses);
+        expect(session.dirty, isFalse);
+        expect(session.error, isNotNull);
+        if (refusal == 'unsupported capability') {
+          expect(session.error.toString(), contains('同色跨轴网络'));
+          expect(
+            backend.commands.where((command) => command.words[1] == 10),
+            isEmpty,
+          );
+        }
+        await session.setOptimization(false);
+        expect(session.error, isNull);
+        expect(session.canRunComputer, isTrue);
+        await session.close();
+        session.dispose();
+      },
+    );
+  }
 
   test(
     'held keys coalesce actual sensor pulses and release never pulses',
@@ -173,18 +218,15 @@ void main() {
     },
   );
 
-  test(
-    'source content/profile, not filename, gates fixed physical mapping',
-    () async {
-      final backend = ComputerCircuitBackend()..digest = 'other';
-      final session = WorldCircuitSession.fromSource(backend, source);
-      await session.open();
-      expect(await session.verifyComputer(), isFalse);
-      expect(backend.commands, isEmpty);
-      await session.close();
-      session.dispose();
-    },
-  );
+  test('source content, not filename, gates fixed physical mapping', () async {
+    final backend = ComputerCircuitBackend()..digest = 'other';
+    final session = WorldCircuitSession.fromSource(backend, source);
+    await session.open();
+    expect(await session.verifyComputer(), isFalse);
+    expect(backend.commands, isEmpty);
+    await session.close();
+    session.dispose();
+  });
 
   test(
     'real ROM lamp writes, physical reset controls, then yellow clock pulses',

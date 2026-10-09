@@ -40,7 +40,7 @@ jobs:
           cmake -S native -B build/computerraria/native -DCMAKE_BUILD_TYPE=Release -DABC_PERF_COUNTERS=ON
           cmake --build build/computerraria/native --parallel 2
           python3 tool/perf/computerraria_provenance.py --artifact build/computerraria/native/libabc_engine.so --cmake-cache build/computerraria/native/CMakeCache.txt --output build/computerraria/raw/native/build.json
-      - name: Three default OFF lifecycles, including full paired save and reopen
+      - name: Three default OFF lifecycles, including full WLD save and reopen
         env:
           ABC_COMPUTERRARIA_OPTIMIZED: '0'
           ABC_COMPUTERRARIA_SAVE: '1'
@@ -48,7 +48,7 @@ jobs:
           python3 tool/perf/run_ci_suite.py --suite computerraria-native-standard --runs 3
           --timeout-seconds 1200 --output-dir build/computerraria/raw/native --
           dart run native/computerraria_acceptance.dart build/computerraria/native/libabc_engine.so
-          build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
+          build/public-computerraria/computerraria.wld
           - assets/computer/pong.bin {report}
       - name: Three ON lifecycles with the identical program, input and physical pulses
         if: ${{ !cancelled() }}
@@ -59,7 +59,7 @@ jobs:
           python3 tool/perf/run_ci_suite.py --suite computerraria-native-optimized --runs 3
           --timeout-seconds 1200 --output-dir build/computerraria/raw/native --
           dart run native/computerraria_acceptance.dart build/computerraria/native/libabc_engine.so
-          build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
+          build/public-computerraria/computerraria.wld
           - assets/computer/pong.bin {report}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
@@ -95,13 +95,13 @@ jobs:
           ABC_WEB_OUTPUT="$PWD/build/computerraria/engine-web" bash tool/build_web_engine.sh
           cp build/computerraria/engine-web/manifest.json build/computerraria/raw/web/engine-manifest.json
           python3 tool/perf/computerraria_provenance.py --artifact build/computerraria/engine-web/world.js --artifact build/computerraria/engine-web/world.wasm --cmake-cache build/wasm-wld/CMakeCache.txt --output build/computerraria/raw/web/build.json
-      - name: Three default OFF compound RPC lifecycles and paired save/reopen
+      - name: Three default OFF compound RPC lifecycles and WLD save/reopen
         run: >-
           python3 tool/perf/run_ci_suite.py --suite computerraria-web-standard --runs 3
           --timeout-seconds 1200 --output-dir build/computerraria/raw/web --
           node test/web/computerraria_file_acceptance.cjs
           build/computerraria/engine-web/world.js build/computerraria/engine-web/world.wasm
-          build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
+          build/public-computerraria/computerraria.wld
           {report} --pong assets/computer/pong.bin --input - --save --compound-frame
       - name: Three ON compound RPC lifecycles with identical physical inputs
         if: ${{ !cancelled() }}
@@ -110,7 +110,7 @@ jobs:
           --timeout-seconds 1200 --output-dir build/computerraria/raw/web --
           node test/web/computerraria_file_acceptance.cjs
           build/computerraria/engine-web/world.js build/computerraria/engine-web/world.wasm
-          build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
+          build/public-computerraria/computerraria.wld
           {report} --pong assets/computer/pong.bin --input - --save --optimized --compound-frame
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
@@ -142,7 +142,6 @@ jobs:
           cp build/public-computerraria/input-manifest.json build/computerraria/raw/ui/
           echo "TMPDIR=$PWD/build/computerraria/tmp/ui" >> "$GITHUB_ENV"
           echo "COMPUTERRARIA_WLD=$PWD/build/public-computerraria/computerraria.wld" >> "$GITHUB_ENV"
-          echo "COMPUTERRARIA_TWLD=$PWD/build/public-computerraria/computerraria.twld" >> "$GITHUB_ENV"
       - name: Record observed software renderer
         run: |
           xvfb-run -a -s '-screen 0 1440x1000x24' glxinfo -B > build/computerraria/raw/ui/glxinfo.txt

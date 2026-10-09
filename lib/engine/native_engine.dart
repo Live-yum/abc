@@ -82,16 +82,13 @@ class _NativeEngine
   }
 
   @override
-  Future<WorldCircuitResult> openWorldCircuit(
-    Uint8List world, {
-    Uint8List? twld,
-  }) async => WorldCircuitResult.fromMap(
-    (await _call('worldCircuitOpen', [world, twld])) as Map,
-  );
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async =>
+      WorldCircuitResult.fromMap(
+        (await _call('worldCircuitOpen', [world])) as Map,
+      );
   @override
   Future<WorldCircuitResult> openWorldCircuitSource(
     WorldCircuitSource world, {
-    WorldCircuitSource? twld,
     void Function(WorldCircuitProgress)? onProgress,
   }) async {
     var polling = false, finished = false;
@@ -112,10 +109,7 @@ class _NativeEngine
           });
     try {
       return WorldCircuitResult.fromMap(
-        (await _call('worldCircuitOpenSource', [
-          world.toFileMap(),
-          twld?.toFileMap(),
-        ])) as Map,
+        (await _call('worldCircuitOpenSource', [world.toFileMap()])) as Map,
       );
     } finally {
       finished = true;

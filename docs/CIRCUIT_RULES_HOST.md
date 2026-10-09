@@ -6,7 +6,7 @@ editor, catalog and computation session at commit
 under `vendor/viewer-circuit`; the original reference checkout stays unchanged.
 The Flutter host does not translate the device
 rules into a second Dart implementation. This host is separate from the legacy
-small `terraforge.circuit` sandbox and from `.wld`/`.twld` world sessions.
+small `terraforge.circuit` sandbox and from `.wld` world sessions.
 
 The retained document format is `viewer-terralogic`, schema version 1. The
 authoritative parser validates the game's target/source, four wire colors,

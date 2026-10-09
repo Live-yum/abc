@@ -1,11 +1,8 @@
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
-
 import 'package:terraforge/engine/world_circuit_backend.dart';
 
-Future<({WorldCircuitSource world, WorldCircuitSource twld})>
-computerInputs() async {
+Future<WorldCircuitSource> computerInput() async {
   Future<WorldCircuitSource> input(String key, String name) async {
     final path = Platform.environment[key];
     if (path == null || path.isEmpty) {
@@ -19,17 +16,10 @@ computerInputs() async {
     );
   }
 
-  final result = (
-    world: await input('COMPUTERRARIA_WLD', 'computerraria.wld'),
-    twld: await input('COMPUTERRARIA_TWLD', 'computerraria.twld'),
-  );
-  if (result.world.length != 405983441 ||
-      result.twld.length != 427712 ||
-      (await sha256.bind(File(result.twld.path!).openRead()).first)
-              .toString() !=
-          'c6de694b3d034701513dc1ba17311213561ec359d3ecddde7bc35ea3c9611ed8') {
+  final result = await input('COMPUTERRARIA_WLD', 'computerraria.wld');
+  if (result.length != 405983441) {
     throw StateError(
-      'This profile accepts only the pinned public Computerraria pair.',
+      'This profile accepts only the pinned public Computerraria WLD.',
     );
   }
   // The production owner verifies the complete WLD SHA-256 before fixed-layout

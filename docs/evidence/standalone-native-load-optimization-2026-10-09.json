@@ -1,0 +1,143 @@
+{
+  "schema": "abc.standaloneNativeLoad.optimizationComparison.v1",
+  "measurement_date": "2026-10-09",
+  "status": "isolated-loading-variant-evidence; final-merged-loading-measurement-pending",
+  "scope": {
+    "runtime": "Linux x86_64 standalone C host / streamed Native C engine",
+    "operation": "WLD open and full circuit compile to ready; public reference additionally initializes the 64 x 48 monochrome display",
+    "circuit_world_abi_version": 2,
+    "fresh_process_each_run": true,
+    "os_page_cache_dropped": false,
+    "compiled_cache_used": false,
+    "excludes": [
+      "Flutter UI import latency",
+      "browser import latency",
+      "ordinary preview and rendering",
+      "CPU/Pong execution",
+      "export",
+      "target-device performance"
+    ],
+    "cache_caveat": "OS page cache was uncontrolled. Fresh-process runs are not verified cold-storage measurements."
+  },
+  "provenance": {
+    "historical_baseline_report": "standalone-native-load-2026-10-09.json",
+    "historical_baseline_report_sha256": "27c533d0b186828bc1342e93b843767fd97079d5494ee00e8afd71dd097a1ac9",
+    "baseline_engine_library_sha256": "18bd6c66a2b27ab3e8a18281d292475f7390bb155d53b9c4a8fbdaf8746f0abf",
+    "isolated_optimized_engine_library_sha256": "08fd47547cb2ba13401a525c01b0b5ea9f9390f1ade232c1d39c538e98944d1f",
+    "matched_build_flags": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "C_FLAGS": "-O3 -DNDEBUG -std=gnu17 -fPIC -fvisibility=hidden",
+      "ABC_PERF_COUNTERS": "ON (matches baseline)",
+      "ABC_SANITIZERS": "OFF"
+    },
+    "optimization": "Sparse wired-row and gate compiler indexes, skipped absent wire colors, bulk-zero output arrays, checked inline decode and paged-word access. Column/color/row ordering preserved; no persistent compiled cache.",
+    "artifact_boundary": "These numbers bind to the isolated optimized library above. Final merged Native/WASM artifacts differ and have not been certified by these measurements.",
+    "certifies_final_merged_artifacts": false
+  },
+  "public_reference_world": {
+    "input": {
+      "bytes": 405983441,
+      "version": 279,
+      "width": 15200,
+      "height": 7200,
+      "origin": "Public upstream Computerraria WLD; world bytes are not included"
+    },
+    "baseline": {
+      "runs": 3,
+      "load_seconds": [
+        17.123600527,
+        17.809406212,
+        17.654248591
+      ],
+      "median_load_seconds": 17.654248591,
+      "max_observed_peak_rss_bytes": 150786048,
+      "max_observed_peak_rss_MiB": 143.80078125
+    },
+    "isolated_optimized": {
+      "runs": 3,
+      "load_seconds": [
+        9.66372316,
+        10.088000512,
+        9.403678527
+      ],
+      "median_load_seconds": 9.66372316,
+      "max_observed_peak_rss_bytes": 150859776,
+      "max_observed_peak_rss_MiB": 143.87109375
+    },
+    "median_reduction_percent": 45.26120378226411,
+    "peak_rss_delta_bytes": 73728,
+    "peak_rss_interpretation": "The measured gain is loading time. Peak process RSS was effectively unchanged; no memory reduction is claimed.",
+    "optimized_engine_peak_bytes": 145729450,
+    "optimized_engine_active_loaded_bytes": 126744066,
+    "validation": {
+      "compiled_array_digests_equal": 14,
+      "structural_counters_equal": 15,
+      "tracked_owner_bytes_after_close": 0,
+      "source_opened_read_only": true,
+      "source_identity_verified_each_run": true,
+      "all_12_compile_phases_cancel_and_close_to_zero_owned_bytes": true,
+      "work_unit_1_equivalent": true,
+      "parser_differential_cases": 1679376,
+      "isolated_off_mode_cpu_48_signatures_and_rom_mutation_control": "passed; original isolated acceptance snapshot, before the new PixelBox-rule assertions"
+    },
+    "separate_dart_owner_observation": {
+      "import_seconds": 14.874,
+      "runs": 1,
+      "scope": "Dart owner import with the isolated loading variant; distinct from standalone C load timing and not a Flutter UI measurement",
+      "comparable_baseline_in_this_report": false
+    }
+  },
+  "sanitized_private_world": {
+    "input": {
+      "bytes": 11956596,
+      "version": 326,
+      "width": 8400,
+      "height": 2400
+    },
+    "measurement_scope": "standalone C streamed world open plus full circuit compile to ready; excludes ordinary UI preview and rendering; excludes input hashing",
+    "baseline": {
+      "runs": 3,
+      "load_seconds": [
+        2.093652706,
+        1.993109123,
+        1.982061533
+      ],
+      "median_load_seconds": 1.993109123
+    },
+    "isolated_optimized": {
+      "runs": 3,
+      "load_seconds": [
+        0.583613449,
+        0.548495772,
+        0.553877706
+      ],
+      "median_load_seconds": 0.553877706
+    },
+    "median_reduction_percent": 72.21036722935115,
+    "fresh_process_each_run": true,
+    "os_page_cache_dropped": false,
+    "source_identity_verified_before_and_after": true,
+    "all_compiled_structure_hashes_equal": true,
+    "native_owners_after_close": 0,
+    "redaction": "Only dimensions, format version, byte count and aggregate/run timing results are public. Private input name, path, hash and source bytes are omitted."
+  },
+  "current_pure_wld_acceptance": {
+    "off": "Physical CPU works. Ordinary PixelBoxes require both axes in the same game-rule TripWire, so this WLD does not display Pong in OFF mode.",
+    "on": "WireHead-style group-pair parity within a logic-gate wave drives the actual 3072 monochrome PixelBoxes. This changes future pixel behavior; it is not merely a speed switch.",
+    "initial_layered_native_acceptance": "passed",
+    "final_merged_native_acceptance": "passed; one fresh local process per mode; see pure-wld-backend-acceptance-2026-10-09.json",
+    "final_node_wasm_acceptance": "passed; see pure-wld-backend-acceptance-2026-10-09.json",
+    "current_flutter_ui_acceptance": "pending",
+    "historical_companion_format_evidence": "CPU/Pong, browser, continuation and soak results from the former multi-file format do not certify this candidate.",
+    "node_wasm_sha256": "b3ace044d3b466eee338d25c87dd034c10cc8e73ec1c07e5f900bf42c694e7b8",
+    "on_no_reset_saved_continuation": "passed under final Node WASM; see pure-wld-backend-acceptance-2026-10-09.json",
+    "native_library_sha256": "d033ffd68651f3d7abda7b329ac46e576caa1400bdf73d340e8bd7cf48ebf9d7"
+  },
+  "limitations": [
+    "Three runs per variant and world are bounded host-local evidence, not a hardware-independent speed guarantee.",
+    "Standalone C load timings and the separate Dart owner observation must not be substituted for actual Flutter UI import timing.",
+    "Tracked allocation release does not prove immediate process RSS return or absence of a leak.",
+    "The unchanged historical baseline report remains the source for its sampling and closed-RSS observations.",
+    "No private save, private source identifier, credential or proprietary game source is included."
+  ]
+}

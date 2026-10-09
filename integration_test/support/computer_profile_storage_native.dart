@@ -38,8 +38,10 @@ class _NativeComputerProfileStorage implements ComputerProfileStorage {
       if (await input.length() != source.length) {
         throw const FormatException('Computer profile source length changed.');
       }
-      final extension = name.toLowerCase().endsWith('.twld') ? 'twld' : 'wld';
-      final output = File('${_root.path}/output-${++_sequence}.$extension');
+      if (!name.toLowerCase().endsWith('.wld')) {
+        throw const FormatException('Expected a WLD output name.');
+      }
+      final output = File('${_root.path}/output-${++_sequence}.wld');
       try {
         // File.copy uses the native filesystem; no whole-world Dart buffer.
         await input.copy(output.path);

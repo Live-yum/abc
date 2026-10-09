@@ -8,6 +8,7 @@
  * size and the number of wire-connected devices. A full list rejects only the
  * new registration; HitSwitch still changes the timer/button's visible frame. */
 #define CX_MECH_LIMIT 999u
+extern void tx_set_error(const char*,const char*);
 
 static int grow(CxWorld* w,void** data,uint32_t* capacity,uint32_t count,uint32_t size){if(count<=*capacity)return 1;uint32_t n=*capacity?*capacity*2u:64u;while(n<count){if(n>UINT32_MAX/2u)return 0;n*=2u;}if((uint64_t)n*size>UINT32_MAX)return 0;void* p=cx_alloc(w,n*size);if(!p)return 0;if(*data)memcpy(p,*data,*capacity*size);cx_free(w,*data);*data=p;*capacity=n;return 1;}
 static int is_switch(uint32_t type){switch(type){case 132:case 135:case 136:case 144:case 314:case 411:case 423:case 428:case 440:case 441:case 442:case 467:case 468:case 476:return 1;default:return 0;}}
@@ -21,10 +22,24 @@ static int prepare_policy(CxWorld* w,CxDevice* d){TxTile tile=d->tile;if(tile.ty
     for(uint32_t back=0;back<=2u&&back<=w->x;back++){uint32_t x=w->x-back;fill_policy(w,p,x,back?w->previous_columns[x&1u]:w->column);}return TCW_OK;
 }
 int cx_devices_column(CxWorld* w){
+    /* Complete the previous pixel column's right-neighbour evidence without
+     * rescanning the world or retaining a world-sized adjacency map. */
+    for(uint32_t i=w->pixel_column_first;i<w->pixel_count;i++){
+        CxPixel* p=w->pixels+i;
+        if(p->x+1u==w->x&&cx_inside_wiring(w,w->x,p->y))
+            p->connected_h|=(uint8_t)(cx_wire_mask(w->column+p->y)&(p->cell_word>>24));
+    }
+    w->pixel_column_first=w->pixel_count;
     for(uint32_t i=0;i<w->policy_count;){CxActuationPolicy* p=w->policies+i;fill_policy(w,p,w->x,w->column);if(w->x>=p->x+2u||w->x+1u==w->width){finish_policy(w,p);w->policies[i]=w->policies[--w->policy_count];}else ++i;}
     w->column_device_first=w->device_count;
     for(uint32_t y=0;y<w->height;y++){TxTile* t=w->column+y;if(!t->active&&!t->actuator)continue;
-        if(t->type==445u||t->type==0xfffeu){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->custom=t->type==0xfffeu;p->cell_word=t->type|((uint32_t)(t->active|(t->actuator<<1)|(t->inactive<<2)|(p->custom?8u:0u)|(t->wall?16u:0u))<<16)|(cx_wire_mask(t)<<24);p->state=p->initial=p->custom?(uint8_t)((t->frame_x/18)&3u)|((uint8_t)((t->frame_y/18)&3u)<<2):(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;}
+        if(t->type==445u){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->cell_word=t->type|((uint32_t)(t->active|(t->actuator<<1)|(t->inactive<<2)|(t->wall?16u:0u))<<16)|(cx_wire_mask(t)<<24);p->state=p->initial=(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;
+            if(cx_inside_wiring(w,w->x,y)){
+                uint32_t mask=cx_wire_mask(t);
+                if(w->x&&cx_inside_wiring(w,w->x-1u,y))p->connected_h=(uint8_t)(mask&cx_wire_mask(w->previous_columns[(w->x-1u)&1u]+y));
+                if(y&&cx_inside_wiring(w,w->x,y-1u))p->connected_v|=(uint8_t)(mask&cx_wire_mask(w->column+y-1u));
+                if(y+1u<w->height&&cx_inside_wiring(w,w->x,y+1u))p->connected_v|=(uint8_t)(mask&cx_wire_mask(w->column+y+1u));
+            }}
         if(is_switch(t->type)||t->actuator||t->type==130u||t->type==131u){if(!grow(w,(void**)&w->devices,&w->device_capacity,w->device_count+1u,sizeof(CxDevice)))return TCW_MEMORY;CxDevice* d=w->devices+w->device_count++;memset(d,0,sizeof(*d));d->x=w->x;d->y=y;d->tile=d->initial=*t;if(t->type==144u)d->tile.frame_y=0;if(t->actuator||t->type==130u||t->type==131u){int s=prepare_policy(w,d);if(s)return s;}}
     }return TCW_OK;
 }
@@ -35,16 +50,21 @@ void cx_devices_end_columns(CxWorld* w){
     for(uint32_t i=0;i<w->policy_count;i++)finish_policy(w,w->policies+i);cx_free(w,w->policies);w->policies=NULL;w->policy_count=w->policy_capacity=0;
     for(uint32_t i=0;i<2;i++){cx_free(w,w->previous_columns[i]);w->previous_columns[i]=NULL;}
 }
+int cx_pixel_topology_supported(const CxPixel* p){
+    for(uint32_t c=0;c<4;c++)if((p->connected_h&p->connected_v&(1u<<c))&&p->h[c]!=p->v[c])return 0;
+    return 1;
+}
 int cx_devices_compile(CxWorld* w){
     cx_devices_end_columns(w);
-    uint64_t count=0;for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(w->twld_state&&p->custom&&p->h[c]==p->v[c])continue;count+=p->h[c]!=0;if(!w->twld_state||p->custom)count+=p->v[c]!=0;}
+    w->pixel_compat_unsupported=0;for(uint32_t i=0;i<w->pixel_count;i++)w->pixel_compat_unsupported+=!cx_pixel_topology_supported(w->pixels+i);
+    uint64_t count=0;for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;count+=p->h[c]!=0;count+=p->v[c]!=0;}
     for(uint32_t i=0;i<w->device_count;i++)if(w->devices[i].tile.type==144u||w->devices[i].tile.type==411u)for(uint32_t c=0;c<4;c++)count+=w->devices[i].nets[c]!=0;
     for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){count+=w->devices[i].tile.actuator!=0;count+=w->devices[i].tile.type==130u||w->devices[i].tile.type==131u;}
     if(count>UINT32_MAX/sizeof(CxPort))return TCW_MEMORY;
     w->ports=(CxPort*)cx_alloc(w,(count?count:1u)*sizeof(CxPort));w->pixel_touched=(uint32_t*)cx_alloc(w,(w->pixel_count?w->pixel_count:1u)*4u);w->pixel_snapshot=(uint8_t*)cx_alloc(w,w->pixel_count?w->pixel_count:1u);
     w->mech_capacity=w->device_count?w->device_count:1u;if(w->mech_capacity>CX_MECH_LIMIT)w->mech_capacity=CX_MECH_LIMIT;w->mechs=(uint32_t*)cx_alloc(w,w->mech_capacity*4u);w->mechs_snapshot=(uint32_t*)cx_alloc(w,w->mech_capacity*4u);
     if(!w->ports||!w->pixel_touched||!w->pixel_snapshot||!w->mechs||!w->mechs_snapshot)return TCW_MEMORY;
-    for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(w->twld_state&&p->custom&&p->h[c]==p->v[c])continue;if(p->h[c])w->ports[w->port_count++]=(CxPort){p->h[c],i,0,(uint8_t)c,0};if((!w->twld_state||p->custom)&&p->v[c])w->ports[w->port_count++]=(CxPort){p->v[c],i,1,(uint8_t)c,0};}
+    for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(p->h[c])w->ports[w->port_count++]=(CxPort){p->h[c],i,0,(uint8_t)c,0};if(p->v[c])w->ports[w->port_count++]=(CxPort){p->v[c],i,1,(uint8_t)c,0};}
     for(uint32_t i=0;i<w->device_count;i++)if(w->devices[i].tile.type==144u||w->devices[i].tile.type==411u)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c])w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,w->devices[i].tile.type==144u?2:3,(uint8_t)c,0};
     for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){if(w->devices[i].tile.actuator)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,4,(uint8_t)c,0};if(w->devices[i].tile.type==130u||w->devices[i].tile.type==131u)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,5,(uint8_t)c,0};}
     qsort(w->ports,w->port_count,sizeof(CxPort),compare_ports);return TCW_OK;
@@ -56,7 +76,7 @@ static int toggle_timer(CxWorld* w,CxDevice* d){if(d->tile.frame_y==0){d->tile.f
 /* Device dedup belongs to one TripWire. Epochs avoid clearing every unrelated
  * switch for each gate output; wrapping the epoch restores an empty generation.
  * Epoch state is transient, so cancellation starts fresh on the next trip. */
-int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->twld_state)w->pixel_touched_count=0;if(w->optimization){if(++w->wire_trip_epoch==0u){for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_epoch=0;w->wire_trip_epoch=1u;}}else for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
+int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->optimization)w->pixel_touched_count=0;if(w->optimization){if(++w->wire_trip_epoch==0u){for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_epoch=0;w->wire_trip_epoch=1u;}}else for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
 int cx_net_hit(void* context,uint32_t net){
     CxWorld* w=(CxWorld*)context;uint32_t group=net+1u,lo=0,hi=w->port_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;if(w->ports[m].net<group)lo=m+1;else hi=m;}
     while(lo<w->port_count&&w->ports[lo].net==group){CxPort* port=w->ports+lo++;
@@ -69,21 +89,48 @@ int cx_net_hit(void* context,uint32_t net){
             if(w->vm_trip_index==1u&&d->x>=w->seed_x&&d->x-w->seed_x<w->seed_width&&d->y>=w->seed_y&&d->y-w->seed_y<w->seed_height)continue;
             base->wire_hit_mask|=bit;int shift=base->tile.frame_x>=36?-36:36;for(uint32_t a=x;a<x+2u;a++)for(uint32_t b=y;b<y+2u;b++){CxDevice* part=cx_device_find(w,a,b);if(part&&part->tile.type==411u)part->tile.frame_x=(int16_t)(part->tile.frame_x+shift);}continue;
         }
-        CxPixel* p=w->pixels+port->pixel;if(!p->marked){p->marked=1;w->pixel_touched[w->pixel_touched_count++]=port->pixel;}uint8_t bit=(uint8_t)(1u<<port->colour);
-        if(w->twld_state){if(port->axis)p->hit_v^=bit;else p->hit_h^=bit;}else if(port->axis)p->hit_v|=bit;else p->hit_h|=bit;
+        CxPixel* p=w->pixels+port->pixel;uint8_t bit=(uint8_t)(1u<<port->colour);
+        if(w->optimization){
+            /* One group per colour: ignore the compiler's disconnected axis
+             * stub, and count a shared H/V group only once. An isolated wire
+             * uses its vertical seed, matching direct rectangle triggering. */
+            uint32_t chosen=(p->connected_h&bit)?p->h[port->colour]:p->v[port->colour];
+            if(port->net!=chosen||(port->axis&&p->h[port->colour]==chosen))continue;
+        }
+        if(!p->marked){p->marked=1;w->pixel_touched[w->pixel_touched_count++]=port->pixel;}
+        if(w->optimization)p->hit_h^=bit;
+        else if(port->axis)p->hit_v|=bit;else p->hit_h|=bit;
     }return 0;
 }
 static int pixel_pass(CxWorld* w){
     for(uint32_t i=0;i<w->pixel_touched_count;i++){CxPixel* p=w->pixels+w->pixel_touched[i];
-        if(p->custom){uint8_t both=p->hit_h&p->hit_v;for(uint32_t c=0;c<4;c++)if(both&(1u<<c))p->state^=(uint8_t)(1u<<(3u-c));}
-        else if(w->twld_state){uint32_t n=(uint32_t)__builtin_popcount((unsigned)p->hit_h);p->state^=(uint8_t)((n*(n-1u)/2u)&1u);}
-        else if(p->hit_h&&p->hit_v)p->state^=1u;
+        if(w->optimization){
+            /* WireHead Accelerator records each group hit within one gate
+             * wave and toggles once for every differently coloured pair.
+             * Modulo two, C(popcount(group-hit parities),2) is equivalent,
+             * including repeated group hits in distinct TripWire calls. */
+            uint32_t n=(uint32_t)__builtin_popcount((unsigned)p->hit_h);
+            p->state^=(uint8_t)((n*(n-1u)/2u)&1u);
+        }else if(p->hit_h&&p->hit_v)p->state^=1u;
         p->hit_h=p->hit_v=p->marked=0;
     }w->pixel_touched_count=0;return 0;
 }
-int cx_trip_end(void* context){CxWorld* w=(CxWorld*)context;return w->twld_state?0:pixel_pass(w);}
-int cx_wave_begin(void* context){(void)context;return 0;}
-int cx_wave_end(void* context){CxWorld* w=(CxWorld*)context;return w->twld_state?pixel_pass(w):0;}
+int cx_trip_end(void* context){CxWorld* w=(CxWorld*)context;return w->optimization?0:pixel_pass(w);}
+int cx_pixel_wave_end(void* context){CxWorld* w=(CxWorld*)context;return w->optimization?pixel_pass(w):0;}
+int cx_set_optimization(CxWorld* w,uint32_t enabled){
+    if(w->phase!=CX_IDLE||w->event.kind)return TCW_STATE;
+    if(enabled>1u)return TCW_INVALID;
+    if(enabled&&w->pixel_compat_unsupported){
+        tx_set_error("TERRAX_CIRCUIT_UNSUPPORTED", "WireHead pixel topology requires merging differently connected axes of the same wire colour");
+        return TCW_UNSUPPORTED;
+    }
+    if(w->optimization!=enabled){
+        for(uint32_t i=0;i<w->device_count;i++){w->devices[i].wire_hit_mask=0;w->devices[i].wire_hit_epoch=0;}
+        for(uint32_t i=0;i<w->pixel_count;i++)w->pixels[i].hit_h=w->pixels[i].hit_v=w->pixels[i].marked=0;
+        w->pixel_touched_count=0;w->wire_trip_epoch=0;w->optimization=enabled;
+    }
+    return TCW_OK;
+}
 int cx_interact(CxWorld* w){
     CxDevice* d=cx_device_find(w,w->command.x,w->command.y);if(!d)return 0;
     uint32_t type=d->tile.type;

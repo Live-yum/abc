@@ -2,19 +2,17 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:terraforge/domain/computerraria_computer.dart';
+import 'package:terraforge/engine/engine.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 
 /// Contract-only fake. It reports tile states; it does not execute a CPU.
 class ComputerCircuitBackend implements WorldCircuitSourceBackend {
   static const savedWldSha =
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-  static const savedTwldSha =
-      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
   String digest = ComputerrariaComputer.sourceSha256;
-  String twldDigest =
-      'c6de694b3d034701513dc1ba17311213561ec359d3ecddde7bc35ea3c9611ed8';
-  bool profile = true;
   bool optimized = false;
+  bool optimizationSupported = true;
+  bool rejectOptimization = false;
   int opens = 0, closes = 0, cancels = 0;
   Completer<void>? holdOpen, holdClock, holdWrite;
   final commands = <WorldCircuitCommand>[];
@@ -24,15 +22,12 @@ class ComputerCircuitBackend implements WorldCircuitSourceBackend {
     ..[3] = 7200;
 
   @override
-  Future<WorldCircuitResult> openWorldCircuit(
-    Uint8List bytes, {
-    Uint8List? twld,
-  }) => throw StateError('Large inputs must use source descriptors');
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List bytes) =>
+      throw StateError('Large inputs must use source descriptors');
 
   @override
   Future<WorldCircuitResult> openWorldCircuitSource(
     WorldCircuitSource world, {
-    WorldCircuitSource? twld,
     void Function(WorldCircuitProgress)? onProgress,
   }) async {
     opens++;
@@ -50,13 +45,10 @@ class ComputerCircuitBackend implements WorldCircuitSourceBackend {
       opens,
       stats,
       Uint8List(0),
-      reserved: profile ? 1 : 0,
+      reserved: optimizationSupported ? 4 : 0,
       sourceSha256: world.path?.startsWith('/output/') == true
           ? savedWldSha
           : digest,
-      twldSourceSha256: twld?.path?.startsWith('/output/') == true
-          ? savedTwldSha
-          : twldDigest,
     );
   }
 
@@ -67,6 +59,11 @@ class ComputerCircuitBackend implements WorldCircuitSourceBackend {
   ) async {
     commands.add(command);
     final kind = command.words[1];
+    if (kind == 10 &&
+        command.words[7] == 1 &&
+        (!optimizationSupported || rejectOptimization)) {
+      throw const EngineException('Unsupported pixel topology', -7);
+    }
     if (kind == 10) optimized = command.words[7] == 1;
     if (kind == 2 && command.words[2] == 3194) await holdClock?.future;
     if (kind == 5) await holdWrite?.future;
@@ -97,7 +94,7 @@ class ComputerCircuitBackend implements WorldCircuitSourceBackend {
           final at = (dx * h + dy) * 16;
           data.setUint32(at, x + dx, Endian.little);
           data.setUint32(at + 4, y + dy, Endian.little);
-          data.setUint32(at + 8, x == 7371 ? 65534 : 445, Endian.little);
+          data.setUint32(at + 8, 445, Endian.little);
         }
       }
     }
@@ -106,7 +103,9 @@ class ComputerCircuitBackend implements WorldCircuitSourceBackend {
       stats,
       records,
       resultKind: kind,
-      reserved: (profile ? 1 : 0) | (optimized ? 2 : 0),
+      reserved: kind == 6
+          ? 0
+          : (optimizationSupported ? 4 : 0) | (optimized ? 10 : 0),
       worldSource: kind == 6
           ? const WorldCircuitSource.file(
               path: '/output/copy.wld',
@@ -114,15 +113,6 @@ class ComputerCircuitBackend implements WorldCircuitSourceBackend {
               name: 'copy.wld',
               token: 'wld',
               sha256: savedWldSha,
-            )
-          : null,
-      twldSource: kind == 6
-          ? const WorldCircuitSource.file(
-              path: '/output/copy.twld',
-              length: 100,
-              name: 'copy.twld',
-              token: 'twld',
-              sha256: savedTwldSha,
             )
           : null,
     );

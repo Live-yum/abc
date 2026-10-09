@@ -10,7 +10,7 @@ import, profile verification, physical program loading and actual monitors.
 
 - Load an engine-recognized sectioned WLD. The ordinary byte API is capped at
   64 MiB; the dedicated source picker accepts WLD files up to 1 GiB without
-  materializing them in Dart. Optional compressed TWLD is capped at 16 MiB. Engine rejects legacy WLD and future-layout/read-only
+  materializing them in Dart. Engine rejects legacy WLD and future-layout/read-only
   worlds. The host never changes their version or strips protection flags.
 - Compile complete-world electrical connectivity; query bounded viewports and
   optional wall layer; trigger ordinary wire pulses or actual HitSwitch behavior;
@@ -22,7 +22,7 @@ import, profile verification, physical program loading and actual monitors.
   Each run batch refreshes the last accepted viewport inside the same serialized
   operation. Pause stops future tick requests; an already accepted atomic command completes.
 - Reset closes the session and reopens a private copy of the original input.
-- Save returns a separate candidate WLD/TWLD. Application must validate/reopen and
+- Save returns a separate candidate WLD. Application must validate/reopen and
   adopt this candidate using its usual undo/save flow. No original file is changed.
 - Failed commands are cancelled; VM transactional rollback is engine-owned.
 - Engine capability restrictions and device support are authoritative. This is
@@ -62,7 +62,7 @@ No call uses the legacy uint32 pointer descriptors on a 64-bit host.
 
 Run native proof with `native/world_circuit_smoke.dart`; run Web proof with
 `test/web/world_circuit_smoke.cjs` and authorized JS/WASM artifacts. Release 326,
-legacy rejection, future read-only rejection, TWLD/mod rules, fragment objects,
+legacy rejection, future read-only rejection, fragment objects,
 every device family are not established by the small synthetic fixture. Full-world
 CPU/display evidence and profile acceptance are tracked separately in
 [the computer workflow](COMPUTERRARIA.md). Do not present them as tested parity.

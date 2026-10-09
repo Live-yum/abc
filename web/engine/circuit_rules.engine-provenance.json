@@ -15,15 +15,16 @@
     "worldWorkspaceAbiVersion": 1,
     "pixelWorkspaceAbiVersion": 1,
     "circuitAbiVersion": 1,
-    "circuitWorldAbiVersion": 1,
+    "circuitWorldAbiVersion": 2,
     "circuitWorldFragmentObjects": 1,
     "circuitWorldFragmentSupports": 1,
     "circuitWorldPixels": 1,
     "circuitWorldOptimization": 1,
+    "circuitWorldWireHeadPixels": 1,
     "playerWorkspaceAbiVersion": 0,
     "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
     "dirty": true,
-    "compiler": "native",
+    "compiler": "emscripten-5.0.7",
     "target": "web",
     "featureSet": "wld",
     "viewerWebProfile": true,
@@ -40,8 +41,8 @@
     },
     {
       "path": "web/engine/world.wasm",
-      "bytes": 439742,
-      "sha256": "8ec58666a19a3507dc2cdcc578dc7b0d5425f0ca667db8ea4f143f18dd27dc7b"
+      "bytes": 405036,
+      "sha256": "b3ace044d3b466eee338d25c87dd034c10cc8e73ec1c07e5f900bf42c694e7b8"
     },
     {
       "path": "web/engine/player.js",
@@ -50,12 +51,12 @@
     },
     {
       "path": "web/engine/player.wasm",
-      "bytes": 66302,
-      "sha256": "48c4881f8ebf03d0b68be359e6c65717518ff2d54e2db21eea6c7aff77c33bc0"
+      "bytes": 66343,
+      "sha256": "0ffbcb5a3a9c075f34751ee51fa23762cce369f3500f98ae710f8d756130461b"
     }
   ],
   "sourceManifest": {
     "path": "native/vendor/TerraWasm/SOURCE_MANIFEST.json",
-    "sha256": "539e4369e9517bad5c1d2337241c51d37150eef983376c069b48947783c1cd7c"
+    "sha256": "a51b6c058eb3709a5bd958c7fbde79e0d3a239b6b787a74eb4a7fa7e3749e399"
   }
 }

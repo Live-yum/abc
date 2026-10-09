@@ -102,33 +102,45 @@ void main() {
     },
   );
 
-  test('all 16 real color frame states remain distinct and map row-major', () {
-    const region = ComputerDisplayRegion('test', 20, 30, 4, 4, colored: true);
-    final records = Uint8List(16 * 16), data = ByteData.sublistView(records);
-    for (var x = 0; x < 4; x++) {
-      for (var y = 0; y < 4; y++) {
-        final at = (x * 4 + y) * 16, state = y * 4 + x;
-        data.setUint32(at, 20 + x, Endian.little);
-        data.setUint32(at + 4, 30 + y, Endian.little);
-        data.setUint32(at + 8, 65534 | (9 << 16), Endian.little);
-        data.setInt16(at + 12, (state & 3) * 18, Endian.little);
-        data.setInt16(at + 14, (state >> 2) * 18, Endian.little);
+  test(
+    'real mono PixelBox frame states decode row-major and reject foreign tiles',
+    () {
+      const region = ComputerDisplayRegion('test', 20, 30, 2, 2);
+      final records = Uint8List(4 * 16), data = ByteData.sublistView(records);
+      for (var x = 0; x < 2; x++) {
+        for (var y = 0; y < 2; y++) {
+          final at = (x * 2 + y) * 16;
+          data.setUint32(at, 20 + x, Endian.little);
+          data.setUint32(at + 4, 30 + y, Endian.little);
+          data.setUint32(at + 8, 445 | (9 << 16), Endian.little);
+          data.setInt16(at + 12, y * 18, Endian.little);
+        }
       }
-    }
-    WorldCircuitResult result() =>
-        WorldCircuitResult(1, List.filled(24, 0), records, resultKind: 9);
-    final rgba = region.decode(result());
-    expect(ComputerDisplayRegion.palette.toSet().length, 16);
-    for (var i = 0; i < 16; i++) {
-      final color = ComputerDisplayRegion.palette[i];
-      expect(rgba.sublist(i * 4, i * 4 + 4), [
-        (color >> 16) & 255,
-        (color >> 8) & 255,
-        color & 255,
+      WorldCircuitResult result() =>
+          WorldCircuitResult(1, List.filled(24, 0), records, resultKind: 9);
+      expect(region.decode(result()), [
+        0,
+        0,
+        0,
+        255,
+        0,
+        0,
+        0,
+        255,
+        255,
+        255,
+        255,
+        255,
+        255,
+        255,
+        255,
         255,
       ]);
-    }
-    data.setInt16(12, 17, Endian.little);
-    expect(() => region.decode(result()), throwsFormatException);
-  });
+      data.setInt16(12, 17, Endian.little);
+      expect(() => region.decode(result()), throwsFormatException);
+      data.setInt16(12, 0, Endian.little);
+      data.setUint32(8, 65534, Endian.little);
+      expect(() => region.decode(result()), throwsFormatException);
+    },
+  );
 }

@@ -7,19 +7,9 @@ import '../engine/world_circuit_backend.dart';
 class ComputerrariaComputer {
   static const sourceSha256 =
       '55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33';
-  static const companionSha256 =
-      'c6de694b3d034701513dc1ba17311213561ec359d3ecddde7bc35ea3c9611ed8';
   static const romBytes = 768 * 1024;
   static const ramBytes = 368 * 1024;
   static const mono = ComputerDisplayRegion('黑白显示器', 6485, 800, 64, 48);
-  static const color = ComputerDisplayRegion(
-    '彩色显示器',
-    7371,
-    1002,
-    176,
-    96,
-    colored: true,
-  );
 
   static WorldCircuitCommand clock([int pulses = 1]) =>
       WorldCircuitCommand.trigger(
@@ -203,36 +193,13 @@ class ComputerrariaComputer {
 class ComputerDisplayRegion {
   final String name;
   final int x, y, width, height;
-  final bool colored;
   const ComputerDisplayRegion(
     this.name,
     this.x,
     this.y,
     this.width,
-    this.height, {
-    this.colored = false,
-  });
-
-  // Rounded mean of each 16x16 tile in the pinned MIT WireHead sprite. This is
-  // a flat state-color monitor, not a reproduction of Terraria's tile texture.
-  static const palette = [
-    0x2b2e3d,
-    0x9d9366,
-    0xa3c39c,
-    0xbc6fd2,
-    0x909dbc,
-    0xc7aa67,
-    0xaee891,
-    0xc873ee,
-    0xbc9b90,
-    0x67b1c7,
-    0xa391e8,
-    0xd3ee73,
-    0xe58e85,
-    0x6ed4e3,
-    0xa294fc,
-    0x8c8f9c,
-  ];
+    this.height,
+  );
 
   Uint8List decode(WorldCircuitResult response) {
     if (response.resultKind != 9 ||
@@ -251,22 +218,18 @@ class ComputerDisplayRegion {
           py < 0 ||
           px >= width ||
           py >= height ||
-          tile != (colored ? 65534 : 445) ||
+          tile != 445 ||
           fx < 0 ||
           fx % 18 != 0 ||
           fy < 0 ||
           fy % 18 != 0 ||
-          (colored ? fx > 54 || fy > 54 : fx > 18 || fy != 0)) {
+          (fx > 18 || fy != 0)) {
         throw const FormatException('显示器返回了无效的实际像素状态。');
       }
       final index = py * width + px;
       if (seen[index] != 0) throw const FormatException('显示器像素重复。');
       seen[index] = 1;
-      final rgb = colored
-          ? palette[fx ~/ 18 + 4 * (fy ~/ 18)]
-          : fx == 18
-          ? 0xffffff
-          : 0;
+      final rgb = fx == 18 ? 0xffffff : 0;
       out[index * 4] = (rgb >> 16) & 255;
       out[index * 4 + 1] = (rgb >> 8) & 255;
       out[index * 4 + 2] = rgb & 255;

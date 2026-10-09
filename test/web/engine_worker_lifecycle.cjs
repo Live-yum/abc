@@ -93,17 +93,17 @@ function harness(owner, bridge, timeoutMs = 1000) {
   assert.ok(JSON.parse(await bounded.client.createPlayer('replacement')).handle > boundedHandles.at(-1));
   await bounded.client.dispose();
 
-  const tcw = harness('worldCircuit', {open:async()=>({session:1,stats:Array(24).fill(0),resultKind:0,resultCount:0,reserved:0,records:new Uint8Array()}), close:async()=>{}});
-  const a = (await tcw.client.open(new Uint8Array([1]), null)).session;
+  const tcw = harness('worldCircuit', {open:async()=>({session:1,stats:[2,...Array(23).fill(0)],resultKind:0,resultCount:0,reserved:0,records:new Uint8Array()}), close:async()=>{}});
+  const a = (await tcw.client.open(new Uint8Array([1]))).session;
   await tcw.client.close(a);
-  const b = (await tcw.client.open(new Uint8Array([1]), null)).session;
+  const b = (await tcw.client.open(new Uint8Array([1]))).session;
   assert.notEqual(a,b, 'Native TCW handle reuse cannot alias closed public handles');
   await assert.rejects(tcw.client.command(a, '[]', '[]'), {code:'STALE_HANDLE'});
   const dying = tcw.client.close(b); const rejected = assert.rejects(dying, {code:'COMPUTATION_OWNER_LOST'});
   tcw.workers[0].onerror({message:'unexpected worker exit'}); await rejected;
 
   let finishStream, finishCommand, releasedSource, streamCancelled = false;
-  const streamResult = () => ({session:7,stats:Array(24).fill(0),resultKind:0,resultCount:0,reserved:0,records:new Uint8Array()});
+  const streamResult = () => ({session:7,stats:[2,...Array(23).fill(0)],resultKind:0,resultCount:0,reserved:0,records:new Uint8Array()});
   const sourceBlob = new Blob([new Uint8Array([7,8,9])]);
   const streamed = harness('worldCircuit', {
     openSource:async source => { assert.ok(source instanceof Blob); assert.equal(source.size,3); await new Promise(resolve => { finishStream=resolve; }); return streamResult(); },
@@ -114,7 +114,7 @@ function harness(owner, bridge, timeoutMs = 1000) {
     releaseSource:async token => { releasedSource=token; },
     close:async()=>{},
   });
-  const sourceOpening=streamed.client.openSource(sourceBlob,null);
+  const sourceOpening=streamed.client.openSource(sourceBlob);
   await sleep(0);
   assert.equal((await streamed.client.progress()).stage,'compile','Progress must bypass the active import');
   finishStream();const streamedId=(await sourceOpening).session;

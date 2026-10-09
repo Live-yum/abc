@@ -18,15 +18,53 @@ typedef _OneD = int Function(int);
 /// bounded working set independent of world size. Files are never user paths.
 class NativeWorldCircuitBindings {
   final DynamicLibrary library;
+  final Map<String, Object?> _buildInfo;
+  final void Function(Directory) _deleteOutputDirectory;
   final Map<int, _Session> _sessions = {};
   final Map<String, Directory> _outputs = {};
   int _outputSequence = 0;
   bool _cancelRequested = false;
   Map<String, Object?>? _progress;
   static const memoryBudget = 192 * 1024 * 1024;
-  NativeWorldCircuitBindings(this.library);
+  NativeWorldCircuitBindings(
+    this.library, {
+    void Function(Directory)? deleteOutputDirectory,
+  }) : _buildInfo = _readBuildInfo(library),
+       _deleteOutputDirectory =
+           deleteOutputDirectory ??
+           ((directory) => directory.deleteSync(recursive: true));
 
-  void _check(int status) {
+  static Map<String, Object?> _readBuildInfo(DynamicLibrary library) {
+    final pointer = library
+        .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+          'abc_engine_build_info',
+        )();
+    if (pointer == nullptr) {
+      throw const EngineException('Missing circuit build identity');
+    }
+    final decoded = jsonDecode(pointer.toDartString());
+    if (decoded is! Map<String, dynamic>) {
+      throw const EngineException('Invalid circuit build identity');
+    }
+    return Map<String, Object?>.unmodifiable(decoded);
+  }
+
+  void _requireCircuitAbi() {
+    final version = _buildInfo['circuitWorldAbiVersion'];
+    if (version is! int || version != 2) {
+      throw EngineException(
+        'Unsupported world circuit ABI: $version (expected 2)',
+      );
+    }
+  }
+
+  void _check(int status, {bool enablingOptimization = false}) {
+    if (status == -7 && enablingOptimization) {
+      throw const EngineException(
+        '当前世界的像素接线拓扑不支持此模式；同色跨轴网络暂不支持，请保持电路优化关闭。',
+        -7,
+      );
+    }
     if (status < 0) {
       throw EngineException('World circuit engine status $status', status);
     }
@@ -47,21 +85,20 @@ class NativeWorldCircuitBindings {
       return null;
     }
     if (method == 'worldCircuitReleaseSource') {
-      final directory = _outputs.remove(args[0] as String);
+      final token = args[0] as String;
+      final directory = _outputs[token];
       if (directory != null && directory.existsSync()) {
-        directory.deleteSync(recursive: true);
+        _deleteOutputDirectory(directory);
       }
+      _outputs.remove(token);
       return null;
     }
     if (method == 'worldCircuitOpenSource') {
       _cancelRequested = false;
-      return _openSource(
-        Map<String, Object?>.from(args[0] as Map),
-        args[1] == null ? null : Map<String, Object?>.from(args[1] as Map),
-      );
+      return _openSource(Map<String, Object?>.from(args[0] as Map));
     }
     if (method == 'worldCircuitOpen') {
-      return _open(args[0] as Uint8List, args[1] as Uint8List?);
+      return _open(args[0] as Uint8List);
     }
     final id = args[0] as int;
     final session = _sessions[id];
@@ -78,29 +115,26 @@ class NativeWorldCircuitBindings {
     final words = (args[1] as List).cast<int>(),
         records = (args[2] as List).cast<int>();
     validateWorldCircuitCommand(words, records);
+    if (words[1] == 10 &&
+        words[7] == 1 &&
+        _buildInfo['circuitWorldWireHeadPixels'] != 1) {
+      throw const EngineException('当前引擎不支持 WireHead 式像素规则，请更新引擎后再开启电路优化。');
+    }
     _cancelRequested = false;
     if (words[1] == 7 || words[1] == 8) {
-      final infoPointer = library
-          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
-            'abc_engine_build_info',
-          )();
-      if (infoPointer == nullptr) {
-        throw const EngineException('Missing circuit build identity');
-      }
-      final info = jsonDecode(infoPointer.toDartString()) as Map;
       if (words[1] == 7 &&
           List.generate(
             records.length ~/ 4,
             (i) => records[i * 4 + 3],
           ).any((anchor) => anchor != 0) &&
-          info['circuitWorldFragmentSupports'] != 1) {
+          _buildInfo['circuitWorldFragmentSupports'] != 1) {
         throw const EngineException(
           'Circuit placement supports are unavailable',
         );
       }
       if (words[1] == 8 &&
           words[12] == 1 &&
-          info['circuitWorldFragmentObjects'] != 1) {
+          _buildInfo['circuitWorldFragmentObjects'] != 1) {
         throw const EngineException(
           'Circuit object companions are unavailable',
         );
@@ -112,7 +146,7 @@ class NativeWorldCircuitBindings {
       p.asTypedList(16).setAll(0, words);
       r.asTypedList(records.length).setAll(0, records);
       if (words[1] == 6) {
-        for (final id in [3, 5]) {
+        for (final id in [3]) {
           (session.files[id] ??= File(
             session.paths[id]!,
           ).openSync(mode: FileMode.write)).truncateSync(0);
@@ -124,6 +158,7 @@ class NativeWorldCircuitBindings {
           Int32 Function(Uint32, Pointer<Uint32>, Pointer<Uint32>),
           int Function(int, Pointer<Uint32>, Pointer<Uint32>)
         >('abc_world_circuit_command')(id, p, r),
+        enablingOptimization: words[1] == 10 && words[7] == 1,
       );
       return session.streamed
           ? _pumpAsync(id, session, command: words)
@@ -138,13 +173,12 @@ class NativeWorldCircuitBindings {
     }
   }
 
-  Map<String, Object?> _open(Uint8List bytes, Uint8List? twld) {
+  Map<String, Object?> _open(Uint8List bytes) {
+    _requireCircuitAbi();
     if (_sessions.isNotEmpty) {
       throw const EngineException('Close the existing world circuit first');
     }
-    if (bytes.isEmpty ||
-        bytes.length > 64 * 1024 * 1024 ||
-        (twld?.length ?? 0) > 16 * 1024 * 1024) {
+    if (bytes.isEmpty || bytes.length > 64 * 1024 * 1024) {
       throw const EngineException('World circuit input exceeds host budget');
     }
     final out = calloc<Uint32>(), input = calloc<Uint8>(bytes.length);
@@ -159,26 +193,12 @@ class NativeWorldCircuitBindings {
         >('abc_world_open')(input, bytes.length, out),
       );
       world = out.value;
-      session = _Session(world, twld);
+      session = _Session(world);
       _check(
         library.lookupFunction<
-          Int32 Function(
-            Uint32,
-            Uint32,
-            Uint32,
-            Uint32,
-            Uint32,
-            Pointer<Uint32>,
-          ),
-          int Function(int, int, int, int, int, Pointer<Uint32>)
-        >('abc_world_circuit_begin')(
-          world,
-          2,
-          twld == null ? 0 : 4,
-          twld?.length ?? 0,
-          memoryBudget,
-          out,
-        ),
+          Int32 Function(Uint32, Uint32, Uint32, Pointer<Uint32>),
+          int Function(int, int, int, Pointer<Uint32>)
+        >('abc_world_circuit_begin')(world, 2, memoryBudget, out),
       );
       id = out.value;
       _sessions[id] = session;
@@ -237,42 +257,25 @@ class NativeWorldCircuitBindings {
     return digest.value.toString();
   }
 
-  Future<Map<String, Object?>> _openSource(
-    Map<String, Object?> source,
-    Map<String, Object?>? sidecar,
-  ) async {
+  Future<Map<String, Object?>> _openSource(Map<String, Object?> source) async {
+    _requireCircuitAbi();
     if (_sessions.isNotEmpty) {
       throw const EngineException('Close the existing world circuit first');
     }
     final worldSource = WorldCircuitSource.fromMap(source);
     worldSource.toFileMap();
-    final twldSource = sidecar == null
-        ? null
-        : WorldCircuitSource.fromMap(sidecar);
-    if (twldSource != null &&
-        (twldSource.length < 1 || twldSource.length > 16 * 1024 * 1024)) {
-      throw const EngineException('TWLD source exceeds host budget');
-    }
-    final session = _Session(0, null, streamed: true);
+    final session = _Session(0, streamed: true);
     final out = calloc<Uint32>(),
         event = calloc<Uint32>(12),
         data = calloc<Pointer<Uint8>>();
     int task = 0, id = 0;
     try {
       session.attach(1, worldSource);
-      if (twldSource != null) session.attach(4, twldSource);
       session.sourceSha256 = await _hashRange(
         'hash',
         worldSource.length,
         (offset, length) => session.read(1, offset, length),
       );
-      if (twldSource != null) {
-        session.twldSourceSha256 = await _hashRange(
-          'hash-companion',
-          twldSource.length,
-          (offset, length) => session.read(4, offset, length),
-        );
-      }
       _check(
         library.lookupFunction<
           Int32 Function(Uint32, Uint32, Pointer<Uint32>),
@@ -342,23 +345,9 @@ class NativeWorldCircuitBindings {
       task = 0;
       _check(
         library.lookupFunction<
-          Int32 Function(
-            Uint32,
-            Uint32,
-            Uint32,
-            Uint32,
-            Uint32,
-            Pointer<Uint32>,
-          ),
-          int Function(int, int, int, int, int, Pointer<Uint32>)
-        >('abc_world_circuit_begin')(
-          session.world,
-          2,
-          twldSource == null ? 0 : 4,
-          twldSource?.length ?? 0,
-          memoryBudget,
-          out,
-        ),
+          Int32 Function(Uint32, Uint32, Uint32, Pointer<Uint32>),
+          int Function(int, int, int, Pointer<Uint32>)
+        >('abc_world_circuit_begin')(session.world, 2, memoryBudget, out),
       );
       id = out.value;
       _sessions[id] = session;
@@ -429,25 +418,6 @@ class NativeWorldCircuitBindings {
     }
   }
 
-  Future<Map<String, Object?>> _leaseOutputs(_Session session) async {
-    Map<String, Object?>? world, twld;
-    try {
-      world = await _leaseOutput(session, 3, 'world.wld');
-      if (session.hasTwld) twld = await _leaseOutput(session, 5, 'world.twld');
-      final result = <String, Object?>{'worldSource': world};
-      if (twld != null) result['twldSource'] = twld;
-      return result;
-    } catch (_) {
-      for (final output in [world, twld]) {
-        final directory = _outputs.remove(output?['token']);
-        if (directory != null && directory.existsSync()) {
-          directory.deleteSync(recursive: true);
-        }
-      }
-      rethrow;
-    }
-  }
-
   Map<String, Object?> _pump(int id, _Session session, {List<int>? command}) {
     final commandKind = command?[1] ?? 0, save = commandKind == 6;
     final fragments = commandKind == 7 || commandKind == 8;
@@ -477,7 +447,7 @@ class NativeWorldCircuitBindings {
             source = e[2],
             offset = e[3],
             length = e[4];
-        if (e[0] != 1 || e[5] != 0) {
+        if (e[0] != 2 || e[5] != 0) {
           throw const EngineException('Invalid circuit event ABI');
         }
         if (kind == 4) {
@@ -531,11 +501,11 @@ class NativeWorldCircuitBindings {
                 throw const EngineException('Invalid circuit companion output');
               }
               objectBytes += length;
-            } else if (source != 2 && !(save && (source == 3 || source == 5))) {
+            } else if (source != 2 && !(save && source == 3)) {
               throw const EngineException('Unexpected circuit output source');
             }
             final file = session.files[source];
-            if (file == null || source == 4) {
+            if (file == null) {
               throw const EngineException('Invalid circuit output source');
             }
             file.setPositionSync(offset);
@@ -559,11 +529,8 @@ class NativeWorldCircuitBindings {
           int Function(int, Pointer<Uint32>)
         >('abc_world_circuit_stats')(id, stats),
       );
-      if (save &&
-          (session.files[3]!.lengthSync() != resultCount ||
-              (session.hasTwld &&
-                  session.files[5]!.lengthSync() != reserved))) {
-        throw const EngineException('Incomplete circuit saved files');
+      if (save && session.files[3]!.lengthSync() != resultCount) {
+        throw const EngineException('Incomplete circuit saved world');
       }
       Uint8List read(int source) {
         final f = session.files[source]!;
@@ -589,7 +556,6 @@ class NativeWorldCircuitBindings {
         'stats': stats.asTypedList(24).toList(),
         'records': records.takeBytes(),
         if (save) 'world': read(3),
-        if (save && session.hasTwld) 'twld': read(5),
       };
     } finally {
       calloc.free(event);
@@ -650,7 +616,7 @@ class NativeWorldCircuitBindings {
             'maxReadBytes': session.maxReadBytes,
           },
         };
-        if (e[0] != 1 || e[5] != 0) {
+        if (e[0] != 2 || e[5] != 0) {
           throw const EngineException('Invalid circuit event ABI');
         }
         if (kind == 4) {
@@ -703,11 +669,11 @@ class NativeWorldCircuitBindings {
                 throw const EngineException('Invalid circuit companion output');
               }
               objectBytes += length;
-            } else if (source != 2 && !(save && (source == 3 || source == 5))) {
+            } else if (source != 2 && !(save && source == 3)) {
               throw const EngineException('Unexpected circuit output source');
             }
             final file = session.files[source];
-            if (file == null || source == 4) {
+            if (file == null) {
               throw const EngineException('Invalid circuit output source');
             }
             file.setPositionSync(offset);
@@ -731,11 +697,8 @@ class NativeWorldCircuitBindings {
           int Function(int, Pointer<Uint32>)
         >('abc_world_circuit_stats')(id, stats),
       );
-      if (save &&
-          (session.files[3]!.lengthSync() != resultCount ||
-              (session.hasTwld &&
-                  session.files[5]!.lengthSync() != reserved))) {
-        throw const EngineException('Incomplete circuit saved files');
+      if (save && session.files[3]!.lengthSync() != resultCount) {
+        throw const EngineException('Incomplete circuit saved world');
       }
       Uint8List read(int source) {
         final f = session.files[source]!;
@@ -761,8 +724,7 @@ class NativeWorldCircuitBindings {
         'stats': stats.asTypedList(24).toList(),
         'records': records.takeBytes(),
         'sourceSha256': session.sourceSha256,
-        'twldSourceSha256': session.twldSourceSha256,
-        if (save) ...await _leaseOutputs(session),
+        if (save) 'worldSource': await _leaseOutput(session, 3, 'world.wld'),
       };
     } catch (_) {
       _one('cancel')(id);
@@ -790,9 +752,8 @@ class NativeWorldCircuitBindings {
 
 class _Session {
   int world;
-  bool hasTwld;
   final bool streamed;
-  String? sourceSha256, twldSourceSha256;
+  String? sourceSha256;
   int readBytes = 0, readRequests = 0, maxReadBytes = 0;
   final Directory directory = Directory.systemTemp.createTempSync(
     'abc-circuit-',
@@ -800,14 +761,12 @@ class _Session {
   final Map<int, RandomAccessFile> files = {};
   final Map<int, String> paths = {};
   final Map<int, FileStat> originals = {};
-  _Session(this.world, Uint8List? twld, {this.streamed = false})
-    : hasTwld = twld != null {
+  _Session(this.world, {this.streamed = false}) {
     try {
-      for (final id in [2, 3, 4, 5, 6]) {
+      for (final id in [2, 3, 6]) {
         paths[id] = '${directory.path}/$id';
         files[id] = File(paths[id]!).openSync(mode: FileMode.write);
       }
-      if (twld != null) files[4]!.writeFromSync(twld);
     } catch (_) {
       close();
       rethrow;
@@ -825,7 +784,6 @@ class _Session {
     files[id] = handle;
     paths[id] = source.path!;
     originals[id] = stat;
-    if (id == 4) hasTwld = true;
   }
 
   Uint8List read(int id, int offset, int length) {

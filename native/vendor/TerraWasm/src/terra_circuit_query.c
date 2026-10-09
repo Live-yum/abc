@@ -15,12 +15,17 @@ static CxBinding* bind_point(CxWorld* w,uint32_t y){
     if(w->binding_count==w->binding_capacity){uint32_t n=w->binding_capacity?w->binding_capacity*2u:128u;if(n<w->binding_capacity||(uint64_t)n*sizeof(CxBinding)>UINT32_MAX)return NULL;CxBinding* p=(CxBinding*)cx_alloc(w,n*sizeof(CxBinding));if(!p)return NULL;if(w->binding_count)memcpy(p,w->bindings,w->binding_count*sizeof(CxBinding));cx_free(w,w->bindings);w->bindings=p;w->binding_capacity=n;}
     b=w->bindings+w->binding_count++;memset(b,0,sizeof(*b));b->x=w->x;b->y=y;b->tile=w->column[y];b->gate=point_gate(w,y);for(uint32_t c=0;c<4;c++){b->nets[c]=w->seed_ids[y*4u+c];b->opposite[c]=w->opposite_ids[y*4u+c];}return b;
 }
-static int routing(CxWorld* w,const TxTile* t){if(!t->active)return -1;if(t->type==424u){int r=t->frame_x/18;return r>=0&&r<=2?r:-1;}if(t->type==0xfffeu||(t->type==445u&&!w->twld_state))return 0;return -1;}
-static uint32_t entering_net(CxWorld* w,const CxBinding* b,uint32_t colour,uint32_t direction){int r=routing(w,&b->tile);int other=r==0?direction>=2u:r==1?(direction==1u||direction==3u):r==2?(direction==1u||direction==2u):0;return other?b->opposite[colour]:b->nets[colour];}
+static int routing(const TxTile* t){if(!t->active)return -1;if(t->type==424u){int r=t->frame_x/18;return r>=0&&r<=2?r:-1;}if(t->type==445u)return 0;return -1;}
+static uint32_t entering_net(const CxBinding* b,uint32_t colour,uint32_t direction){int r=routing(&b->tile);int other=r==0?direction>=2u:r==1?(direction==1u||direction==3u):r==2?(direction==1u||direction==2u):0;return other?b->opposite[colour]:b->nets[colour];}
 static uint32_t trigger_net(CxWorld* w,const CxBinding* b,uint32_t colour){
-    if(!(cx_wire_mask(&b->tile)&(1u<<colour)))return 0;if(cx_inside_wiring(w,b->x,b->y))return b->nets[colour];
-    const int dx[4]={0,0,1,-1},dy[4]={1,-1,0,0};int r=routing(w,&b->tile);
-    for(uint32_t d=0;d<4u;d++){if(r>=0&&d!=(r==1?3u:r==2?2u:0u))continue;int64_t x=(int64_t)b->x+dx[d],y=(int64_t)b->y+dy[d];if(x<0||y<0||!cx_inside_wiring(w,(uint32_t)x,(uint32_t)y))continue;CxBinding* inside=find_binding(w,(uint32_t)x,(uint32_t)y);if(inside)return entering_net(w,inside,colour,d);}
+    if(!(cx_wire_mask(&b->tile)&(1u<<colour)))return 0;if(cx_inside_wiring(w,b->x,b->y)){
+        if(w->optimization&&b->tile.active&&b->tile.type==445u){
+            uint32_t i=cx_pixel_find(w,b->x,b->y);if(i!=CX_NONE){CxPixel* p=w->pixels+i;return (p->connected_h&(1u<<colour))?p->h[colour]:p->v[colour];}
+        }
+        return b->nets[colour];
+    }
+    const int dx[4]={0,0,1,-1},dy[4]={1,-1,0,0};int r=routing(&b->tile);
+    for(uint32_t d=0;d<4u;d++){if(r>=0&&d!=(r==1?3u:r==2?2u:0u))continue;int64_t x=(int64_t)b->x+dx[d],y=(int64_t)b->y+dy[d];if(x<0||y<0||!cx_inside_wiring(w,(uint32_t)x,(uint32_t)y))continue;CxBinding* inside=find_binding(w,(uint32_t)x,(uint32_t)y);if(inside)return entering_net(inside,colour,d);}
     return 0;
 }
 static void seek_checkpoint(CxWorld* w,uint32_t x){
@@ -49,7 +54,7 @@ int cx_query_begin(CxWorld* w){
 static void pack_cell(CxWorld* w,uint32_t x,uint32_t y,uint32_t* out){
     if(w->command.flags&2u){const TxTile* t=w->column+y;uint32_t flags=(t->wall?1u:0u)|32u|(t->invisible_wall?64u:0u)|(t->fullbright_wall?128u:0u);out[0]=x;out[1]=y;out[2]=t->wall|(flags<<16);out[3]=t->wall_color;return;}
     TxTile t=w->column[y];uint32_t gate=point_gate(w,y);cx_current_tile(w,x,y,gate,&t,w->ids+y*4u);
-    uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);if(t.type==0xfffeu)flags|=8u;
+    uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);
     out[0]=x;out[1]=y;out[2]=t.type|(flags<<16)|(cx_wire_mask(&t)<<24);out[3]=(uint16_t)t.frame_x|((uint32_t)(uint16_t)t.frame_y<<16);
 }
 int cx_query_step(CxWorld* w,uint32_t* work){
@@ -112,23 +117,18 @@ static int query_pixels(CxWorld* w,const TerraCircuitWorldCommand* cmd){
         uint32_t* out=w->result+w->result_count++*4u;
         out[0]=p->x;out[1]=p->y;out[2]=p->cell_word;
         if(out[2]&(2u<<16)){CxDevice* d=cx_device_find(w,p->x,p->y);if(d)out[2]=(out[2]&~(4u<<16))|((uint32_t)d->tile.inactive<<18);}
-        out[3]=p->custom?18u*(p->state&3u)|((18u*((p->state>>2)&3u))<<16):18u*p->state;
+        out[3]=18u*p->state;
     }
     w->command=*cmd;cx_emit(w,TCW_RESULT,0,0,w->result_count*16u,w->result);w->event.result_kind=TCW_PIXELS;w->event.result_count=w->result_count;return TCW_CONTINUE;
 }
 int32_t terra_circuit_world_command(uint32_t handle,const TerraCircuitWorldCommand* input){
     CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;if(!input)return TCW_INVALID;if(w->phase!=CX_IDLE||w->event.kind)return TCW_STATE;
-    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=1||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_OPTIMIZATION||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
+    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=TERRA_CIRCUIT_WORLD_ABI||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_OPTIMIZATION||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
     /* A rejected bounded query must not poison SAVE's earlier dispatch path. */
     w->error=0;
     if(cmd.kind==TCW_OPTIMIZATION){
         if(cmd.mask>1u||cmd.data_count||cmd.flags)return TCW_INVALID;
-        if(w->optimization!=cmd.mask){
-            /* Transient dedup metadata has no saved-world meaning. Reset it at
-             * the idle boundary so switching cannot alias an earlier epoch. */
-            for(uint32_t i=0;i<w->device_count;i++){w->devices[i].wire_hit_mask=0;w->devices[i].wire_hit_epoch=0;}
-            w->wire_trip_epoch=0;w->optimization=cmd.mask;
-        }
+        int status=cx_set_optimization(w,cmd.mask);if(status)return status;
         w->command=cmd;return TCW_OK;
     }
     if(cmd.kind==TCW_PIXELS)return query_pixels(w,&cmd);
@@ -136,7 +136,7 @@ int32_t terra_circuit_world_command(uint32_t handle,const TerraCircuitWorldComma
     if(cmd.kind==TCW_TRIGGER&&(cmd.flags&1u)){int s=cx_interaction_rect(w,&cmd);if(s<0)return TCW_INVALID;if(!s){w->command=cmd;return TCW_OK;}}
     if((cmd.kind==TCW_VIEWPORT||cmd.kind==TCW_TRIGGER)&&(!cmd.width||!cmd.height||cmd.x>=w->width||cmd.y>=w->height||cmd.width>w->width-cmd.x||cmd.height>w->height-cmd.y))return TCW_INVALID;
     if(cmd.kind==TCW_TRIGGER&&(cmd.mask>15u||!cmd.mask))return TCW_INVALID;
-    if(cmd.kind==TCW_SAVE){if(!cmd.source_id||cmd.source_id==w->world_source||cmd.source_id==w->scratch_source||cmd.source_id==w->twld_source)return TCW_INVALID;if(w->twld&&(!cmd.aux_source_id||cmd.aux_source_id==cmd.source_id||cmd.aux_source_id==w->world_source||cmd.aux_source_id==w->scratch_source||cmd.aux_source_id==w->twld_source))return TCW_INVALID;w->command=cmd;w->output_source=cmd.source_id;w->output_offset=0;w->output_length=0;w->save_cursor=0;w->twld_saved_size=0;w->phase=CX_SAVE_PREFIX;w->input_length=0;return TCW_OK;}
+    if(cmd.kind==TCW_SAVE){if(!cmd.source_id||cmd.source_id==w->world_source||cmd.source_id==w->scratch_source||cmd.aux_source_id)return TCW_INVALID;w->command=cmd;w->output_source=cmd.source_id;w->output_offset=0;w->output_length=0;w->save_cursor=0;w->phase=CX_SAVE_PREFIX;w->input_length=0;return TCW_OK;}
     uint32_t count=0,allocated_count=0;
     if(cmd.kind==TCW_READ_LAMPS||cmd.kind==TCW_WRITE_LAMPS){if(cmd.data_count>65536u||(!cmd.data_ptr&&cmd.data_count))return TCW_INVALID;count=cmd.data_count;
 #ifdef __wasm__
@@ -166,7 +166,7 @@ int cx_save_step(CxWorld* w,uint32_t* work){
     }
     if(w->phase==CX_SAVE_TILES){
         while(*work&&w->x<w->width){int s=cx_scan_step(w,work);if(s<0||w->event.kind)return s;if(s!=2)return TCW_CONTINUE;
-            while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y;TxTile t=w->column[y];cx_current_tile(w,w->x,y,point_gate(w,y),&t,w->ids+y*4u);if(t.type==0xfffeu&&!cx_mod_vanilla(w,w->x,y,&t))return TCW_FORMAT;t.same=0;
+            while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y;TxTile t=w->column[y];cx_current_tile(w,w->x,y,point_gate(w,y),&t,w->ids+y*4u);t.same=0;
                 if(w->save_previous_valid&&w->save_repeat<32767u&&same_tile(&w->save_previous,&t))++w->save_repeat;
                 else{s=flush_tile(w);if(s)return s;w->save_previous=t;w->save_repeat=0;w->save_previous_valid=1;}
                 ++w->emit_y;--*work;

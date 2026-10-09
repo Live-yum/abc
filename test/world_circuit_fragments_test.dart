@@ -60,11 +60,11 @@ WorldCircuitResult _result(
   Uint8List? objects,
 }) => WorldCircuitResult(
   9,
-  [1, 0, 64, 64, ...List.filled(20, 0)],
+  [2, 0, 64, 64, ...List.filled(20, 0)],
   records,
   resultKind: kind,
   resultCount: count,
-  reserved: 1,
+  reserved: 0,
   objects: objects,
 );
 
@@ -92,10 +92,8 @@ class _Backend implements WorldCircuitBackend {
   final commands = <WorldCircuitCommand>[];
   final events = <String>[];
   @override
-  Future<WorldCircuitResult> openWorldCircuit(
-    Uint8List world, {
-    Uint8List? twld,
-  }) async => _result(0, Uint8List(0), count: 0);
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async =>
+      _result(0, Uint8List(0), count: 0);
   @override
   Future<WorldCircuitResult> commandWorldCircuit(
     int session,

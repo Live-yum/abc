@@ -1,6 +1,6 @@
 // Opt-in acceptance of the complete original public world through ABC's actual
 // file-backed Dart/C owner. No instruction decoder or expected framebuffer is
-// linked into the DUT. Paths: library, WLD, TWLD, input-once.bin, Pong.bin, report.
+// linked into the DUT. Paths: library, WLD, input-once.bin, Pong.bin, report.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
@@ -13,8 +13,8 @@ import 'package:terraforge/engine/native_world_circuit_bindings.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 
 Future<void> main(List<String> args) async {
-  if (args.length != 6) {
-    throw ArgumentError('library WLD TWLD input.bin Pong.bin report.json');
+  if (args.length != 5) {
+    throw ArgumentError('library WLD input.bin Pong.bin report.json');
   }
   final lib = DynamicLibrary.open(args[0]),
       api = NativeWorldCircuitBindings(DynamicLibrary.open(args[0]));
@@ -22,7 +22,8 @@ Future<void> main(List<String> args) async {
     File('native/fixtures/computerraria/programs.json').readAsStringSync(),
   ) as Map;
   final report = <String, Object?>{
-    'schema': 1,
+    'schema': 2,
+    'inputFormat': 'wld-only',
     'status': 'running',
     'temporaryDirectory': Directory.systemTemp.path,
     'host': 'Dart native owner with C physical wiring VM',
@@ -30,6 +31,15 @@ Future<void> main(List<String> args) async {
   };
   final optimized = Platform.environment['ABC_COMPUTERRARIA_OPTIMIZED'] == '1';
   report['optimizationEnabled'] = optimized;
+  report['pixelRule'] = optimized
+      ? 'wirehead-color-pair-wave'
+      : 'game-tripwire-crossing';
+  report['displayCompatibility'] = {
+    'status': optimized ? 'supported' : 'unsupported-under-game-rules',
+    'expectedBehavior': optimized
+        ? 'moving-pong'
+        : 'recorded-without-pong-display-claim',
+  };
   final wall = Stopwatch()..start();
   Map<String, Object?> source(String path) => {
     'path': path,
@@ -197,26 +207,13 @@ Future<void> main(List<String> args) async {
     ]);
   }
 
-  Future<Map> display(bool color, {bool old = false}) => command(
+  Future<Map> display({bool old = false}) => command(
     old
-        ? WorldCircuitCommand.viewport(
-            color ? 7371 : 6485,
-            color ? 1002 : 800,
-            color ? 176 : 64,
-            color ? 96 : 48,
-          )
-        : WorldCircuitCommand.pixels(
-            color ? 7371 : 6485,
-            color ? 1002 : 800,
-            color ? 176 : 64,
-            color ? 96 : 48,
-          ),
+        ? WorldCircuitCommand.viewport(6485, 800, 64, 48)
+        : WorldCircuitCommand.pixels(6485, 800, 64, 48),
   );
   try {
-    final opened = await call('worldCircuitOpenSource', [
-      source(args[1]),
-      source(args[2]),
-    ]);
+    final opened = await call('worldCircuitOpenSource', [source(args[1])]);
     id = opened['session'] as int;
     report['defaultOptimization'] = (opened['reserved'] as int) & 2 != 0;
     require(
@@ -228,21 +225,28 @@ Future<void> main(List<String> args) async {
       ((mode['reserved'] as int) & 2 != 0) == optimized,
       'Native strategy did not match requested mode',
     );
+    require(
+      (mode['reserved'] as int) & 4 == 4 &&
+          (((mode['reserved'] as int) & 8 != 0) == optimized),
+      'Actual topology qualification and selected PixelBox rule',
+    );
+    report['readyMetadata'] = {
+      'flags': mode['reserved'],
+      'optimizationEnabled': optimized,
+      'topologyEligible': true,
+      'wireHeadPixelRulesEnabled': optimized,
+    };
     report['activeOptimizationAtStart'] = activeOptimization;
     final stats = (opened['stats'] as List).cast<int>();
+    report['circuitAbi'] = stats[0];
+    require(stats[0] == 2, 'Actual WLD-only circuit ABI');
     report['import'] = {
       'milliseconds': wall.elapsedMilliseconds,
       'stats': stats,
       'sourceSha256': opened['sourceSha256'],
-      'twldSourceSha256': opened['twldSourceSha256'],
       'rssBytes': ProcessInfo.currentRss,
       'maxRssBytes': ProcessInfo.maxRss,
     };
-    require(
-      opened['twldSourceSha256'] ==
-          'c6de694b3d034701513dc1ba17311213561ec359d3ecddde7bc35ea3c9611ed8',
-      'Original companion digest must be computed from actual bytes',
-    );
     final structure = lib
         .lookupFunction<
           Uint32 Function(Uint32, Uint32),
@@ -264,15 +268,8 @@ Future<void> main(List<String> args) async {
           stats[12] == 13641575,
       'Full world was not represented',
     );
-    require(
-      (opened['reserved'] as int) & 1 == 1,
-      'Original TWLD compatibility profile missing',
-    );
-    require(
-      rows(await display(false)).length == 3072 &&
-          rows(await display(true)).length == 16896,
-      'Native screen geometry',
-    );
+    require((opened['reserved'] as int) & 1 == 0, 'WLD-only reserved bit');
+    require(rows(await display()).length == 3072, 'Native screen geometry');
     final checks = (fixtures['main'] as Map)['checks'] as List;
     final addresses = checks.map((v) => (v as Map)['address'] as int).toList();
     final expected = checks.map((v) => (v as Map)['expected'] as int).toList();
@@ -293,50 +290,43 @@ Future<void> main(List<String> args) async {
       'Actual ROM mutation did not change exactly one expected result',
     );
     report['displayProgram'] = await execute(image('display'), [0x1000bc]);
-    final mono = rows(await display(false)), color = rows(await display(true));
-    final litMono = mono.where((r) => r[3] != 0).toList(),
-        litColor = color.where((r) => r[3] != 0).toList();
+    final mono = rows(await display());
+    final litMono = mono.where((r) => r[3] != 0).toList();
+    // Preserve actual observations even when the required monitor behavior fails.
+    report['display'] = {'mono': litMono, 'recordCount': mono.length};
+    report['correctness'] = <String, Object?>{
+      'displayMonoSha256': frameHash(await display()),
+    };
     require(
-      litMono.length == 2 &&
-          litMono[0][0] == 6485 &&
-          litMono[1][0] == 6516 &&
-          litMono.every((v) => v[1] == 800 && v[3] == 18),
+      optimized
+          ? (litMono.length == 2 &&
+                litMono[0][0] == 6485 &&
+                litMono[1][0] == 6516 &&
+                litMono.every((v) => v[1] == 800 && v[3] == 18))
+          : litMono.isEmpty,
       'Real monochrome display mismatch',
     );
     require(
-      litColor.length == 8 &&
-          litColor.first[0] == 7371 &&
-          litColor.last[0] == 7378 &&
-          litColor.every((v) => v[1] == 1002 && v[3] == (54 | (54 << 16))),
-      'Real color display mismatch',
-    );
-    require(
-      jsonEncode(rows(await display(false, old: true))) == jsonEncode(mono),
+      jsonEncode(rows(await display(old: true))) == jsonEncode(mono),
       'Direct mono query differs from original viewport',
-    );
-    require(
-      jsonEncode(rows(await display(true, old: true))) == jsonEncode(color),
-      'Direct color query differs from original viewport',
     );
     final pixelTime = Stopwatch()..start();
     for (var n = 0; n < 100; n++) {
-      await display(false);
+      await display();
     }
     report['display'] = {
       'mono': litMono,
-      'color': litColor,
       'monoQueries100Ms': pixelTime.elapsedMilliseconds,
     };
     report['correctness'] = <String, Object?>{
-      'displayMonoSha256': frameHash(await display(false)),
-      'displayColorSha256': frameHash(await display(true)),
+      'displayMonoSha256': frameHash(await display()),
     };
     stdout.writeln(
-      'PASS: full-world identity, 48 CPU signatures, real ROM negative control, actual mono/color output, direct pixels match viewport',
+      'PASS: full-world identity, 48 CPU signatures, ROM negative control and declared PixelBox rule; display compatibility: ${optimized ? 'supported' : 'unsupported under game rules'}',
     );
-    final input = args[3] == '-'
+    final input = args[2] == '-'
         ? image('input')
-        : File(args[3]).readAsBytesSync();
+        : File(args[2]).readAsBytesSync();
     final probes = <Map<String, Object?>>[];
     probes.add({
       'sensor': null,
@@ -466,15 +456,22 @@ Future<void> main(List<String> args) async {
     report['inputProbes'] = probes;
     stdout.writeln(jsonEncode({'inputProbes': probes}));
     await execute(image('clear'), [0x1000bc]);
-    final pong = File(args[4]).readAsBytesSync();
+    final pong = File(args[3]).readAsBytesSync();
     await load(pong);
     final frames = <Map<String, Object?>>[], hashes = <String>{};
     final play = Stopwatch()..start(), firstPongSample = clockSamples.length;
     var clocks = 0;
-    for (var n = 0; n < 400; n++) {
+    final cpuTrace = <Map<String, Object?>>[];
+    final passiveRam = ramRecords([
+      for (var i = 0; i < 16; i++) 0x100000 + i * 4,
+      for (var i = 0; i < 256; i++) 0x15bc00 + i * 4,
+    ]);
+    Future<String> passiveRamHash() async =>
+        frameHash(await command(WorldCircuitCommand.lamps(passiveRam)));
+    for (var n = 0; n < 12; n++) {
       await command(ComputerrariaComputer.clock(128));
       clocks += 128;
-      final frame = await display(false), bytes = frame['records'] as Uint8List;
+      final frame = await display(), bytes = frame['records'] as Uint8List;
       final lit = rows(frame)
           .where((v) => v[3] == 18)
           .map((v) => [v[0] - 6485, v[1] - 800])
@@ -483,23 +480,28 @@ Future<void> main(List<String> args) async {
       if (hashes.add(hash)) {
         frames.add({'clocks': clocks, 'sha256': hash, 'lit': lit});
       }
-      final moving = frames
-          .where(
-            (v) => (v['lit'] as List).any((dynamic p) => p[0] > 1 && p[0] < 62),
-          )
-          .length;
-      if (moving >= 3) break;
+      cpuTrace.add({
+        'clocks': clocks,
+        'ready': await ready(),
+        'ramSha256': await passiveRamHash(),
+      });
     }
     require(
-      frames
-              .where(
-                (v) => (v['lit'] as List).any(
-                  (dynamic p) => p[0] > 1 && p[0] < 62,
-                ),
-              )
-              .length >=
-          3,
-      'Upstream Pong did not produce three actual moving-ball states',
+      cpuTrace.map((r) => r['ramSha256']).toSet().length > 1,
+      'Pong physical RAM/stack must change; equal halted CPUs cannot pass',
+    );
+    require(
+      optimized
+          ? frames
+                    .where(
+                      (v) => (v['lit'] as List).any(
+                        (dynamic p) => p[0] > 1 && p[0] < 62,
+                      ),
+                    )
+                    .length >=
+                3
+          : frames.every((v) => (v['lit'] as List).isEmpty),
+      'Pong does not match the explicitly selected display rule',
     );
     final samples = clockSamples.sublist(firstPongSample),
         times = samples.map((v) => v['milliseconds'] as double).toList()
@@ -511,6 +513,9 @@ Future<void> main(List<String> args) async {
       'clocks': clocks,
       'milliseconds': play.elapsedMilliseconds,
       'frames': frames,
+      'cpuTrace': cpuTrace,
+      'cpuTraceMeasurement': 'passive-ready-and-1088-ram-bytes-no-reset-bus',
+      'displayStatus': optimized ? 'moving' : 'expected-dark',
       'pureClockMilliseconds': pureClockMs,
       'pureClockPulsesPerSecond': clocks * 1000 / pureClockMs,
       'batchMedianMs': times[times.length ~/ 2],
@@ -518,16 +523,15 @@ Future<void> main(List<String> args) async {
       'clockSamples': samples,
     };
     (report['correctness'] as Map<String, Object?>).addAll({
-      'pongFinalMonoSha256': frameHash(await display(false)),
-      'pongFinalColorSha256': frameHash(await display(true)),
+      'pongFinalMonoSha256': frameHash(await display()),
     });
-    report['finalStats'] = (await display(false))['stats'];
+    report['finalStats'] = (await display())['stats'];
     report['hostProgress'] = api.dispatch('worldCircuitProgress', []);
     report['maxRssBytes'] = ProcessInfo.maxRss;
     stdout.writeln(
-      'PASS: original upstream Pong physically executes and produces multiple real screen states',
+      'PASS: original upstream Pong physical CPU/RAM trace; display ${optimized ? 'moving' : 'expected dark under game rules'}',
     );
-    final beforeSwitch = (await display(false))['records'] as Uint8List;
+    final beforeSwitch = (await display())['records'] as Uint8List;
     final beforeReady = await ready();
     final flipped = await command(WorldCircuitCommand.optimization(!optimized));
     require(
@@ -535,52 +539,36 @@ Future<void> main(List<String> args) async {
       'Mode switch did not take effect',
     );
     require(
-      (flipped['reserved'] as int) & 1 == 1,
-      'Optimization must not replace TWLD compatibility',
-    );
-    require(
       beforeSwitch.toString() ==
-              ((await display(false))['records'] as Uint8List).toString() &&
+              ((await display())['records'] as Uint8List).toString() &&
           beforeReady == await ready(),
       'Idle switch changed physical display/ready state',
     );
     await command(WorldCircuitCommand.optimization(optimized));
     report['idleSwitchPreservesState'] = true;
     if (Platform.environment['ABC_COMPUTERRARIA_SAVE'] == '1') {
-      final beforeMono = rows(await display(false)),
-          beforeColor = rows(await display(true));
-      final beforeHashes = {
-        'mono': frameHash(await display(false)),
-        'color': frameHash(await display(true)),
-      };
+      final beforeMono = rows(await display());
+      final beforeHashes = {'mono': frameHash(await display())};
+      final savedRam = await passiveRamHash();
       final saveTime = Stopwatch()..start(),
           saved = await command(WorldCircuitCommand.save());
-      final wld = WorldCircuitSource.fromMap(saved['worldSource'] as Map),
-          twld = WorldCircuitSource.fromMap(saved['twldSource'] as Map);
-      outputTokens.addAll([wld.token!, twld.token!]);
+      final wld = WorldCircuitSource.fromMap(saved['worldSource'] as Map);
+      outputTokens.add(wld.token!);
       report['save'] = <String, Object?>{
         'milliseconds': saveTime.elapsedMilliseconds,
         'worldBytes': wld.length,
-        'twldBytes': twld.length,
         'worldSha256': await fileHash(wld.path!),
-        'twldSha256': await fileHash(twld.path!),
         'beforeDisplaySha256': beforeHashes,
+        'beforeRamSha256': savedRam,
       };
       require(
-        wld.sha256 == (report['save'] as Map)['worldSha256'] &&
-            twld.sha256 == (report['save'] as Map)['twldSha256'],
+        wld.sha256 == (report['save'] as Map)['worldSha256'],
         'Leased output digests must match independent streamed hashes',
       );
       api.dispatch('worldCircuitClose', [id]);
       id = 0;
-      require(
-        File(wld.path!).existsSync() && File(twld.path!).existsSync(),
-        'Paired output lifetime',
-      );
-      final reopened = await call('worldCircuitOpenSource', [
-        wld.toFileMap(),
-        twld.toFileMap(),
-      ]);
+      require(File(wld.path!).existsSync(), 'WLD output lifetime');
+      final reopened = await call('worldCircuitOpenSource', [wld.toFileMap()]);
       id = reopened['session'] as int;
       require(
         (reopened['reserved'] as int) & 2 == 0,
@@ -588,52 +576,37 @@ Future<void> main(List<String> args) async {
       );
       await command(WorldCircuitCommand.optimization(optimized));
       require(
-        jsonEncode(rows(await display(false))) == jsonEncode(beforeMono),
+        jsonEncode(rows(await display())) == jsonEncode(beforeMono),
         'Saved native mono frames changed',
       );
-      require(
-        jsonEncode(rows(await display(true))) == jsonEncode(beforeColor),
-        'Saved native color frames changed',
-      );
       report['savedSourceSha256'] = reopened['sourceSha256'];
+      final reopenedRam = await passiveRamHash();
+      require(reopenedRam == savedRam, 'Saved physical RAM/stack changed');
+      (report['save'] as Map)['reopenedRamSha256'] = reopenedRam;
       (report['save'] as Map)['reopenedDisplaySha256'] = {
-        'mono': frameHash(await display(false)),
-        'color': frameHash(await display(true)),
+        'mono': frameHash(await display()),
       };
       await execute(image('display'), [0x1000bc]);
       require(
-        rows(await display(false))
+        rows(await display())
                 .where((r) => r[1] == 800 && r[0] < 6517)
                 .where((r) => r[3] != 0)
                 .length ==
-            2,
-        'Reopened physical mono controller cannot set target word',
-      );
-      require(
-        rows(await display(true))
-            .where((r) => r[1] == 1002 && r[0] < 7379)
-            .every((r) => r[3] == (54 | (54 << 16))),
-        'Reopened physical color controller cannot set target word',
+            (optimized ? 2 : 0),
+        'Reopened physical mono controller differs from the selected rule',
       );
       await execute(image('clear'), [0x1000bc]);
-      final clearedMono = rows(await display(false)),
-          clearedColor = rows(await display(true));
+      final clearedMono = rows(await display());
       require(
         clearedMono
-                .where((r) => r[1] == 800 && r[0] < 6517)
-                .every((r) => r[3] == 0) &&
-            clearedColor
-                .where((r) => r[1] == 1002 && r[0] < 7379)
-                .every((r) => r[3] == 0),
+            .where((r) => r[1] == 800 && r[0] < 6517)
+            .every((r) => r[3] == 0),
         'Saved physical target-word set/clear failed',
       );
       report['postReopenTargetWordsCleared'] = true;
       (report['save'] as Map<String, Object?>).addAll({
         'status': 'passed',
-        'postProgramDisplaySha256': {
-          'mono': frameHash(await display(false)),
-          'color': frameHash(await display(true)),
-        },
+        'postProgramDisplaySha256': {'mono': frameHash(await display())},
       });
       report['postReopenOtherPixelChanges'] = {
         'scope': 'Observed after reset/replacing a paused Pong ROM and issuing real display updates; partial-word fixture does not promise other buffer words stay unchanged.',
@@ -647,23 +620,12 @@ Future<void> main(List<String> args) async {
                 clearedMono[i][3],
               ],
         ],
-        'color': [
-          for (var i = 0; i < beforeColor.length; i++)
-            if (beforeColor[i][3] != clearedColor[i][3])
-              [
-                clearedColor[i][0],
-                clearedColor[i][1],
-                beforeColor[i][3],
-                clearedColor[i][3],
-              ],
-        ],
       };
       api.dispatch('worldCircuitClose', [id]);
       id = 0;
       api.dispatch('worldCircuitReleaseSource', [wld.token]);
-      api.dispatch('worldCircuitReleaseSource', [twld.token]);
       stdout.writeln(
-        'PASS: complete streamed paired save, independent output lifetime, reopen and real CPU clear',
+        'PASS: complete streamed WLD save, independent output lifetime, reopen and real CPU clear',
       );
     }
     report['activeOptimizationAtEnd'] = activeOptimization;
@@ -684,7 +646,7 @@ Future<void> main(List<String> args) async {
         )();
     if (report['nativeBytesAfterClose'] != 0) report['status'] = 'failed';
     report['elapsedMilliseconds'] = wall.elapsedMilliseconds;
-    File(args[5]).writeAsStringSync(
+    File(args[4]).writeAsStringSync(
       '${const JsonEncoder.withIndent('  ').convert(report)}\n',
     );
   }

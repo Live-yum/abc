@@ -862,19 +862,23 @@ int parse_header(TxWorld *w){
         return *off<=end;
     }
     if (end>len) end=len;
-#define TILE_U8(value) do { if (!terra_reader_has(*off,1u,end)) return 0; (value)=rd_u8(p,end,off); } while (0)
-#define TILE_U16(value) do { if (!terra_reader_has(*off,2u,end)) return 0; (value)=rd_u16le(p,end,off); } while (0)
+/* Keep every payload bounded, but perform each check and little-endian
+     * read together. The generic rd_u16le helper repeated the same check and
+     * forced an out-of-line call for each framed tile field. */
+#define TILE_U8(value) do { uint32_t at=*off; if (at>=end) return 0; (value)=p[at]; *off=at+1u; } while (0)
+#define TILE_U16(value) do { uint32_t at=*off; if (at>end||2u>end-at) return 0; (value)=(uint16_t)(p[at]|((uint32_t)p[at+1u]<<8)); *off=at+2u; } while (0)
     uint8_t f1;
     TILE_U8(f1);
     uint8_t f2=0,f3=0,f4=0;
     if (f1&1u)TILE_U8(f2);
     if (f2&1u)TILE_U8(f3);
     if (f3&1u)TILE_U8(f4);
-    if (tx_world_is_future(w) && ((f4&0xe1u) || (f2&0x80u))) return 0;
+    int future=tx_world_is_future(w);
+    if (future && ((f4&0xe1u) || (f2&0x80u))) return 0;
     t->active=(f1>>1)&1u;
     if (t->active){
         if (f1&32u)TILE_U16(t->type); else TILE_U8(t->type);
-        if (tx_world_is_future(w) && t->type>=w->tile_type_count) return 0;
+        if (future && t->type>=w->tile_type_count) return 0;
         if (tile_important(w,t->type)){
             TILE_U16(t->frame_x);
             TILE_U16(t->frame_y);

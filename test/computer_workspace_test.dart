@@ -17,18 +17,11 @@ class _Sources implements WorldCircuitFileGateway {
   List<Object> saveResults = [];
   bool derived = false;
   @override
-  Future<WorldCircuitSource?> pick({required bool companion}) async =>
-      pending == null
+  Future<WorldCircuitSource?> pick() async => pending == null
       ? WorldCircuitSource.file(
-          path: derived
-              ? companion
-                    ? '/output/copy.twld'
-                    : '/output/copy.wld'
-              : companion
-              ? '/fixture/p.twld'
-              : '/fixture/p.wld',
-          length: companion ? 427712 : 405983441,
-          name: companion ? 'p.twld' : 'p.wld',
+          path: derived ? '/output/copy.wld' : '/fixture/p.wld',
+          length: 405983441,
+          name: 'p.wld',
         )
       : pending!.future;
   @override
@@ -45,7 +38,7 @@ class _Sources implements WorldCircuitFileGateway {
 }
 
 void main() {
-  test('fully saved pair persists across Workspace recreation and resumes without CPU reset', () async {
+  test('fully saved WLD persists across Workspace recreation and resumes without CPU reset', () async {
     final backend = ComputerCircuitBackend(),
         vault = MemoryVault(),
         sources = _Sources();
@@ -62,13 +55,14 @@ void main() {
       worldCircuitFiles: sources,
     );
     await workspace.dispatch('worldCircuitChooseWorld');
-    await workspace.dispatch('worldCircuitChooseTwld');
     await workspace.dispatch('worldCircuitImport');
     await workspace.dispatch('worldCircuitLoadProgram');
     await workspace.dispatch('worldCircuitStep', {'pulses': 128});
     await workspace.dispatch('worldCircuitSave');
     expect(workspace.view.error, isEmpty);
     expect((workspace.view.result['worldCircuit'] as Map)['dirty'], isFalse);
+    expect(sources.saves, ['p_circuit.wld']);
+    expect(backend.released, ['wld']);
     expect(vault.records.length, 1);
     await workspace.close();
     workspace.dispose();
@@ -82,7 +76,6 @@ void main() {
       worldCircuitFiles: sources,
     );
     await workspace.dispatch('worldCircuitChooseWorld');
-    await workspace.dispatch('worldCircuitChooseTwld');
     await workspace.dispatch('worldCircuitImport');
     final state = workspace.view.result['worldCircuit'] as Map;
     expect(state['restoredFromExport'], isTrue);
@@ -127,18 +120,16 @@ void main() {
     },
   );
 
-  for (final scenario in ['cancel-wld', 'cancel-twld', 'fail-twld']) {
+  for (final scenario in ['cancel-wld', 'fail-wld']) {
     test(
-      'paired source export retains dirty session and releases both outputs: $scenario',
+      'WLD export retains dirty session and releases output: $scenario',
       () async {
         final backend = ComputerCircuitBackend();
         final vault = MemoryVault();
         final sources = _Sources()
           ..saveResults = scenario == 'cancel-wld'
               ? [false]
-              : scenario == 'cancel-twld'
-              ? [true, false]
-              : [true, StateError('disk full')];
+              : [StateError('disk full')];
         final files = FakeFiles()
           ..next = PickedFile('p.bin', Uint8List.fromList([1, 0, 0, 0]));
         final workspace = Workspace(
@@ -149,7 +140,6 @@ void main() {
           worldCircuitFiles: sources,
         );
         await workspace.dispatch('worldCircuitChooseWorld');
-        await workspace.dispatch('worldCircuitChooseTwld');
         await workspace.dispatch('worldCircuitImport');
         await workspace.dispatch('worldCircuitLoadProgram');
         await workspace.dispatch('worldCircuitSave');
@@ -157,18 +147,14 @@ void main() {
         expect(state['open'], isTrue);
         expect(state['dirty'], isTrue);
         expect(state['programName'], 'p.bin');
-        expect(backend.released.toSet(), {'wld', 'twld'});
+        expect(backend.released.toSet(), {'wld'});
         expect(vault.records, isEmpty);
         expect(backend.closes, 0);
-        expect(sources.saves.length, scenario == 'cancel-wld' ? 1 : 2);
+        expect(sources.saves.length, 1);
         if (scenario == 'cancel-wld') {
           expect(workspace.view.status, contains('已取消 WLD'));
         } else {
-          expect(workspace.view.status, contains('WLD 已导出'));
-          expect(workspace.view.status, isNot(contains('已导出模拟世界及匹配')));
-        }
-        if (scenario == 'fail-twld') {
-          expect(workspace.view.error, contains('TWLD 导出失败'));
+          expect(workspace.view.error, contains('disk full'));
         }
         await workspace.close();
         workspace.dispose();
@@ -187,7 +173,6 @@ void main() {
         worldCircuitFiles: _Sources(),
       );
       await workspace.dispatch('worldCircuitChooseWorld');
-      await workspace.dispatch('worldCircuitChooseTwld');
       final opening = workspace.dispatch('worldCircuitImport');
       while (backend.opens == 0) {
         await Future<void>.delayed(Duration.zero);
@@ -210,7 +195,7 @@ void main() {
     },
   );
 
-  test('new WLD clears prior pairing; reset clears program and keeps empty viewport safe', () async {
+  test('WLD reset clears program and keeps empty viewport safe', () async {
     final backend = ComputerCircuitBackend(),
         sources = _Sources(),
         files = FakeFiles();
@@ -222,11 +207,6 @@ void main() {
     );
     Map state() => workspace.view.result['worldCircuit'] as Map;
     await workspace.dispatch('worldCircuitChooseWorld');
-    await workspace.dispatch('worldCircuitChooseTwld');
-    expect(state()['companionName'], 'p.twld');
-    await workspace.dispatch('worldCircuitChooseWorld');
-    expect(state()['companionName'], isNull);
-    await workspace.dispatch('worldCircuitChooseTwld');
     await workspace.dispatch('worldCircuitImport');
     files.next = PickedFile('p.bin', Uint8List.fromList([1, 0, 0, 0]));
     await workspace.dispatch('worldCircuitLoadProgram');

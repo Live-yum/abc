@@ -1,0 +1,869 @@
+{
+  "schema": "abc.standaloneNativeLoad.summary.v2",
+  "measurement_kind": "standaloneNativeLoad",
+  "measurement_date": "2026-10-09",
+  "load_scope": "wld-only-mono64x48",
+  "circuit_world_abi_version": 2,
+  "runtime": "Linux x86_64 standalone C host / streamed Native C engine",
+  "inputs": {
+    "world": {
+      "bytes": 405983441,
+      "sha256": "55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33",
+      "version": 279,
+      "width": 15200,
+      "height": 7200
+    }
+  },
+  "sampling": {
+    "rss_target_ms": 10,
+    "pss_uss_target_ms": 100,
+    "process_selection": "Only each directly launched child PID; no process enumeration",
+    "fresh_process_per_run": true,
+    "os_page_cache_dropped": false,
+    "engine_budget_bytes": 201326592,
+    "compiler_during_measured_process": false
+  },
+  "provenance": {
+    "host_kind": "Packaged WLD-only standalone C load host; not Flutter or Dart",
+    "measurement_host_sha256": "317c73e10343c36f95b8c48a6314a0858eeb4bca6b0cbdf740acc118e338d260",
+    "measurement_host_source_sha256": "25c1fc52ea12e9a4ea59adbc66db87fd6f00a1bb21d3d3df55749e424c7b173e",
+    "measurement_sampler_source_sha256": "833f46022884168c3d2cecbf4ed1f60cc925c2af8b097778ce7d51f928695dcf",
+    "summary_reducer_source_sha256": "9e530c5412ac74b132947d407ba37b7dc36cec55680db4d8b6010b7190d32e97",
+    "engine_library_sha256": "18bd6c66a2b27ab3e8a18281d292475f7390bb155d53b9c4a8fbdaf8746f0abf",
+    "engine_build_source_state": "Rebuilt from the current WLD-only ABI 2 candidate; uncommitted working tree",
+    "host_compile_flags": [
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror"
+    ],
+    "linked_libraries": [
+      "libabc_engine.so",
+      "libcrypto",
+      "libdl"
+    ],
+    "packaged_tool_remeasured": true,
+    "raw_report_sha256": {
+      "run-1": "fe604e4bdce968389afc750f4f025834d00c94634d131261591e6d9ecbf7c415",
+      "run-2": "c2748f71573c5101826ed48236bfaf74b2e9dbb3500df47beeb2cd53c680a0cd",
+      "run-3": "eb2c98816de7ab39715db81efd62cbaae0f47c65c0df181d272994bd281f9c52"
+    },
+    "raw_samples_sha256": {
+      "run-1": "053d058b59b37af0a4a3f12972182a917e3172579b5dce1872806f8b1a5c1063",
+      "run-2": "a8576706414522224c704a1b4cd95e57ed727e7c4b60e7f1d027a48e7cef44b8",
+      "run-3": "4a7dfd2a4570d656c15c6e322da4757b38caf0ca3b725393554757650851cbe6"
+    },
+    "raw_events_sha256": {
+      "run-1": "c868e1c285ee260e0545582f97a4a60183447314f48eca887067e5a5bacabf9f",
+      "run-2": "0670d3cd671bee63fb9c2637043825b46e425207e3bb35a71f90765e51ccba8a",
+      "run-3": "5c8a85242298d9bea29272a2d48356dbfd1209de0c4445404236739889501343"
+    }
+  },
+  "validation": {
+    "all_exit_codes_zero": true,
+    "all_reports_valid": true,
+    "input_hash_verified_in_each_measured_process": true,
+    "world_dimensions": [
+      15200,
+      7200
+    ],
+    "compiled_columns": 15200,
+    "mono_display_pixels": 3072,
+    "mono_display_rgba_bytes": 12288,
+    "cpu_clock_pulses": 0,
+    "circuit_ticks": 0,
+    "source_file_opened_read_only": true,
+    "loaded_library_identity_verified": true
+  },
+  "runs": [
+    {
+      "run": 1,
+      "run_id": "wld-only-1",
+      "valid": true,
+      "exit_code": 0,
+      "started_utc": "2026-10-09T07:53:13Z",
+      "load_seconds": 17.123600527,
+      "conservative_recorded_peak_rss_bytes": 150691840,
+      "conservative_recorded_peak_rss_MiB": 143.7109375,
+      "ru_maxrss_bytes": 150691840,
+      "observed_VmHWM_bytes": 150183936,
+      "sampled_peak_RSS_bytes": 150183936,
+      "sampled_peak_PSS_bytes": 140152832,
+      "sampled_peak_USS_bytes": 140132352,
+      "peak_phase": "compile.intern",
+      "engine_peak_bytes": 145729418,
+      "engine_active_loaded_bytes": 126744034,
+      "baseline": {
+        "RSS_bytes": {
+          "min": 2605056,
+          "median": 2605056,
+          "max": 2605056
+        },
+        "PSS_bytes": null,
+        "USS_bytes": null
+      },
+      "loaded": {
+        "RSS_bytes": {
+          "min": 131289088,
+          "median": 131289088,
+          "max": 131289088
+        },
+        "PSS_bytes": {
+          "min": 130560000,
+          "median": 130560000,
+          "max": 130560000
+        },
+        "USS_bytes": {
+          "min": 130539520,
+          "median": 130539520,
+          "max": 130539520
+        }
+      },
+      "closed": {
+        "RSS_bytes": {
+          "min": 68751360,
+          "median": 68751360,
+          "max": 68751360
+        },
+        "PSS_bytes": null,
+        "USS_bytes": null
+      },
+      "rss_samples": 1696,
+      "pss_uss_samples": 170,
+      "max_sampling_gap_seconds": 0.013683033001143485,
+      "unavailable": [],
+      "scratch_bytes": 125337249,
+      "phase_timeline": [
+        {
+          "phase": "baseline",
+          "start_seconds": 0.000151173,
+          "duration_seconds": 0.050213070993777364,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 2605056,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "source_hash",
+          "start_seconds": 0.05036435,
+          "duration_seconds": 0.3629197359987302,
+          "sample_count": 36,
+          "sampled_peak_rss_bytes": 4702208,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "open_parse",
+          "start_seconds": 0.413283981,
+          "duration_seconds": 1.6331536520010559,
+          "sample_count": 161,
+          "sampled_peak_rss_bytes": 7294976,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "circuit_begin",
+          "start_seconds": 2.046437909,
+          "duration_seconds": 0.0001580780080985278,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "compile.topology",
+          "start_seconds": 2.046595701,
+          "duration_seconds": 4.298162844992476,
+          "sample_count": 426,
+          "sampled_peak_rss_bytes": 69595136,
+          "engine_active_bytes_at_start": 1905420,
+          "engine_peak_bytes_at_start": 1905420
+        },
+        {
+          "phase": "compile.roots",
+          "start_seconds": 6.344758556,
+          "duration_seconds": 0.10964075299852993,
+          "sample_count": 11,
+          "sampled_peak_rss_bytes": 69623808,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.number",
+          "start_seconds": 6.454399301,
+          "duration_seconds": 0.031172471004538238,
+          "sample_count": 3,
+          "sampled_peak_rss_bytes": 69623808,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.remap",
+          "start_seconds": 6.485571779,
+          "duration_seconds": 0.058474450997891836,
+          "sample_count": 6,
+          "sampled_peak_rss_bytes": 69623808,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.map_size",
+          "start_seconds": 6.544046231,
+          "duration_seconds": 0.05381421800120734,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 69623808,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.map_encode",
+          "start_seconds": 6.59786045,
+          "duration_seconds": 0.13281194999581203,
+          "sample_count": 13,
+          "sampled_peak_rss_bytes": 89985024,
+          "engine_active_bytes_at_start": 64430476,
+          "engine_peak_bytes_at_start": 64430476
+        },
+        {
+          "phase": "compile.count",
+          "start_seconds": 6.730672461,
+          "duration_seconds": 5.001293504014029,
+          "sample_count": 495,
+          "sampled_peak_rss_bytes": 95617024,
+          "engine_active_bytes_at_start": 84653388,
+          "engine_peak_bytes_at_start": 85098444
+        },
+        {
+          "phase": "compile.layout",
+          "start_seconds": 11.731965904,
+          "duration_seconds": 0.049579374986933544,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 95617024,
+          "engine_active_bytes_at_start": 90007052,
+          "engine_peak_bytes_at_start": 90410380
+        },
+        {
+          "phase": "compile.zero",
+          "start_seconds": 11.781545319,
+          "duration_seconds": 0.03660482600389514,
+          "sample_count": 4,
+          "sampled_peak_rss_bytes": 96669696,
+          "engine_active_bytes_at_start": 95259169,
+          "engine_peak_bytes_at_start": 95259169
+        },
+        {
+          "phase": "compile.write",
+          "start_seconds": 11.818150111,
+          "duration_seconds": 4.989222119009355,
+          "sample_count": 494,
+          "sampled_peak_rss_bytes": 100864000,
+          "engine_active_bytes_at_start": 95259169,
+          "engine_peak_bytes_at_start": 95259169
+        },
+        {
+          "phase": "compile.flush",
+          "start_seconds": 16.807372229,
+          "duration_seconds": 0.010752792994026095,
+          "sample_count": 1,
+          "sampled_peak_rss_bytes": 102711296,
+          "engine_active_bytes_at_start": 95259169,
+          "engine_peak_bytes_at_start": 95259169
+        },
+        {
+          "phase": "compile.intern",
+          "start_seconds": 16.818125116,
+          "duration_seconds": 0.30540018700412475,
+          "sample_count": 30,
+          "sampled_peak_rss_bytes": 150183936,
+          "engine_active_bytes_at_start": 101627658,
+          "engine_peak_bytes_at_start": 101627658
+        },
+        {
+          "phase": "ready",
+          "start_seconds": 17.123525261,
+          "duration_seconds": 1.799399615265429e-05,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126694818,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "circuit_loaded",
+          "start_seconds": 17.123543186,
+          "duration_seconds": 9.114999556913972e-06,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126694818,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "display_init",
+          "start_seconds": 17.123552303,
+          "duration_seconds": 4.8223999328911304e-05,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126694818,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "loaded",
+          "start_seconds": 17.123600527,
+          "duration_seconds": 0.05009177399915643,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 131289088,
+          "engine_active_bytes_at_start": 126744034,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "close",
+          "start_seconds": 17.173692349,
+          "duration_seconds": 0.0021886570029892027,
+          "sample_count": 1,
+          "sampled_peak_rss_bytes": 94187520,
+          "engine_active_bytes_at_start": 126744034,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "closed",
+          "start_seconds": 17.175880995,
+          "duration_seconds": null,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 68751360,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "run_id": "wld-only-2",
+      "valid": true,
+      "exit_code": 0,
+      "started_utc": "2026-10-09T07:53:51Z",
+      "load_seconds": 17.809406212,
+      "conservative_recorded_peak_rss_bytes": 150786048,
+      "conservative_recorded_peak_rss_MiB": 143.80078125,
+      "ru_maxrss_bytes": 150786048,
+      "observed_VmHWM_bytes": 150786048,
+      "sampled_peak_RSS_bytes": 150126592,
+      "sampled_peak_PSS_bytes": 145559552,
+      "sampled_peak_USS_bytes": 145539072,
+      "peak_phase": "compile.intern",
+      "engine_peak_bytes": 145729418,
+      "engine_active_loaded_bytes": 126744034,
+      "baseline": {
+        "RSS_bytes": {
+          "min": 2641920,
+          "median": 2641920,
+          "max": 2641920
+        },
+        "PSS_bytes": null,
+        "USS_bytes": null
+      },
+      "loaded": {
+        "RSS_bytes": {
+          "min": 131469312,
+          "median": 131469312.0,
+          "max": 131469312
+        },
+        "PSS_bytes": null,
+        "USS_bytes": null
+      },
+      "closed": {
+        "RSS_bytes": {
+          "min": 68980736,
+          "median": 68980736,
+          "max": 68980736
+        },
+        "PSS_bytes": {
+          "min": 68251648,
+          "median": 68251648,
+          "max": 68251648
+        },
+        "USS_bytes": {
+          "min": 68231168,
+          "median": 68231168,
+          "max": 68231168
+        }
+      },
+      "rss_samples": 1763,
+      "pss_uss_samples": 177,
+      "max_sampling_gap_seconds": 0.024198707003961317,
+      "unavailable": [],
+      "scratch_bytes": 125337249,
+      "phase_timeline": [
+        {
+          "phase": "baseline",
+          "start_seconds": 8.1396e-05,
+          "duration_seconds": 0.05016875799628906,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 2641920,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "source_hash",
+          "start_seconds": 0.050250243,
+          "duration_seconds": 0.3150871990073938,
+          "sample_count": 31,
+          "sampled_peak_rss_bytes": 4739072,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "open_parse",
+          "start_seconds": 0.365337358,
+          "duration_seconds": 1.6373624349944293,
+          "sample_count": 162,
+          "sampled_peak_rss_bytes": 7442432,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "circuit_begin",
+          "start_seconds": 2.002699902,
+          "duration_seconds": 0.00020158699771855026,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "compile.topology",
+          "start_seconds": 2.002901392,
+          "duration_seconds": 4.382370494000497,
+          "sample_count": 434,
+          "sampled_peak_rss_bytes": 69742592,
+          "engine_active_bytes_at_start": 1905420,
+          "engine_peak_bytes_at_start": 1905420
+        },
+        {
+          "phase": "compile.roots",
+          "start_seconds": 6.385271868,
+          "duration_seconds": 0.11237857000378426,
+          "sample_count": 11,
+          "sampled_peak_rss_bytes": 69804032,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.number",
+          "start_seconds": 6.497650442,
+          "duration_seconds": 0.031009986996650696,
+          "sample_count": 3,
+          "sampled_peak_rss_bytes": 69804032,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.remap",
+          "start_seconds": 6.528660423,
+          "duration_seconds": 0.06117175199324265,
+          "sample_count": 6,
+          "sampled_peak_rss_bytes": 69804032,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.map_size",
+          "start_seconds": 6.589832178,
+          "duration_seconds": 0.05616941300104372,
+          "sample_count": 6,
+          "sampled_peak_rss_bytes": 69804032,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.map_encode",
+          "start_seconds": 6.64600159,
+          "duration_seconds": 0.14149757601262536,
+          "sample_count": 14,
+          "sampled_peak_rss_bytes": 90484736,
+          "engine_active_bytes_at_start": 64430476,
+          "engine_peak_bytes_at_start": 64430476
+        },
+        {
+          "phase": "compile.count",
+          "start_seconds": 6.787499228,
+          "duration_seconds": 5.139044960000319,
+          "sample_count": 509,
+          "sampled_peak_rss_bytes": 95797248,
+          "engine_active_bytes_at_start": 84653388,
+          "engine_peak_bytes_at_start": 85098444
+        },
+        {
+          "phase": "compile.layout",
+          "start_seconds": 11.926544126,
+          "duration_seconds": 0.05498786999669392,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 95797248,
+          "engine_active_bytes_at_start": 90007052,
+          "engine_peak_bytes_at_start": 90410380
+        },
+        {
+          "phase": "compile.zero",
+          "start_seconds": 11.981532033,
+          "duration_seconds": 0.0398570139950607,
+          "sample_count": 4,
+          "sampled_peak_rss_bytes": 96849920,
+          "engine_active_bytes_at_start": 95259169,
+          "engine_peak_bytes_at_start": 95259169
+        },
+        {
+          "phase": "compile.write",
+          "start_seconds": 12.021389023,
+          "duration_seconds": 5.480862562006223,
+          "sample_count": 541,
+          "sampled_peak_rss_bytes": 101044224,
+          "engine_active_bytes_at_start": 95259169,
+          "engine_peak_bytes_at_start": 95259169
+        },
+        {
+          "phase": "compile.flush",
+          "start_seconds": 17.502251572,
+          "duration_seconds": 0.008105905988486484,
+          "sample_count": 1,
+          "sampled_peak_rss_bytes": 108773376,
+          "engine_active_bytes_at_start": 95259169,
+          "engine_peak_bytes_at_start": 95259169
+        },
+        {
+          "phase": "compile.intern",
+          "start_seconds": 17.510357592,
+          "duration_seconds": 0.2989761130011175,
+          "sample_count": 30,
+          "sampled_peak_rss_bytes": 150126592,
+          "engine_active_bytes_at_start": 101627658,
+          "engine_peak_bytes_at_start": 101627658
+        },
+        {
+          "phase": "ready",
+          "start_seconds": 17.809333631,
+          "duration_seconds": 1.7919999663718045e-05,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126694818,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "circuit_loaded",
+          "start_seconds": 17.8093515,
+          "duration_seconds": 4.4140033423900604e-06,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126694818,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "display_init",
+          "start_seconds": 17.809355913,
+          "duration_seconds": 5.029700696468353e-05,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126694818,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "loaded",
+          "start_seconds": 17.809406212,
+          "duration_seconds": 0.050085728988051414,
+          "sample_count": 4,
+          "sampled_peak_rss_bytes": 131469312,
+          "engine_active_bytes_at_start": 126744034,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "close",
+          "start_seconds": 17.859491978,
+          "duration_seconds": 0.002604836001410149,
+          "sample_count": 1,
+          "sampled_peak_rss_bytes": 131469312,
+          "engine_active_bytes_at_start": 126744034,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "closed",
+          "start_seconds": 17.862096812,
+          "duration_seconds": null,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 68980736,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "run_id": "wld-only-3",
+      "valid": true,
+      "exit_code": 0,
+      "started_utc": "2026-10-09T07:54:54Z",
+      "load_seconds": 17.654248591,
+      "conservative_recorded_peak_rss_bytes": 150781952,
+      "conservative_recorded_peak_rss_MiB": 143.796875,
+      "ru_maxrss_bytes": 150667264,
+      "observed_VmHWM_bytes": 150781952,
+      "sampled_peak_RSS_bytes": 150781952,
+      "sampled_peak_PSS_bytes": 138924032,
+      "sampled_peak_USS_bytes": 138903552,
+      "peak_phase": "compile.intern",
+      "engine_peak_bytes": 145729418,
+      "engine_active_loaded_bytes": 126744034,
+      "baseline": {
+        "RSS_bytes": {
+          "min": 2560000,
+          "median": 2560000,
+          "max": 2560000
+        },
+        "PSS_bytes": null,
+        "USS_bytes": null
+      },
+      "loaded": {
+        "RSS_bytes": {
+          "min": 131289088,
+          "median": 131289088,
+          "max": 131289088
+        },
+        "PSS_bytes": {
+          "min": 130560000,
+          "median": 130560000,
+          "max": 130560000
+        },
+        "USS_bytes": {
+          "min": 130539520,
+          "median": 130539520,
+          "max": 130539520
+        }
+      },
+      "closed": {
+        "RSS_bytes": {
+          "min": 68755456,
+          "median": 68755456,
+          "max": 68755456
+        },
+        "PSS_bytes": null,
+        "USS_bytes": null
+      },
+      "rss_samples": 1748,
+      "pss_uss_samples": 175,
+      "max_sampling_gap_seconds": 0.012090718999388628,
+      "unavailable": [],
+      "scratch_bytes": 125337249,
+      "phase_timeline": [
+        {
+          "phase": "baseline",
+          "start_seconds": 8.1185e-05,
+          "duration_seconds": 0.0501820770004997,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 2560000,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "source_hash",
+          "start_seconds": 0.050263465,
+          "duration_seconds": 0.3099076590006007,
+          "sample_count": 30,
+          "sampled_peak_rss_bytes": 4657152,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "open_parse",
+          "start_seconds": 0.360170933,
+          "duration_seconds": 1.6051266279973788,
+          "sample_count": 159,
+          "sampled_peak_rss_bytes": 7327744,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "circuit_begin",
+          "start_seconds": 1.965297681,
+          "duration_seconds": 0.00011769898992497474,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        },
+        {
+          "phase": "compile.topology",
+          "start_seconds": 1.965415262,
+          "duration_seconds": 4.512173128008726,
+          "sample_count": 447,
+          "sampled_peak_rss_bytes": 69623808,
+          "engine_active_bytes_at_start": 1905420,
+          "engine_peak_bytes_at_start": 1905420
+        },
+        {
+          "phase": "compile.roots",
+          "start_seconds": 6.477588375,
+          "duration_seconds": 0.10821722199034411,
+          "sample_count": 11,
+          "sampled_peak_rss_bytes": 69623808,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.number",
+          "start_seconds": 6.585805612,
+          "duration_seconds": 0.03126641300332267,
+          "sample_count": 3,
+          "sampled_peak_rss_bytes": 69623808,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.remap",
+          "start_seconds": 6.617072023,
+          "duration_seconds": 0.0598100930073997,
+          "sample_count": 6,
+          "sampled_peak_rss_bytes": 69623808,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.map_size",
+          "start_seconds": 6.676882104,
+          "duration_seconds": 0.057284780996269546,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 69623808,
+          "engine_active_bytes_at_start": 64364684,
+          "engine_peak_bytes_at_start": 64364684
+        },
+        {
+          "phase": "compile.map_encode",
+          "start_seconds": 6.7341669,
+          "duration_seconds": 0.13848242499807384,
+          "sample_count": 14,
+          "sampled_peak_rss_bytes": 90177536,
+          "engine_active_bytes_at_start": 64430476,
+          "engine_peak_bytes_at_start": 64430476
+        },
+        {
+          "phase": "compile.count",
+          "start_seconds": 6.872649345,
+          "duration_seconds": 5.164036033995217,
+          "sample_count": 511,
+          "sampled_peak_rss_bytes": 95617024,
+          "engine_active_bytes_at_start": 84653388,
+          "engine_peak_bytes_at_start": 85098444
+        },
+        {
+          "phase": "compile.layout",
+          "start_seconds": 12.036685356,
+          "duration_seconds": 0.04697682800178882,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 95617024,
+          "engine_active_bytes_at_start": 90007052,
+          "engine_peak_bytes_at_start": 90410380
+        },
+        {
+          "phase": "compile.zero",
+          "start_seconds": 12.083662218,
+          "duration_seconds": 0.03385765700659249,
+          "sample_count": 3,
+          "sampled_peak_rss_bytes": 96669696,
+          "engine_active_bytes_at_start": 95259169,
+          "engine_peak_bytes_at_start": 95259169
+        },
+        {
+          "phase": "compile.write",
+          "start_seconds": 12.117519859,
+          "duration_seconds": 5.186401176993968,
+          "sample_count": 513,
+          "sampled_peak_rss_bytes": 100864000,
+          "engine_active_bytes_at_start": 95259169,
+          "engine_peak_bytes_at_start": 95259169
+        },
+        {
+          "phase": "compile.flush",
+          "start_seconds": 17.303921021,
+          "duration_seconds": 0.01014489600493107,
+          "sample_count": 1,
+          "sampled_peak_rss_bytes": 101437440,
+          "engine_active_bytes_at_start": 95259169,
+          "engine_peak_bytes_at_start": 95259169
+        },
+        {
+          "phase": "compile.intern",
+          "start_seconds": 17.314065934,
+          "duration_seconds": 0.3401112790015759,
+          "sample_count": 34,
+          "sampled_peak_rss_bytes": 150781952,
+          "engine_active_bytes_at_start": 101627658,
+          "engine_peak_bytes_at_start": 101627658
+        },
+        {
+          "phase": "ready",
+          "start_seconds": 17.654177228,
+          "duration_seconds": 1.9982995581813157e-05,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126694818,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "circuit_loaded",
+          "start_seconds": 17.654197161,
+          "duration_seconds": 4.660003469325602e-06,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126694818,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "display_init",
+          "start_seconds": 17.654201821,
+          "duration_seconds": 4.676799289882183e-05,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126694818,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "loaded",
+          "start_seconds": 17.654248591,
+          "duration_seconds": 0.050091130004148,
+          "sample_count": 5,
+          "sampled_peak_rss_bytes": 131289088,
+          "engine_active_bytes_at_start": 126744034,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "close",
+          "start_seconds": 17.704339792,
+          "duration_seconds": 0.002256138002849184,
+          "sample_count": 0,
+          "sampled_peak_rss_bytes": null,
+          "engine_active_bytes_at_start": 126744034,
+          "engine_peak_bytes_at_start": 145729418
+        },
+        {
+          "phase": "closed",
+          "start_seconds": 17.706595892,
+          "duration_seconds": null,
+          "sample_count": 6,
+          "sampled_peak_rss_bytes": 68755456,
+          "engine_active_bytes_at_start": null,
+          "engine_peak_bytes_at_start": null
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Standalone C host and streamed native engine, not Dart/Flutter UI memory.",
+    "Fresh process; OS page cache is uncontrolled and is not cleared.",
+    "RSS and PSS/USS samples can miss short transients; PSS/USS peaks are lower bounds.",
+    "ru_maxrss and observed VmHWM are retained separately; the larger recorded value is the conservative recorded RSS peak.",
+    "Early ru_maxrss may include pre-exec launcher accounting; it is not current baseline RSS.",
+    "PSS divides shared pages. USS is Private_Clean plus Private_Dirty; shared RSS is not unique ownership.",
+    "Circuit allocation counters exclude host, decoder, library, allocator and mapped-page overhead; the 192 MiB circuit budget is not an RSS limit.",
+    "Unavailable circuit counters before creation and after close are null, not proof of zero outstanding engine allocations.",
+    "Engine phases are observed after bounded calls; a call can cross a phase boundary before it is reported.",
+    "Only the physical 64x48 monochrome display is read and decoded to a C RGBA buffer; there are no Flutter textures, raster frames, CPU clock pulses, Pong or exports."
+  ],
+  "max_observed_peak_rss_bytes": 150786048,
+  "median_load_seconds": 17.654248591
+}

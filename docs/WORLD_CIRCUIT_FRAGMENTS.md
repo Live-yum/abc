@@ -4,7 +4,7 @@
 pages of at most 32,768 eight-word descriptors. Terminal `READY.resultCount`
 is the total descriptor count, not the current page size. The result preserves
 `resultKind`, `resultCount`, and `reserved`; the latter carries native rule flags
-except for SAVE, where it reports TWLD output bytes.
+except for SAVE, where it is zero.
 
 `WorldCircuitSession.extract` pauses the scheduler and waits for earlier commands
 before sending command 8. It captures a distinct source-6 COB1 output, validates

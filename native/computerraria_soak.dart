@@ -11,10 +11,12 @@ import 'package:terraforge/engine/native_world_circuit_bindings.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 
 Future<void> main(List<String> args) async {
-  if (args.length != 5) {
-    throw ArgumentError('library WLD TWLD cycles journal.jsonl');
+  if (args.length != 6) {
+    throw ArgumentError(
+      'library WLD acceptance-off.json acceptance-on.json cycles journal.jsonl',
+    );
   }
-  final cycles = int.parse(args[3]);
+  final cycles = int.parse(args[4]);
   if (cycles < 1 || cycles > 200) throw ArgumentError('cycles must be 1..200');
   final library = DynamicLibrary.open(args[0]),
       api = NativeWorldCircuitBindings(DynamicLibrary.open(args[0]));
@@ -31,7 +33,7 @@ Future<void> main(List<String> args) async {
   )();
   int? descriptors() =>
       Platform.isLinux ? Directory('/proc/self/fd').listSync().length : null;
-  final journalFile = File(args[4]);
+  final journalFile = File(args[5]);
   journalFile.parent.createSync(recursive: true);
   final journal = journalFile.openSync(mode: FileMode.write);
   void record(Map<String, Object?> entry) {
@@ -69,12 +71,55 @@ Future<void> main(List<String> args) async {
   }
   final expected = checks.map((v) => v['expected'] as int).toList();
   final pong = File('assets/computer/pong.bin').readAsBytesSync();
-  final sidecarHash = (await sha256.bind(File(args[2]).openRead()).first)
+  final acceptanceBytes = [
+    File(args[2]).readAsBytesSync(),
+    File(args[3]).readAsBytesSync(),
+  ];
+  final acceptances = [
+    for (final bytes in acceptanceBytes) jsonDecode(utf8.decode(bytes)) as Map,
+  ];
+  final libraryHash = sha256
+      .convert(File(args[0]).readAsBytesSync())
       .toString();
+  final expectedFrames = <String>[];
+  for (var mode = 0; mode < 2; mode++) {
+    final accepted = acceptances[mode];
+    require(
+      accepted['schema'] == 2 &&
+          accepted['status'] == 'passed' &&
+          accepted['inputFormat'] == 'wld-only' &&
+          accepted['circuitAbi'] == 2 &&
+          accepted['librarySha256'] == libraryHash &&
+          accepted['optimizationEnabled'] == (mode == 1) &&
+          accepted['pixelRule'] ==
+              (mode == 1
+                  ? 'wirehead-color-pair-wave'
+                  : 'game-tripwire-crossing') &&
+          (accepted['import'] as Map)['sourceSha256'] ==
+              ComputerrariaComputer.sourceSha256,
+      'Fresh mode-specific WLD acceptance from this exact library is required',
+    );
+    final acceptedPong = accepted['pong'] as Map;
+    require(
+      acceptedPong['binarySha256'] == sha256.convert(pong).toString() &&
+          acceptedPong['clocks'] == 1536,
+      'Acceptance requires unchanged Pong and the fixed1536-clock trace',
+    );
+    final frame =
+        (accepted['correctness'] as Map)['pongFinalMonoSha256'] as String;
+    require(
+      RegExp(r'^[0-9a-f]{64}$').hasMatch(frame),
+      'Missing fresh per-mode frame signature',
+    );
+    expectedFrames.add(frame);
+  }
+  const expectedPongClocks = 1536;
+  final expectedCpuClocks = (acceptances[0]['main'] as Map)['clocks'] as int;
   require(
-    sidecarHash ==
-        'c6de694b3d034701513dc1ba17311213561ec359d3ecddde7bc35ea3c9611ed8',
-    'Wrong original TWLD',
+    expectedCpuClocks > 0 &&
+        expectedCpuClocks <= 4096 &&
+        (acceptances[1]['main'] as Map)['clocks'] == expectedCpuClocks,
+    'Both modes require the same verified CPU clock count',
   );
   final baselineFd = descriptors(), started = DateTime.now().toUtc();
   final rssAfter = <int>[];
@@ -82,15 +127,19 @@ Future<void> main(List<String> args) async {
     'event': 'start',
     'cycles': cycles,
     'startedAt': started.toIso8601String(),
-    'librarySha256': sha256.convert(File(args[0]).readAsBytesSync()).toString(),
+    'librarySha256': libraryHash,
+    'acceptanceReportSha256': [
+      for (final bytes in acceptanceBytes) sha256.convert(bytes).toString(),
+    ],
     'worldBytes': File(args[1]).lengthSync(),
-    'twldSha256': sidecarHash,
+    'inputFormat': 'wld-only',
+    'requiredCircuitAbi': 2,
     'baselineFd': baselineFd,
     'rss': ProcessInfo.currentRss,
     'temporaryDirectory': Directory.systemTemp.path,
   });
   var passed = 0;
-  String? baselineFrame;
+  final baselineFrames = <bool, String>{};
   try {
     for (var cycle = 0; cycle < cycles; cycle++) {
       final elapsed = Stopwatch()..start(), optimized = cycle.isOdd;
@@ -120,18 +169,19 @@ Future<void> main(List<String> args) async {
       }
 
       try {
-        opened = await call('worldCircuitOpenSource', [
-          source(args[1]),
-          source(args[2]),
-        ]);
+        opened = await call('worldCircuitOpenSource', [source(args[1])]);
         id = opened['session'] as int;
+        require(
+          (opened['stats'] as List)[0] == 2,
+          'Actual circuit ABI must be2',
+        );
         require(
           opened['sourceSha256'] == ComputerrariaComputer.sourceSha256,
           'Input world changed in cycle $cycle',
         );
         require(
-          (opened['reserved'] as int) & 3 == 1,
-          'New session must use original TWLD and default OFF',
+          (opened['reserved'] as int) & 3 == 0,
+          'New WLD session must default OFF',
         );
         await command(WorldCircuitCommand.optimization(optimized));
         await reset();
@@ -142,7 +192,7 @@ Future<void> main(List<String> args) async {
           await command(WorldCircuitCommand.lamps(batch, write: true));
         }
         await reset();
-        await command(ComputerrariaComputer.clock(386));
+        await command(ComputerrariaComputer.clock(expectedCpuClocks));
         for (var n = 0; !await ready() && n < 3; n++) {
           await command(ComputerrariaComputer.clock());
         }
@@ -177,7 +227,9 @@ Future<void> main(List<String> args) async {
         }
         await reset();
         final pulseTime = Stopwatch()..start();
-        await command(ComputerrariaComputer.clock(1536));
+        for (var count = 0; count < expectedPongClocks; count += 128) {
+          await command(ComputerrariaComputer.clock(128));
+        }
         pongClockMicroseconds = pulseTime.elapsedMicroseconds;
         final screen = await command(
           WorldCircuitCommand.pixels(6485, 800, 64, 48),
@@ -189,14 +241,14 @@ Future<void> main(List<String> args) async {
         );
         frameHash = sha256.convert(frames).toString();
         require(
-          frameHash == '1f5ba8481be3883b0300456083a84f742616fdea7d0b3738d296d489372178ef',
-          'Physical Pong frame differs from the complete acceptance signature',
+          frameHash == expectedFrames[optimized ? 1 : 0],
+          'Physical Pong frame differs from the fresh single-WLD acceptance',
         );
         finalStats = (screen['stats'] as List).cast<int>();
-        baselineFrame ??= frameHash;
+        baselineFrames.putIfAbsent(optimized, () => frameHash!);
         require(
-          frameHash == baselineFrame,
-          'Physical Pong trace differs across modes/cycles',
+          frameHash == baselineFrames[optimized],
+          'Physical Pong trace differs across repetitions of this mode',
         );
       } finally {
         if (id != 0) api.dispatch('worldCircuitClose', [id]);
@@ -230,7 +282,7 @@ Future<void> main(List<String> args) async {
         'peakNative': finalStats[17],
         'sourceSha256': opened['sourceSha256'],
         'frameSha256': frameHash,
-        'pongClockPulses': 1536,
+        'pongClockPulses': expectedPongClocks,
         'pongClockMicroseconds': pongClockMicroseconds,
       };
       record(row);

@@ -12,10 +12,7 @@ class _Backend implements WorldCircuitBackend {
   final kinds = <int>[];
   final originals = <Uint8List>[];
   @override
-  Future<WorldCircuitResult> openWorldCircuit(
-    Uint8List world, {
-    Uint8List? twld,
-  }) async {
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async {
     opens++;
     originals.add(Uint8List.fromList(world));
     return WorldCircuitResult(opens, List.filled(24, 0), Uint8List(0));

@@ -34,7 +34,7 @@
   function validate(owner, method, args) {
     if (!Object.hasOwn(METHODS, owner) || !METHODS[owner].includes(method)) invalid('Unknown worker method');
     if (!Array.isArray(args)) invalid('Worker arguments must be an array');
-    const counts = owner === 'document' ? {open:2, createPlayer:1, projectPlayer:1, inspect:1, mutate:3, save:1, preview:1, generateMap:2, close:1} : owner === 'worldCircuit' ? {open:2, openSource:2, command:3, computerFrame:3, close:1, releaseSource:1, progress:0, cancelOperation:0} : {propagate:6};
+    const counts = owner === 'document' ? {open:2, createPlayer:1, projectPlayer:1, inspect:1, mutate:3, save:1, preview:1, generateMap:2, close:1} : owner === 'worldCircuit' ? {open:1, openSource:1, command:3, computerFrame:3, close:1, releaseSource:1, progress:0, cancelOperation:0} : {propagate:6};
     if (args.length !== counts[method]) invalid('Invalid worker argument count');
     let size = 64;
     if (owner === 'document') {
@@ -52,8 +52,8 @@
         if (method === 'generateMap') size += string(args[1], 8 * MiB);
       }
     } else if (owner === 'worldCircuit') {
-      if (method === 'open') size += bytes(args[0], 64 * MiB) + bytes(args[1], 16 * MiB, true);
-      else if (method === 'openSource') size += source(args[0]) + source(args[1], true);
+      if (method === 'open') size += bytes(args[0], 64 * MiB);
+      else if (method === 'openSource') size += source(args[0]);
       else if (!isControl(owner, method)) {
         handle(args[0]);
         if (method === 'command') size += string(args[1], 1024) + string(args[2], 4 * MiB);
@@ -98,13 +98,13 @@
     else if (method === 'progress') {
       if (!value || typeof value !== 'object' || typeof value.stage !== 'string' || value.stage.length > 32 || ['phase','completed','total'].some(k => !Number.isSafeInteger(value[k]) || value[k] < 0)) invalid('Invalid circuit progress');
     } else {
-      if (!value || typeof value !== 'object' || !Array.isArray(value.stats) || value.stats.length !== 24 || value.stats.some(v => !Number.isInteger(v) || v < 0 || v > 0xffffffff)) invalid('Invalid circuit response');
+      if (!value || typeof value !== 'object' || !Array.isArray(value.stats) || value.stats.length !== 24 || value.stats[0] !== 2 || value.stats.some(v => !Number.isInteger(v) || v < 0 || v > 0xffffffff)) invalid('Invalid circuit response');
       handle(value.session);
-      for (const field of ['sourceSha256','twldSourceSha256']) if (value[field] != null && (typeof value[field] !== 'string' || !/^[0-9a-f]{64}$/.test(value[field]))) invalid('Invalid circuit source digest');
+      for (const field of ['sourceSha256']) if (value[field] != null && (typeof value[field] !== 'string' || !/^[0-9a-f]{64}$/.test(value[field]))) invalid('Invalid circuit source digest');
       for (const field of ['resultKind','resultCount','reserved']) if (!Number.isInteger(value[field]) || value[field] < 0 || value[field] > 0xffffffff) invalid('Invalid circuit result field');
       bytes(value.records, 8 * MiB, true);
-      for (const field of ['world','twld','objects']) bytes(value[field], (field === 'objects' ? 4 : field === 'twld' ? 16 : 64) * MiB, true);
-      for (const field of ['worldSource','twldSource']) if (value[field] != null) {
+      for (const field of ['world','objects']) bytes(value[field], (field === 'objects' ? 4 : 64) * MiB, true);
+      for (const field of ['worldSource']) if (value[field] != null) {
         const item = value[field]; source(item.blob); handle(item.token);
         if (item.sha256 != null && (typeof item.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(item.sha256))) invalid('Invalid saved circuit digest');
         if (item.size !== item.blob.size || typeof item.name !== 'string' || item.name.length > 255) invalid('Invalid saved circuit source');
@@ -170,7 +170,7 @@
               if (!value || value.session !== request.args[0]) invalid('Mismatched circuit result');
               value.session = request.publicHandle;
             }
-            if (owner === 'worldCircuit' && value && typeof value === 'object') for (const field of ['worldSource','twldSource']) if (value[field]) {
+            if (owner === 'worldCircuit' && value && typeof value === 'object') for (const field of ['worldSource']) if (value[field]) {
               const native = value[field].token, token = nextSource++; handle(token); sources.set(token, {native,generation}); value[field].token = token;
             }
             if (request.method === 'releaseSource') sources.delete(request.publicSource);

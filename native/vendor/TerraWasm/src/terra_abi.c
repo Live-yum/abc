@@ -81,8 +81,10 @@ static const char g_capabilities[] =
 #endif
 
 #if TERRAWASM_FEATURE_WLD
+#define TERRAX_CIRCUIT_WORLD_ABI 2
 #define TERRAX_STREAM_IDENTITY_JSON ",\"stream\":{\"version\":2,\"inputLease\":true,\"editPlan\":true,\"pngColumnCursors\":true,\"stampTiles\":true,\"stampObjects\":1}"
 #else
+#define TERRAX_CIRCUIT_WORLD_ABI 0
 #define TERRAX_STREAM_IDENTITY_JSON ""
 #endif
 
@@ -92,11 +94,12 @@ static const char g_build_info_json[] =
     ",\"worldWorkspaceAbiVersion\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
     ",\"pixelWorkspaceAbiVersion\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
     ",\"circuitAbiVersion\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
-    ",\"circuitWorldAbiVersion\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
+    ",\"circuitWorldAbiVersion\":" TERRAX_STRINGIFY(TERRAX_CIRCUIT_WORLD_ABI)
     ",\"circuitWorldFragmentObjects\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
     ",\"circuitWorldFragmentSupports\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
     ",\"circuitWorldPixels\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
     ",\"circuitWorldOptimization\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
+    ",\"circuitWorldWireHeadPixels\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
     ",\"playerWorkspaceAbiVersion\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_PLR)
     ",\"sourceCommit\":\"" TERRAX_BUILD_COMMIT "\""
     ",\"dirty\":" TERRAX_STRINGIFY(TERRAX_BUILD_DIRTY)

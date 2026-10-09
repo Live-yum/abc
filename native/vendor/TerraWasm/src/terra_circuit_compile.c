@@ -7,13 +7,18 @@
 #include <limits.h>
 #include <string.h>
 
+/* Private hot-loop accessors preserve the paged layout and its allocation
+ * contract. Avoid crossing a translation-unit boundary for every DSU edge. */
+static inline uint32_t compile_word(const CxWords* words,uint32_t i){return words->pages[i/CX_WORDS][i&(CX_WORDS-1u)];}
+static inline void compile_set_word(CxWords* words,uint32_t i,uint32_t value){words->pages[i/CX_WORDS][i&(CX_WORDS-1u)]=value;}
+static inline uint32_t compile_wire_mask(const TxTile* t){return t->wire_red|(t->wire_blue<<1)|(t->wire_green<<2)|(t->wire_yellow<<3);}
 static uint32_t root(CxWorld* w,uint32_t a){
-    while(cx_word(&w->parents,a)!=a){uint32_t p=cx_word(&w->parents,a);uint32_t pp=cx_word(&w->parents,p);cx_set_word(&w->parents,a,pp);a=pp;}return a;
+    for(;;){uint32_t p=compile_word(&w->parents,a);if(p==a)return a;uint32_t pp=compile_word(&w->parents,p);compile_set_word(&w->parents,a,pp);a=pp;}
 }
 static uint32_t make_label(CxWorld* w){
     if(w->phase==CX_TOPOLOGY){
         if(w->labels_count>=0x7ffffffeu){cx_fail(w,TCW_MEMORY,"circuit connectivity labels exceed the native address space");return 0;}
-        uint32_t id=++w->labels_count;if(!cx_words_size(w,&w->parents,id+1u))return 0;cx_set_word(&w->parents,id,id);return id;
+        uint32_t id=++w->labels_count;if(!cx_words_size(w,&w->parents,id+1u))return 0;compile_set_word(&w->parents,id,id);return id;
     }
     if(w->label_cursor>=w->labels_count||w->map_cursor>=w->map.length){cx_fail(w,TCW_FORMAT,"compiled connectivity replay diverged from the WLD source");return 0;}
     uint32_t v=cx_var_read(&w->map,&w->map_cursor);int32_t delta=(int32_t)((v>>1)^(uint32_t)-(int32_t)(v&1u));
@@ -22,7 +27,7 @@ static uint32_t make_label(CxWorld* w){
 static uint32_t join(CxWorld* w,uint32_t a,uint32_t b){
     if(!a)return b?b:make_label(w);if(!b)return a;
     if(w->phase!=CX_TOPOLOGY){if(a!=b)cx_fail(w,TCW_FORMAT,"wire network replay does not match its compiled union graph");return a;}
-    a=root(w,a);b=root(w,b);if(a>b){uint32_t t=a;a=b;b=t;}cx_set_word(&w->parents,b,a);return a;
+    a=root(w,a);b=root(w,b);if(a>b){uint32_t t=a;a=b;b=t;}compile_set_word(&w->parents,b,a);return a;
 }
 static int important_tile(const TxTile* t){return t->active&&(t->type==419u||t->type==420u||t->type==424u||t->type==445u||t->actuator||t->type==132u||t->type==135u||t->type==136u||t->type==144u||t->type==33u||t->type==4u||t->type==429u||t->type==423u);}
 static int standard(const CxWorld* w,uint32_t y){
@@ -55,23 +60,80 @@ static int checkpoint(CxWorld* w){
     }
     c->length=w->checkpoints.length-c->offset;return 1;
 }
+/* Keep the original column/colour/row visit order, including every junction
+ * and PixelBox route. A gap in a colour's list is an unwired cell and breaks
+ * vertical connectivity. The previous frontier is read-only until all four
+ * colours finish; zeroed ids provide the next frontier's unwired cells. */
+static int sparse_wires(CxWorld* w,uint32_t* work){
+    while(*work&&w->col_colour<4u){
+        uint32_t c=w->col_colour;
+        const uint32_t* rows=w->compile_rows+c*w->height;
+        if(w->col_row==w->compile_wire_count[c]){++w->col_colour;w->col_row=0;w->up=0;continue;}
+        uint32_t index=w->col_row,y=rows[index];TxTile* t=w->column+y;
+        uint32_t left=w->front[y*4u+c],up=index&&rows[index-1u]+1u==y?w->up:0,right,down;
+        if(t->active&&(t->type==424u||t->type==445u)){
+            int route=t->type==424u?t->frame_x/18:0;
+            if(route<0||route>2)right=down=join(w,left,up);
+            else if(route==1){join(w,left,up);right=down=make_label(w);}
+            else if(route==2){right=up?up:make_label(w);down=left?left:make_label(w);}
+            else{right=left?left:make_label(w);down=up?up:make_label(w);}
+        }else right=down=join(w,left,up);
+        if(w->error)return -(int)w->error;
+        w->ids[y*4u+c]=right;w->up=down;
+        if(w->phase==CX_COUNT&&w->pixel_at_y[y])cx_pixel_ports(w,y,c,right,down);
+        ++w->col_row;--*work;
+    }
+    if(w->col_colour<4u)return TCW_CONTINUE;
+    memcpy(w->front,w->ids,w->height*16u);
+    if(w->phase==CX_COUNT)cx_devices_bind_column(w);
+    w->col_stage=4;w->emit_y=w->emit_colour=w->emit_phase=0;return 2;
+}
 int cx_scan_step(CxWorld* w,uint32_t* work){
     if(w->x>=w->width)return TCW_OK;
-    if(w->col_stage==0&&w->y==0){if(!checkpoint(w))return TCW_MEMORY;w->col_stage=1;}
+    int compiling=w->phase==CX_TOPOLOGY||w->phase==CX_COUNT||w->phase==CX_WRITE;
+    if(w->col_stage==0&&w->y==0){
+        if(!checkpoint(w))return TCW_MEMORY;
+        if(compiling){
+            memset(w->compile_wire_count,0,sizeof(w->compile_wire_count));w->compile_gate_count=0;
+            memset(w->ids,0,w->height*16u);memset(w->gate_at_y,0,w->height*4u);
+            if(w->phase==CX_TOPOLOGY)w->column_gates[w->x]=w->gate_cursor;
+            else w->gate_cursor=w->column_gates[w->x];
+        }
+        w->col_stage=1;
+    }
     while(*work&&w->col_stage==1){
         TxTile t;int s=cx_world_tile(w,&t);if(s)return s;uint32_t run=(uint32_t)t.same+1u;
+        uint32_t mask=compiling?compile_wire_mask(&t):0;
         if(run>w->height-w->y)return cx_fail(w,TCW_FORMAT,"circuit RLE run crosses a world column");
         for(uint32_t i=0;i<run;i++)w->column[w->y+i]=t;
-        if(w->phase==CX_TOPOLOGY){uint32_t wires=cx_wire_mask(&t);if(wires){w->wire_cells+=run;if(w->x<w->min_x)w->min_x=w->x;if(w->x>w->max_x)w->max_x=w->x;if(w->y<w->min_y)w->min_y=w->y;if(w->y+run-1u>w->max_y)w->max_y=w->y+run-1u;}
+        if(w->phase==CX_TOPOLOGY){uint32_t wires=mask;if(wires){w->wire_cells+=run;if(w->x<w->min_x)w->min_x=w->x;if(w->x>w->max_x)w->max_x=w->x;if(w->y<w->min_y)w->min_y=w->y;if(w->y+run-1u>w->max_y)w->max_y=w->y+run-1u;}
             if(important_tile(&t))w->devices_count+=run;
         }
-        w->y+=run;--*work;if(w->y==w->height){int s=cx_mod_column(w);if(s)return s;memset(w->pixel_at_y,0,w->height*4u);if(w->phase==CX_COUNT){s=cx_devices_column(w);if(s)return s;}w->col_stage=2;w->col_colour=0;w->col_row=0;w->up=0;}
+        if(compiling){
+            /* Decode and validate every source record, but enumerate only the
+             * circuit-bearing rows. Border wires retain the existing two-tile
+             * exclusion; border and unwired gates still receive IDs. */
+            uint32_t first=w->y<2u?2u:w->y,end=w->y+run;
+            if(w->height>4u&&w->width>4u&&w->x>=2u&&w->x<w->width-2u){
+                if(end>w->height-2u)end=w->height-2u;
+                for(uint32_t c=0;c<4;c++)if(mask&(1u<<c)){
+                    uint32_t* rows=w->compile_rows+c*w->height;
+                    for(uint32_t y=first;y<end;y++)rows[w->compile_wire_count[c]++]=y;
+                }
+            }
+            if(t.active&&t.type==420u)for(uint32_t i=0;i<run;i++){
+                uint32_t y=w->y+i;w->gate_at_y[y]=++w->gate_cursor;
+                w->compile_rows[w->height*4u+w->compile_gate_count++]=y;
+            }
+        }
+        w->y+=run;--*work;if(w->y==w->height){memset(w->pixel_at_y,0,w->height*4u);if(w->phase==CX_COUNT){int s=cx_devices_column(w);if(s)return s;}w->col_stage=2;w->col_colour=0;w->col_row=0;w->up=0;}
     }
+    if(compiling&&w->col_stage==2)return sparse_wires(w,work);
     while(*work&&w->col_stage==2){
         uint32_t c=w->col_colour,y=w->col_row;TxTile* t=w->column+y;
         uint32_t left=w->front[y*4u+c],up=w->up,right=0,down=0,seed=0,opposite=0;
-        if(cx_inside_wiring(w,w->x,y)&&(cx_wire_mask(t)&(1u<<c))){
-            if(t->active&&(t->type==424u||(t->type==445u&&!w->twld_state)||t->type==0xfffeu)){
+        if(cx_inside_wiring(w,w->x,y)&&(compile_wire_mask(t)&(1u<<c))){
+            if(t->active&&(t->type==424u||t->type==445u)){
                 int route=t->type==424u?t->frame_x/18:0;
                 if(route<0||route>2){opposite=seed=right=down=join(w,left,up);}
                 else if(route==1){seed=join(w,left,up);opposite=right=down=make_label(w);}
@@ -102,7 +164,7 @@ static uint32_t find_general(CxWorld* w,uint32_t gate){uint32_t lo=0,hi=w->gener
 static int add_general(CxWorld* w,uint32_t y){
     if(!grow_array(w,(void**)&w->general,&w->general_capacity,w->general_count+1u,sizeof(CxGeneralGate)))return 0;
     CxGeneralGate* g=w->general+w->general_count;memset(g,0,sizeof(*g));g->id=w->gate_at_y[y];g->x=w->x;g->y=y;g->first=w->lamp_count;g->style=(uint8_t)(w->column[y].frame_y/18);g->frame=g->initial_frame=(uint8_t)(w->column[y].frame_x/18);
-    for(uint32_t c=0;c<4;c++)g->nets[c]=(y+2u==w->height&&cx_inside_wiring(w,w->x,y-1u)&&cx_wire_mask(w->column+y)&(1u<<c))?w->ids[(y-1u)*4u+c]:w->ids[y*4u+c];
+    for(uint32_t c=0;c<4;c++)g->nets[c]=(y+2u==w->height&&cx_inside_wiring(w,w->x,y-1u)&&compile_wire_mask(w->column+y)&(1u<<c))?w->ids[(y-1u)*4u+c]:w->ids[y*4u+c];
     uint32_t row=y,conditions=0;int faulty=0;
     while(row>0){--row;TxTile* t=w->column+row;if(!t->active||t->type!=419u)break;
         if(!grow_array(w,(void**)&w->lamps,&w->lamp_capacity,w->lamp_count+1u,sizeof(CxGeneralLamp)))return 0;
@@ -114,32 +176,31 @@ static int add_general(CxWorld* w,uint32_t y){
 }
 static int append_rule(CxWorld* w,uint32_t net,uint32_t gate,const uint8_t* data,uint32_t n){
     if(!net)return TCW_OK;
-    uint32_t prev=cx_word(&w->previous_gate,net),delta=gate-prev;
+    uint32_t prev=compile_word(&w->previous_gate,net),delta=gate-prev;
     if(gate<prev)return cx_fail(w,TCW_FORMAT,"circuit membership order is not monotonic");
     uint8_t member[5];uint32_t mn=cx_var_put(member,delta);
     if(w->phase==CX_COUNT){
-        uint32_t old=cx_word(&w->code_ends,net);if(!old)++w->action_count;
-        if(n>UINT32_MAX-old||mn>UINT32_MAX-cx_word(&w->member_ends,net))return cx_fail(w,TCW_MEMORY,"one compiled circuit net exceeds the address space");
-        cx_set_word(&w->code_ends,net,old+n);cx_set_word(&w->member_ends,net,cx_word(&w->member_ends,net)+mn);
-        cx_set_word(&w->previous_gate,net,gate);return TCW_OK;
+        uint32_t old=compile_word(&w->code_ends,net);if(!old)++w->action_count;
+        if(n>UINT32_MAX-old||mn>UINT32_MAX-compile_word(&w->member_ends,net))return cx_fail(w,TCW_MEMORY,"one compiled circuit net exceeds the address space");
+        compile_set_word(&w->code_ends,net,old+n);compile_set_word(&w->member_ends,net,compile_word(&w->member_ends,net)+mn);
+        compile_set_word(&w->previous_gate,net,gate);return TCW_OK;
     }
-    if(!w->record_length){memcpy(w->record,data,n);memcpy(w->record+n,member,mn);w->record_length=n;w->record_member_length=mn;w->record_position=0;w->record_store=cx_word(&w->code_ends,net);}
+    if(!w->record_length){memcpy(w->record,data,n);memcpy(w->record+n,member,mn);w->record_length=n;w->record_member_length=mn;w->record_position=0;w->record_store=compile_word(&w->code_ends,net);}
     while(w->record_position<w->record_length){uint32_t pos=w->record_store+w->record_position,bytes=w->record_length-w->record_position,bound=CX_PAGE_SIZE-(pos&(CX_PAGE_SIZE-1u));if(bytes>bound)bytes=bound;
         int s=cx_store(w,pos,w->record+w->record_position,bytes,1);if(s)return s;w->record_position+=bytes;
     }
-    while(w->record_position<w->record_length+w->record_member_length){uint32_t mpos=w->record_position-w->record_length;uint32_t pos=cx_word(&w->member_ends,net)+mpos,bytes=w->record_member_length-mpos,bound=CX_PAGE_SIZE-(pos&(CX_PAGE_SIZE-1u));if(bytes>bound)bytes=bound;
+    while(w->record_position<w->record_length+w->record_member_length){uint32_t mpos=w->record_position-w->record_length;uint32_t pos=compile_word(&w->member_ends,net)+mpos,bytes=w->record_member_length-mpos,bound=CX_PAGE_SIZE-(pos&(CX_PAGE_SIZE-1u));if(bytes>bound)bytes=bound;
         int s=cx_store(w,pos,w->record+w->record_position,bytes,1);if(s)return s;w->record_position+=bytes;
     }
-    cx_set_word(&w->code_ends,net,cx_word(&w->code_ends,net)+w->record_length);cx_set_word(&w->member_ends,net,cx_word(&w->member_ends,net)+w->record_member_length);
-    cx_set_word(&w->previous_gate,net,gate);w->record_length=0;return TCW_OK;
+    compile_set_word(&w->code_ends,net,compile_word(&w->code_ends,net)+w->record_length);compile_set_word(&w->member_ends,net,compile_word(&w->member_ends,net)+w->record_member_length);
+    compile_set_word(&w->previous_gate,net,gate);w->record_length=0;return TCW_OK;
 }
 static int column_rules(CxWorld* w,uint32_t* work){
-    while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y,gate=w->gate_at_y[y];
-        if(!gate){++w->emit_y;--*work;continue;}
+    while(*work&&w->emit_y<w->compile_gate_count){uint32_t y=w->compile_rows[w->height*4u+w->emit_y],gate=w->gate_at_y[y];
         if(standard(w,y)){
             uint8_t record[64];uint32_t n=1,nc=0,no=0;
             for(uint32_t c=0;c<4;c++)if(w->ids[(y-1u)*4u+c]){n+=cx_var_put(record+n,w->ids[(y-1u)*4u+c]);++nc;}
-            for(uint32_t c=0;c<4;c++){uint32_t net=(y+2u==w->height&&cx_inside_wiring(w,w->x,y-1u)&&cx_wire_mask(w->column+y)&(1u<<c))?w->ids[(y-1u)*4u+c]:w->ids[y*4u+c];if(net){n+=cx_var_put(record+n,net);++no;}}
+            for(uint32_t c=0;c<4;c++){uint32_t net=(y+2u==w->height&&cx_inside_wiring(w,w->x,y-1u)&&compile_wire_mask(w->column+y)&(1u<<c))?w->ids[(y-1u)*4u+c]:w->ids[y*4u+c];if(net){n+=cx_var_put(record+n,net);++no;}}
             record[0]=(uint8_t)(nc|(no<<3)|(w->column[y-1u].frame_x==18?64u:0u));
             while(w->emit_colour<4u){uint32_t c=w->emit_colour,net=w->ids[(y-2u)*4u+c];int s=append_rule(w,net,gate,record,n);if(s)return s;++w->emit_colour;}
         }else{
@@ -156,10 +217,12 @@ static int column_rules(CxWorld* w,uint32_t* work){
         }
         ++w->emit_y;w->emit_colour=0;w->emit_phase=0;--*work;
     }
-    return w->emit_y==w->height?TCW_OK:TCW_CONTINUE;
+    return w->emit_y==w->compile_gate_count?TCW_OK:TCW_CONTINUE;
 }
 static uint32_t zigzag(int32_t v){return ((uint32_t)v<<1)^(uint32_t)(v>>31);}
 int cx_compile_initialize(CxWorld* w){
+    if((uint64_t)w->height*20u>UINT32_MAX)return 0;
+    w->compile_rows=(uint32_t*)cx_alloc(w,w->height*20u);if(!w->compile_rows)return 0;
     w->phase=CX_TOPOLOGY;if(!cx_words_size(w,&w->parents,1))return 0;cx_scan_reset(w);return 1;
 }
 static int prepare_count(CxWorld* w){
@@ -202,7 +265,7 @@ static int prepare_intern(CxWorld* w){
 }
 static int intern_step(CxWorld* w,uint32_t* work){
     while(*work&&w->intern_group<=w->networks){uint32_t g=w->intern_group;
-        if(!w->intern_stage){w->intern_end=cx_word(&w->code_ends,g);w->intern_member_end=cx_word(&w->member_ends,g);w->intern_copy=w->intern_member_copy=0;
+        if(!w->intern_stage){w->intern_end=compile_word(&w->code_ends,g);w->intern_member_end=compile_word(&w->member_ends,g);w->intern_copy=w->intern_member_copy=0;
             if(w->intern_end==w->intern_start){w->intern_start=w->intern_end;w->intern_member_start=w->intern_member_end;++w->intern_group;--*work;goto drop_pages;}
             w->intern_stage=1;w->intern_pool_code=w->code.length;
         }
@@ -248,14 +311,14 @@ int cx_compile_step(CxWorld* w,uint32_t* work){
         if(w->cursor!=w->tile_end)return cx_fail(w,TCW_FORMAT,"circuit tile section does not end at its declared boundary");
         if(w->phase==CX_TOPOLOGY){w->gates=w->gate_cursor;w->column_gates[w->width]=w->gates;w->phase=CX_ROOTS;w->phase_cursor=1;}
         else if(w->phase==CX_COUNT){cx_devices_end_columns(w);w->phase=CX_LAYOUT;w->phase_cursor=1;w->layout_code=w->layout_member=0;}
-        else{w->phase=CX_FLUSH;w->flush_index=0;}
+        else{cx_free(w,w->compile_rows);w->compile_rows=NULL;w->phase=CX_FLUSH;w->flush_index=0;}
         return TCW_OK;
     }
     if(w->phase>=CX_ROOTS&&w->phase<=CX_MAP_ENCODE){
-        while(*work&&w->phase_cursor<=w->labels_count){uint32_t i=w->phase_cursor++,value=cx_word(&w->parents,i);--*work;
+        while(*work&&w->phase_cursor<=w->labels_count){uint32_t i=w->phase_cursor++,value=compile_word(&w->parents,i);--*work;
             if(w->phase==CX_ROOTS){root(w,i);}
-            else if(w->phase==CX_NUMBER){if(value==i)cx_set_word(&w->parents,i,0x80000000u|++w->networks);}
-            else if(w->phase==CX_REMAP){if(!(value&0x80000000u))cx_set_word(&w->parents,i,cx_word(&w->parents,value));}
+            else if(w->phase==CX_NUMBER){if(value==i)compile_set_word(&w->parents,i,0x80000000u|++w->networks);}
+            else if(w->phase==CX_REMAP){if(!(value&0x80000000u))compile_set_word(&w->parents,i,compile_word(&w->parents,value));}
             else{value&=0x7fffffffu;uint32_t encoded=zigzag((int32_t)value-(int32_t)w->map_previous);w->map_previous=value;
                 if(w->phase==CX_MAP_SIZE){uint32_t n=cx_var_size(encoded);if(n>UINT32_MAX-w->map_size)return TCW_MEMORY;w->map_size+=n;}
                 else{uint8_t b[5];uint32_t n=cx_var_put(b,encoded);if(!cx_bytes_append(w,&w->map,b,n))return TCW_MEMORY;}
@@ -267,14 +330,14 @@ int cx_compile_step(CxWorld* w,uint32_t* work){
         return TCW_OK;
     }
     if(w->phase==CX_LAYOUT){
-        while(*work&&w->phase_cursor<=w->networks){uint32_t g=w->phase_cursor++,n=cx_word(&w->code_ends,g),m=cx_word(&w->member_ends,g);--*work;
+        while(*work&&w->phase_cursor<=w->networks){uint32_t g=w->phase_cursor++,n=compile_word(&w->code_ends,g),m=compile_word(&w->member_ends,g);--*work;
             if(n>w->max_group)w->max_group=n;if(n>UINT32_MAX-w->layout_code||m>UINT32_MAX-w->layout_member)return TCW_MEMORY;
-            cx_set_word(&w->code_ends,g,w->layout_code);cx_set_word(&w->member_ends,g,w->layout_member);cx_set_word(&w->previous_gate,g,0);w->layout_code+=n;w->layout_member+=m;
+            compile_set_word(&w->code_ends,g,w->layout_code);compile_set_word(&w->member_ends,g,w->layout_member);compile_set_word(&w->previous_gate,g,0);w->layout_code+=n;w->layout_member+=m;
         }
         if(w->phase_cursor<=w->networks)return TCW_CONTINUE;
         w->code_size=w->layout_code;w->member_size=w->layout_member;
         /* Member offsets follow the canonical-code interval in the same file. */
-        for(uint32_t g=1;g<=w->networks;g++)cx_set_word(&w->member_ends,g,cx_word(&w->member_ends,g)+w->code_size);
+        for(uint32_t g=1;g<=w->networks;g++)compile_set_word(&w->member_ends,g,compile_word(&w->member_ends,g)+w->code_size);
         return prepare_store(w);
     }
     if(w->phase==CX_ZERO){

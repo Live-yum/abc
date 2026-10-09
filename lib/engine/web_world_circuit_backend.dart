@@ -9,8 +9,8 @@ import 'world_circuit_backend.dart';
 external _Bridge get _bridge;
 
 extension type _Bridge(JSObject _) implements JSObject {
-  external JSPromise<_Result> open(JSUint8Array world, JSUint8Array? twld);
-  external JSPromise<_Result> openSource(JSObject world, JSObject? twld);
+  external JSPromise<_Result> open(JSUint8Array world);
+  external JSPromise<_Result> openSource(JSObject world);
   external JSPromise<_Progress> progress();
   external JSPromise<JSAny?> cancelOperation();
   external JSPromise<JSAny?> releaseSource(JSNumber token);
@@ -68,12 +68,9 @@ extension type _Result(JSObject _) implements JSObject {
   external JSArray<JSNumber> get stats;
   external JSUint8Array get records;
   external JSUint8Array? get world;
-  external JSUint8Array? get twld;
   external JSUint8Array? get objects;
   external _Source? get worldSource;
-  external _Source? get twldSource;
   external JSString? get sourceSha256;
-  external JSString? get twldSourceSha256;
   external JSNumber get resultKind;
   external JSNumber get resultCount;
   external JSNumber get reserved;
@@ -83,12 +80,9 @@ extension type _Result(JSObject _) implements JSObject {
     stats.toDart.map((v) => v.toDartInt).toList(),
     records.toDart,
     world: world?.toDart,
-    twld: twld?.toDart,
     objects: objects?.toDart,
     worldSource: worldSource?.convert(),
-    twldSource: twldSource?.convert(),
     sourceSha256: sourceSha256?.toDart,
-    twldSourceSha256: twldSourceSha256?.toDart,
     resultKind: resultKind.toDartInt,
     resultCount: resultCount.toDartInt,
     reserved: reserved.toDartInt,
@@ -114,7 +108,9 @@ extension type _ComputerFrame(JSObject _) implements JSObject {
 }
 
 class WebWorldCircuitBackend
-    implements WorldCircuitSourceBackend, WorldCircuitComputerBackend {
+    implements WorldCircuitSourceBackend, WorldCircuitExternalOwnerBackend {
+  @override
+  bool get completesComputerBatchFromExternalEvent => true;
   @override
   Future<WorldCircuitComputerFrame> clockAndReadDisplay(
     int session,
@@ -131,14 +127,11 @@ class WebWorldCircuitBackend
           .convert();
 
   @override
-  Future<WorldCircuitResult> openWorldCircuit(
-    Uint8List world, {
-    Uint8List? twld,
-  }) async => (await _bridge.open(world.toJS, twld?.toJS).toDart).convert();
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async =>
+      (await _bridge.open(world.toJS).toDart).convert();
   @override
   Future<WorldCircuitResult> openWorldCircuitSource(
     WorldCircuitSource world, {
-    WorldCircuitSource? twld,
     void Function(WorldCircuitProgress)? onProgress,
   }) async {
     JSObject input(WorldCircuitSource source) {
@@ -154,8 +147,7 @@ class WebWorldCircuitBackend
       return value;
     }
 
-    final worldBlob = input(world),
-        twldBlob = twld == null ? null : input(twld);
+    final worldBlob = input(world);
     var polling = false, finished = false;
     final timer = onProgress == null
         ? null
@@ -172,7 +164,7 @@ class WebWorldCircuitBackend
             }
           });
     try {
-      return (await _bridge.openSource(worldBlob, twldBlob).toDart).convert();
+      return (await _bridge.openSource(worldBlob).toDart).convert();
     } finally {
       finished = true;
       timer?.cancel();

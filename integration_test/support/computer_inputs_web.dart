@@ -1,6 +1,5 @@
 import 'dart:js_interop';
 
-import 'package:crypto/crypto.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 
 @JS('fetch')
@@ -13,11 +12,9 @@ extension type _Response(JSObject _) implements JSObject {
 
 extension type _Blob(JSObject _) implements JSObject {
   external JSNumber get size;
-  external JSPromise<JSArrayBuffer> arrayBuffer();
 }
 
-Future<({WorldCircuitSource world, WorldCircuitSource twld})>
-computerInputs() async {
+Future<WorldCircuitSource> computerInput() async {
   Future<WorldCircuitSource> input(String address, String name) async {
     final uri = Uri.parse(address);
     if (!const ['localhost', '127.0.0.1', '::1'].contains(uri.host) ||
@@ -38,27 +35,14 @@ computerInputs() async {
     );
   }
 
-  final result = (
-    world: await input(
-      const String.fromEnvironment('COMPUTERRARIA_WLD_URL'),
-      'computerraria.wld',
-    ),
-    twld: await input(
-      const String.fromEnvironment('COMPUTERRARIA_TWLD_URL'),
-      'computerraria.twld',
-    ),
+  final result = await input(
+    const String.fromEnvironment('COMPUTERRARIA_WLD_URL'),
+    'computerraria.wld',
   );
-  if (result.world.length != 405983441 || result.twld.length != 427712) {
+  if (result.length != 405983441) {
     throw StateError(
-      'This profile accepts only the pinned public Computerraria pair.',
+      'This profile accepts only the pinned public Computerraria WLD.',
     );
-  }
-  final sidecar = await _Blob(result.twld.blob! as JSObject)
-      .arrayBuffer()
-      .toDart;
-  if (sha256.convert(sidecar.toDart.asUint8List()).toString() !=
-      'c6de694b3d034701513dc1ba17311213561ec359d3ecddde7bc35ea3c9611ed8') {
-    throw StateError('The public companion fixture hash differs.');
   }
   return result;
 }

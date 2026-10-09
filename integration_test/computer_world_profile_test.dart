@@ -29,24 +29,21 @@ import 'support/profile_memory_native.dart'
     if (dart.library.js_interop) 'support/profile_memory_web.dart'
     as memory;
 import 'support/profile_recorder.dart';
+import 'support/profile_os_memory_native.dart'
+    if (dart.library.js_interop) 'support/profile_os_memory_web.dart'
+    as os_memory;
 import 'support/computer_profile_storage.dart';
 import 'support/computer_profile_interaction.dart';
 
 class _SourceFiles implements WorldCircuitFileGateway {
-  final WorldCircuitSource world, twld;
+  final WorldCircuitSource world;
   final ComputerProfileStorage storage;
-  WorldCircuitSource? savedWorld, savedTwld;
-  bool useSavedPair = false;
-  _SourceFiles(this.world, this.twld, this.storage);
+  WorldCircuitSource? savedWorld;
+  bool useSavedWorld = false;
+  _SourceFiles(this.world, this.storage);
   @override
-  Future<WorldCircuitSource?> pick({required bool companion}) async =>
-      useSavedPair
-      ? companion
-            ? savedTwld!
-            : savedWorld!
-      : companion
-      ? twld
-      : world;
+  Future<WorldCircuitSource?> pick() async =>
+      useSavedWorld ? savedWorld! : world;
   @override
   Future<bool> save(
     WorldCircuitSource source, {
@@ -54,11 +51,7 @@ class _SourceFiles implements WorldCircuitFileGateway {
     List<WorldCircuitSource> protectedSources = const [],
   }) async {
     final retained = await storage.retain(source, name);
-    if (name.endsWith('.twld')) {
-      savedTwld = retained;
-    } else {
-      savedWorld = retained;
-    }
+    savedWorld = retained;
     return true;
   }
 }
@@ -73,13 +66,20 @@ class _NoSmallFiles implements FileGateway {
 }
 
 class _ObservedBackend
-    implements WorldCircuitSourceBackend, WorldCircuitComputerBackend {
+    implements WorldCircuitSourceBackend, WorldCircuitExternalOwnerBackend {
+  @override
+  bool get completesComputerBatchFromExternalEvent =>
+      inner is WorldCircuitExternalOwnerBackend &&
+      (inner as WorldCircuitExternalOwnerBackend)
+          .completesComputerBatchFromExternalEvent;
   final WorldCircuitSourceBackend inner;
   int? id;
   WorldCircuitResult? latest;
   int clocks = 0;
   final inputEvents = <Map<String, Object?>>[];
   final inputCompletedUs = <int>[];
+  List<int>? _cpuProbePoints;
+  int get cpuProbeCount => (_cpuProbePoints?.length ?? 0) ~/ 4;
   _ObservedBackend(this.inner);
   @override
   Future<WorldCircuitComputerFrame> clockAndReadDisplay(
@@ -112,24 +112,21 @@ class _ObservedBackend
   @override
   Future<WorldCircuitResult> openWorldCircuitSource(
     WorldCircuitSource source, {
-    WorldCircuitSource? twld,
     void Function(WorldCircuitProgress)? onProgress,
   }) async {
     final result = await inner.openWorldCircuitSource(
       source,
-      twld: twld,
       onProgress: onProgress,
     );
     id = result.session;
+    _cpuProbePoints = null;
     latest = result;
     return result;
   }
 
   @override
-  Future<WorldCircuitResult> openWorldCircuit(
-    Uint8List source, {
-    Uint8List? twld,
-  }) => throw StateError('Actual-world profile requires source handles');
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List source) =>
+      throw StateError('Actual-world profile requires source handles');
   @override
   Future<WorldCircuitResult> commandWorldCircuit(
     int session,
@@ -170,7 +167,12 @@ class _ObservedBackend
       inner.releaseWorldCircuitSource(source);
   Future<String> memorySignature() async {
     final records = <int>[];
-    for (var address = 0x100000; address < 0x100040; address += 4) {
+    // Passive lamp reads only: never reset buses or execute RAM-read programs.
+    // The Pong stack changes while the initial RAM prefix may remain constant.
+    for (final address in [
+      for (var at = 0x100000; at < 0x100040; at += 4) at,
+      for (var at = 0x15bc00; at < 0x15c000; at += 4) at,
+    ]) {
       for (var bit = 0; bit < 32; bit++) {
         final (x, y) = ComputerrariaComputer.ramLamp(address, bit);
         records.addAll([x, y, 0, 0]);
@@ -179,6 +181,37 @@ class _ObservedBackend
     final result = await inner.commandWorldCircuit(
       id!,
       WorldCircuitCommand.lamps(records),
+    );
+    return sha256.convert(result.records).toString();
+  }
+
+  Future<String> cpuSignature() async {
+    if (_cpuProbePoints == null) {
+      final view = await inner.commandWorldCircuit(
+        id!,
+        WorldCircuitCommand.viewport(3150, 130, 300, 200),
+      );
+      final data = ByteData.sublistView(view.records);
+      final points = <int>[];
+      expect(view.records.length % 16, 0);
+      for (var at = 0; at < view.records.length; at += 16) {
+        final tile = data.getUint32(at + 8, Endian.little) & 65535;
+        final frameX = data.getUint32(at + 12, Endian.little) & 65535;
+        if (tile == 419 && frameX != 36) {
+          points.addAll([
+            data.getUint32(at, Endian.little),
+            data.getUint32(at + 4, Endian.little),
+            0,
+            0,
+          ]);
+        }
+      }
+      expect(points, isNotEmpty, reason: 'Actual CPU lamp probes required');
+      _cpuProbePoints = points;
+    }
+    final result = await inner.commandWorldCircuit(
+      id!,
+      WorldCircuitCommand.lamps(_cpuProbePoints!),
     );
     return sha256.convert(result.records).toString();
   }
@@ -193,7 +226,7 @@ void main() {
       fail('Use flutter drive --profile; debug timing is not accepted.');
     }
     binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
-    final sources = await inputs.computerInputs();
+    final source = await inputs.computerInput();
     const cycles = int.fromEnvironment(
       'COMPUTERRARIA_PROFILE_CYCLES',
       defaultValue: 2,
@@ -222,23 +255,33 @@ void main() {
     var status = 'failed';
     String? failure, failureStack;
     var stage = 'mount';
+    os_memory.OsLoadingMemoryProbe? osProbe;
+    Map<String, Object?>? loadingMemory;
+    int? observedCircuitAbi;
+    var priorCancelledLoad = false, completeLoads = 0, loadAttempts = 0;
     recorder.start();
     try {
+      osProbe = await os_memory.OsLoadingMemoryProbe.start();
       snapshots.add({'phase': 'baseline', ...await memory.memorySnapshot()});
       for (var cycle = 0; cycle < cycles; cycle++) {
         for (final optimized in [false, true]) {
           final mode = optimized ? 'optimized' : 'standard';
+          final pixelRule = optimized
+              ? 'wirehead-color-pair-wave'
+              : 'game-tripwire-crossing';
+          final displayCompatibility = {
+            'status': optimized ? 'supported' : 'unsupported-under-game-rules',
+            'expectedBehavior': optimized
+                ? 'moving-pong'
+                : 'recorded-without-pong-display-claim',
+          };
           final engine = core.createTerraEngine();
           final backend = _ObservedBackend(
             circuit_factory.createWorldCircuitBackend(engine)!
                 as WorldCircuitSourceBackend,
           );
           final storage = await createComputerProfileStorage();
-          final sourceFiles = _SourceFiles(
-            sources.world,
-            sources.twld,
-            storage,
-          );
+          final sourceFiles = _SourceFiles(source, storage);
           Workspace createWorkspace() => Workspace(
             engine: engine,
             files: _NoSmallFiles(),
@@ -248,6 +291,46 @@ void main() {
           );
           var workspace = createWorkspace();
           Map state() => workspace.view.result['worldCircuit'] as Map;
+          int litPixels(Uint8List rgba) {
+            expect(rgba.length, 64 * 48 * 4);
+            var lit = 0;
+            for (var at = 0; at < rgba.length; at += 4) {
+              if (rgba[at] != 0 || rgba[at + 1] != 0 || rgba[at + 2] != 0) {
+                lit++;
+              }
+            }
+            return lit;
+          }
+
+          Map<String, Object?> readyMetadata() {
+            final actual = backend.latest!;
+            expect(actual.circuitOptimizationEnabled, optimized);
+            expect(actual.circuitOptimizationSupported, isTrue);
+            expect(actual.wireHeadPixelRulesEnabled, optimized);
+            return {
+              'flags': actual.reserved,
+              'optimizationEnabled': actual.circuitOptimizationEnabled,
+              'topologyEligible': actual.circuitOptimizationSupported,
+              'wireHeadPixelRulesEnabled': actual.wireHeadPixelRulesEnabled,
+            };
+          }
+
+          Map<String, Object?> paddleLatencyApplicability(String direction) {
+            final movesPaddle =
+                direction == 'up' ||
+                direction == 'down' ||
+                direction == 'touch-hold-down';
+            return {
+              'paddleStateLatencyStatus': optimized && movesPaddle
+                  ? 'observed'
+                  : 'notApplicable',
+              if (!optimized || !movesPaddle)
+                'paddleStateLatencyReason': movesPaddle
+                    ? 'game-tripwire-display-not-supported'
+                    : 'pong-ignores-direction',
+            };
+          }
+
           Future<void> waitFor(bool Function() condition) async {
             final timeout = Stopwatch()..start();
             while (!condition()) {
@@ -287,8 +370,57 @@ void main() {
                   ? 'framework key down/up on focused production monitor'
                   : id.contains('touch-')
                   ? 'pointer down/up on production direction control'
-                  : 'pointer tap on production WorldCircuitPanel; actual full WLD/TWLD and wiring VM',
+                  : 'pointer tap on production WorldCircuitPanel; actual full WLD and wiring VM',
             );
+          }
+
+          Future<void> observeLoad(
+            String kind,
+            Future<void> Function() operation, {
+            bool cancelled = false,
+          }) async {
+            await osProbe!.begin({
+              'kind': kind,
+              'cycle': cycle,
+              'mode': mode,
+              'hostLoadAttempt': loadAttempts++,
+              'priorCancelledLoad': priorCancelledLoad,
+              'hostLoadContext': cancelled
+                  ? 'cancelled-load-attempt'
+                  : completeLoads == 0
+                  ? 'fresh-host-first-complete-load'
+                  : 'repeat-in-same-host',
+              'cacheState': 'uncontrolled',
+            });
+            var outcome = 'failed';
+            final evidence = <String, Object?>{};
+            try {
+              await operation();
+              if (cancelled) {
+                outcome = 'cancelled';
+                priorCancelledLoad = true;
+              } else {
+                final actualAbi = backend.latest!.stats[0];
+                expect(actualAbi, 2, reason: 'Actual WLD-only circuit ABI');
+                observedCircuitAbi ??= actualAbi;
+                expect(actualAbi, observedCircuitAbi);
+                expect(state()['computerVerified'], isTrue);
+                expect(state()['keyboardVerified'], isTrue);
+                final frames = state()['displayFrames'] as Map;
+                final mono =
+                    frames[ComputerrariaComputer.mono.name] as Uint8List;
+                expect(mono.length, 64 * 48 * 4);
+                evidence.addAll({
+                  'completeWldVerified': true,
+                  'monoRgbaBytes': mono.length,
+                  'monoDisplayInitialized': true,
+                });
+                outcome = 'ready';
+                completeLoads++;
+              }
+            } finally {
+              await osProbe!.end(outcome, evidence);
+            }
           }
 
           Future<void> mount() => tester.pumpWidget(
@@ -313,19 +445,25 @@ void main() {
           );
           try {
             await mount();
-            await measure('computer.choose-pair', () async {
+            await measure('computer.choose-world', () async {
               await tap('选择完整 WLD');
-              await tap('选择配套 TWLD');
             });
             if (cycle == 0 && !optimized) {
-              await measure('computer.cancel-import', () async {
-                await tap('导入完整电路', wait: false);
-                await waitFor(() => state()['importing'] == true);
-                await tap('取消当前加载');
-                expect(state()['open'], isFalse);
-              });
+              await observeLoad(
+                'cancelled-import',
+                () => measure('computer.cancel-import', () async {
+                  await tap('导入完整电路', wait: false);
+                  await waitFor(() => state()['importing'] == true);
+                  await tap('取消当前加载');
+                  expect(state()['open'], isFalse);
+                }),
+                cancelled: true,
+              );
             }
-            await measure('computer.import', () => tap('导入完整电路'));
+            await observeLoad(
+              'initial-import',
+              () => measure('computer.import', () => tap('导入完整电路')),
+            );
             expect(state()['computerVerified'], isTrue);
             expect(state()['programName'], isNull);
             expect(state()['keyboardVerified'], isTrue);
@@ -336,6 +474,8 @@ void main() {
             }
             await measure('computer.load-pong', () => tap('载入 Pong 程序'));
             expect(state()['canRunComputer'], isTrue);
+            expect(state()['running'], isFalse);
+            final selectedReadyMetadata = readyMetadata();
             backend.clocks = 0;
             backend.inputEvents.clear();
             backend.inputCompletedUs.clear();
@@ -359,14 +499,12 @@ void main() {
                 if (workspace.view.error.isNotEmpty) fail(workspace.view.error);
                 if (batch % 4 == 3) {
                   final frames = state()['displayFrames'] as Map;
+                  final mono = frames['黑白显示器'] as Uint8List;
                   trace.add({
                     'pulses': (batch + 1) * 128,
-                    'mono': sha256
-                        .convert(frames['黑白显示器'] as Uint8List)
-                        .toString(),
-                    'color': sha256
-                        .convert(frames['彩色显示器'] as Uint8List)
-                        .toString(),
+                    'mono': sha256.convert(mono).toString(),
+                    'monoLitPixels': litPixels(mono),
+                    'cpuProbe': await backend.cpuSignature(),
                     'ram': await backend.memorySignature(),
                   });
                 }
@@ -376,11 +514,44 @@ void main() {
               backend.inputEvents,
             );
             expect(backend.clocks, 5120);
+            final distinctCpuStates = trace
+                .map((row) => row['cpuProbe'])
+                .toSet()
+                .length;
+            final distinctRamStates = trace
+                .map((row) => row['ram'])
+                .toSet()
+                .length;
+            expect(
+              distinctCpuStates > 1 || distinctRamStates > 1,
+              isTrue,
+              reason: 'Passive CPU/RAM samples must show actual execution',
+            );
             if (optimized) {
               expect(
-                trace,
-                standardTraces[cycle],
-                reason: 'Both modes must retain identical actual pixels and physical RAM signatures for the same inputs.',
+                trace.map((row) => row['mono']).toSet().length,
+                greaterThan(1),
+              );
+              expect(
+                trace.any((row) => (row['monoLitPixels']! as int) > 0),
+                isTrue,
+              );
+            }
+            List<Map<String, Object?>> cpuRamTrace(
+              List<Map<String, Object?>> rows,
+            ) => [
+              for (final row in rows)
+                {
+                  'pulses': row['pulses'],
+                  'cpuProbe': row['cpuProbe'],
+                  'ram': row['ram'],
+                },
+            ];
+            if (optimized) {
+              expect(
+                cpuRamTrace(trace),
+                cpuRamTrace(standardTraces[cycle]!),
+                reason: 'Both modes retain identical passive CPU/RAM states for the same physical inputs; pixel rules differ.',
               );
               expect(inputEvents, standardInputs[cycle]);
             } else {
@@ -389,35 +560,43 @@ void main() {
             }
             final savedFrames = Map.of(state()['displayFrames'] as Map);
             final savedRam = await backend.memorySignature();
+            final savedCpu = await backend.cpuSignature();
             final savedProgram = state()['programName'];
             final savedPulses = state()['physicalPulses'];
-            await measure('computer.export-pair', () async {
+            await measure('computer.export-world', () async {
               await tap('保存模拟结果', wait: false);
               await tester.pump(const Duration(milliseconds: 250));
               await tap('继续');
               expect(state()['dirty'], isFalse);
               expect(sourceFiles.savedWorld?.sha256, isNotNull);
-              expect(sourceFiles.savedTwld?.sha256, isNotNull);
             });
             await measure('computer.close-exported', () => tap('关闭'));
             await workspace.close();
             await tester.pumpWidget(const SizedBox());
             workspace.dispose();
-            sourceFiles.useSavedPair = true;
+            await osProbe.closePoint({
+              'phase': 'after-export-close',
+              'cycle': cycle,
+              'mode': mode,
+            });
+            sourceFiles.useSavedWorld = true;
             workspace = createWorkspace();
             await mount();
-            await measure('computer.reselect-exported-pair', () async {
+            await measure('computer.reselect-exported-world', () async {
               await tap('选择完整 WLD');
-              await tap('选择配套 TWLD');
             });
             final clocksBeforeReopen = backend.clocks;
-            await measure('computer.reimport-resume', () => tap('导入完整电路'));
+            await observeLoad(
+              'exported-reimport',
+              () => measure('computer.reimport-resume', () => tap('导入完整电路')),
+            );
             expect(state()['restoredFromExport'], isTrue);
             expect(state()['canRunComputer'], isTrue);
             expect(state()['programName'], savedProgram);
             expect(state()['physicalPulses'], savedPulses);
             expect(state()['displayFrames'], savedFrames);
             expect(await backend.memorySignature(), savedRam);
+            expect(await backend.cpuSignature(), savedCpu);
             expect(
               backend.clocks,
               clocksBeforeReopen,
@@ -425,6 +604,7 @@ void main() {
             );
             expect(state()['optimizationEnabled'], isFalse);
             if (optimized) await tap('电路优化');
+            readyMetadata();
             await measure('computer.idle-mode-roundtrip', () async {
               final frames = Map.of(state()['displayFrames'] as Map);
               final ram = await backend.memorySignature();
@@ -439,19 +619,6 @@ void main() {
             await tap('运行物理时钟', wait: false);
             final screen = findComputerProfileMonitor('黑白显示器，显示实际物理像素状态');
             await focusComputerProfileMonitor(tester, screen);
-            Future<void> inputWait(bool Function() condition) async {
-              final watch = Stopwatch()..start();
-              while (!condition()) {
-                if (watch.elapsed > const Duration(seconds: 5)) {
-                  fail(
-                    'No acknowledged physical sensor/input release within five seconds.',
-                  );
-                }
-                await tester.pump(const Duration(milliseconds: 16));
-                if (state()['error'] != null) fail(state()['error'].toString());
-              }
-            }
-
             double paddleCenter() {
               final rgba =
                   (state()['displayFrames'] as Map)['黑白显示器'] as Uint8List;
@@ -465,11 +632,36 @@ void main() {
               return rows == 0 ? -1 : sum / rows;
             }
 
+            Future<void> inputWait(
+              String phase,
+              bool Function() condition,
+            ) async {
+              final watch = Stopwatch()..start();
+              final initialClock = backend.clocks;
+              while (!condition()) {
+                if (watch.elapsed > const Duration(seconds: 5)) {
+                  fail(
+                    'Input timeout: phase=$phase clockCount=${backend.clocks} '
+                    'clockDelta=${backend.clocks - initialClock} '
+                    'centerNow=${paddleCenter()} elapsed=${watch.elapsed}.',
+                  );
+                }
+                await tester.pump(const Duration(milliseconds: 16));
+                if (state()['error'] != null) fail(state()['error'].toString());
+              }
+            }
+
             Future<void> releaseProof(int x, int releasedUs) async {
               final releaseClock = backend.clocks;
-              await inputWait(() => backend.clocks >= releaseClock + 128);
+              await inputWait(
+                'sensor-$x.release-first-batch',
+                () => backend.clocks >= releaseClock + 128,
+              );
               final afterDrain = backend.inputEvents.length;
-              await inputWait(() => backend.clocks >= releaseClock + 256);
+              await inputWait(
+                'sensor-$x.release-second-batch',
+                () => backend.clocks >= releaseClock + 256,
+              );
               expect(
                 backend.inputEvents.skip(afterDrain).where((e) => e['x'] == x),
                 isEmpty,
@@ -504,81 +696,103 @@ void main() {
               ),
             ]) {
               await measure('computer.keyboard-${key.$1}', () async {
-                final eventStart = backend.inputEvents.length,
-                    centerBefore = paddleCenter();
-                final startUs = Timeline.now;
-                await tester.sendKeyDownEvent(key.$2, physicalKey: key.$3);
+                final eventStart = backend.inputEvents.length;
                 int eventIndex() => backend.inputEvents.indexWhere(
                   (event) => event['x'] == key.$4,
                   eventStart,
                 );
-                await inputWait(() => eventIndex() >= 0);
-                final event = eventIndex(),
-                    acknowledgedUs = backend.inputCompletedUs[event];
-                final releaseUs = Timeline.now;
-                await tester.sendKeyUpEvent(key.$2, physicalKey: key.$3);
-                await tester.pump();
+                final input = await observeComputerProfileHeldInput(
+                  input: 'keyboard-${key.$1}',
+                  press: () async {
+                    await tester.sendKeyDownEvent(key.$2, physicalKey: key.$3);
+                  },
+                  release: () async {
+                    await tester.sendKeyUpEvent(key.$2, physicalKey: key.$3);
+                    await tester.pump();
+                  },
+                  pump: () => tester.pump(const Duration(milliseconds: 16)),
+                  nowUs: () => Timeline.now,
+                  physicalClocks: () => backend.clocks,
+                  sensorIndex: eventIndex,
+                  sensorAcknowledgedUs: (index) =>
+                      backend.inputCompletedUs[index],
+                  paddleCenter: paddleCenter,
+                  expectPaddleChange:
+                      optimized && (key.$1 == 'up' || key.$1 == 'down'),
+                  error: () => state()['error']?.toString(),
+                );
                 expect(
                   (state()['heldKeys'] as Iterable).contains(key.$1),
                   isFalse,
                 );
-                await releaseProof(key.$4, releaseUs);
-                if (key.$1 == 'up' || key.$1 == 'down') {
-                  await inputWait(() => paddleCenter() != centerBefore);
-                }
+                await releaseProof(key.$4, input.releasedUs);
                 inputLatencies.add({
                   'cycle': cycle,
                   'mode': mode,
                   'input': key.$1,
                   'interaction':
                       'Flutter key down/up on focused production monitor',
-                  'pressToPhysicalSensorMs': (acknowledgedUs - startUs) / 1000,
-                  'acceptedAtClock': backend.inputEvents[event]['atClock'],
+                  ...input.latencies,
+                  ...paddleLatencyApplicability(key.$1),
+                  'acceptedAtClock':
+                      backend.inputEvents[input.sensorIndex]['atClock'],
                   'releaseToVerifiedNoMorePulsesMs':
-                      (Timeline.now - releaseUs) / 1000,
-                  'paddleCenterBefore': centerBefore,
-                  'paddleCenterObservedAfter': paddleCenter(),
-                  'visualLatencyClaim': false,
+                      (Timeline.now - input.releasedUs) / 1000,
                 });
               });
             }
             await measure('computer.touch-hold-down', () async {
               final button = find.bySemanticsLabel('计算机向下');
               await revealComputerProfileTarget(tester, button);
-              final start = backend.inputEvents.length, startUs = Timeline.now;
-              final gesture = await tester.startGesture(
-                tester.getCenter(button),
-              );
+              final start = backend.inputEvents.length;
+              late TestGesture gesture;
               int eventIndex() => backend.inputEvents.indexWhere(
                 (event) => event['x'] == 6517,
                 start,
               );
-              try {
-                await inputWait(() => eventIndex() >= 0);
-              } finally {
-                await gesture.up();
-              }
-              final index = eventIndex(), releaseUs = Timeline.now;
-              await releaseProof(6517, releaseUs);
+              final input = await observeComputerProfileHeldInput(
+                input: 'touch-hold-down',
+                press: () async {
+                  gesture = await tester.startGesture(tester.getCenter(button));
+                },
+                release: () async {
+                  await gesture.up();
+                  await tester.pump();
+                },
+                pump: () => tester.pump(const Duration(milliseconds: 16)),
+                nowUs: () => Timeline.now,
+                physicalClocks: () => backend.clocks,
+                sensorIndex: eventIndex,
+                sensorAcknowledgedUs: (index) =>
+                    backend.inputCompletedUs[index],
+                paddleCenter: paddleCenter,
+                expectPaddleChange: optimized,
+                error: () => state()['error']?.toString(),
+              );
+              expect(
+                (state()['heldKeys'] as Iterable).contains('down'),
+                isFalse,
+              );
+              await releaseProof(6517, input.releasedUs);
               inputLatencies.add({
                 'cycle': cycle,
                 'mode': mode,
                 'input': 'touch-hold-down',
                 'interaction':
                     'pointer down/up on production direction control',
-                'pressToPhysicalSensorMs':
-                    (backend.inputCompletedUs[index] - startUs) / 1000,
-                'acceptedAtClock': backend.inputEvents[index]['atClock'],
+                ...input.latencies,
+                ...paddleLatencyApplicability('touch-hold-down'),
+                'acceptedAtClock':
+                    backend.inputEvents[input.sensorIndex]['atClock'],
                 'releaseToVerifiedNoMorePulsesMs':
-                    (Timeline.now - releaseUs) / 1000,
-                'visualLatencyClaim': false,
+                    (Timeline.now - input.releasedUs) / 1000,
               });
             });
             await tap('暂停');
             final before = Uint8List.fromList(
               (state()['displayFrames'] as Map)['黑白显示器'] as Uint8List,
             );
-            await measure('computer.run-displayed-pong', () async {
+            await measure('computer.run-physical-program', () async {
               await tap('运行物理时钟', wait: false);
               await revealComputerProfileTarget(
                 tester,
@@ -588,6 +802,7 @@ void main() {
               final clocksBefore = backend.clocks,
                   pollsBefore = state()['displayedFrames'] as int;
               var observedChanges = 0;
+              var allDarkSamples = litPixels(before) == 0;
               Uint8List previous = before;
               while (watch.elapsed < const Duration(seconds: seconds)) {
                 await tester.pump(const Duration(milliseconds: 16));
@@ -595,6 +810,7 @@ void main() {
                 if (state()['error'] != null) fail(state()['error'].toString());
                 final next =
                     (state()['displayFrames'] as Map)['黑白显示器'] as Uint8List;
+                if (litPixels(next) != 0) allDarkSamples = false;
                 if (!listEquals(previous, next)) {
                   observedChanges++;
                   previous = next;
@@ -605,18 +821,32 @@ void main() {
               final stopped = state()['physicalPulses'];
               await tester.pump(const Duration(milliseconds: 120));
               expect(state()['physicalPulses'], stopped);
-              expect(
-                observedChanges,
-                greaterThan(1),
-                reason:
-                    'Actual circuit display must visibly change beyond boot.',
-              );
+              if (optimized) {
+                expect(
+                  observedChanges,
+                  greaterThan(1),
+                  reason:
+                      'WireHead rules must produce actual changing Pong pixels',
+                );
+                expect(allDarkSamples, isFalse);
+              }
               observations.add({
                 'cycle': cycle,
                 'mode': mode,
+                'pixelRule': pixelRule,
+                'displayCompatibility': displayCompatibility,
+                'readyMetadata': selectedReadyMetadata,
+                'cpuRamLiveness': {
+                  'measurement': 'passive-lamp-queries-no-reset-bus',
+                  'cpuProbeCount': backend.cpuProbeCount,
+                  'ramProbeBytes': 1088,
+                  'distinctCpuStates': distinctCpuStates,
+                  'distinctRamStates': distinctRamStates,
+                },
                 'deterministicTrace': trace,
                 'inputEventsAtPhysicalClock': inputEvents,
                 'observedDisplayChanges': observedChanges,
+                'allDarkSamples': allDarkSamples,
                 'physicalPulses': stopped,
                 'nativeActiveBytes': backend.latest?.activeBytes,
                 'nativePeakBytes': backend.latest?.peakBytes,
@@ -658,6 +888,11 @@ void main() {
             await tester.pumpWidget(const SizedBox());
             workspace.dispose();
             await storage.close();
+            await osProbe.closePoint({
+              'phase': 'after-cycle-close',
+              'cycle': cycle,
+              'mode': mode,
+            });
           }
           snapshots.add({
             'phase': 'after-close',
@@ -670,7 +905,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       final steady = recorder.results().where(
         (row) =>
-            (row['id'] as String).startsWith('computer.run-displayed-pong.'),
+            (row['id'] as String).startsWith('computer.run-physical-program.'),
       );
       expect(steady.length, 2);
       for (final row in steady) {
@@ -688,6 +923,16 @@ void main() {
           reason: 'Native profile acceptance requires actual VM heap samples.',
         );
       }
+      loadingMemory = await osProbe.finish();
+      if (!kIsWeb) {
+        expect(
+          loadingMemory['status'],
+          'observed',
+          reason: 'Loading OS samples must be present and complete.',
+        );
+        expect((loadingMemory['windows'] as List).length, cycles * 4 + 1);
+        expect((loadingMemory['closeSamples'] as List).length, cycles * 4);
+      }
       status = 'passed';
     } catch (e, stack) {
       failure = e.toString();
@@ -695,6 +940,7 @@ void main() {
       rethrow;
     } finally {
       recorder.stop();
+      loadingMemory ??= await osProbe?.finish();
       final rows = recorder
           .results()
           .map(
@@ -717,7 +963,9 @@ void main() {
           )
           .toList();
       final report = <String, dynamic>{
-        'schema': 1,
+        'schema': 2,
+        'inputFormat': 'wld-only',
+        'circuitAbi': observedCircuitAbi,
         'status': status,
         'buildMode': 'profile',
         'cycles': cycles,
@@ -749,9 +997,7 @@ void main() {
         'fixture': {
           'id': 'public-upstream-computerraria@0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8',
           'wldSha256': ComputerrariaComputer.sourceSha256,
-          'twldSha256': 'c6de694b3d034701513dc1ba17311213561ec359d3ecddde7bc35ea3c9611ed8',
-          'wldBytes': sources.world.length,
-          'twldBytes': sources.twld.length,
+          'wldBytes': source.length,
           'identity':
               'SHA-256 plus physical anchors verified by production session',
         },
@@ -778,16 +1024,18 @@ void main() {
           ),
           ...memory.runtimeOverrides(),
         },
-        'methodology': 'Every lifecycle is retained with no excluded warmup. First and repeat cycles are identified; filesystem/cache state is uncontrolled. Each cycle runs standard then optimized. Correctness uses fixed pulse/input checkpoints; steady throughput uses equal wall-time windows.',
+        'methodology': 'Every lifecycle is retained with no excluded warmup. First and repeat cycles are identified; filesystem/cache state is uncontrolled. Each cycle runs standard game TripWire rules then optimized WireHead pixel pairing. Fixed pulse/input checkpoints compare passive CPU/RAM across modes, while display expectations are mode-specific. Steady throughput uses equal wall-time windows.',
         'operations': rows,
         'observations': observations,
         'inputLatencies': inputLatencies,
         'memory': snapshots,
+        'loadingOsMemory': loadingMemory,
         'limits': [
           'System file chooser latency excluded; picker returns explicit source handles.',
           'No target-device claim follows from Linux or browser profiling.',
           'Input uses independently calibrated physical sensors and sticky read-clear semantics.',
           'Input latency starts at framework-injected real key/pointer events and ends at the actual sensor-command completion. OS device latency and raster presentation latency are not claimed.',
+          'The standard game-rule mode must execute the CPU; its actual monitor pixels are recorded without a Pong display compatibility claim, and decoded paddle latency is explicitly not applicable. Only WireHead mode must demonstrate displayed Pong motion.',
         ],
       };
       binding.reportData = report;

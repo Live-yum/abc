@@ -111,19 +111,19 @@ async function regionCycle() {
 }
 async function tcwCycle() {
   const f=fixtures[0]; let session;
-  const command=(kind,x=0,y=0,w=0,h=0,count=0,flags=0)=>tcw.command(session,JSON.stringify([1,kind,x,y,w,h,1,1,count,0,0,kind===6?3:0,flags,kind===6?5:0,0,0]),'[]');
+  const command=(kind,x=0,y=0,w=0,h=0,count=0,flags=0)=>tcw.command(session,JSON.stringify([2,kind,x,y,w,h,1,1,count,0,0,kind===6?3:0,flags,0,0,0]),'[]');
   try {
-    session=(await measure('tcw.open',f,()=>tcw.open(source,null))).session; own('tcw',session);
+    session=(await measure('tcw.open',f,()=>tcw.open(source))).session; own('tcw',session);
     const viewport=await measure('tcw.viewport',f,()=>command(1,3,10,1,1)); assert.equal(new DataView(viewport.records.buffer).getUint32(12,true)&65535,0);
     await measure('tcw.trigger',f,()=>command(2,2,10,1,1,1,1));
     await measure('tcw.tick60',f,()=>command(3,0,0,0,0,60));
     assert.equal(new DataView((await command(1,3,10,1,1)).records.buffer).getUint32(12,true)&65535,66);
     const saved=await measure('tcw.export',f,()=>command(6)); assert.ok(saved.world.length);
     await measure('tcw.close',f,()=>tcw.close(session)); release('tcw',session); session=null;
-    session=(await measure('tcw.reopen',f,()=>tcw.open(saved.world,null))).session; own('tcw',session);
+    session=(await measure('tcw.reopen',f,()=>tcw.open(saved.world))).session; own('tcw',session);
     assert.equal(new DataView((await command(1,3,10,1,1)).records.buffer).getUint32(12,true)&65535,66);
   } finally { if(session) {await tcw.close(session);release('tcw',session);} }
-  await measure('tcw.reject-recover',f,()=>assert.rejects(()=>tcw.open(new Uint8Array([1,2,3]),null)));
+  await measure('tcw.reject-recover',f,()=>assert.rejects(()=>tcw.open(new Uint8Array([1,2,3]))));
   const cells=[];for(let x=1;x<=5;x++)cells.push(x,2,15,x===1||x===5?1:0);
   for(let color=0;color<4;color++) assert.deepEqual((await measure(`circuit.traverse-${color}`,f,()=>circuit.propagateRaw(8,8,cells,1,2,color))).sort((a,b)=>a-b),[17,18,19,20,21]);
 }
@@ -138,16 +138,16 @@ async function largeWorldCycle(f) {
   const ruled=await measure('rules.batch-update-large-world',f,()=>region.operation(f.bytes,'batch_update_tiles',JSON.stringify({rules:[{where:{type:1,wire_red:false},patch:{wall:2,wire_red:true},limit:1}]}),new Uint8Array(),new Uint8Array()));
   assert.ok(ruled.length);assert.notDeepEqual(ruled,f.bytes);
   let session;
-  const command=(kind,x=0,y=0,w=0,h=0,count=0,flags=0)=>tcw.command(session,JSON.stringify([1,kind,x,y,w,h,1,1,count,0,0,kind===6?3:0,flags,kind===6?5:0,0,0]),'[]');
+  const command=(kind,x=0,y=0,w=0,h=0,count=0,flags=0)=>tcw.command(session,JSON.stringify([2,kind,x,y,w,h,1,1,count,0,0,kind===6?3:0,flags,0,0,0]),'[]');
   try {
-    const opened=await measure('tcw.open-large-world',f,()=>tcw.open(f.bytes,null));session=opened.session;own('tcw',session);
+    const opened=await measure('tcw.open-large-world',f,()=>tcw.open(f.bytes));session=opened.session;own('tcw',session);
     assert.ok(opened.stats[2]>=32&&opened.stats[3]>=32);
     await measure('tcw.viewport-large-world',f,()=>command(1,0,0,32,32));
     await measure('tcw.trigger-large-world',f,()=>command(2,0,0,32,32,1,1));
     const tick=await measure('tcw.tick60-large-world',f,()=>command(3,0,0,0,0,60));assert.equal(tick.stats[18],60);
     const saved=await measure('tcw.export-large-world',f,()=>command(6));assert.ok(saved.world.length);
     await measure('tcw.close-large-world',f,()=>tcw.close(session));release('tcw',session);session=null;
-    session=(await measure('tcw.reopen-large-world',f,()=>tcw.open(saved.world,null))).session;own('tcw',session);
+    session=(await measure('tcw.reopen-large-world',f,()=>tcw.open(saved.world))).session;own('tcw',session);
   } finally {if(session){await tcw.close(session);release('tcw',session);}}
 }
 let rules;

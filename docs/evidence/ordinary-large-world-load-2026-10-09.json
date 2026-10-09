@@ -1,0 +1,1972 @@
+{
+  "schema": "abc.ordinaryWldLoad.sanitizedSummary.v1",
+  "status": "passed",
+  "measurementDate": "2026-10-09",
+  "scope": "Ordinary WLD file read, open/metadata and PNG thumbnail; no UI or TCW",
+  "fixture": {
+    "width": 8400,
+    "height": 2400,
+    "formatVersion": 326,
+    "bytes": 11956596
+  },
+  "machine": {
+    "os": "Linux",
+    "kernel": "6.18.44",
+    "arch": "x86_64",
+    "logicalCpus": 9
+  },
+  "artifacts": {
+    "nativeLibrarySha256": "d033ffd68651f3d7abda7b329ac46e576caa1400bdf73d340e8bd7cf48ebf9d7",
+    "wasmSha256": "b3ace044d3b466eee338d25c87dd034c10cc8e73ec1c07e5f900bf42c694e7b8",
+    "loaderSha256": "957c19caf1995131ac8bc462d66f0cf81df2a0be48adb1ae1070c7cdb4366e87",
+    "bridgeSha256": "922e679284f0df78651df39e8c6213c2b8ff50bcc057369caae98c72559b4a1e"
+  },
+  "sourceManifestSha256": "a51b6c058eb3709a5bd958c7fbde79e0d3a239b6b787a74eb4a7fa7e3749e399",
+  "sourceManifestProvenance": "Final source manifest identity supplied by the coordinating build task; measured Native and WASM identities verified before and after each process.",
+  "methodology": {
+    "freshProcessesPerBackend": 3,
+    "warmCyclesPerProcess": 3,
+    "execution": "One backend process at a time, alternating backend order across rounds.",
+    "fresh": "First ordinary WLD load in a fresh runtime process. OS page cache is uncontrolled and never flushed.",
+    "warm": "Three sequential close/read/open/thumbnail cycles after the first load in each process; runtime instance reused, input reread each cycle.",
+    "scope": "Read-only local file read, runtime initialization, ordinary WLD open including header/format/chests/bestiary metadata, PNG creation and host copy; explicit close and final validated reopen.",
+    "totals": "Totals sum individually timed phases; exclude input SHA validation, PNG validation, memory snapshots and report bookkeeping. readInitOpenThumbnail adds lazy runtime/library setup but excludes interpreter/process startup.",
+    "native": "Direct ctypes host uses production pointer-safe C facade. Includes input copy and metadata JSON decode; excludes Dart FFI/isolate and Flutter. Native app request 1024x1024 is retained.",
+    "wasm": "Actual production Node-loaded document bridge and release WASM. Includes JS bridge input copy, chunked open yields and metadata parse. Web app request max_w=960 is retained.",
+    "memory": "Process RSS snapshots and whole-process high-water RSS include host, runtime, validation and all preceding cycles; they are not engine live bytes or operation-specific peaks. WASM capacity is not live allocation.",
+    "comparison": "Preview dimensions and host stacks differ, so no strict cross-platform ranking or historical speedup claim. Not Flutter chooser-to-frame latency, raster rendering, browser worker startup, TCW compilation or circuit execution.",
+    "privacy": "No source path, name, hash, world metadata contents, WLD bytes, or PNG contents are serialized.",
+    "wasmImplicitOpeningPreview": "The production Web incremental open path also generates a 384px-wide opening preview internally before this harness requests the explicit 960px-wide PNG. Native synchronous buffer open does not perform that implicit preview.",
+    "sampleDependence": "Three independent runtime processes per backend; the nine warm samples are grouped three per process and are not nine independent processes.",
+    "historicalComparison": "Historical Native numbers included Dart/isolate overhead and a mixed preloaded-input workload. This direct ctypes harness cannot support a precise historical speedup percentage. No strict cross-platform ranking is claimed."
+  },
+  "validation": {
+    "frozenArtifactsVerifiedBeforeAndAfterEveryProcess": true,
+    "allProcessesPassed": true,
+    "freshSampleCountPerBackend": 3,
+    "warmSampleCountPerBackend": 9
+  },
+  "summary": {
+    "native": {
+      "fresh": {
+        "fileRead": {
+          "samplesMs": [
+            7.100782007910311,
+            5.209534996538423,
+            6.310944998404011
+          ],
+          "medianMs": 6.310944998404011,
+          "minMs": 5.209534996538423,
+          "maxMs": 7.100782007910311
+        },
+        "runtimeInit": {
+          "samplesMs": [
+            0.3848710039164871,
+            0.36934200034011155,
+            0.3682300011860207
+          ],
+          "medianMs": 0.36934200034011155,
+          "minMs": 0.3682300011860207,
+          "maxMs": 0.3848710039164871
+        },
+        "openMetadata": {
+          "samplesMs": [
+            15.039003003039397,
+            14.811064989771694,
+            15.522418994805776
+          ],
+          "medianMs": 15.039003003039397,
+          "minMs": 14.811064989771694,
+          "maxMs": 15.522418994805776
+        },
+        "thumbnail": {
+          "samplesMs": [
+            140.2407739951741,
+            138.870365000912,
+            141.28240800346248
+          ],
+          "medianMs": 140.2407739951741,
+          "minMs": 138.870365000912,
+          "maxMs": 141.28240800346248
+        },
+        "close": {
+          "samplesMs": [
+            0.2827689895639196,
+            0.36077100958209485,
+            0.3136040031677112
+          ],
+          "medianMs": 0.3136040031677112,
+          "minMs": 0.2827689895639196,
+          "maxMs": 0.36077100958209485
+        },
+        "openThumbnail": {
+          "samplesMs": [
+            155.2797769982135,
+            153.68142999068368,
+            156.80482699826825
+          ],
+          "medianMs": 155.2797769982135,
+          "minMs": 153.68142999068368,
+          "maxMs": 156.80482699826825
+        },
+        "readOpenThumbnail": {
+          "samplesMs": [
+            162.3805590061238,
+            158.8909649872221,
+            163.11577199667227
+          ],
+          "medianMs": 162.3805590061238,
+          "minMs": 158.8909649872221,
+          "maxMs": 163.11577199667227
+        },
+        "readInitOpenThumbnail": {
+          "samplesMs": [
+            162.7654300100403,
+            159.26030698756222,
+            163.4840019978583
+          ],
+          "medianMs": 162.7654300100403,
+          "minMs": 159.26030698756222,
+          "maxMs": 163.4840019978583
+        }
+      },
+      "warm": {
+        "fileRead": {
+          "samplesMs": [
+            4.246850992785767,
+            1.415683000232093,
+            1.2891740043414757,
+            4.074644995853305,
+            1.6515379975317046,
+            1.630455008125864,
+            4.698156000813469,
+            1.4376979961525649,
+            1.4504550053970888
+          ],
+          "medianMs": 1.630455008125864,
+          "minMs": 1.2891740043414757,
+          "maxMs": 4.698156000813469
+        },
+        "runtimeInit": {
+          "samplesMs": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "medianMs": 0.0,
+          "minMs": 0.0,
+          "maxMs": 0.0
+        },
+        "openMetadata": {
+          "samplesMs": [
+            13.103693010634743,
+            6.054519006283954,
+            5.222441992373206,
+            13.086968989227898,
+            5.712108002626337,
+            5.568895998294465,
+            13.634205999551341,
+            5.940535993431695,
+            5.878568001207896
+          ],
+          "medianMs": 5.940535993431695,
+          "minMs": 5.222441992373206,
+          "maxMs": 13.634205999551341
+        },
+        "thumbnail": {
+          "samplesMs": [
+            141.49601799726952,
+            141.4435000042431,
+            140.10163200146053,
+            138.99460500397254,
+            139.22048998938408,
+            137.85911600280087,
+            143.25031600310467,
+            147.30674699239898,
+            139.82774601026904
+          ],
+          "medianMs": 140.10163200146053,
+          "minMs": 137.85911600280087,
+          "maxMs": 147.30674699239898
+        },
+        "close": {
+          "samplesMs": [
+            0.010835996363312006,
+            0.008547998731955886,
+            0.008570001227781177,
+            0.010568997822701931,
+            0.008478004019707441,
+            0.009048002539202571,
+            0.010926989489234984,
+            0.007604990969412029,
+            0.00778799585532397
+          ],
+          "medianMs": 0.008570001227781177,
+          "minMs": 0.007604990969412029,
+          "maxMs": 0.010926989489234984
+        },
+        "openThumbnail": {
+          "samplesMs": [
+            154.59971100790426,
+            147.49801901052706,
+            145.32407399383374,
+            152.08157399320044,
+            144.93259799201041,
+            143.42801200109534,
+            156.884522002656,
+            153.24728298583068,
+            145.70631401147693
+          ],
+          "medianMs": 147.49801901052706,
+          "minMs": 143.42801200109534,
+          "maxMs": 156.884522002656
+        },
+        "readOpenThumbnail": {
+          "samplesMs": [
+            158.84656200069003,
+            148.91370201075915,
+            146.6132479981752,
+            156.15621898905374,
+            146.58413598954212,
+            145.0584670092212,
+            161.58267800346948,
+            154.68498098198324,
+            147.15676901687402
+          ],
+          "medianMs": 148.91370201075915,
+          "minMs": 145.0584670092212,
+          "maxMs": 161.58267800346948
+        },
+        "readInitOpenThumbnail": {
+          "samplesMs": [
+            158.84656200069003,
+            148.91370201075915,
+            146.6132479981752,
+            156.15621898905374,
+            146.58413598954212,
+            145.0584670092212,
+            161.58267800346948,
+            154.68498098198324,
+            147.15676901687402
+          ],
+          "medianMs": 148.91370201075915,
+          "minMs": 145.0584670092212,
+          "maxMs": 161.58267800346948
+        }
+      }
+    },
+    "wasm": {
+      "fresh": {
+        "fileRead": {
+          "samplesMs": [
+            4.011029000000001,
+            5.750058000000003,
+            4.744285999999995
+          ],
+          "medianMs": 4.744285999999995,
+          "minMs": 4.011029000000001,
+          "maxMs": 5.750058000000003
+        },
+        "runtimeInit": {
+          "samplesMs": [
+            9.379171,
+            5.507221000000001,
+            5.3999609999999905
+          ],
+          "medianMs": 5.507221000000001,
+          "minMs": 5.3999609999999905,
+          "maxMs": 9.379171
+        },
+        "openMetadata": {
+          "samplesMs": [
+            183.83643899999998,
+            184.395592,
+            186.406204
+          ],
+          "medianMs": 184.395592,
+          "minMs": 183.83643899999998,
+          "maxMs": 186.406204
+        },
+        "thumbnail": {
+          "samplesMs": [
+            183.881995,
+            178.703886,
+            181.287487
+          ],
+          "medianMs": 181.287487,
+          "minMs": 178.703886,
+          "maxMs": 183.881995
+        },
+        "close": {
+          "samplesMs": [
+            0.13733700000000226,
+            0.13591700000000628,
+            0.1429319999999734
+          ],
+          "medianMs": 0.13733700000000226,
+          "minMs": 0.13591700000000628,
+          "maxMs": 0.1429319999999734
+        },
+        "openThumbnail": {
+          "samplesMs": [
+            367.718434,
+            363.099478,
+            367.693691
+          ],
+          "medianMs": 367.693691,
+          "minMs": 363.099478,
+          "maxMs": 367.718434
+        },
+        "readOpenThumbnail": {
+          "samplesMs": [
+            371.729463,
+            368.849536,
+            372.437977
+          ],
+          "medianMs": 371.729463,
+          "minMs": 368.849536,
+          "maxMs": 372.437977
+        },
+        "readInitOpenThumbnail": {
+          "samplesMs": [
+            381.108634,
+            374.356757,
+            377.837938
+          ],
+          "medianMs": 377.837938,
+          "minMs": 374.356757,
+          "maxMs": 381.108634
+        }
+      },
+      "warm": {
+        "fileRead": {
+          "samplesMs": [
+            5.119754,
+            5.275577999999996,
+            6.5031320000000505,
+            5.835648999999989,
+            5.952748000000042,
+            6.240586000000121,
+            5.760439000000019,
+            6.5086390000000165,
+            6.5712720000001354
+          ],
+          "medianMs": 5.952748000000042,
+          "minMs": 5.119754,
+          "maxMs": 6.5712720000001354
+        },
+        "runtimeInit": {
+          "samplesMs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "medianMs": 0,
+          "minMs": 0,
+          "maxMs": 0
+        },
+        "openMetadata": {
+          "samplesMs": [
+            166.29761900000005,
+            173.6084400000001,
+            162.94412599999987,
+            160.90617400000002,
+            160.626846,
+            158.80780499999992,
+            162.93568899999997,
+            166.20486900000003,
+            166.17387899999994
+          ],
+          "medianMs": 162.94412599999987,
+          "minMs": 158.80780499999992,
+          "maxMs": 173.6084400000001
+        },
+        "thumbnail": {
+          "samplesMs": [
+            162.22233900000003,
+            161.65747199999987,
+            161.64045499999997,
+            157.64216299999998,
+            158.26609400000007,
+            158.61570600000005,
+            164.40111000000002,
+            168.94230599999992,
+            161.0898810000001
+          ],
+          "medianMs": 161.64045499999997,
+          "minMs": 157.64216299999998,
+          "maxMs": 168.94230599999992
+        },
+        "close": {
+          "samplesMs": [
+            0.018139000000019223,
+            0.020301999999901454,
+            0.02087300000016512,
+            0.022881999999981417,
+            0.020404999999982465,
+            0.01858400000014626,
+            0.025933000000009088,
+            0.02440799999999399,
+            0.017970000000104847
+          ],
+          "medianMs": 0.020404999999982465,
+          "minMs": 0.017970000000104847,
+          "maxMs": 0.025933000000009088
+        },
+        "openThumbnail": {
+          "samplesMs": [
+            328.5199580000001,
+            335.26591199999996,
+            324.58458099999984,
+            318.548337,
+            318.89294000000007,
+            317.42351099999996,
+            327.336799,
+            335.14717499999995,
+            327.26376000000005
+          ],
+          "medianMs": 327.26376000000005,
+          "minMs": 317.42351099999996,
+          "maxMs": 335.26591199999996
+        },
+        "readOpenThumbnail": {
+          "samplesMs": [
+            333.6397120000001,
+            340.54148999999995,
+            331.0877129999999,
+            324.383986,
+            324.8456880000001,
+            323.6640970000001,
+            333.097238,
+            341.65581399999996,
+            333.8350320000002
+          ],
+          "medianMs": 333.097238,
+          "minMs": 323.6640970000001,
+          "maxMs": 341.65581399999996
+        },
+        "readInitOpenThumbnail": {
+          "samplesMs": [
+            333.6397120000001,
+            340.54148999999995,
+            331.0877129999999,
+            324.383986,
+            324.8456880000001,
+            323.6640970000001,
+            333.097238,
+            341.65581399999996,
+            333.8350320000002
+          ],
+          "medianMs": 333.097238,
+          "minMs": 323.6640970000001,
+          "maxMs": 341.65581399999996
+        }
+      }
+    }
+  },
+  "processes": [
+    {
+      "backend": "native",
+      "runtime": "Python 3.12.14 ctypes host / Native C engine",
+      "round": 1,
+      "previewRequest": {
+        "operation": "render_preview_png",
+        "max_w": 1024,
+        "max_h": 1024
+      },
+      "samples": [
+        {
+          "cycle": 0,
+          "phase": "fresh",
+          "timingMs": {
+            "fileRead": 7.100782007910311,
+            "runtimeInit": 0.3848710039164871,
+            "openMetadata": 15.039003003039397,
+            "thumbnail": 140.2407739951741,
+            "close": 0.2827689895639196,
+            "openThumbnail": 155.2797769982135,
+            "readOpenThumbnail": 162.3805590061238,
+            "readInitOpenThumbnail": 162.7654300100403
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 10776576,
+              "processPeakRssBytes": 14942208
+            },
+            "afterRead": {
+              "rssBytes": 22765568,
+              "processPeakRssBytes": 22675456
+            },
+            "afterOpen": {
+              "rssBytes": 37249024,
+              "processPeakRssBytes": 49029120
+            },
+            "afterThumbnail": {
+              "rssBytes": 39596032,
+              "processPeakRssBytes": 49029120
+            },
+            "afterClose": {
+              "rssBytes": 29667328,
+              "processPeakRssBytes": 49029120
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 1,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 4.246850992785767,
+            "runtimeInit": 0.0,
+            "openMetadata": 13.103693010634743,
+            "thumbnail": 141.49601799726952,
+            "close": 0.010835996363312006,
+            "openThumbnail": 154.59971100790426,
+            "readOpenThumbnail": 158.84656200069003,
+            "readInitOpenThumbnail": 158.84656200069003
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 29667328,
+              "processPeakRssBytes": 49029120
+            },
+            "afterRead": {
+              "rssBytes": 25247744,
+              "processPeakRssBytes": 49029120
+            },
+            "afterOpen": {
+              "rssBytes": 51154944,
+              "processPeakRssBytes": 51068928
+            },
+            "afterThumbnail": {
+              "rssBytes": 51159040,
+              "processPeakRssBytes": 51068928
+            },
+            "afterClose": {
+              "rssBytes": 51159040,
+              "processPeakRssBytes": 51068928
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 2,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 1.415683000232093,
+            "runtimeInit": 0.0,
+            "openMetadata": 6.054519006283954,
+            "thumbnail": 141.4435000042431,
+            "close": 0.008547998731955886,
+            "openThumbnail": 147.49801901052706,
+            "readOpenThumbnail": 148.91370201075915,
+            "readInitOpenThumbnail": 148.91370201075915
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 51159040,
+              "processPeakRssBytes": 51068928
+            },
+            "afterRead": {
+              "rssBytes": 51159040,
+              "processPeakRssBytes": 51068928
+            },
+            "afterOpen": {
+              "rssBytes": 52383744,
+              "processPeakRssBytes": 52379648
+            },
+            "afterThumbnail": {
+              "rssBytes": 52383744,
+              "processPeakRssBytes": 52379648
+            },
+            "afterClose": {
+              "rssBytes": 52383744,
+              "processPeakRssBytes": 52379648
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 3,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 1.2891740043414757,
+            "runtimeInit": 0.0,
+            "openMetadata": 5.222441992373206,
+            "thumbnail": 140.10163200146053,
+            "close": 0.008570001227781177,
+            "openThumbnail": 145.32407399383374,
+            "readOpenThumbnail": 146.6132479981752,
+            "readInitOpenThumbnail": 146.6132479981752
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 52383744,
+              "processPeakRssBytes": 52379648
+            },
+            "afterRead": {
+              "rssBytes": 52383744,
+              "processPeakRssBytes": 52379648
+            },
+            "afterOpen": {
+              "rssBytes": 52416512,
+              "processPeakRssBytes": 52379648
+            },
+            "afterThumbnail": {
+              "rssBytes": 52416512,
+              "processPeakRssBytes": 52379648
+            },
+            "afterClose": {
+              "rssBytes": 52416512,
+              "processPeakRssBytes": 52379648
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        }
+      ],
+      "finalReopenMs": 5.048390012234449,
+      "validation": {
+        "inputIdentityVerifiedEachCycle": true,
+        "actualMetadataVerifiedEachCycle": true,
+        "finalReopenFullMetadataEqual": true,
+        "allHandlesClosed": true,
+        "inputOpenedReadOnly": true
+      },
+      "wholeProcessWallMs": 709.3145479884697
+    },
+    {
+      "backend": "wasm",
+      "runtime": "Node 24.19.0 / V8 13.6.233.17-node.51 / release WASM document bridge",
+      "round": 1,
+      "previewRequest": {
+        "operation": "render_thumbnail_png",
+        "max_w": 960
+      },
+      "samples": [
+        {
+          "cycle": 0,
+          "phase": "fresh",
+          "timingMs": {
+            "fileRead": 4.011029000000001,
+            "runtimeInit": 9.379171,
+            "openMetadata": 183.83643899999998,
+            "thumbnail": 183.881995,
+            "close": 0.13733700000000226,
+            "openThumbnail": 367.718434,
+            "readOpenThumbnail": 371.729463,
+            "readInitOpenThumbnail": 381.108634
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 38928384,
+              "processPeakRssBytes": 38928384,
+              "heapUsedBytes": 7988000,
+              "externalBytes": 3873078,
+              "arrayBufferBytes": 146595,
+              "wasmCapacityBytes": 0,
+              "wasmNativeLiveBytes": null,
+              "wasmBridgeLiveBytes": null
+            },
+            "afterRead": {
+              "rssBytes": 50987008,
+              "processPeakRssBytes": 50987008,
+              "heapUsedBytes": 8036808,
+              "externalBytes": 15829714,
+              "arrayBufferBytes": 12103191,
+              "wasmCapacityBytes": 0,
+              "wasmNativeLiveBytes": null,
+              "wasmBridgeLiveBytes": null
+            },
+            "afterOpen": {
+              "rssBytes": 91901952,
+              "processPeakRssBytes": 93966336,
+              "heapUsedBytes": 8864400,
+              "externalBytes": 83373816,
+              "arrayBufferBytes": 12508195,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 92164096,
+              "processPeakRssBytes": 93966336,
+              "heapUsedBytes": 8916864,
+              "externalBytes": 84083372,
+              "arrayBufferBytes": 13217777,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 100945920,
+              "processPeakRssBytes": 100945920,
+              "heapUsedBytes": 11174312,
+              "externalBytes": 86893849,
+              "arrayBufferBytes": 16028254,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 1,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 5.119754,
+            "runtimeInit": 0,
+            "openMetadata": 166.29761900000005,
+            "thumbnail": 162.22233900000003,
+            "close": 0.018139000000019223,
+            "openThumbnail": 328.5199580000001,
+            "readOpenThumbnail": 333.6397120000001,
+            "readInitOpenThumbnail": 333.6397120000001
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 100945920,
+              "processPeakRssBytes": 100945920,
+              "heapUsedBytes": 11177088,
+              "externalBytes": 86893849,
+              "arrayBufferBytes": 16028254,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterRead": {
+              "rssBytes": 113004544,
+              "processPeakRssBytes": 113004544,
+              "heapUsedBytes": 11180840,
+              "externalBytes": 98850445,
+              "arrayBufferBytes": 27984850,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterOpen": {
+              "rssBytes": 115077120,
+              "processPeakRssBytes": 115077120,
+              "heapUsedBytes": 13463632,
+              "externalBytes": 96105493,
+              "arrayBufferBytes": 25239898,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 115470336,
+              "processPeakRssBytes": 115470336,
+              "heapUsedBytes": 13477648,
+              "externalBytes": 96815075,
+              "arrayBufferBytes": 25949480,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 116617216,
+              "processPeakRssBytes": 116617216,
+              "heapUsedBytes": 13160152,
+              "externalBytes": 99625538,
+              "arrayBufferBytes": 28759943,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 2,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 5.275577999999996,
+            "runtimeInit": 0,
+            "openMetadata": 173.6084400000001,
+            "thumbnail": 161.65747199999987,
+            "close": 0.020301999999901454,
+            "openThumbnail": 335.26591199999996,
+            "readOpenThumbnail": 340.54148999999995,
+            "readInitOpenThumbnail": 340.54148999999995
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 116617216,
+              "processPeakRssBytes": 116617216,
+              "heapUsedBytes": 13371240,
+              "externalBytes": 99625538,
+              "arrayBufferBytes": 28759943,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterRead": {
+              "rssBytes": 128544768,
+              "processPeakRssBytes": 128544768,
+              "heapUsedBytes": 13167552,
+              "externalBytes": 111582134,
+              "arrayBufferBytes": 40716539,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterOpen": {
+              "rssBytes": 103854080,
+              "processPeakRssBytes": 128544768,
+              "heapUsedBytes": 9749528,
+              "externalBytes": 84148901,
+              "arrayBufferBytes": 13283280,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 104247296,
+              "processPeakRssBytes": 128544768,
+              "heapUsedBytes": 9766144,
+              "externalBytes": 84858457,
+              "arrayBufferBytes": 13992862,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 113029120,
+              "processPeakRssBytes": 128544768,
+              "heapUsedBytes": 17755232,
+              "externalBytes": 87734470,
+              "arrayBufferBytes": 16868875,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 3,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 6.5031320000000505,
+            "runtimeInit": 0,
+            "openMetadata": 162.94412599999987,
+            "thumbnail": 161.64045499999997,
+            "close": 0.02087300000016512,
+            "openThumbnail": 324.58458099999984,
+            "readOpenThumbnail": 331.0877129999999,
+            "readInitOpenThumbnail": 331.0877129999999
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 113029120,
+              "processPeakRssBytes": 128544768,
+              "heapUsedBytes": 17756896,
+              "externalBytes": 87734470,
+              "arrayBufferBytes": 16868875,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterRead": {
+              "rssBytes": 124956672,
+              "processPeakRssBytes": 128544768,
+              "heapUsedBytes": 17760928,
+              "externalBytes": 99691066,
+              "arrayBufferBytes": 28825471,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterOpen": {
+              "rssBytes": 115040256,
+              "processPeakRssBytes": 128544768,
+              "heapUsedBytes": 15239496,
+              "externalBytes": 84148901,
+              "arrayBufferBytes": 13283306,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 115040256,
+              "processPeakRssBytes": 128544768,
+              "heapUsedBytes": 15249488,
+              "externalBytes": 84858483,
+              "arrayBufferBytes": 13992888,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 113147904,
+              "processPeakRssBytes": 128544768,
+              "heapUsedBytes": 17576104,
+              "externalBytes": 87668934,
+              "arrayBufferBytes": 16803339,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        }
+      ],
+      "finalReopenMs": 161.37400500000012,
+      "validation": {
+        "inputIdentityVerifiedEachCycle": true,
+        "actualMetadataVerifiedEachCycle": true,
+        "finalReopenFullMetadataEqual": true,
+        "allHandlesClosed": true,
+        "inputOpenedReadOnly": true
+      },
+      "wholeProcessWallMs": 1802.040770999156
+    },
+    {
+      "backend": "wasm",
+      "runtime": "Node 24.19.0 / V8 13.6.233.17-node.51 / release WASM document bridge",
+      "round": 2,
+      "previewRequest": {
+        "operation": "render_thumbnail_png",
+        "max_w": 960
+      },
+      "samples": [
+        {
+          "cycle": 0,
+          "phase": "fresh",
+          "timingMs": {
+            "fileRead": 5.750058000000003,
+            "runtimeInit": 5.507221000000001,
+            "openMetadata": 184.395592,
+            "thumbnail": 178.703886,
+            "close": 0.13591700000000628,
+            "openThumbnail": 363.099478,
+            "readOpenThumbnail": 368.849536,
+            "readInitOpenThumbnail": 374.356757
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 38797312,
+              "processPeakRssBytes": 38797312,
+              "heapUsedBytes": 7973072,
+              "externalBytes": 3873078,
+              "arrayBufferBytes": 146595,
+              "wasmCapacityBytes": 0,
+              "wasmNativeLiveBytes": null,
+              "wasmBridgeLiveBytes": null
+            },
+            "afterRead": {
+              "rssBytes": 50987008,
+              "processPeakRssBytes": 50987008,
+              "heapUsedBytes": 8021880,
+              "externalBytes": 15829714,
+              "arrayBufferBytes": 12103191,
+              "wasmCapacityBytes": 0,
+              "wasmNativeLiveBytes": null,
+              "wasmBridgeLiveBytes": null
+            },
+            "afterOpen": {
+              "rssBytes": 91631616,
+              "processPeakRssBytes": 93675520,
+              "heapUsedBytes": 8864272,
+              "externalBytes": 83373816,
+              "arrayBufferBytes": 12508195,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 92155904,
+              "processPeakRssBytes": 93675520,
+              "heapUsedBytes": 8916736,
+              "externalBytes": 84083372,
+              "arrayBufferBytes": 13217777,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 100937728,
+              "processPeakRssBytes": 100937728,
+              "heapUsedBytes": 11200624,
+              "externalBytes": 86893849,
+              "arrayBufferBytes": 16028254,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 1,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 5.835648999999989,
+            "runtimeInit": 0,
+            "openMetadata": 160.90617400000002,
+            "thumbnail": 157.64216299999998,
+            "close": 0.022881999999981417,
+            "openThumbnail": 318.548337,
+            "readOpenThumbnail": 324.383986,
+            "readInitOpenThumbnail": 324.383986
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 100937728,
+              "processPeakRssBytes": 100937728,
+              "heapUsedBytes": 11203400,
+              "externalBytes": 86893849,
+              "arrayBufferBytes": 16028254,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterRead": {
+              "rssBytes": 112865280,
+              "processPeakRssBytes": 112865280,
+              "heapUsedBytes": 11207152,
+              "externalBytes": 98850445,
+              "arrayBufferBytes": 27984850,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterOpen": {
+              "rssBytes": 115077120,
+              "processPeakRssBytes": 115077120,
+              "heapUsedBytes": 13505048,
+              "externalBytes": 96105493,
+              "arrayBufferBytes": 25239898,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 115208192,
+              "processPeakRssBytes": 115208192,
+              "heapUsedBytes": 13519064,
+              "externalBytes": 96815075,
+              "arrayBufferBytes": 25949480,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 116391936,
+              "processPeakRssBytes": 116391936,
+              "heapUsedBytes": 13201328,
+              "externalBytes": 99625538,
+              "arrayBufferBytes": 28759943,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 2,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 5.952748000000042,
+            "runtimeInit": 0,
+            "openMetadata": 160.626846,
+            "thumbnail": 158.26609400000007,
+            "close": 0.020404999999982465,
+            "openThumbnail": 318.89294000000007,
+            "readOpenThumbnail": 324.8456880000001,
+            "readInitOpenThumbnail": 324.8456880000001
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 116391936,
+              "processPeakRssBytes": 116391936,
+              "heapUsedBytes": 13203552,
+              "externalBytes": 99625538,
+              "arrayBufferBytes": 28759943,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterRead": {
+              "rssBytes": 128319488,
+              "processPeakRssBytes": 128319488,
+              "heapUsedBytes": 13208728,
+              "externalBytes": 111582134,
+              "arrayBufferBytes": 40716539,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterOpen": {
+              "rssBytes": 103731200,
+              "processPeakRssBytes": 128450560,
+              "heapUsedBytes": 9762872,
+              "externalBytes": 84148901,
+              "arrayBufferBytes": 13283280,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 104255488,
+              "processPeakRssBytes": 128450560,
+              "heapUsedBytes": 9779488,
+              "externalBytes": 84858457,
+              "arrayBufferBytes": 13992862,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 112644096,
+              "processPeakRssBytes": 128450560,
+              "heapUsedBytes": 17768488,
+              "externalBytes": 87734470,
+              "arrayBufferBytes": 16868875,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 3,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 6.240586000000121,
+            "runtimeInit": 0,
+            "openMetadata": 158.80780499999992,
+            "thumbnail": 158.61570600000005,
+            "close": 0.01858400000014626,
+            "openThumbnail": 317.42351099999996,
+            "readOpenThumbnail": 323.6640970000001,
+            "readInitOpenThumbnail": 323.6640970000001
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 112644096,
+              "processPeakRssBytes": 128450560,
+              "heapUsedBytes": 17770152,
+              "externalBytes": 87734470,
+              "arrayBufferBytes": 16868875,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterRead": {
+              "rssBytes": 124571648,
+              "processPeakRssBytes": 128450560,
+              "heapUsedBytes": 17774184,
+              "externalBytes": 99691066,
+              "arrayBufferBytes": 28825471,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterOpen": {
+              "rssBytes": 114569216,
+              "processPeakRssBytes": 128450560,
+              "heapUsedBytes": 15218288,
+              "externalBytes": 84148901,
+              "arrayBufferBytes": 13283306,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 114569216,
+              "processPeakRssBytes": 128450560,
+              "heapUsedBytes": 15228280,
+              "externalBytes": 84858483,
+              "arrayBufferBytes": 13992888,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 112672768,
+              "processPeakRssBytes": 128450560,
+              "heapUsedBytes": 17533080,
+              "externalBytes": 87668934,
+              "arrayBufferBytes": 16803339,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        }
+      ],
+      "finalReopenMs": 161.77124200000003,
+      "validation": {
+        "inputIdentityVerifiedEachCycle": true,
+        "actualMetadataVerifiedEachCycle": true,
+        "finalReopenFullMetadataEqual": true,
+        "allHandlesClosed": true,
+        "inputOpenedReadOnly": true
+      },
+      "wholeProcessWallMs": 1768.3608140068827
+    },
+    {
+      "backend": "native",
+      "runtime": "Python 3.12.14 ctypes host / Native C engine",
+      "round": 2,
+      "previewRequest": {
+        "operation": "render_preview_png",
+        "max_w": 1024,
+        "max_h": 1024
+      },
+      "samples": [
+        {
+          "cycle": 0,
+          "phase": "fresh",
+          "timingMs": {
+            "fileRead": 5.209534996538423,
+            "runtimeInit": 0.36934200034011155,
+            "openMetadata": 14.811064989771694,
+            "thumbnail": 138.870365000912,
+            "close": 0.36077100958209485,
+            "openThumbnail": 153.68142999068368,
+            "readOpenThumbnail": 158.8909649872221,
+            "readInitOpenThumbnail": 159.26030698756222
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 10780672,
+              "processPeakRssBytes": 15183872
+            },
+            "afterRead": {
+              "rssBytes": 22769664,
+              "processPeakRssBytes": 22675456
+            },
+            "afterOpen": {
+              "rssBytes": 37253120,
+              "processPeakRssBytes": 49033216
+            },
+            "afterThumbnail": {
+              "rssBytes": 39600128,
+              "processPeakRssBytes": 49033216
+            },
+            "afterClose": {
+              "rssBytes": 29671424,
+              "processPeakRssBytes": 49033216
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 1,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 4.074644995853305,
+            "runtimeInit": 0.0,
+            "openMetadata": 13.086968989227898,
+            "thumbnail": 138.99460500397254,
+            "close": 0.010568997822701931,
+            "openThumbnail": 152.08157399320044,
+            "readOpenThumbnail": 156.15621898905374,
+            "readInitOpenThumbnail": 156.15621898905374
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 29671424,
+              "processPeakRssBytes": 49033216
+            },
+            "afterRead": {
+              "rssBytes": 25251840,
+              "processPeakRssBytes": 49033216
+            },
+            "afterOpen": {
+              "rssBytes": 51159040,
+              "processPeakRssBytes": 51073024
+            },
+            "afterThumbnail": {
+              "rssBytes": 51163136,
+              "processPeakRssBytes": 51073024
+            },
+            "afterClose": {
+              "rssBytes": 51163136,
+              "processPeakRssBytes": 51073024
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 2,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 1.6515379975317046,
+            "runtimeInit": 0.0,
+            "openMetadata": 5.712108002626337,
+            "thumbnail": 139.22048998938408,
+            "close": 0.008478004019707441,
+            "openThumbnail": 144.93259799201041,
+            "readOpenThumbnail": 146.58413598954212,
+            "readInitOpenThumbnail": 146.58413598954212
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 51163136,
+              "processPeakRssBytes": 51073024
+            },
+            "afterRead": {
+              "rssBytes": 51163136,
+              "processPeakRssBytes": 51073024
+            },
+            "afterOpen": {
+              "rssBytes": 52387840,
+              "processPeakRssBytes": 52383744
+            },
+            "afterThumbnail": {
+              "rssBytes": 52387840,
+              "processPeakRssBytes": 52383744
+            },
+            "afterClose": {
+              "rssBytes": 52387840,
+              "processPeakRssBytes": 52383744
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 3,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 1.630455008125864,
+            "runtimeInit": 0.0,
+            "openMetadata": 5.568895998294465,
+            "thumbnail": 137.85911600280087,
+            "close": 0.009048002539202571,
+            "openThumbnail": 143.42801200109534,
+            "readOpenThumbnail": 145.0584670092212,
+            "readInitOpenThumbnail": 145.0584670092212
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 52387840,
+              "processPeakRssBytes": 52383744
+            },
+            "afterRead": {
+              "rssBytes": 52387840,
+              "processPeakRssBytes": 52383744
+            },
+            "afterOpen": {
+              "rssBytes": 52420608,
+              "processPeakRssBytes": 52383744
+            },
+            "afterThumbnail": {
+              "rssBytes": 52420608,
+              "processPeakRssBytes": 52383744
+            },
+            "afterClose": {
+              "rssBytes": 52420608,
+              "processPeakRssBytes": 52383744
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        }
+      ],
+      "finalReopenMs": 5.43368500075303,
+      "validation": {
+        "inputIdentityVerifiedEachCycle": true,
+        "actualMetadataVerifiedEachCycle": true,
+        "finalReopenFullMetadataEqual": true,
+        "allHandlesClosed": true,
+        "inputOpenedReadOnly": true
+      },
+      "wholeProcessWallMs": 697.2900490072789
+    },
+    {
+      "backend": "native",
+      "runtime": "Python 3.12.14 ctypes host / Native C engine",
+      "round": 3,
+      "previewRequest": {
+        "operation": "render_preview_png",
+        "max_w": 1024,
+        "max_h": 1024
+      },
+      "samples": [
+        {
+          "cycle": 0,
+          "phase": "fresh",
+          "timingMs": {
+            "fileRead": 6.310944998404011,
+            "runtimeInit": 0.3682300011860207,
+            "openMetadata": 15.522418994805776,
+            "thumbnail": 141.28240800346248,
+            "close": 0.3136040031677112,
+            "openThumbnail": 156.80482699826825,
+            "readOpenThumbnail": 163.11577199667227,
+            "readInitOpenThumbnail": 163.4840019978583
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 10776576,
+              "processPeakRssBytes": 15183872
+            },
+            "afterRead": {
+              "rssBytes": 22765568,
+              "processPeakRssBytes": 22675456
+            },
+            "afterOpen": {
+              "rssBytes": 37126144,
+              "processPeakRssBytes": 48947200
+            },
+            "afterThumbnail": {
+              "rssBytes": 39534592,
+              "processPeakRssBytes": 48947200
+            },
+            "afterClose": {
+              "rssBytes": 29605888,
+              "processPeakRssBytes": 48947200
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 1,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 4.698156000813469,
+            "runtimeInit": 0.0,
+            "openMetadata": 13.634205999551341,
+            "thumbnail": 143.25031600310467,
+            "close": 0.010926989489234984,
+            "openThumbnail": 156.884522002656,
+            "readOpenThumbnail": 161.58267800346948,
+            "readInitOpenThumbnail": 161.58267800346948
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 29605888,
+              "processPeakRssBytes": 48947200
+            },
+            "afterRead": {
+              "rssBytes": 25186304,
+              "processPeakRssBytes": 48947200
+            },
+            "afterOpen": {
+              "rssBytes": 51093504,
+              "processPeakRssBytes": 50880512
+            },
+            "afterThumbnail": {
+              "rssBytes": 51093504,
+              "processPeakRssBytes": 50880512
+            },
+            "afterClose": {
+              "rssBytes": 51093504,
+              "processPeakRssBytes": 50880512
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 2,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 1.4376979961525649,
+            "runtimeInit": 0.0,
+            "openMetadata": 5.940535993431695,
+            "thumbnail": 147.30674699239898,
+            "close": 0.007604990969412029,
+            "openThumbnail": 153.24728298583068,
+            "readOpenThumbnail": 154.68498098198324,
+            "readInitOpenThumbnail": 154.68498098198324
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 51093504,
+              "processPeakRssBytes": 50880512
+            },
+            "afterRead": {
+              "rssBytes": 51097600,
+              "processPeakRssBytes": 50880512
+            },
+            "afterOpen": {
+              "rssBytes": 52322304,
+              "processPeakRssBytes": 52191232
+            },
+            "afterThumbnail": {
+              "rssBytes": 52322304,
+              "processPeakRssBytes": 52191232
+            },
+            "afterClose": {
+              "rssBytes": 52322304,
+              "processPeakRssBytes": 52191232
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 3,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 1.4504550053970888,
+            "runtimeInit": 0.0,
+            "openMetadata": 5.878568001207896,
+            "thumbnail": 139.82774601026904,
+            "close": 0.00778799585532397,
+            "openThumbnail": 145.70631401147693,
+            "readOpenThumbnail": 147.15676901687402,
+            "readInitOpenThumbnail": 147.15676901687402
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 52322304,
+              "processPeakRssBytes": 52191232
+            },
+            "afterRead": {
+              "rssBytes": 52322304,
+              "processPeakRssBytes": 52191232
+            },
+            "afterOpen": {
+              "rssBytes": 52350976,
+              "processPeakRssBytes": 52191232
+            },
+            "afterThumbnail": {
+              "rssBytes": 52350976,
+              "processPeakRssBytes": 52191232
+            },
+            "afterClose": {
+              "rssBytes": 52350976,
+              "processPeakRssBytes": 52191232
+            }
+          },
+          "preview": {
+            "width": 1024,
+            "height": 292,
+            "bytes": 786221,
+            "signatureCrcAndInflateVerified": true
+          }
+        }
+      ],
+      "finalReopenMs": 5.481426996993832,
+      "validation": {
+        "inputIdentityVerifiedEachCycle": true,
+        "actualMetadataVerifiedEachCycle": true,
+        "finalReopenFullMetadataEqual": true,
+        "allHandlesClosed": true,
+        "inputOpenedReadOnly": true
+      },
+      "wholeProcessWallMs": 721.8633140000748
+    },
+    {
+      "backend": "wasm",
+      "runtime": "Node 24.19.0 / V8 13.6.233.17-node.51 / release WASM document bridge",
+      "round": 3,
+      "previewRequest": {
+        "operation": "render_thumbnail_png",
+        "max_w": 960
+      },
+      "samples": [
+        {
+          "cycle": 0,
+          "phase": "fresh",
+          "timingMs": {
+            "fileRead": 4.744285999999995,
+            "runtimeInit": 5.3999609999999905,
+            "openMetadata": 186.406204,
+            "thumbnail": 181.287487,
+            "close": 0.1429319999999734,
+            "openThumbnail": 367.693691,
+            "readOpenThumbnail": 372.437977,
+            "readInitOpenThumbnail": 377.837938
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 38797312,
+              "processPeakRssBytes": 38797312,
+              "heapUsedBytes": 7972960,
+              "externalBytes": 3873078,
+              "arrayBufferBytes": 146595,
+              "wasmCapacityBytes": 0,
+              "wasmNativeLiveBytes": null,
+              "wasmBridgeLiveBytes": null
+            },
+            "afterRead": {
+              "rssBytes": 50855936,
+              "processPeakRssBytes": 50855936,
+              "heapUsedBytes": 8021768,
+              "externalBytes": 15829714,
+              "arrayBufferBytes": 12103191,
+              "wasmCapacityBytes": 0,
+              "wasmNativeLiveBytes": null,
+              "wasmBridgeLiveBytes": null
+            },
+            "afterOpen": {
+              "rssBytes": 91734016,
+              "processPeakRssBytes": 93999104,
+              "heapUsedBytes": 8876968,
+              "externalBytes": 83373816,
+              "arrayBufferBytes": 12508195,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 87937024,
+              "processPeakRssBytes": 93999104,
+              "heapUsedBytes": 8928752,
+              "externalBytes": 84083372,
+              "arrayBufferBytes": 13217777,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 96587776,
+              "processPeakRssBytes": 96587776,
+              "heapUsedBytes": 11212480,
+              "externalBytes": 86893849,
+              "arrayBufferBytes": 16028254,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 1,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 5.760439000000019,
+            "runtimeInit": 0,
+            "openMetadata": 162.93568899999997,
+            "thumbnail": 164.40111000000002,
+            "close": 0.025933000000009088,
+            "openThumbnail": 327.336799,
+            "readOpenThumbnail": 333.097238,
+            "readInitOpenThumbnail": 333.097238
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 96587776,
+              "processPeakRssBytes": 96587776,
+              "heapUsedBytes": 11215256,
+              "externalBytes": 86893849,
+              "arrayBufferBytes": 16028254,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterRead": {
+              "rssBytes": 108515328,
+              "processPeakRssBytes": 108515328,
+              "heapUsedBytes": 11219008,
+              "externalBytes": 98850445,
+              "arrayBufferBytes": 27984850,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterOpen": {
+              "rssBytes": 110362624,
+              "processPeakRssBytes": 110362624,
+              "heapUsedBytes": 13505208,
+              "externalBytes": 96105493,
+              "arrayBufferBytes": 25239898,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 110886912,
+              "processPeakRssBytes": 110886912,
+              "heapUsedBytes": 13519224,
+              "externalBytes": 96815075,
+              "arrayBufferBytes": 25949480,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 111882240,
+              "processPeakRssBytes": 111882240,
+              "heapUsedBytes": 13223264,
+              "externalBytes": 99625538,
+              "arrayBufferBytes": 28759943,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 2,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 6.5086390000000165,
+            "runtimeInit": 0,
+            "openMetadata": 166.20486900000003,
+            "thumbnail": 168.94230599999992,
+            "close": 0.02440799999999399,
+            "openThumbnail": 335.14717499999995,
+            "readOpenThumbnail": 341.65581399999996,
+            "readInitOpenThumbnail": 341.65581399999996
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 111882240,
+              "processPeakRssBytes": 111882240,
+              "heapUsedBytes": 13226480,
+              "externalBytes": 99625538,
+              "arrayBufferBytes": 28759943,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterRead": {
+              "rssBytes": 123940864,
+              "processPeakRssBytes": 123940864,
+              "heapUsedBytes": 13230664,
+              "externalBytes": 111582134,
+              "arrayBufferBytes": 40716539,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterOpen": {
+              "rssBytes": 130887680,
+              "processPeakRssBytes": 130887680,
+              "heapUsedBytes": 20029648,
+              "externalBytes": 111582160,
+              "arrayBufferBytes": 40716565,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 131149824,
+              "processPeakRssBytes": 131149824,
+              "heapUsedBytes": 20041952,
+              "externalBytes": 112291742,
+              "arrayBufferBytes": 41426147,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 111104000,
+              "processPeakRssBytes": 131805184,
+              "heapUsedBytes": 14324784,
+              "externalBytes": 87734529,
+              "arrayBufferBytes": 16868934,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        },
+        {
+          "cycle": 3,
+          "phase": "warm",
+          "timingMs": {
+            "fileRead": 6.5712720000001354,
+            "runtimeInit": 0,
+            "openMetadata": 166.17387899999994,
+            "thumbnail": 161.0898810000001,
+            "close": 0.017970000000104847,
+            "openThumbnail": 327.26376000000005,
+            "readOpenThumbnail": 333.8350320000002,
+            "readInitOpenThumbnail": 333.8350320000002
+          },
+          "memory": {
+            "beforeRead": {
+              "rssBytes": 111104000,
+              "processPeakRssBytes": 131805184,
+              "heapUsedBytes": 14326448,
+              "externalBytes": 87734529,
+              "arrayBufferBytes": 16868934,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterRead": {
+              "rssBytes": 122376192,
+              "processPeakRssBytes": 131805184,
+              "heapUsedBytes": 14334064,
+              "externalBytes": 99691125,
+              "arrayBufferBytes": 28825530,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterOpen": {
+              "rssBytes": 112254976,
+              "processPeakRssBytes": 131805184,
+              "heapUsedBytes": 15423040,
+              "externalBytes": 84148901,
+              "arrayBufferBytes": 13283306,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterThumbnail": {
+              "rssBytes": 112254976,
+              "processPeakRssBytes": 131805184,
+              "heapUsedBytes": 15433032,
+              "externalBytes": 84858483,
+              "arrayBufferBytes": 13992888,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 12087952,
+              "wasmBridgeLiveBytes": 0
+            },
+            "afterClose": {
+              "rssBytes": 110350336,
+              "processPeakRssBytes": 131805184,
+              "heapUsedBytes": 17747896,
+              "externalBytes": 87668934,
+              "arrayBufferBytes": 16803339,
+              "wasmCapacityBytes": 67108864,
+              "wasmNativeLiveBytes": 0,
+              "wasmBridgeLiveBytes": 0
+            }
+          },
+          "preview": {
+            "width": 960,
+            "height": 274,
+            "bytes": 709549,
+            "signatureCrcAndInflateVerified": true
+          }
+        }
+      ],
+      "finalReopenMs": 163.052995,
+      "validation": {
+        "inputIdentityVerifiedEachCycle": true,
+        "actualMetadataVerifiedEachCycle": true,
+        "finalReopenFullMetadataEqual": true,
+        "allHandlesClosed": true,
+        "inputOpenedReadOnly": true
+      },
+      "wholeProcessWallMs": 1825.6534880056279
+    }
+  ]
+}

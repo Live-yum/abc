@@ -78,6 +78,12 @@ def main():
         if patch["id"] != patch_ref["id"] or patch["baseSourceCommit"] != terra["sourceCommit"]:
             raise ValueError("Local patch does not identify the pinned source base")
         verify_sha_records(ROOT, [patch["patch"]])
+        verify_sha_records(ROOT, patch.get("attributionFiles", []))
+        for removed in patch.get("removedFiles", []):
+            if len(removed["beforeSha256"]) != 64 or not removed["beforeBytes"]:
+                raise ValueError("Removed source omits its original identity")
+            if (terra_root / removed["path"]).exists():
+                raise ValueError(f"Removed source unexpectedly present: {removed['path']}")
         for change in patch["files"]:
             if len(change["beforeSha256"]) != 64 or not change["beforeBytes"]:
                 raise ValueError("Local patch omits its original source identity")

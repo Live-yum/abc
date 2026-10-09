@@ -80,7 +80,6 @@ VaultEntry _copyEntry(VaultEntry entry, {String? sha256, int? size}) =>
 ComputerProvenanceRecord _record(int index, {Uint8List? image, int? pulses}) =>
     ComputerProvenanceRecord(
       wldSha256: index.toRadixString(16).padLeft(64, '0'),
-      twldSha256: (index + 100).toRadixString(16).padLeft(64, '0'),
       programName: '程序-$index.bin',
       programImage: image ?? Uint8List.fromList([index, 0, 0, 0]),
       physicalPulses: pulses,
@@ -91,20 +90,19 @@ Map<String, dynamic> _json([ComputerProvenanceRecord? record]) => jsonDecode(
 ) as Map<String, dynamic>;
 
 void main() {
-  test('exact pair and image metadata survive codec without source bytes', () {
+  test('exact WLD and image metadata survive codec without source bytes', () {
     final record = _record(1, pulses: 12345);
     final encoded = ComputerProvenanceRegistry().register(record).encode();
     final decoded = ComputerProvenanceRegistry.decode(encoded);
-    final restored = decoded.find(record.wldSha256, record.twldSha256)!;
+    final restored = decoded.find(record.wldSha256)!;
     expect(restored.baseProfileSha256, ComputerrariaComputer.sourceSha256);
     expect(restored.programKnown, isTrue);
     expect(restored.programName, '程序-1.bin');
     expect(restored.programImage, [1, 0, 0, 0]);
     expect(restored.physicalPulses, 12345);
     expect(restored.programSha256, record.programSha256);
-    expect(decoded.find(record.wldSha256, _record(2).twldSha256), isNull);
-    expect(decoded.find(_record(2).wldSha256, record.twldSha256), isNull);
-    expect(decoded.find('程序-1.bin', record.twldSha256), isNull);
+    expect(decoded.find(_record(2).wldSha256), isNull);
+    expect(decoded.find('程序-1.bin'), isNull);
     expect(encoded, isNot(contains('worldBytes')));
     expect(encoded, isNot(contains('path')));
   });
@@ -112,7 +110,6 @@ void main() {
   test('verified empty ROM stays distinct from a loaded zero program', () {
     final empty = ComputerProvenanceRecord(
       wldSha256: 'a' * 64,
-      twldSha256: 'b' * 64,
       programName: null,
       programImage: Uint8List(0),
     );
@@ -131,7 +128,7 @@ void main() {
     final registry = ComputerProvenanceRegistry().register(record);
     input[0] = 0;
     record.programImage.fillRange(0, 4, 9);
-    registry.find(record.wldSha256, record.twldSha256)!.programImage[2] = 0;
+    registry.find(record.wldSha256)!.programImage[2] = 0;
     expect(record.programImage, [1, 0, 255, 0]);
     expect(() => registry.records.add(_record(2)), throwsUnsupportedError);
     final restored = ComputerProvenanceRegistry.decode(registry.encode());
@@ -155,32 +152,23 @@ void main() {
     expect(writes, [x, y, 0, 0]);
   });
 
-  test(
-    'duplicates replace and refresh age; oldest pair eviction is stable',
-    () {
-      var registry = ComputerProvenanceRegistry();
-      for (var index = 1; index <= 8; index++) {
-        registry = registry.register(_record(index));
-      }
-      registry = registry.register(_record(1, pulses: 17));
-      expect(registry.records.length, 8);
-      expect(registry.records.last.physicalPulses, 17);
-      registry = registry.register(_record(9));
-      expect(registry.records.length, 8);
-      expect(
-        registry.find(_record(2).wldSha256, _record(2).twldSha256),
-        isNull,
-      );
-      expect(
-        registry.find(_record(1).wldSha256, _record(1).twldSha256),
-        isNotNull,
-      );
-      expect(
-        ComputerProvenanceRegistry.decode(registry.encode()).encode(),
-        registry.encode(),
-      );
-    },
-  );
+  test('duplicates replace and refresh age; oldest WLD eviction is stable', () {
+    var registry = ComputerProvenanceRegistry();
+    for (var index = 1; index <= 8; index++) {
+      registry = registry.register(_record(index));
+    }
+    registry = registry.register(_record(1, pulses: 17));
+    expect(registry.records.length, 8);
+    expect(registry.records.last.physicalPulses, 17);
+    registry = registry.register(_record(9));
+    expect(registry.records.length, 8);
+    expect(registry.find(_record(2).wldSha256), isNull);
+    expect(registry.find(_record(1).wldSha256), isNotNull);
+    expect(
+      ComputerProvenanceRegistry.decode(registry.encode()).encode(),
+      registry.encode(),
+    );
+  });
 
   test('eight maximum ROM records fit the bounded JSON budget', () {
     var registry = ComputerProvenanceRegistry();
@@ -210,7 +198,6 @@ void main() {
         expect(
           () => ComputerProvenanceRecord(
             wldSha256: 'a' * 64,
-            twldSha256: 'b' * 64,
             programName: name,
             programImage: Uint8List(4),
           ),
@@ -223,7 +210,6 @@ void main() {
       expect(
         () => ComputerProvenanceRecord(
           wldSha256: 'A' * 64,
-          twldSha256: 'b' * 64,
           programName: null,
           programImage: Uint8List(0),
         ),
@@ -232,7 +218,6 @@ void main() {
       expect(
         () => ComputerProvenanceRecord(
           wldSha256: 'a' * 64,
-          twldSha256: 'b' * 64,
           programName: null,
           programImage: Uint8List(4),
         ),
@@ -246,8 +231,8 @@ void main() {
     () {
       final mutations = <void Function(Map<String, dynamic>)>[
         (j) => j['format'] = 'other',
-        (j) => j['version'] = 2,
-        (j) => j['version'] = 1.0,
+        (j) => j['version'] = 1,
+        (j) => j['version'] = 2.0,
         (j) => j['baseProfileSha256'] = 'a' * 64,
         (j) => j['extra'] = true,
         (j) => j['records'] = {},
@@ -281,7 +266,6 @@ void main() {
     () {
       final changes = <String, Object?>{
         'wldSha256': 'A' * 64,
-        'twldSha256': 'b' * 63,
         'programName': 12,
         'programKnown': false,
         'programLength': 3,
@@ -315,14 +299,39 @@ void main() {
     expect(store.available, isTrue);
     await store.register(record);
     await store.load();
-    expect(store.find(record.wldSha256, record.twldSha256), same(record));
-    expect(
-      ComputerProvenanceStore().find(record.wldSha256, record.twldSha256),
-      isNull,
-    );
+    expect(store.find(record.wldSha256), same(record));
+    expect(ComputerProvenanceStore().find(record.wldSha256), isNull);
   });
 
-  test('pair stays invisible until the persistent put has completed', () async {
+  test(
+    'legacy provenance remains private and cannot identify a WLD export',
+    () async {
+      final record = _record(1);
+      final vault = _MemoryVault();
+      final legacy = _json(record)..['version'] = 1;
+      final bytes = Uint8List.fromList(utf8.encode(jsonEncode(legacy)));
+      final entry = VaultEntry(
+        id: 'preferences-computer-provenance-v1-00000000000000000001',
+        name: 'Legacy computer provenance',
+        kind: ComputerProvenanceStore.entryKind,
+        sha256: crypto.sha256.convert(bytes).toString(),
+        size: bytes.length,
+        modified: DateTime.utc(2026, 1, 1),
+      );
+      await vault.put(entry, bytes);
+      final store = ComputerProvenanceStore(vault: vault);
+      await store.load();
+      expect(ComputerProvenanceStore.isEntry(entry), isTrue);
+      expect(store.available, isTrue);
+      expect(store.find(record.wldSha256), isNull);
+      await store.register(_record(2));
+      expect(vault.entries.containsKey(entry.id), isTrue);
+      expect(store.find(record.wldSha256), isNull);
+      expect(store.find(_record(2).wldSha256), isNotNull);
+    },
+  );
+
+  test('WLD stays invisible until the persistent put has completed', () async {
     final vault = _MemoryVault()..holdPut = Completer<void>();
     final store = ComputerProvenanceStore(vault: vault);
     await store.load();
@@ -331,10 +340,10 @@ void main() {
     while (vault.putCalls == 0) {
       await Future<void>.delayed(Duration.zero);
     }
-    expect(store.find(record.wldSha256, record.twldSha256), isNull);
+    expect(store.find(record.wldSha256), isNull);
     vault.holdPut!.complete();
     await saving;
-    expect(store.find(record.wldSha256, record.twldSha256), isNotNull);
+    expect(store.find(record.wldSha256), isNotNull);
     final reopened = ComputerProvenanceStore(vault: vault);
     await reopened.load();
     expect(reopened.registry.encode(), store.registry.encode());
@@ -345,7 +354,7 @@ void main() {
     );
   });
 
-  test('committed pair stays invisible until read-back is verified', () async {
+  test('committed WLD stays invisible until read-back is verified', () async {
     final vault = _MemoryVault()..holdRead = Completer<void>();
     final store = ComputerProvenanceStore(vault: vault);
     await store.load();
@@ -355,10 +364,10 @@ void main() {
       await Future<void>.delayed(Duration.zero);
     }
     expect(vault.entries.length, 1);
-    expect(store.find(record.wldSha256, record.twldSha256), isNull);
+    expect(store.find(record.wldSha256), isNull);
     vault.holdRead!.complete();
     await saving;
-    expect(store.find(record.wldSha256, record.twldSha256), isNotNull);
+    expect(store.find(record.wldSha256), isNotNull);
   });
 
   for (final failure in ['put', 'afterPut', 'corruptPut', 'metadata']) {
@@ -373,12 +382,12 @@ void main() {
       await expectLater(store.register(record), throwsA(isA<VaultException>()));
       expect(store.available, isFalse);
       expect(store.registry.records, isEmpty);
-      expect(store.find(record.wldSha256, record.twldSha256), isNull);
+      expect(store.find(record.wldSha256), isNull);
       expect(store.diagnostic, contains('普通世界'));
       if (failure == 'afterPut') {
         vault.failAfterPut = false;
         await store.load();
-        expect(store.find(record.wldSha256, record.twldSha256), isNotNull);
+        expect(store.find(record.wldSha256), isNotNull);
         expect(store.error, isNull);
       }
     });
@@ -414,7 +423,7 @@ void main() {
         await expectLater(store.load(), throwsA(isA<Exception>()));
         expect(store.available, isFalse);
         expect(store.registry.records, isEmpty);
-        expect(store.find(record.wldSha256, record.twldSha256), isNull);
+        expect(store.find(record.wldSha256), isNull);
       },
     );
   }
@@ -441,7 +450,7 @@ void main() {
       final latest = vault.entries.keys.toList()..sort();
       vault.data[latest.last]![0] ^= 1;
       await expectLater(store.load(), throwsA(isA<VaultException>()));
-      expect(store.find(_record(1).wldSha256, _record(1).twldSha256), isNull);
+      expect(store.find(_record(1).wldSha256), isNull);
       expect(store.available, isFalse);
     },
   );

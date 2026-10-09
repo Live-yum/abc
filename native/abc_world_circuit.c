@@ -7,7 +7,7 @@ extern void* tx_bridge_native_alloc(uint32_t);
 extern void tx_bridge_native_free(void*);
 _Static_assert(sizeof(((TerraCircuitWorldEvent*)0)->data_ptr)==sizeof(uintptr_t),"Apply private native pointer-safety patch before building");
 _Static_assert(sizeof(((TerraCircuitWorldCommand*)0)->data_ptr)==sizeof(uintptr_t),"Apply private native pointer-safety patch before building");
-int32_t abc_world_circuit_begin(uint32_t w,uint32_t s,uint32_t t,uint32_t n,uint32_t b,uint32_t* h){return terra_circuit_world_begin(w,s,t,n,b,h);}
+int32_t abc_world_circuit_begin(uint32_t w,uint32_t s,uint32_t b,uint32_t* h){return terra_circuit_world_begin(w,s,b,h);}
 int32_t abc_world_circuit_step(uint32_t h,uint32_t work,uint32_t* v,const uint8_t** data){
  if(!v||!data)return -1;TerraCircuitWorldEvent e={0};*data=NULL;
  int32_t s=terra_circuit_world_step(h,work,&e);if(s<0)return s;

@@ -67,7 +67,6 @@ abstract interface class WorldCircuitSourceBackend
     implements WorldCircuitBackend {
   Future<WorldCircuitResult> openWorldCircuitSource(
     WorldCircuitSource world, {
-    WorldCircuitSource? twld,
     void Function(WorldCircuitProgress)? onProgress,
   });
   Future<WorldCircuitProgress?> worldCircuitProgress();
@@ -81,10 +80,7 @@ abstract interface class WorldCircuitSourceBackend
 /// Real whole-world wiring VM. Sessions retain an immutable original; save
 /// returns a candidate WLD for normal validation/adoption, never overwrites it.
 abstract interface class WorldCircuitBackend {
-  Future<WorldCircuitResult> openWorldCircuit(
-    Uint8List world, {
-    Uint8List? twld,
-  });
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List world);
   Future<WorldCircuitResult> commandWorldCircuit(
     int session,
     WorldCircuitCommand command,
@@ -101,6 +97,16 @@ abstract interface class WorldCircuitComputerBackend
     WorldCircuitCommand clock,
     WorldCircuitCommand pixels,
   );
+}
+
+/// A successful batch completion must follow a real external-owner event
+/// (such as a dedicated Worker's onmessage), never only a completed Future.
+/// This permits one next batch without inserting a redundant host Timer.
+/// Wrappers must forward the wrapped owner's actual capability. Test doubles
+/// and native backends retain timer scheduling unless explicitly supported.
+abstract interface class WorldCircuitExternalOwnerBackend
+    implements WorldCircuitComputerBackend {
+  bool get completesComputerBatchFromExternalEvent;
 }
 
 class WorldCircuitComputerFrame {
@@ -132,7 +138,7 @@ class WorldCircuitCommand {
     int stride = 1,
     bool walls = false,
   }) => WorldCircuitCommand._([
-    1,
+    2,
     1,
     x,
     y,
@@ -154,7 +160,7 @@ class WorldCircuitCommand {
   /// absent. Records have the same coordinate/type/frame layout as viewport.
   factory WorldCircuitCommand.pixels(int x, int y, int width, int height) =>
       WorldCircuitCommand._([
-        1,
+        2,
         9,
         x,
         y,
@@ -172,11 +178,12 @@ class WorldCircuitCommand {
         0,
       ]);
 
-  /// Optional equivalent device-dedup fast path. The backend accepts changes
-  /// only while idle; callers pause and drain queued physical pulses first.
+  /// Enables device deduplication and WireHead-style PixelBox pairing within
+  /// a gate wave. Future pixel results can differ from the vanilla rules.
+  /// The backend requires supported topology and an idle, drained session.
   factory WorldCircuitCommand.optimization(bool enabled) =>
       WorldCircuitCommand._([
-        1,
+        2,
         10,
         0,
         0,
@@ -202,7 +209,7 @@ class WorldCircuitCommand {
     int pulses = 1,
     bool hitSwitch = true,
   }) => WorldCircuitCommand._([
-    1,
+    2,
     2,
     x,
     y,
@@ -220,7 +227,7 @@ class WorldCircuitCommand {
     0,
   ]);
   factory WorldCircuitCommand.ticks(int count) => WorldCircuitCommand._([
-    1,
+    2,
     3,
     0,
     0,
@@ -239,7 +246,7 @@ class WorldCircuitCommand {
   ]);
   factory WorldCircuitCommand.lamps(List<int> records, {bool write = false}) =>
       WorldCircuitCommand._([
-        1,
+        2,
         write ? 5 : 4,
         0,
         0,
@@ -257,7 +264,7 @@ class WorldCircuitCommand {
         0,
       ], records);
   factory WorldCircuitCommand.save() =>
-      WorldCircuitCommand._([1, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 5, 0, 0]);
+      WorldCircuitCommand._([2, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0]);
 
   /// Geometry is a verified four-word record per occupied object cell. The
   /// engine retains the first set for this session; subsequent pages omit it.
@@ -266,7 +273,7 @@ class WorldCircuitCommand {
     int count = 256,
     List<int> geometry = const [],
   }) => WorldCircuitCommand._([
-    1,
+    2,
     7,
     offset,
     0,
@@ -291,7 +298,7 @@ class WorldCircuitCommand {
     int maxObjectBytes = 4 * 1024 * 1024,
     int maxObjects = 32768,
   }) => WorldCircuitCommand._([
-    1,
+    2,
     8,
     0,
     0,
@@ -318,9 +325,8 @@ class WorldCircuitResult {
   final List<int> stats;
   final Uint8List records;
   final Uint8List? world;
-  final Uint8List? twld;
-  final WorldCircuitSource? worldSource, twldSource;
-  final String? sourceSha256, twldSourceSha256;
+  final WorldCircuitSource? worldSource;
+  final String? sourceSha256;
 
   /// The terminal READY metadata, not a RESULT batch's page count.
   final int resultKind, resultCount, reserved;
@@ -330,11 +336,8 @@ class WorldCircuitResult {
     this.stats,
     this.records, {
     this.world,
-    this.twld,
     this.worldSource,
-    this.twldSource,
     this.sourceSha256,
-    this.twldSourceSha256,
     this.resultKind = 0,
     this.resultCount = 0,
     this.reserved = 0,
@@ -347,15 +350,10 @@ class WorldCircuitResult {
         (map['stats'] as List).cast<int>(),
         map['records'] as Uint8List,
         world: map['world'] as Uint8List?,
-        twld: map['twld'] as Uint8List?,
         worldSource: map['worldSource'] is Map
             ? WorldCircuitSource.fromMap(map['worldSource'] as Map)
             : null,
-        twldSource: map['twldSource'] is Map
-            ? WorldCircuitSource.fromMap(map['twldSource'] as Map)
-            : null,
         sourceSha256: map['sourceSha256'] as String?,
-        twldSourceSha256: map['twldSourceSha256'] as String?,
         resultKind: map['resultKind'] as int? ?? 0,
         resultCount: map['resultCount'] as int? ?? 0,
         reserved: map['reserved'] as int? ?? 0,
@@ -369,8 +367,10 @@ class WorldCircuitResult {
   int get devices => stats[11];
   int get networks => stats[13];
   int get ticks => stats[18] + (stats[19] << 32);
-  bool get hasWireHeadPixels => resultKind != 6 && (reserved & 1) != 0;
   bool get circuitOptimizationEnabled => resultKind != 6 && (reserved & 2) != 0;
+  bool get circuitOptimizationSupported =>
+      resultKind != 6 && (reserved & 4) != 0;
+  bool get wireHeadPixelRulesEnabled => resultKind != 6 && (reserved & 8) != 0;
   int get activeBytes => stats[16];
   int get peakBytes => stats[17];
   int get netPulses => stats[20] + (stats[21] << 32);
@@ -380,10 +380,11 @@ class WorldCircuitResult {
 /// Wire validation is shared by command construction and the isolate boundary.
 void validateWorldCircuitCommand(List<int> words, List<int> records) {
   if (words.length != 16 ||
-      words[0] != 1 ||
+      words[0] != 2 ||
       words[1] < 1 ||
       words[1] > 10 ||
       words[9] != 0 ||
+      (words[1] != 8 && words[13] != 0) ||
       words[14] != 0 ||
       words[15] != 0 ||
       words[10] * 4 != records.length ||

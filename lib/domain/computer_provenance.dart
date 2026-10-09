@@ -26,24 +26,22 @@ Map<String, dynamic> _object(Object? value, Set<String> keys) {
   return value;
 }
 
-/// Local evidence for one exact app-issued WLD/TWLD pair. Names and paths are
+/// Local evidence for one exact app-issued WLD. Names and paths are
 /// never identities. The image is the known ROM extent, including word padding,
 /// so replacing it later can clear the previous program's entire tail.
 final class ComputerProvenanceRecord {
   final String wldSha256;
-  final String twldSha256;
   final String? programName;
   final int? physicalPulses;
   final Uint8List _programImage;
 
   ComputerProvenanceRecord({
     required this.wldSha256,
-    required this.twldSha256,
     required this.programName,
     required Uint8List programImage,
     this.physicalPulses,
   }) : _programImage = _copyProgram(programImage) {
-    if (!_digest(wldSha256) || !_digest(twldSha256)) {
+    if (!_digest(wldSha256)) {
       throw const FormatException('计算机导出来源必须包含完整的小写 SHA-256。');
     }
     if ((programName == null) != _programImage.isEmpty) {
@@ -68,12 +66,10 @@ final class ComputerProvenanceRecord {
   String get programSha256 => crypto.sha256.convert(_programImage).toString();
   Uint8List get programImage => Uint8List.fromList(_programImage);
 
-  bool matches(String wld, String twld) =>
-      wldSha256 == wld && twldSha256 == twld;
+  bool matches(String wld) => wldSha256 == wld;
 
   Map<String, Object?> toJson() => {
     'wldSha256': wldSha256,
-    'twldSha256': twldSha256,
     'programKnown': programKnown,
     'programName': programName,
     'programLength': programLength,
@@ -85,7 +81,6 @@ final class ComputerProvenanceRecord {
   factory ComputerProvenanceRecord.fromJson(Object? value) {
     final json = _object(value, {
       'wldSha256',
-      'twldSha256',
       'programKnown',
       'programName',
       'programLength',
@@ -98,7 +93,6 @@ final class ComputerProvenanceRecord {
     final name = json['programName'];
     final pulses = json['physicalPulses'];
     if (!_digest(json['wldSha256']) ||
-        !_digest(json['twldSha256']) ||
         !_digest(json['programSha256']) ||
         !json.containsKey('programName') ||
         (name != null && name is! String) ||
@@ -121,7 +115,6 @@ final class ComputerProvenanceRecord {
     }
     return ComputerProvenanceRecord(
       wldSha256: json['wldSha256'] as String,
-      twldSha256: json['twldSha256'] as String,
       programName: name as String?,
       programImage: image,
       physicalPulses: pulses as int?,
@@ -130,10 +123,10 @@ final class ComputerProvenanceRecord {
 }
 
 /// Bounded, ordered evidence. Oldest means earliest registration, independent
-/// of the system clock; replacing an exact pair moves it to the newest slot.
+/// of the system clock; replacing an exact world moves it to the newest slot.
 class ComputerProvenanceRegistry {
   static const format = 'terraforge.computer-provenance';
-  static const version = 1;
+  static const version = 2;
   static const maxRecords = 8;
   static const maxJsonBytes = 9 * 1024 * 1024;
   final List<ComputerProvenanceRecord> records;
@@ -142,18 +135,16 @@ class ComputerProvenanceRegistry {
   ComputerProvenanceRegistry._(Iterable<ComputerProvenanceRecord> records)
     : records = List.unmodifiable(records);
 
-  ComputerProvenanceRecord? find(String wldSha256, String twldSha256) {
+  ComputerProvenanceRecord? find(String wldSha256) {
     for (final record in records) {
-      if (record.matches(wldSha256, twldSha256)) return record;
+      if (record.matches(wldSha256)) return record;
     }
     return null;
   }
 
   ComputerProvenanceRegistry register(ComputerProvenanceRecord record) {
     final next = [
-      ...records.where(
-        (previous) => !previous.matches(record.wldSha256, record.twldSha256),
-      ),
+      ...records.where((previous) => !previous.matches(record.wldSha256)),
       record,
     ];
     return ComputerProvenanceRegistry._(
@@ -197,10 +188,8 @@ class ComputerProvenanceRegistry {
     final records = <ComputerProvenanceRecord>[];
     for (final entry in entries) {
       final record = ComputerProvenanceRecord.fromJson(entry);
-      if (records.any(
-        (previous) => previous.matches(record.wldSha256, record.twldSha256),
-      )) {
-        throw const FormatException('计算机导出来源包含重复的文件对。');
+      if (records.any((previous) => previous.matches(record.wldSha256))) {
+        throw const FormatException('计算机导出来源包含重复的世界文件。');
       }
       records.add(record);
     }
@@ -208,15 +197,15 @@ class ComputerProvenanceRegistry {
   }
 }
 
-/// Private local persistence only. Call register only after both exported files
-/// were saved successfully from a verified, complete computer session.
+/// Private local persistence only. Call register only after the exported WLD
+/// was saved successfully from a verified, complete computer session.
 ///
 /// LocalVault records are immutable. A new snapshot is verified before old
 /// snapshots are pruned or it becomes visible. There is normally one snapshot;
 /// an interrupted commit can leave two. Before another commit, pruning must
 /// succeed so repeated storage failures cannot grow an unbounded history.
 class ComputerProvenanceStore {
-  static const entryPrefix = 'preferences-computer-provenance-v1-';
+  static const entryPrefix = 'preferences-computer-provenance-v2-';
   static const entryKind = 'computer-provenance';
   static final _gates = Expando<_StoreGate>();
   final LocalVault? vault;
@@ -233,10 +222,11 @@ class ComputerProvenanceStore {
   String? get diagnostic =>
       _error == null ? null : '本机计算机导出来源记录不可用；导入世界仍按普通世界处理。$_error';
 
-  static bool isEntry(VaultEntry entry) => entry.id.startsWith(entryPrefix);
+  static bool isEntry(VaultEntry entry) =>
+      entry.id.startsWith('preferences-computer-provenance-');
 
-  ComputerProvenanceRecord? find(String wldSha256, String twldSha256) =>
-      _available ? _registry.find(wldSha256, twldSha256) : null;
+  ComputerProvenanceRecord? find(String wldSha256) =>
+      _available ? _registry.find(wldSha256) : null;
 
   Future<void> load() => _run(() async {
     if (vault == null) return;
@@ -310,7 +300,9 @@ class ComputerProvenanceStore {
   }
 
   Future<List<VaultEntry>> _entries() async {
-    final entries = (await vault!.list()).where(isEntry).toList();
+    final entries = (await vault!.list())
+        .where((entry) => entry.id.startsWith(entryPrefix))
+        .toList();
     final ids = <String>{};
     for (final entry in entries) {
       _sequence(entry);

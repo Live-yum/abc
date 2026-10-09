@@ -87,7 +87,7 @@
 
 - 证据：`tool/test_circuit_rules.mjs` 比较固定原模块、Web bundle 与 Native 传输 shim，1364 次调用、15 示例/1180 模拟包/12 次结构变化一致，结束时无残留 traversal handles 或 callback buffers。`native/circuit_rules_corpus_test.dart` 用真实 Linux QuickJS/FFI 在 44 秒内重放全部 244 个记录案例，包含新增预览/提交/取消/失效/预算/失败恢复；示例模拟只保留各示例前四命令及 reset，不能写成 Native 重放全部 1180 包。`native/circuit_rules_bundle_test.dart` 另运行全部 15 示例。10 项 `test/web/circuit_rules_lifecycle.cjs` 验证队列、限额、启动失败、取消、超时、释放和重置；40 项 actor/UI/导航专项覆盖可达交互。
 - **完整编辑器预览已实现并验证**：面板通过 `rulesPreviewRoute/rulesPreviewNetwork/rulesCommitPreview/rulesCancelPreview` 调用 facade 的原 `CircuitEditor.route`/`traceNetwork`，不修改参考寻路/拓扑算法。预览显示逐色覆盖和数量，确认绑定文档 ID/代次/revision/token，一次提交形成一条 undo；取消、后续编辑、模拟、重置、导入、关闭使旧计划失效。最多 60000 格，60001 格拒绝。证明覆盖三种 junction 样式、pixel 方向、多格占用与支撑、未选择线色保留、防意外短接、不可达路径、重复/伪造/过期确认和精确 undo/redo。独立单格沙盒不作为此完整规则路径的替代证据；目标平台和实际浏览器交互仍分开验收。
-- 整图 WLD/TWLD 的 TCW 会话是第三条独立路径，保留触发/60 Hz 调度/保存/回读；它不是 `viewer-terralogic` 文件编辑器，也不由完整器件库测试自动获得所有游戏机制的验证。
+- 整图 WLD 的 TCW 会话是第三条独立路径，保留触发/60 Hz 调度/保存/回读；它不是 `viewer-terralogic` 文件编辑器，也不由完整器件库测试自动获得所有游戏机制的验证。
 - 较早布线快照全套已覆盖“恢复后未保存标记直到导出成功才清除”和“导航离开时幂等暂停”的生命周期回归；取消导出与忙碌中的暂停均有专门测试。Android/iOS/macOS 嵌入式 JS 运行与真机交互尚未验证。
 
 ## 用户动作矩阵

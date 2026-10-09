@@ -105,7 +105,7 @@ class Workspace extends TerraController {
   WorldCircuitSession? _worldCircuit;
   Future<void>? _worldCircuitClosing;
   bool _closingWorkspace = false, _disposed = false;
-  WorldCircuitSource? _circuitSource, _circuitCompanion;
+  WorldCircuitSource? _circuitSource;
   int _circuitImportGeneration = 0;
   bool _circuitImporting = false;
   bool _circuitCancelling = false;
@@ -495,11 +495,9 @@ class Workspace extends TerraController {
               worldCircuitBackend is WorldCircuitSourceBackend,
           'sourceName': _circuitSource?.name,
           'sourceBytes': _circuitSource?.length,
-          'companionName': _circuitCompanion?.name,
           'importing': _circuitImporting,
           'cancelling': _circuitCancelling,
           'streamed': _worldCircuit?.streamed ?? false,
-          'profile': _worldCircuit?.compatibilityProfile ?? false,
           'computerVerified': _worldCircuit?.computerVerified ?? false,
           'canRunComputer': _worldCircuit?.canRunComputer ?? false,
           'programName': _worldCircuit?.programName,
@@ -516,15 +514,16 @@ class Workspace extends TerraController {
           'displayedFrames': _worldCircuit?.displayedFrames ?? 0,
           'displayFrames': _worldCircuit?.displayFrames ?? const {},
           'displayIdentity': _worldCircuit?.displayIdentity,
-          'selectedDisplay': _worldCircuit?.selectedDisplay.colored == true
-              ? 'color'
-              : 'mono',
           'progress': _worldCircuit?.progress,
           'keyboardVerified': _worldCircuit?.computerVerified ?? false,
           'heldKeys': _worldCircuit?.heldKeys.toList() ?? const <String>[],
           'busy': _busy || (_worldCircuit?.busy ?? false),
           'running': _worldCircuit?.running ?? false,
           'optimizationEnabled': _worldCircuit?.optimizationEnabled ?? false,
+          'optimizationSupported':
+              _worldCircuit?.optimizationSupported ?? false,
+          'wireHeadPixelRulesEnabled':
+              _worldCircuit?.wireHeadPixelRulesEnabled ?? false,
           'dirty': _worldCircuit?.dirty ?? false,
           'error': _worldCircuit?.error?.toString(),
           'width': _worldCircuit?.result?.width,
@@ -763,18 +762,13 @@ class Workspace extends TerraController {
         case 'worldOverlay':
           await _readWorldOverlay(args);
         case 'worldCircuitChooseWorld':
-          await _chooseCircuitSource(companion: false);
-        case 'worldCircuitChooseTwld':
-          await _chooseCircuitSource(companion: true);
-        case 'worldCircuitClearTwld':
-          if (_worldCircuit != null) throw const EngineException('请先关闭电路会话。');
-          _circuitCompanion = null;
+          await _chooseCircuitSource();
         case 'worldCircuitImport':
           await _importCircuitSource();
         case 'worldCircuitLoadPong':
           final session = _worldCircuit;
           if (session == null || !session.computerVerified) {
-            throw const EngineException('请先核验完整计算机和配套 TWLD。');
+            throw const EngineException('请先核验完整 WLD 计算机。');
           }
           session.pause();
           final asset = await rootBundle.load('assets/computer/pong.bin');
@@ -793,7 +787,7 @@ class Workspace extends TerraController {
         case 'worldCircuitLoadProgram':
           final session = _worldCircuit;
           if (session == null || !session.computerVerified) {
-            throw const EngineException('请先核验完整计算机和配套 TWLD。');
+            throw const EngineException('请先核验完整 WLD 计算机。');
           }
           session.pause();
           final program = await files.pick('computerProgram');
@@ -801,8 +795,6 @@ class Workspace extends TerraController {
             await session.loadProgram(program.name, program.bytes);
             _status = '已将 ${program.name} 写入实际 ROM 灯位，并通过物理控制复位到地址 0。';
           }
-        case 'worldCircuitSelectDisplay':
-          await _worldCircuit?.selectComputerDisplay(args['color'] == true);
         case 'worldCircuitRefreshDisplay':
           await _worldCircuit?.refreshComputerDisplays();
         case 'worldCircuitOpen':
@@ -832,8 +824,9 @@ class Workspace extends TerraController {
           final session = _worldCircuit;
           if (session == null) throw const EngineException('请先载入世界电路。');
           await session.setOptimization(args['enabled'] == true);
-          _status =
-              '电路优化已${session.optimizationEnabled ? '开启' : '关闭'}，现有状态保留；可继续运行。';
+          _status = session.optimizationEnabled
+              ? '电路优化已开启：设备去重与 WireHead 式像素规则。当前 ROM 和帧保留，后续运行结果可能不同。'
+              : '电路优化已关闭：使用原版像素规则。当前 ROM 和帧保留，后续运行结果可能不同。';
         case 'worldCircuitStep':
           if (_worldCircuit?.computerVerified == true) {
             await _worldCircuit!.stepComputer(
@@ -2388,18 +2381,12 @@ class Workspace extends TerraController {
     notifyListeners();
   }
 
-  Future<void> _chooseCircuitSource({required bool companion}) async {
+  Future<void> _chooseCircuitSource() async {
     if (_worldCircuit != null) throw const EngineException('请先关闭当前电路会话。');
     final generation = ++_circuitImportGeneration;
-    final source = await worldCircuitFiles.pick(companion: companion);
+    final source = await worldCircuitFiles.pick();
     if (generation != _circuitImportGeneration || source == null) return;
-    if (companion) {
-      _circuitCompanion = source;
-    } else {
-      _circuitSource = source;
-      // A newly selected WLD must be deliberately paired again.
-      _circuitCompanion = null;
-    }
+    _circuitSource = source;
     _status = '已选择 ${source.name}；导入时读取实际文件内容。';
   }
 
@@ -2409,7 +2396,7 @@ class Workspace extends TerraController {
     try {
       await _computerProvenance.load();
     } catch (_) {
-      /* Original known worlds still work; derived pairs fail closed. */
+      /* Original known worlds still work; derived worlds fail closed. */
     }
   }
 
@@ -2428,7 +2415,6 @@ class Workspace extends TerraController {
     final session = WorldCircuitSession.fromSource(
       backend,
       source,
-      companion: _circuitCompanion,
       hostStages: hostStages,
     );
     _worldCircuit = session;
@@ -2438,16 +2424,13 @@ class Workspace extends TerraController {
       if (generation != _circuitImportGeneration) return;
       final opened = session.result!;
       await session.verifyComputer(
-        provenance: _computerProvenance.find(
-          opened.sourceSha256 ?? '',
-          opened.twldSourceSha256 ?? '',
-        ),
+        provenance: _computerProvenance.find(opened.sourceSha256 ?? ''),
       );
       if (generation != _circuitImportGeneration) return;
       if (session.computerVerified) {
         _status = session.restoredFromExport
-            ? '已核验本机导出的配对文件，恢复实际 ROM、CPU、显示器状态，可继续运行。'
-            : '已核验完整 Computerraria 与配套 TWLD。原始 ROM 为空，请加载 RV32I 程序。';
+            ? '已核验本机导出的 WLD，恢复实际 ROM、CPU、显示器状态，可继续运行。'
+            : '已核验完整 Computerraria WLD。原始 ROM 为空，请加载 RV32I 程序。';
         _circuitViewport = {};
       } else {
         final result = session.result!;
@@ -2457,9 +2440,7 @@ class Workspace extends TerraController {
           'width': result.width < 48 ? result.width : 48,
           'height': result.height < 32 ? result.height : 32,
         });
-        _status = session.result!.hasWireHeadPixels
-            ? '已载入完整世界；该文件不匹配已核验的计算机布局，可查看实际电路。'
-            : '已载入 WLD 原版电路规则。Computerraria 显示器需要匹配的 TWLD，请关闭后选择配套文件。';
+        _status = '已载入完整 WLD 原版电路；该文件不匹配已核验的计算机布局，可查看实际电路。';
       }
     } catch (_) {
       if (generation == _circuitImportGeneration) rethrow;
@@ -2608,7 +2589,7 @@ class Workspace extends TerraController {
     if (session.streamed) {
       session.pause();
       final result = await session.command(WorldCircuitCommand.save());
-      final output = result.worldSource, companion = result.twldSource;
+      final output = result.worldSource;
       final backend = worldCircuitBackend as WorldCircuitSourceBackend;
       try {
         if (output == null) throw const EngineException('引擎未返回可导出的世界文件。');
@@ -2616,68 +2597,40 @@ class Workspace extends TerraController {
           RegExp(r'\.wld$', caseSensitive: false),
           '',
         );
-        final originals = [
-          session.source!,
-          if (session.companion != null) session.companion!,
-        ];
         final saved = await worldCircuitFiles.save(
           output,
           name: '${stem}_circuit.wld',
-          protectedSources: originals,
+          protectedSources: [session.source!],
         );
-        var companionSaved = companion == null;
-        if (saved && companion != null) {
-          try {
-            companionSaved = await worldCircuitFiles.save(
-              companion,
-              name: '${stem}_circuit.twld',
-              protectedSources: originals,
-            );
-          } catch (e) {
-            _status = 'WLD 已导出，但 TWLD 未导出；模拟状态仍保留。';
-            throw EngineException('WLD 已导出，但 TWLD 导出失败：$e');
-          }
-        }
-        _status = !saved
-            ? '已取消 WLD 导出，模拟状态仍保留。'
-            : companionSaved
-            ? '已导出模拟世界${companion == null ? '' : '及匹配 TWLD'}副本。'
-            : 'WLD 已导出；TWLD 导出已取消，请再次导出完整配对文件。';
-        if (saved &&
-            companionSaved &&
-            companion != null &&
-            session.computerVerified) {
+        _status = saved ? '已导出模拟世界 WLD 副本。' : '已取消 WLD 导出，模拟状态仍保留。';
+        if (saved && session.computerVerified) {
           if (session.programIncomplete || !session.programBaselineKnown) {
             _status += ' 程序状态未完整核验，本次文件未登记为可续跑计算机。';
           } else {
             try {
-              if (output.sha256 == null || companion.sha256 == null) {
-                throw const EngineException('引擎未提供已导出配对文件的完整性标识。');
+              if (output.sha256 == null) {
+                throw const EngineException('引擎未提供已导出 WLD 的完整性标识。');
               }
               await _computerProvenance.register(
                 ComputerProvenanceRecord(
                   wldSha256: output.sha256!,
-                  twldSha256: companion.sha256!,
                   programName: session.programName,
                   programImage: session.programImage,
                   physicalPulses: session.physicalPulses,
                 ),
               );
               session.markSaved();
-              _status += ' 已保留本机续跑来源，可重新导入这两个文件继续运行。';
+              _status += ' 已保留本机续跑来源，可重新导入此 WLD 继续运行。';
             } catch (e) {
-              _status = '完整 WLD/TWLD 已导出，但本机续跑记录未保存。';
-              throw EngineException('配对文件已保存；续跑来源登记失败：$e');
+              _status = 'WLD 已导出，但本机续跑记录未保存。';
+              throw EngineException('WLD 已保存；续跑来源登记失败：$e');
             }
           }
-        } else if (saved && companionSaved) {
+        } else if (saved) {
           session.markSaved();
         }
       } finally {
-        await Future.wait([
-          if (output != null) backend.releaseWorldCircuitSource(output),
-          if (companion != null) backend.releaseWorldCircuitSource(companion),
-        ]);
+        if (output != null) await backend.releaseWorldCircuitSource(output);
       }
       return;
     }
@@ -2697,9 +2650,6 @@ class Workspace extends TerraController {
       await _activate(record);
     }
     await _persist(record);
-    if (result.twld != null && result.twld!.isNotEmpty) {
-      await _persistArtifact('${record.exportName}.twld', 'twld', result.twld!);
-    }
     _changes.add({
       'kind': 'wld',
       'operation': 'world_circuit',

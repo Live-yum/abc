@@ -6,18 +6,18 @@ function fakeModule() {
  let next=65536,events=[];
  const allocate=n=>{const p=next;next+=(n+7)&~7;return p;};
  M._tx_malloc=allocate;M._tx_free=()=>{};
- const info=new TextEncoder().encode(JSON.stringify({circuitWorldFragmentObjects:1,circuitWorldFragmentSupports:1}));
+ const info=new TextEncoder().encode(JSON.stringify({circuitWorldAbiVersion:2,circuitWorldFragmentObjects:1,circuitWorldFragmentSupports:1}));
  M.HEAPU8.set(info,32);M._terra_build_info_json=()=>32;
- const ready=(kind,count=0)=>[1,4,0,0,0,0,0,0,0,kind,count,1];
+ const ready=(kind,count=0)=>[2,4,0,0,0,0,0,0,0,kind,count,0];
  const payload=(kind,values,source=0,offset=0,count=values.length/8)=>{
   const p=allocate(values.length*4);M.HEAPU32.set(values,p/4);
-  return [1,source?2:3,source,offset,values.length*4,p,0,0,0,kind,count,0];
+  return [2,source?2:3,source,offset,values.length*4,p,0,0,0,kind,count,0];
  };
  M._terra_world_open_begin=()=>1;M._terra_world_open_step=()=>0;
  M._terra_world_open_finish=(t,p)=>{M.HEAPU32[p/4]=42;return 0;};
  M._terra_world_task_close=()=>0;M._terra_world_close=()=>0;
- M._terra_circuit_world_begin=(w,s,t,n,b,p)=>{M.HEAPU32[p/4]=9;events=[ready(0)];return 0;};
- M._terra_circuit_world_stats=(id,p)=>{M.HEAPU32.set([1,0,64,64,...Array(20).fill(0)],p/4);return 0;};
+ M._terra_circuit_world_begin=(w,s,b,p)=>{M.HEAPU32[p/4]=9;events=[ready(0)];return 0;};
+ M._terra_circuit_world_stats=(id,p)=>{M.HEAPU32.set([2,0,64,64,...Array(20).fill(0)],p/4);return 0;};
  M._terra_circuit_world_command=(id,p)=>{
   const w=Array.from(M.HEAPU32.subarray(p/4,p/4+16));
   if(w[1]===7)events=[payload(7,[17,4,6,1,1,1,1,0]),ready(7,23)];
@@ -39,10 +39,10 @@ function fakeModule() {
 }
 (async()=>{
  const M=fakeModule(), bridge=createWorldCircuitBridge(async()=>M);
- const {session}=await bridge.open(new Uint8Array([1]),null);
- const command=(kind,count=1)=>bridge.command(session,JSON.stringify([1,kind,0,0,kind===8?4194304:0,kind===8?32768:0,1,17,count,0,0,0,kind===8?1:0,kind===8?6:0,0,0]),'[]');
+ const {session}=await bridge.open(new Uint8Array([1]));
+ const command=(kind,count=1)=>bridge.command(session,JSON.stringify([2,kind,0,0,kind===8?4194304:0,kind===8?32768:0,1,17,count,0,0,0,kind===8?1:0,kind===8?6:0,0,0]),'[]');
  const page=await command(7);
- assert.equal(page.resultKind,7);assert.equal(page.resultCount,23);assert.equal(page.reserved,1);assert.equal(page.records.length,32);
+ assert.equal(page.resultKind,7);assert.equal(page.resultCount,23);assert.equal(page.reserved,0);assert.equal(page.records.length,32);
  const first=await command(8);assert.equal(first.resultCount,1);assert.equal(first.records.length,32);
  assert.equal(new DataView(first.objects.buffer).getUint32(0,true),0x31424f43);
  const copy=first.objects.slice();await command(8);assert.deepEqual(first.objects,copy);

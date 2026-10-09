@@ -62,7 +62,7 @@ void main() {
           return _LargeFile();
         },
       );
-      final source = await files.pick(companion: false);
+      final source = await files.pick();
       expect(source!.path, '/virtual/406mb.wld');
       expect(source.length, 405983441);
       expect(source.blob, isNull);

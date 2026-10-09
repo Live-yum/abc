@@ -73,14 +73,14 @@ async function documentWork(bridge, benchmark=false) {
 }
 async function circuitWork(bridge, benchmark=false) {
   const run=(name,fn)=>benchmark?sample(name,fn):fn();
-  let opened=await run('worldCircuit.open',()=>bridge.open(circuit,null)), id=opened.session;
-  const cmd=(kind,x=0,y=0,w=0,h=0,count=0,flags=0)=>bridge.command(id,JSON.stringify([1,kind,x,y,w,h,1,1,count,0,0,kind===6?3:0,flags,kind===6?5:0,0,0]),'[]');
+  let opened=await run('worldCircuit.open',()=>bridge.open(circuit)), id=opened.session;
+  const cmd=(kind,x=0,y=0,w=0,h=0,count=0,flags=0)=>bridge.command(id,JSON.stringify([2,kind,x,y,w,h,1,1,count,0,0,kind===6?3:0,flags,0,0,0]),'[]');
   const frame=async()=>{const r=await cmd(1,3,10,1,1);return new DataView(r.records.buffer,r.records.byteOffset).getUint32(12,true)&65535;};
   assert.equal(await frame(),0);
   await run('worldCircuit.trigger',()=>cmd(2,2,10,1,1,1,1));
   await run('worldCircuit.tick',()=>cmd(3,0,0,0,0,60));assert.equal(await frame(),66);
   const saved=await run('worldCircuit.save',()=>cmd(6));await bridge.close(id);
-  opened=await bridge.open(saved.world,null);id=opened.session;assert.equal(await frame(),66);await bridge.close(id);
+  opened=await bridge.open(saved.world);id=opened.session;assert.equal(await frame(),66);await bridge.close(id);
   assert.equal(hash(circuit),circuitHash);return {world:hash(saved.world),stats:saved.stats};
 }
 (async()=>{

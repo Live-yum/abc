@@ -14,7 +14,7 @@ TerraForge's version-1 `terraforge.circuit` JSON project is a separate, bounded 
 
 ## Boundaries
 
-The host implements only the explicitly listed sandbox devices. It does not claim full Terraria wiring equivalence, whole-world import/execution, faulty lamps, actuators, junction boxes, pixel boxes, pumps, teleporters, NPCs, object framing or placement rules. WLD/TWLD streaming descriptors are not used by this editor bridge. The graph is compiled afresh per color pulse; this favors simple ownership and safety over large-world performance.
+The host implements only the explicitly listed sandbox devices. It does not claim full Terraria wiring equivalence, whole-world import/execution, faulty lamps, actuators, junction boxes, pixel boxes, pumps, teleporters, NPCs, object framing or placement rules. WLD streaming descriptors are not used by this editor bridge. The graph is compiled afresh per color pulse; this favors simple ownership and safety over large-world performance.
 
 Run/pause scheduling advances simulation ticks. Device state is never synthesized from a UI animation timer. A paused manual Step advances exactly one tick; a switch must be triggered to emit a pulse. The default timer interval is 60 ticks.
 

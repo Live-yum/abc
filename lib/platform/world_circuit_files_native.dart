@@ -32,7 +32,7 @@ Future<void> ensureSeparateCircuitExport(
         await original.exists() &&
         await FileSystemEntity.identical(target.path, original.path);
     if (samePath || sameFile) {
-      throw const FormatException('请另存为新文件，不能覆盖当前会话正在使用的原始 WLD/TWLD。');
+      throw const FormatException('请另存为新文件，不能覆盖当前会话正在使用的原始 WLD。');
     }
   }
 }
@@ -42,8 +42,8 @@ class PlatformWorldCircuitFiles implements WorldCircuitFileGateway {
   PlatformWorldCircuitFiles({this.picker});
 
   @override
-  Future<WorldCircuitSource?> pick({required bool companion}) async {
-    final extension = companion ? 'twld' : 'wld';
+  Future<WorldCircuitSource?> pick() async {
+    const extension = 'wld';
     final types = [
       XTypeGroup(
         label: extension.toUpperCase(),
@@ -58,7 +58,7 @@ class PlatformWorldCircuitFiles implements WorldCircuitFileGateway {
       throw FormatException('请选择 .$extension 文件。');
     }
     final length = await file.length();
-    final limit = (companion ? 16 : 1024) * 1024 * 1024;
+    const limit = 1024 * 1024 * 1024;
     if (length < 1 || length > limit) {
       throw FormatException('文件必须为 1 字节到 ${limit ~/ 1048576} MiB。');
     }

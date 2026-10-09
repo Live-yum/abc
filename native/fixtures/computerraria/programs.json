@@ -480,16 +480,9 @@
     ]
   },
   "display": {
-    "hex": "b70f1000b70020001301f0ff23a02000b74020009380c0ff1301100023a02000b7e02000370100801301110023a020001301100023ae201eb7c10d609381e10d23ae3f0a6f000000",
+    "hex": "b70f1000b7e02000370100801301110023a020001301100023ae201eb7c10d609381e10d23ae3f0a6f000000",
     "source": [
       "lui x31, 0x100",
-      "lui x1, 0x200",
-      "addi x2, x0, -1",
-      "sw x2, 0(x1)",
-      "lui x1, 0x204",
-      "addi x1, x1, -4",
-      "addi x2, x0, 1",
-      "sw x2, 0(x1)",
       "lui x1, 0x20e",
       "lui x2, 0x80000",
       "addi x2, x2, 1",
@@ -500,19 +493,15 @@
       "addi x3, x3, 222",
       "sw x3, 188(x31)",
       "jal x0, halt"
-    ]
+    ],
+    "sha256": "7c4346af4b244b829009177b0efa2f36202b0e9b92eb64a205ffb10bba12ecdd",
+    "bytes": 44,
+    "provenance": "Authored physical ROM test program for monochrome MMIO; distinct from unchanged upstream Pong."
   },
   "clear": {
-    "hex": "b70f1000b70020001301000023a02000b74020009380c0ff1301100023a02000b7e020001301000023a020001301100023ae201eb7c10d609381e10d23ae3f0a6f000000",
+    "hex": "b70f1000b7e020001301000023a020001301100023ae201eb7c10d609381e10d23ae3f0a6f000000",
     "source": [
       "lui x31, 0x100",
-      "lui x1, 0x200",
-      "addi x2, x0, 0",
-      "sw x2, 0(x1)",
-      "lui x1, 0x204",
-      "addi x1, x1, -4",
-      "addi x2, x0, 1",
-      "sw x2, 0(x1)",
       "lui x1, 0x20e",
       "addi x2, x0, 0",
       "sw x2, 0(x1)",
@@ -522,7 +511,10 @@
       "addi x3, x3, 222",
       "sw x3, 188(x31)",
       "jal x0, halt"
-    ]
+    ],
+    "sha256": "c47f51a948582862ab898b6a44d4e361b1125f0a150246ff8657d93a00142624",
+    "bytes": 40,
+    "provenance": "Authored physical ROM test program for monochrome MMIO; distinct from unchanged upstream Pong."
   },
   "mutationWord": 5,
   "input": {

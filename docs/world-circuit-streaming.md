@@ -1,7 +1,7 @@
 # Complete-world circuit execution
 
 The additional source API accepts an immutable native file or browser File/Blob,
-plus an optional original `.twld` companion. The old small byte-array API remains
+using circuit ABI 2. The small byte-array API remains
 available. Native reads and browser Blob slices are at most 1 MiB. Neither API
 materializes the complete large WLD in Dart/JavaScript. Native scratch and saved
 outputs use files; large browser sources require worker-owned OPFS storage.
@@ -10,39 +10,34 @@ Small browser byte inputs may use a shared bounded 64 MiB paged fallback.
 The native session budget is 192 MiB, reported separately from retained/peak
 native bytes, Dart/JS buffers, Wasm heap and process RSS. The Web heap ceiling is
 256 MiB. These are allocation limits, not a claim that the whole application uses
-only that much memory. The 406 MB public world is streamed; its approximately
-438 MB expanded TWLD is decoded natively in bounded windows.
+only that much memory. The 406 MB public world is streamed without companion files.
 
 `WorldCircuitSourceBackend` adds ranged open, progress, cancellation and explicit
 saved-output release. Completed streamed saves return source descriptors rather
 than full byte arrays. Their files survive circuit close/reset until released.
 Original picker files are never deleted or overwritten by output cleanup.
-Input WLD/TWLD identities and completed output identities are computed from the
+Input WLD identities and completed output identities are computed from the
 actual ranged bytes; a caller-supplied source digest is never trusted. Native
 save completion moves its temporary files into independent leases instead of
 duplicating a whole-world buffer or temporary file.
 
 ## Two simulation settings
 
-The “电路优化” switch defaults OFF. OFF preserves the existing per-TripWire
-device-mask clearing implementation. ON uses a verified independent generation
-counter to deduplicate device hits without clearing unrelated devices on every
-gate output. Generation wrap resets the transient stamps. Existing compiled
-connectivity, gate waves and lazy lamp representation are shared by both modes;
-OFF is not a new wire-by-wire backend, and ON is not the complete WireHead mod.
+The “电路优化” switch defaults OFF. OFF retains per-TripWire device-mask clearing
+and game PixelBox crossings. ON adds generation-stamped device deduplication
+and the referenced WireHead ordinary-PixelBox different-color group-pair parity
+within each gate wave. Existing compiled connectivity, gate scheduling and lazy
+lamp representation remain shared. Future pixel behavior can differ; OFF is
+not replaced with an artificially slower backend.
 
-The source ABI command `TCW_OPTIMIZATION=10` uses `mask=0/1`, no data records and
-no flags. The engine accepts it only at an idle boundary. The application pauses
-and drains the accepted physical clock batch before switching. ROM, RAM, RNG,
-pending input, gate/pixel state and electrical counters do not change.
-Non-save READY bit 1 reports this setting.
-
-TWLD compatibility is independent of the speed switch. Native decoding identifies
-`WireHead/ColorPixelBox` by its saved module/type name and restores the custom
-pixel data; non-save READY bit 0 reports this profile. It supplies the published
-world's display topology and gate-wave pairing semantics without installing or
-executing tModLoader or WireHead. A WLD without the matching sidecar retains its
-original pixel rules in either speed setting.
+Command `TCW_OPTIMIZATION=10` accepts mask 0/1 only while idle. A topology whose
+same-color PixelBox axes would require merging distinct networks rejects ON.
+The application pauses and drains accepted work first; switching does not alter
+ROM, RAM, inputs or existing pixels. Non-save READY bit 1 reports ON, bit 2
+reports topology eligibility, and bit 3 reports the selected WireHead-style
+pixel policy. Bit 0 remains zero. Bit 3 indicates policy, not the presence of a
+screen. SAVE reserved remains zero. The host requires
+`circuitWorldWireHeadPixels: 1` before enabling the new policy.
 
 ## Actual displays and physical I/O
 
@@ -82,11 +77,11 @@ image is `assets/computer/pong.bin` with its adjacent MIT license/provenance.
 ```sh
 ABC_COMPUTERRARIA_SAVE=1 \
   dart native/computerraria_acceptance.dart /path/libabc_engine.so \
-  /path/computerraria.wld /path/computerraria.twld \
+  /path/computerraria.wld \
   - assets/computer/pong.bin /path/report-standard.json
 ABC_COMPUTERRARIA_OPTIMIZED=1 ABC_COMPUTERRARIA_SAVE=1 \
   dart native/computerraria_acceptance.dart /path/libabc_engine.so \
-  /path/computerraria.wld /path/computerraria.twld \
+  /path/computerraria.wld \
   - assets/computer/pong.bin /path/report-optimized.json
 ```
 
@@ -106,7 +101,7 @@ allocator trimming. Use a temporary directory with room for the working files:
 ```sh
 TMPDIR=/path/roomy-temporary-directory \
   dart native/computerraria_soak.dart /path/libabc_engine.so \
-  /path/computerraria.wld /path/computerraria.twld 50 /path/soak.jsonl
+  /path/computerraria.wld 50 /path/soak.jsonl /path/verified-wld-acceptance.json
 ```
 
 Rebuild Web artifacts with `tool/build_web_engine.sh`, stage its four engine

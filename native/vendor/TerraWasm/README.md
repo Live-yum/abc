@@ -139,19 +139,25 @@ python scripts/build_txci.py
 
 WLD Web 使用 `-Oz + LTO` 压缩格式与管理代码，电路遍历、网络编译、VM 和门求值热路径保留 `-O3`；Node WLD 使用调用方选择的优化配置。所有目标参数写入编译身份和 manifest。
 
-新增的 [file-backed circuit world ABI v1](docs/CIRCUIT_WORLD_ABI_V1.md) 在 WLD/all 中实现整图网络预编译、紧凑状态、原生门/像素规则与流式 WLD/TWLD 读写。原有稀疏 traversal ABI 继续服务临时小电路。独立 PLR 不编入这些功能。
+本地补丁的 file-backed circuit world ABI v2 在 WLD/all 中实现整图网络预编译、紧凑状态、原生门/像素规则与单个 WLD 的流式读写。begin 仅接受 world、scratch、memory budget 与输出句柄四个参数；调用前应核对 build info 的 circuitWorldAbiVersion=2。原有稀疏 traversal ABI 继续服务临时小电路。独立 PLR 不编入这些功能。
 
 <!-- circuit-size:start -->
-| 功能集合 | 本轮 Web Wasm 测量 | Wasm 功能预算 |
+| 功能集合 | 上游历史 Web Wasm 参考（非当前交付） | Wasm 功能预算 |
 |---|---:|---:|
 | `wld` | 401,955 B（392.53 KiB） | 416 KiB |
 | `all` | 427,925 B（417.90 KiB） | 448 KiB |
 | `plr` | 不包含新增电路编译器与 VM | 原有 320 KiB |
 
-以上数值来自 Emscripten 5.0.7 对本轮完整源码的发布前构建；正式提交会改变编译身份和文件摘要，精确交付尺寸以随包 manifest 为准。WLD/all 分别保留约 23/30 KiB 功能余量，独立 PLR 预算不变。新增代码的成本包括网络编译、紧凑状态、原版延迟门求值、取消回滚和流式保存。小程序主流程使用单个 `.wld`；原版单色像素盒按逐 `TripWire` 规则执行，`.twld` 彩屏不是使用或验收前提。
+以上尺寸仅保留为上游历史参考，不表示本地补丁后的交付大小。当前产物的尺寸、摘要、编译器与来源以随包 manifest 和实际 build info 为准。本地主流程仅使用单个 `.wld`，只保存 WLD；不含模组附属文件解析、彩色像素映射或游戏运行时。
+
+电路优化默认关闭。OFF 保留原版单色 PixelBox（type 445）逐 `TripWire` 双轴交叉 XOR 翻转。ON 启用设备去重 generation，并按 WireHead 式普通 PixelBox 规则，在同一门波内累计不同颜色实际网络组的命中奇偶性，于波末按组对数量的奇偶性翻转每个像素；跨波不累计。两模式共享物理门 VM，但像素执行边界不同。ON 并非完整 WireHead 模拟，也不复制其组对字典覆盖多个像素的行为。若某个像素同色的两个真实连接轴属于不同网络，启用 ON 返回 `TCW_UNSUPPORTED=-7`，保持当前模式与状态；无像素世界仍可启用。切换只在空闲边界生效，切换动作本身保留像素、ROM/RAM、输入和 RNG。来源与 MIT 声明见 [WireHead reference](../../../vendor/wirehead/README.md)。
+
+`circuitWorldWireHeadPixels=1` 明确标识 ON 规则能力。非 SAVE 的 READY 保留字：bit 0 始终为 0，bit 1 为 ON 模式，bit 2 为拓扑兼容资格，bit 3 为已选择 ON 像素规则；SAVE 的该字段为 0。主机在调用四参数 begin 前检查 `circuitWorldAbiVersion=2`，启用 ON 前检查其专用能力。
+
+冷加载优化在完整解码和校验每条 WLD 记录的前提下，仅枚举带线路与逻辑门的行，保持列、颜色、行顺序及原有交叉路由；分页并查集热循环使用内部访问器，瓦片读取合并重复边界检查并缓存同次读取的 future-layout 判定。编译临时行索引随后释放。优化不引入 CPU 指令解释器，不改变共享门 VM，也不减少输入校验范围。
 <!-- circuit-size:end -->
 
-功能预算按实际新代码单独分配；所有 wrapper 上限仍为 128 KiB，WLD Web 的 64 MiB 初始内存和 160 MiB 最大线性内存保持原值。`scripts/check-artifact-size.mjs` 对每个 profile 校验尺寸与摘要，超过各自预算仍会失败。
+功能预算按实际新代码单独分配；所有 wrapper 上限仍为 128 KiB，本地 WLD Web 构建使用 64 MiB 初始内存，最大线性内存由构建参数指定（当前构建脚本为 256 MiB）。`scripts/check-artifact-size.mjs` 对每个 profile 校验尺寸与摘要，超过各自预算仍会失败。
 
 产出：
 - `build/terrax_world_wasm.js` + `.wasm`（Node.js 目标）

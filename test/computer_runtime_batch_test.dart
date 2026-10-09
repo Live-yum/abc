@@ -56,6 +56,53 @@ class _BatchBackend extends _DisplayBackend
   }
 }
 
+/// Completes every response after a real event-queue turn, like an RPC owner.
+class _EventOwnerBackend extends _BatchBackend
+    implements WorldCircuitExternalOwnerBackend {
+  @override
+  bool get completesComputerBatchFromExternalEvent => true;
+  final responseHolds = <int, Completer<void>>{};
+  int activeBatches = 0, maximumActiveBatches = 0, replies = 0;
+  void Function(int)? onReply;
+  @override
+  Future<WorldCircuitComputerFrame> clockAndReadDisplay(
+    int id,
+    WorldCircuitCommand clock,
+    WorldCircuitCommand pixels,
+  ) async {
+    activeBatches++;
+    if (activeBatches > maximumActiveBatches) {
+      maximumActiveBatches = activeBatches;
+    }
+    try {
+      final frame = await super.clockAndReadDisplay(id, clock, pixels);
+      final ordinal = batches;
+      await responseHolds[ordinal]?.future;
+      await Future<void>.delayed(Duration.zero);
+      replies++;
+      onReply?.call(ordinal);
+      return frame;
+    } finally {
+      activeBatches--;
+    }
+  }
+}
+
+class _ImmediateGuardBackend extends _BatchBackend {
+  void Function()? pauseAfterFirst;
+  @override
+  Future<WorldCircuitComputerFrame> clockAndReadDisplay(
+    int id,
+    WorldCircuitCommand clock,
+    WorldCircuitCommand pixels,
+  ) async {
+    // Bound a regression so the test runner cannot hang on microtask starvation.
+    if (batches >= 4) throw StateError('Unexpected immediate batch burst');
+    if (batches == 0) Timer.run(() => pauseAfterFirst?.call());
+    return super.clockAndReadDisplay(id, clock, pixels);
+  }
+}
+
 Future<WorldCircuitSession> _open(_DisplayBackend backend) async {
   final session = WorldCircuitSession.fromSource(
     backend,
@@ -98,15 +145,155 @@ Future<void> _oneRuntimeBatch(
 }
 
 void main() {
+  test(
+    'event owner continues without a per-batch timer and retains input order',
+    () async {
+      final backend = _EventOwnerBackend();
+      final session = await _open(backend);
+      backend.onReply = (ordinal) {
+        if (ordinal == 1) session.setComputerKey('up', true);
+        if (ordinal == 2) {
+          session.setComputerKey('up', false);
+          session.setComputerKey('down', true);
+          session.setComputerKey('down', false);
+        }
+        if (ordinal == 3) session.pause();
+      };
+      session.run();
+      await _until(() => !session.running && !session.busy);
+      expect(backend.batches, 3);
+      expect(backend.maximumActiveBatches, 1);
+      expect(session.physicalPulses, 384);
+      expect(backend.commands.map((c) => (c.words[1], c.words[2])), [
+        (2, 3194),
+        (9, 6485),
+        (2, 6516),
+        (2, 3194),
+        (9, 6485),
+        (2, 6517),
+        (2, 3194),
+        (9, 6485),
+      ]);
+      final stages = session.hostStages.snapshot()['stages'] as Map;
+      expect((stages['runtime.ownerContinuationGap'] as Map)['count'], 3);
+      expect(stages.containsKey('runtime.timerWait'), isFalse);
+      await session.close();
+      session.dispose();
+    },
+  );
+
+  test(
+    'immediate fake keeps timer fairness and cannot starve a queued pause',
+    () async {
+      final backend = _ImmediateGuardBackend();
+      final session = await _open(backend);
+      backend.pauseAfterFirst = session.pause;
+      session.run();
+      await _until(() => !session.running && !session.busy);
+      expect(backend.batches, 1);
+      expect(session.physicalPulses, 128);
+      expect(session.error, isNull);
+      final stages = session.hostStages.snapshot()['stages'] as Map;
+      expect(stages.containsKey('runtime.timerWait'), isTrue);
+      expect(stages.containsKey('runtime.ownerContinuationGap'), isFalse);
+      await session.close();
+      session.dispose();
+    },
+  );
+
+  test(
+    'pause and restart replace a draining owner pump exactly once',
+    () async {
+      final backend = _EventOwnerBackend()
+        ..responseHolds[1] = Completer<void>()
+        ..responseHolds[2] = Completer<void>();
+      final session = await _open(backend);
+      session.run();
+      await _until(() => backend.batches == 1);
+      session.pause();
+      session.run();
+      session.run();
+      backend.responseHolds[1]!.complete();
+      await _until(() => backend.batches == 2);
+      session.pause();
+      backend.responseHolds[2]!.complete();
+      await _until(() => !session.busy);
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      expect(backend.batches, 2);
+      expect(backend.maximumActiveBatches, 1);
+      expect(session.physicalPulses, 256);
+      await session.close();
+      session.dispose();
+    },
+  );
+
+  for (final operation in ['monitor', 'mode']) {
+    test(
+      'pause invalidates an owner pump waiting for an earlier $operation operation',
+      () async {
+        final backend = _EventOwnerBackend();
+        final session = await _open(backend);
+        backend.holdPixels = Completer<void>();
+        final selecting = operation == 'monitor'
+            ? session.refreshComputerDisplays()
+            : session.setOptimization(true);
+        await _until(() => session.busy);
+        session.run();
+        await Future<void>.delayed(Duration.zero);
+        expect(backend.batches, 0);
+        session.pause();
+        backend.holdPixels!.complete();
+        await selecting;
+        await Future<void>.delayed(Duration.zero);
+        expect(backend.batches, 0);
+        expect(session.optimizationEnabled, operation == 'mode');
+        backend.holdPixels = null;
+        backend.onReply = (_) => session.pause();
+        session.run();
+        await _until(() => !session.running && !session.busy);
+        expect(backend.batches, 1);
+        expect(backend.commands.last.words[2], 6485);
+        await session.close();
+        session.dispose();
+      },
+    );
+  }
+
+  for (final ending in ['close', 'cancel', 'read-error']) {
+    test('event owner cannot schedule later clocks after $ending', () async {
+      final backend = _EventOwnerBackend()
+        ..responseHolds[1] = Completer<void>();
+      final session = await _open(backend);
+      backend.failPixels = ending == 'read-error';
+      session.run();
+      await _until(() => backend.batches == 1);
+      Future<void>? closing;
+      if (ending == 'close') closing = session.close();
+      if (ending == 'cancel') await session.cancelOperation();
+      backend.responseHolds[1]!.complete();
+      if (closing != null) await closing;
+      await _until(() => !session.running && !session.busy);
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      expect(backend.batches, 1);
+      expect(session.physicalPulses, 128);
+      expect(session.dirty, isTrue);
+      if (ending == 'read-error') {
+        expect(session.error.toString(), contains('pixel read failed'));
+      }
+      await session.close();
+      session.dispose();
+    });
+  }
+
   for (final batched in [false, true]) {
     for (final optimized in [false, true]) {
       test(
-        'runtime reads selected monitor after identical input/clock order: batch=$batched mode=$optimized',
+        'runtime reads WLD monitor after identical input/clock order: batch=$batched mode=$optimized',
         () async {
           final backend = batched ? _BatchBackend() : _DisplayBackend();
           final session = await _open(backend);
           await session.setOptimization(optimized);
-          await session.selectComputerDisplay(true);
+          await session.refreshComputerDisplays();
           backend.commands.clear();
           session.setComputerKey('up', true);
           await _oneRuntimeBatch(session, backend);
@@ -116,7 +303,7 @@ void main() {
             backend.commands[1].words,
             ComputerrariaComputer.clock(128).words,
           );
-          expect(backend.commands[2].words[2], ComputerrariaComputer.color.x);
+          expect(backend.commands[2].words[2], ComputerrariaComputer.mono.x);
           expect(session.physicalPulses, 128);
           expect(session.optimizationEnabled, optimized);
           expect(session.dirty, isTrue);
@@ -128,7 +315,7 @@ void main() {
     }
 
     test(
-      'accepted clock survives selected-display failure without replay: batch=$batched',
+      'accepted clock survives display failure without replay: batch=$batched',
       () async {
         final backend = batched ? _BatchBackend() : _DisplayBackend();
         final session = await _open(backend);
@@ -145,25 +332,23 @@ void main() {
     );
   }
 
-  test('selection waits for fresh pixels and pause/explicit validation/export read both screens', () async {
+  test('refresh waits for fresh pixels and pause/explicit validation/export read WLD screen', () async {
     final backend = _BatchBackend();
     final session = await _open(backend);
-    final previous = session.displayFrames[ComputerrariaComputer.color.name];
+    final previous = session.displayFrames[ComputerrariaComputer.mono.name];
     backend.frame++;
     backend.holdPixels = Completer<void>();
-    final switchDisplay = session.selectComputerDisplay(true);
+    final switchDisplay = session.refreshComputerDisplays();
     await _until(() => backend.commands.isNotEmpty);
-    expect(session.selectedDisplay, ComputerrariaComputer.mono);
     expect(
-      session.displayFrames[ComputerrariaComputer.color.name],
+      session.displayFrames[ComputerrariaComputer.mono.name],
       same(previous),
     );
     backend.holdPixels!.complete();
     await switchDisplay;
     backend.holdPixels = null;
-    expect(session.selectedDisplay, ComputerrariaComputer.color);
     expect(
-      session.displayFrames[ComputerrariaComputer.color.name],
+      session.displayFrames[ComputerrariaComputer.mono.name],
       isNot(same(previous)),
     );
     for (final action in [
@@ -172,11 +357,11 @@ void main() {
     ]) {
       backend.commands.clear();
       await action();
-      expect(backend.commands.map((c) => c.words[2]), [6485, 7371]);
+      expect(backend.commands.map((c) => c.words[2]), [6485]);
     }
     backend.commands.clear();
     await session.command(WorldCircuitCommand.save());
-    expect(backend.commands.map((c) => c.words[1]), [9, 9, 6]);
+    expect(backend.commands.map((c) => c.words[1]), [9, 6]);
     await session.close();
     session.dispose();
   });

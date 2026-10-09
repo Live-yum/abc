@@ -38,6 +38,7 @@ void main() {
                         'open': true,
                         'computerVerified': true,
                         'canRunComputer': true,
+                        'optimizationSupported': true,
                         'keyboardVerified': true,
                         'programName': 'p.bin',
                         'width': 15200,
@@ -127,6 +128,7 @@ void main() {
                   'running': true,
                   'computerVerified': true,
                   'canRunComputer': true,
+                  'optimizationSupported': true,
                   'programName': 'Pong.bin',
                   'width': 15200,
                   'height': 7200,
@@ -151,6 +153,55 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final supported in [false, true]) {
+    testWidgets(
+      'pixel mode explains semantics and topology support: $supported',
+      (tester) async {
+        final calls = <(String, Map<String, Object?>)>[];
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: WorldCircuitPanel(
+                  state: {
+                    'open': true,
+                    'computerVerified': true,
+                    'optimizationSupported': supported,
+                    'optimizationEnabled': false,
+                    'width': 15200,
+                    'height': 7200,
+                  },
+                  dispatch: (action, args) async => calls.add((action, args)),
+                ),
+              ),
+            ),
+          ),
+        );
+        expect(find.textContaining('后续运行结果可能不同'), findsOneWidget);
+        final toggle = tester.widget<SwitchListTile>(
+          find.byType(SwitchListTile),
+        );
+        expect(toggle.value, isFalse);
+        if (supported) {
+          expect(toggle.onChanged, isNotNull);
+          expect(find.textContaining('原版规则下可能保持黑屏'), findsOneWidget);
+          await tester.ensureVisible(find.byType(SwitchListTile));
+          await tester.tap(find.byType(SwitchListTile));
+          await tester.pump();
+          expect(calls.single.$1, 'worldCircuitOptimization');
+          expect(calls.single.$2, {'enabled': true});
+        } else {
+          expect(toggle.onChanged, isNull);
+          expect(find.textContaining('同色跨轴网络尚未支持'), findsOneWidget);
+          expect(calls, isEmpty);
+        }
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('real circuit viewport renders and dispatches tile coordinates', (
     tester,

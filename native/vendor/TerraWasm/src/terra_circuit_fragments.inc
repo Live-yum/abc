@@ -49,9 +49,9 @@ static int cf_object(CxWorld* w,uint32_t x,uint32_t y,uint32_t width,uint32_t he
     if(f->object_count==f->object_capacity){uint32_t n=f->object_capacity?f->object_capacity*2:64;if(n<f->object_capacity||n>UINT32_MAX/sizeof(CxFragmentObject))return TCW_MEMORY;CxFragmentObject* p=cx_alloc(w,n*sizeof(*p));if(!p)return TCW_MEMORY;if(f->object_count)memcpy(p,f->objects,f->object_count*sizeof(*p));cx_free(w,f->objects);f->objects=p;f->object_capacity=n;}
     f->objects[f->object_count]=(CxFragmentObject){x,y,width,height,type,net,flags,anchor,frame,0,0,UINT32_MAX,0};f->slots[at]=++f->object_count;return TCW_OK;
 }
-static int cf_known_single(uint32_t type){return type==19||type==427||(type>=435&&type<=439)||type==135||type==136||type==137||type==141||type==144||type==314||type==419||type==420||type==424||type==428||type==442||type==445||type==0xfffeu;}
+static int cf_known_single(uint32_t type){return type==19||type==427||(type>=435&&type<=439)||type==135||type==136||type==137||type==141||type==144||type==314||type==419||type==420||type==424||type==428||type==442||type==445;}
 static int cf_wire_object(const TxTile* t){
-    if(t->actuator||tx_tile_needs_section(t->type)||t->type==0xfffeu)return 1;
+    if(t->actuator||tx_tile_needs_section(t->type))return 1;
     if(t->type==15u&&t->frame_y/40!=1&&t->frame_y/40!=20)return 0;
     return cx_wire_object_type(t->type)||cx_material_has(t->type,CX_MATERIAL_BOULDER)||t->type==484u||t->type==654u;
 }
@@ -70,7 +70,7 @@ static int cf_collect(CxWorld* w,uint32_t y){
     if(g){uint32_t dx=g->shape&255u,dy=(g->shape>>8)&255u;width=(g->shape>>16)&255u;height=g->shape>>24;
         if(dx>x||dy>y||width>w->width-(x-dx)||height>w->height-(y-dy)){width=height=1;flags|=1;}else{x-=dx;top-=dy;}}
     else if(tx_tile_framed(w->world,t->type)&&!cf_known_single(t->type))flags|=1;
-    if(tx_tile_needs_section(t->type))flags|=2;if(t->type==0xfffeu)flags|=4;
+    if(tx_tile_needs_section(t->type))flags|=2;
     int status=cf_object(w,x,top,width,height,t->type,net,flags,g?g->anchor:cf_single_anchor(t),(uint16_t)t->frame_x|((uint32_t)(uint16_t)t->frame_y<<16));
     if(status)return status;
     /* Natural boulder traps release an unwired payload by retracting the wired
@@ -211,7 +211,7 @@ static int cf_emit_page(CxWorld* w){CxFragments* f=w->fragments;uint32_t n=w->co
 int cx_fragments_begin(CxWorld* w,const TerraCircuitWorldCommand* cmd){
     if(!cmd->count||cmd->count>32768u||cmd->data_count>65536u||(!cmd->data_ptr&&cmd->data_count))return TCW_INVALID;
     if(cmd->kind==TCW_EXTRACT&&(!w->fragments||!w->fragments->ready||cmd->data_count))return TCW_STATE;
-    if(cmd->kind==TCW_EXTRACT&&(cmd->flags&1)&&(!cmd->aux_source_id||cmd->aux_source_id==w->world_source||cmd->aux_source_id==w->scratch_source||cmd->aux_source_id==w->twld_source||cmd->width<32||cmd->width>CO_LIMIT||!cmd->height||cmd->height>CO_COUNT))return TCW_INVALID;
+    if(cmd->kind==TCW_EXTRACT&&(cmd->flags&1)&&(!cmd->aux_source_id||cmd->aux_source_id==w->world_source||cmd->aux_source_id==w->scratch_source||cmd->width<32||cmd->width>CO_LIMIT||!cmd->height||cmd->height>CO_COUNT))return TCW_INVALID;
 #ifdef __wasm__
     if(cmd->data_count&&!tx_bridge_range_is_valid(cmd->data_ptr,cmd->data_count*16u))return TCW_INVALID;
 #endif

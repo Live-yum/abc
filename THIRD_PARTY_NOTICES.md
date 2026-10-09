@@ -59,9 +59,16 @@ Synthetic test fixtures are generated locally by the project scripts.
   The unchanged Pong source, driver sources, two host-only cfg guards, build
   script and per-file provenance are in `vendor/computerraria`.
 - Physical clock/reset/ROM/RAM coordinates are verified against the pinned
-  original world. The app enables this fixed layout only for its exact source
-  hash, matching actual anchors and the decoded TWLD compatibility profile.
-- The flat color monitor reduces actual pixel frame states to mean colors
-  measured from WireHead's pinned `e6009d010ca54ff43d04b44697accc7115807b9c`
-  16-by-16 source frames. It is an approximation of sprite appearance. The
-  WireHead PNG, Terraria textures, full WLD and TWLD are not distributed.
+  original WLD. The app enables this fixed layout only for its exact source
+  hash and matching actual anchors, or a locally verified WLD export record.
+- The application reads the world's native 64-by-48 monochrome PixelBox display.
+  Mod-only color-display data is not part of the supported WLD format. No mod
+  runtime, game textures or full world file is distributed.
+
+## WireHead algorithm reference
+
+The optional ordinary-PixelBox gate-wave pairing behavior references
+[WireHead](https://github.com/misprit7/WireHead/tree/e6009d010ca54ff43d04b44697accc7115807b9c),
+MIT © 2023 Xander Naumenko. The full notice is retained at
+`vendor/wirehead/LICENSE` and bundled as `assets/computer/WIREHEAD_LICENSE.txt`. This is a bounded C implementation using physical WLD
+networks, not an embedded mod runtime or a claim of complete WireHead parity.

@@ -31,8 +31,7 @@ class _CircuitFiles implements WorldCircuitFileGateway {
   final outputPaths = <String>[];
   bool acceptSave = true;
   @override
-  Future<WorldCircuitSource?> pick({required bool companion}) async {
-    expect(companion, false);
+  Future<WorldCircuitSource?> pick() async {
     return WorldCircuitSource.file(
       path: file.absolute.path,
       length: await file.length(),

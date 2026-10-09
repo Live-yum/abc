@@ -13,19 +13,19 @@ class WorldCircuitSession extends ChangeNotifier {
   final WorldCircuitBackend backend;
   final HostStageTimings hostStages;
   final Uint8List? _original;
-  final WorldCircuitSource? source, companion;
-  final Uint8List? _originalTwld;
+  final WorldCircuitSource? source;
   WorldCircuitResult? result;
   bool dirty = false;
   bool running = false;
   bool busy = false;
   Object? error;
   Timer? _timer;
+  bool _computerPumpActive = false, _computerWakePending = false;
+  int _computerRunGeneration = 0;
   Timer? _progressTimer;
   bool _pollingProgress = false;
   WorldCircuitProgress? progress;
   bool computerVerified = false;
-  bool compatibilityProfile = false;
   bool programIncomplete = false;
   bool programBaselineKnown = true;
   ComputerProvenanceRecord? _restoredProvenance;
@@ -39,8 +39,9 @@ class WorldCircuitSession extends ChangeNotifier {
   int physicalPulses = 0, displayedFrames = 0, _lastDisplayMicros = 0;
   int _measuredPulses = 0, _measuredFrames = 0;
   int clockBatch = 128;
-  ComputerDisplayRegion selectedDisplay = ComputerrariaComputer.mono;
   bool optimizationEnabled = false;
+  bool optimizationSupported = false;
+  bool wireHeadPixelRulesEnabled = false;
   int _programGeneration = 0;
   final Set<String> _heldKeys = {}, _pendingKeys = {};
   Set<String> get heldKeys => Set.unmodifiable(_heldKeys);
@@ -72,22 +73,17 @@ class WorldCircuitSession extends ChangeNotifier {
   WorldCircuitSession(
     this.backend,
     Uint8List original, {
-    Uint8List? twld,
     HostStageTimings? hostStages,
   }) : hostStages = hostStages ?? HostStageTimings(),
        _original = Uint8List.fromList(original),
-       _originalTwld = twld == null ? null : Uint8List.fromList(twld),
-       source = null,
-       companion = null;
+       source = null;
 
   WorldCircuitSession.fromSource(
     this.backend,
     this.source, {
-    this.companion,
     HostStageTimings? hostStages,
   }) : hostStages = hostStages ?? HostStageTimings(),
-       _original = null,
-       _originalTwld = null {
+       _original = null {
     if (source == null || backend is! WorldCircuitSourceBackend) {
       throw ArgumentError('Streaming world backend and source are required');
     }
@@ -96,12 +92,9 @@ class WorldCircuitSession extends ChangeNotifier {
   Future<WorldCircuitResult> _openOriginal() async {
     final input = source;
     if (input == null) {
-      return backend.openWorldCircuit(_original!, twld: _originalTwld);
+      return backend.openWorldCircuit(_original!);
     }
-    return (backend as WorldCircuitSourceBackend).openWorldCircuitSource(
-      input,
-      twld: companion,
-    );
+    return (backend as WorldCircuitSourceBackend).openWorldCircuitSource(input);
   }
 
   Future<void> cancelOperation() async {
@@ -161,7 +154,9 @@ class WorldCircuitSession extends ChangeNotifier {
   Future<void> open() => _serial(() async {
     if (result != null) throw StateError('Circuit already open');
     result = await _openOriginal();
-    compatibilityProfile = result!.hasWireHeadPixels;
+    optimizationEnabled = result!.circuitOptimizationEnabled;
+    optimizationSupported = result!.circuitOptimizationSupported;
+    wireHeadPixelRulesEnabled = result!.wireHeadPixelRulesEnabled;
     error = null;
   });
 
@@ -173,22 +168,17 @@ class WorldCircuitSession extends ChangeNotifier {
         final active = result;
         computerVerified = false;
         final candidate = provenance ?? _restoredProvenance;
-        final issuedPair =
+        final issuedWorld =
             active != null &&
             candidate != null &&
-            candidate.matches(
-              active.sourceSha256 ?? '',
-              active.twldSourceSha256 ?? '',
-            );
-        final originalPair =
+            candidate.matches(active.sourceSha256 ?? '');
+        final originalWorld =
             active != null &&
-            active.sourceSha256 == ComputerrariaComputer.sourceSha256 &&
-            active.twldSourceSha256 == ComputerrariaComputer.companionSha256;
+            active.sourceSha256 == ComputerrariaComputer.sourceSha256;
         if (active == null ||
-            (!issuedPair && !originalPair) ||
+            (!issuedWorld && !originalWorld) ||
             active.width != 15200 ||
-            active.height != 7200 ||
-            !active.hasWireHeadPixels) {
+            active.height != 7200) {
           return false;
         }
         final ready = await backend.commandWorldCircuit(
@@ -225,8 +215,8 @@ class WorldCircuitSession extends ChangeNotifier {
           }
         }
         await _refreshComputerDisplays(active.session);
-        _restoredProvenance = issuedPair ? candidate : null;
-        if (issuedPair) {
+        _restoredProvenance = issuedWorld ? candidate : null;
+        if (issuedWorld) {
           _program = candidate.programImage;
           programName = candidate.programName;
           physicalPulses = candidate.physicalPulses ?? 0;
@@ -263,8 +253,7 @@ class WorldCircuitSession extends ChangeNotifier {
         region.height,
       );
 
-  String _displayStage(ComputerDisplayRegion region) =>
-      region == ComputerrariaComputer.mono ? 'mono.query' : 'color.query';
+  String _displayStage(ComputerDisplayRegion region) => 'mono.query';
 
   void _acceptDisplay(
     ComputerDisplayRegion region,
@@ -294,25 +283,9 @@ class WorldCircuitSession extends ChangeNotifier {
   }
 
   Future<void> _refreshComputerDisplays(int id) async {
-    for (final region in [
-      ComputerrariaComputer.mono,
-      ComputerrariaComputer.color,
-    ]) {
-      await _refreshDisplay(id, region);
-    }
+    await _refreshDisplay(id, ComputerrariaComputer.mono);
     _countDisplayRead();
   }
-
-  /// Selection is published only after a fresh read accepted behind any clock.
-  Future<void> selectComputerDisplay(bool color) => _serial(() async {
-    if (!computerVerified || result == null) throw StateError('计算机布局尚未核验。');
-    final region = color
-        ? ComputerrariaComputer.color
-        : ComputerrariaComputer.mono;
-    await _refreshDisplay(result!.session, region);
-    selectedDisplay = region;
-    _countDisplayRead();
-  });
 
   /// Explicit UI pause retains a full, fresh validation snapshot after drain.
   Future<void> pauseAndRefreshDisplays() async {
@@ -324,7 +297,8 @@ class WorldCircuitSession extends ChangeNotifier {
 
   Future<void> _runtimeComputerBatch() async {
     final id = result!.session, pulses = clockBatch.clamp(32, 128);
-    final region = selectedDisplay, computerBackend = backend;
+    const region = ComputerrariaComputer.mono;
+    final computerBackend = backend;
     final watch = Stopwatch()..start();
     try {
       if (computerBackend is WorldCircuitComputerBackend) {
@@ -372,20 +346,28 @@ class WorldCircuitSession extends ChangeNotifier {
     return _serial(() async {
       final active = result;
       if (active == null) throw StateError('请先载入世界电路。');
+      if (enabled && !optimizationSupported) {
+        throw StateError('当前世界的像素接线拓扑不支持此模式；同色跨轴网络暂不支持，请保持电路优化关闭。');
+      }
       final next = await backend.commandWorldCircuit(
         active.session,
         WorldCircuitCommand.optimization(enabled),
       );
-      if (next.circuitOptimizationEnabled != enabled) {
+      if (next.circuitOptimizationEnabled != enabled ||
+          next.wireHeadPixelRulesEnabled != enabled ||
+          (enabled && !next.circuitOptimizationSupported)) {
         throw StateError('引擎未确认电路优化模式，当前会话保持暂停。');
       }
       result = next;
       optimizationEnabled = enabled;
+      optimizationSupported = next.circuitOptimizationSupported;
+      wireHeadPixelRulesEnabled = next.wireHeadPixelRulesEnabled;
       _runWatch.reset();
       _measuredPulses = 0;
       _measuredFrames = 0;
       _lastDisplayMicros = 0;
       if (computerVerified) await _refreshComputerDisplays(active.session);
+      error = null;
     });
   }
 
@@ -519,36 +501,84 @@ class WorldCircuitSession extends ChangeNotifier {
     }
   }
 
+  bool _computerRunCurrent(int generation) =>
+      running && !_closing && !_closed && generation == _computerRunGeneration;
+
+  bool get _usesExternalOwnerEvents =>
+      backend is WorldCircuitExternalOwnerBackend &&
+      (backend as WorldCircuitExternalOwnerBackend)
+          .completesComputerBatchFromExternalEvent;
+
   void _scheduleComputer() {
-    if (!running || _closing || _closed) return;
+    if (!running ||
+        _closing ||
+        _closed ||
+        _computerPumpActive ||
+        _computerWakePending) {
+      return;
+    }
+    final generation = _computerRunGeneration;
+    final ownerEvents = _usesExternalOwnerEvents;
     final scheduled = Stopwatch()..start();
-    _timer = Timer(const Duration(milliseconds: 1), () async {
-      hostStages.record('runtime.timerWait', scheduled.elapsedMicroseconds);
-      final loop = Stopwatch()..start();
-      if (!running || _closing || _closed) return;
-      if (busy) {
-        _scheduleComputer();
-        return;
+    void launch() {
+      _computerWakePending = false;
+      _timer = null;
+      if (!_computerRunCurrent(generation) || _computerPumpActive) return;
+      hostStages.record(
+        ownerEvents ? 'runtime.ownerContinuationGap' : 'runtime.timerWait',
+        scheduled.elapsedMicroseconds,
+      );
+      unawaited(_runComputerBatch(generation));
+    }
+
+    if (ownerEvents) {
+      // Each successful preceding batch awaited a worker message event. The
+      // next batch immediately returns control while its owner is computing.
+      launch();
+    } else {
+      // A Future alone does not promise an event-loop turn. Keep an explicit
+      // yield for native/unknown owners and immediately completing test fakes.
+      _computerWakePending = true;
+      _timer = Timer(const Duration(milliseconds: 1), launch);
+    }
+  }
+
+  Future<void> _runComputerBatch(int generation) async {
+    if (!_computerRunCurrent(generation) || _computerPumpActive) return;
+    _computerPumpActive = true;
+    final loop = Stopwatch()..start();
+    var publishFrame = false, acceptedBatch = false;
+    try {
+      // Await the existing serialized owner once per pending operation instead
+      // of spinning or polling a busy owner. Pause invalidates this generation.
+      while (busy) {
+        await _queue;
+        if (!_computerRunCurrent(generation)) return;
       }
-      var publishFrame = false;
-      try {
-        await _serial(() async {
-          if (!running || result == null) return;
-          await _applyComputerKeys(result!.session);
-          await _runtimeComputerBatch();
-          final now = _runWatch.elapsedMicroseconds;
-          if (!running || now - _lastDisplayMicros >= 16667) {
-            _lastDisplayMicros = _runWatch.elapsedMicroseconds;
-            publishFrame = true;
-          }
-        }, notifyState: false);
-        if (publishFrame && !_closed && !_closing) notifyListeners();
-      } catch (_) {
-        pause();
+      if (!_computerRunCurrent(generation)) return;
+      await _serial(() async {
+        if (!_computerRunCurrent(generation) || result == null) return;
+        acceptedBatch = true;
+        await _applyComputerKeys(result!.session);
+        await _runtimeComputerBatch();
+        final now = _runWatch.elapsedMicroseconds;
+        if (!running || now - _lastDisplayMicros >= 16667) {
+          _lastDisplayMicros = _runWatch.elapsedMicroseconds;
+          publishFrame = true;
+        }
+      }, notifyState: false);
+      if (publishFrame && !_closed && !_closing) notifyListeners();
+    } catch (_) {
+      pause();
+    } finally {
+      if (acceptedBatch) {
+        hostStages.record('runtime.loop', loop.elapsedMicroseconds);
       }
-      hostStages.record('runtime.loop', loop.elapsedMicroseconds);
-      if (running) _scheduleComputer();
-    });
+      _computerPumpActive = false;
+      // A pause/restart may have created a newer generation while the accepted
+      // old batch drained. Only this single pump may start its replacement.
+      if (running && !_closed && !_closing) _scheduleComputer();
+    }
   }
 
   Future<WorldCircuitResult> command(
@@ -661,6 +691,7 @@ class WorldCircuitSession extends ChangeNotifier {
     if (computerVerified) {
       if (!canRunComputer) throw StateError('请先完整加载 RV32I 程序。');
       hostStages.reset();
+      _computerRunGeneration++;
       running = true;
       _runWatch.start();
       _scheduleComputer();
@@ -684,6 +715,8 @@ class WorldCircuitSession extends ChangeNotifier {
   }
 
   void pause({bool releaseKeys = true}) {
+    _computerRunGeneration++;
+    _computerWakePending = false;
     _timer?.cancel();
     _timer = null;
     running = false;
@@ -701,17 +734,17 @@ class WorldCircuitSession extends ChangeNotifier {
       _fragments.clear();
       _indexedGeometry = null;
       result = await _openOriginal();
-      compatibilityProfile = result!.hasWireHeadPixels;
       dirty = false;
       computerVerified = false;
-      optimizationEnabled = false;
+      optimizationEnabled = result!.circuitOptimizationEnabled;
+      optimizationSupported = result!.circuitOptimizationSupported;
+      wireHeadPixelRulesEnabled = result!.wireHeadPixelRulesEnabled;
       programIncomplete = false;
       programBaselineKnown = true;
       programName = null;
       _program = Uint8List(0);
       displayFrames.clear();
       displayIdentity = Object();
-      selectedDisplay = ComputerrariaComputer.mono;
       physicalPulses = 0;
       displayedFrames = 0;
       _measuredPulses = 0;

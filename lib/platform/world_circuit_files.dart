@@ -5,7 +5,7 @@ import 'world_circuit_files_native.dart'
 
 /// Large world inputs are retained file handles, never whole Dart byte arrays.
 abstract interface class WorldCircuitFileGateway {
-  Future<WorldCircuitSource?> pick({required bool companion});
+  Future<WorldCircuitSource?> pick();
   Future<bool> save(
     WorldCircuitSource source, {
     required String name,

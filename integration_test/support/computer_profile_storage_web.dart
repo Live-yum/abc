@@ -138,8 +138,10 @@ class _WebComputerProfileStorage implements ComputerProfileStorage {
       if (_Blob(input).size.toDartInt != source.length) {
         throw const FormatException('Computer profile source length changed.');
       }
-      final extension = name.toLowerCase().endsWith('.twld') ? 'twld' : 'wld';
-      final filename = 'output-${++_sequence}.$extension';
+      if (!name.toLowerCase().endsWith('.wld')) {
+        throw const FormatException('Expected a WLD output name.');
+      }
+      final filename = 'output-${++_sequence}.wld';
       _Writable? writable;
       try {
         final handle = await _directory
