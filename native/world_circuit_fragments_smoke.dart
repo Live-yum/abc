@@ -164,5 +164,4 @@ Future<void> main(List<String> args) async {
   stdout.writeln(
     'PASS: native real commands 7/8, pagination, sparse supported footprints, immutable nonempty COB1, budget rejection/recovery, safe stamp/readback and collision rejection',
   );
-  exit(0);
 }

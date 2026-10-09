@@ -41,6 +41,8 @@ class AuthoritativeCircuitPanel extends StatefulWidget {
 class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
   final _x = TextEditingController(text: '0');
   final _y = TextEditingController(text: '0');
+  final _endX = TextEditingController(text: '0');
+  final _endY = TextEditingController(text: '0');
   final _width = TextEditingController(text: '1');
   final _height = TextEditingController(text: '1');
   final _ticks = TextEditingController(text: '1');
@@ -51,6 +53,11 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
       _merge = false,
       _dialogOpen = false,
       _pausePending = false;
+  bool _previewRequested = false,
+      _previewDismissed = false,
+      _cancelPreviewPending = false,
+      _committingPreview = false;
+  int _previewRequest = 0;
   bool get _running => widget.state['running'] == true;
   int _mask = 1;
   Offset _origin = Offset.zero, _scaleOrigin = Offset.zero;
@@ -64,8 +71,30 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
   Map<String, Object?> get _catalog => _map(widget.state['catalog']);
   Map<String, Object?> get _definitions => _map(_catalog['definitions']);
   bool get _loaded => _document['format'] == 'viewer-terralogic';
-  bool get _busy => _pending || widget.state['busy'] == true;
+  bool get _busy =>
+      _pending || _cancelPreviewPending || widget.state['busy'] == true;
   bool get _dirty => _snapshot['dirty'] == true;
+  Map<String, Object?>? get _preview {
+    if (_previewDismissed) return null;
+    final preview = _map(_snapshot['preview']);
+    if (!const ['route', 'removeNetwork'].contains(preview['kind']) ||
+        preview['token'] is! String ||
+        (preview['token'] as String).isEmpty ||
+        preview['editorId'] != _snapshot['id'] ||
+        preview['generation'] != _snapshot['generation'] ||
+        preview['revision'] != _snapshot['revision'] ||
+        preview['cells'] is! List ||
+        preview['count'] is! int ||
+        (preview['count'] as int) < 0 ||
+        (preview['count'] as int) > _CircuitPreviewOverlay.maxCells ||
+        (preview['cells'] as List).length != preview['count'] ||
+        preview['colourCounts'] is! List ||
+        (preview['colourCounts'] as List).length != 4) {
+      return null;
+    }
+    return preview;
+  }
+
   String? get _backendError {
     final error = widget.state['error']?.toString();
     return error == null || error.isEmpty ? null : error;
@@ -99,6 +128,11 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
     final previous = _map(oldWidget.state['snapshot']);
     if (previous['id'] != _snapshot['id']) {
       _selected = null;
+      _endX.text = '0';
+      _endY.text = '0';
+      _previewRequested = false;
+      _previewDismissed = true;
+      _previewRequest++;
       _readViewport();
     }
   }
@@ -123,6 +157,21 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
     String action, [
     Map<String, Object?> args = const {},
   ]) async {
+    // Cancellation must reach the owner even while a preview is computing.
+    // It invalidates a plan; it never submits cells or edits the document.
+    if (action == 'rulesCancelPreview' && mounted) {
+      if (_cancelPreviewPending) return false;
+      setState(() => _cancelPreviewPending = true);
+      try {
+        await widget.onAction(action, args);
+        return true;
+      } catch (e) {
+        if (mounted) setState(() => _error = e.toString());
+        return false;
+      } finally {
+        if (mounted) setState(() => _cancelPreviewPending = false);
+      }
+    }
     // Stopping the owner-managed clock is safe even while its last tick runs.
     if (action == 'rulesToggleRun' && _running && mounted) {
       if (_pausePending) return false;
@@ -166,6 +215,49 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
       _send('rulesEdit', {'method': method, 'args': args});
   Future<bool> _simulate(String method, [List<Object?> args = const []]) =>
       _send('rulesSimulate', {'method': method, 'args': args});
+
+  void _invalidatePreview() {
+    if (_preview == null && !_previewRequested) return;
+    unawaited(_cancelPreview());
+  }
+
+  Future<void> _cancelPreview() async {
+    if (_cancelPreviewPending || _committingPreview) return;
+    setState(() {
+      _previewDismissed = true;
+      _previewRequested = false;
+      _previewRequest++;
+    });
+    await _send('rulesCancelPreview');
+  }
+
+  Future<void> _requestPreview(String action, Map<String, Object?> args) async {
+    if (_busy || _cancelPreviewPending) return;
+    final request = ++_previewRequest;
+    setState(() {
+      _previewRequested = true;
+      _previewDismissed = true;
+    });
+    final ok = await _send(action, args);
+    if (!mounted || request != _previewRequest) return;
+    setState(() {
+      _previewRequested = false;
+      _previewDismissed = !ok;
+    });
+  }
+
+  Future<void> _commitPreview() async {
+    final preview = _preview;
+    if (_busy || _committingPreview || preview == null) return;
+    final request = _previewRequest;
+    setState(() => _committingPreview = true);
+    final ok = await _send('rulesCommitPreview', {'token': preview['token']});
+    if (!mounted) return;
+    setState(() {
+      _committingPreview = false;
+      if (ok && request == _previewRequest) _previewDismissed = true;
+    });
+  }
 
   Future<bool> _confirmDiscard(String operation) async {
     if (!_dirty) return true;
@@ -254,6 +346,7 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
   }
 
   void _chooseBrush(Map<String, Object?> brush) {
+    _invalidatePreview();
     unawaited(_pause());
     setState(() {
       _brush = brush;
@@ -331,6 +424,8 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
 
   Future<void> _actAt(Map<String, Object?> point) async {
     if (_busy || !_loaded) return;
+    if (_preview != null) await _cancelPreview();
+    if (!mounted) return;
     final x = point['x'] as int, y = point['y'] as int;
     setState(() {
       _selected = Offset(x.toDouble(), y.toDouble());
@@ -362,7 +457,7 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
           {...point, 'width': 1, 'height': 1},
         ]);
       case 'network':
-        await _edit('removeNetwork', [point, _mask]);
+        await _requestPreview('rulesPreviewNetwork', {...point, 'mask': _mask});
       default:
         await _edit('paint', [
           point,
@@ -447,21 +542,25 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
     icon: Icon(icon ?? Icons.chevron_right, size: 16),
     label: Text(label),
   );
-  Widget _numberField(String label, TextEditingController controller) =>
-      SizedBox(
-        width: 86,
-        child: TextField(
-          key: ValueKey('circuit-$label'),
-          controller: controller,
-          enabled: !_busy,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(labelText: label),
-        ),
-      );
+  Widget _numberField(
+    String label,
+    TextEditingController controller, {
+    bool invalidatesPreview = false,
+  }) => SizedBox(
+    width: 86,
+    child: TextField(
+      key: ValueKey('circuit-$label'),
+      controller: controller,
+      enabled: !_busy,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: label),
+      onChanged: invalidatesPreview ? (_) => _invalidatePreview() : null,
+    ),
+  );
 
   @override
   void dispose() {
-    for (final controller in [_x, _y, _width, _height, _ticks]) {
+    for (final controller in [_x, _y, _endX, _endY, _width, _height, _ticks]) {
       controller.dispose();
     }
     super.dispose();
@@ -716,9 +815,11 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
                           .toList(),
                   onChanged: _busy
                       ? null
-                      : (value) => setState(() {
-                          _tool = value!;
-                        }),
+                      : (value) {
+                          if (value == null || value == _tool) return;
+                          _invalidatePreview();
+                          setState(() => _tool = value);
+                        },
                 ),
               ),
               _button(
@@ -738,16 +839,22 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
                   selected: _mask & (1 << i) != 0,
                   onSelected: _busy
                       ? null
-                      : (value) => setState(() {
+                      : (value) {
                           final next = value
                               ? _mask | (1 << i)
                               : _mask & ~(1 << i);
-                          if (next != 0) _mask = next;
-                        }),
+                          if (next == 0 || next == _mask) return;
+                          _invalidatePreview();
+                          setState(() => _mask = next);
+                        },
                 ),
             ],
           ),
           const SizedBox(height: 12),
+          if (_previewRequested || _preview != null) ...[
+            _buildPreview(names, colors),
+            const SizedBox(height: 12),
+          ],
           LayoutBuilder(
             builder: (context, constraints) {
               final board = _buildStage(colors);
@@ -809,8 +916,8 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _numberField('X', _x),
-                    _numberField('Y', _y),
+                    _numberField('X', _x, invalidatesPreview: true),
+                    _numberField('Y', _y, invalidatesPreview: true),
                     _numberField('宽', _width),
                     _numberField('高', _height),
                     _button('执行当前工具', () => _guard(() => _actAt(_point()))),
@@ -833,6 +940,42 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
                       () => _guard(() async {
                         await _edit('select', [_rect()]);
                       }),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('自动布线起点使用上方 X / Y，终点使用下方坐标。'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _numberField('终点 X', _endX, invalidatesPreview: true),
+                    _numberField('终点 Y', _endY, invalidatesPreview: true),
+                    _button(
+                      '预览自动布线',
+                      () => _guard(() async {
+                        await _requestPreview('rulesPreviewRoute', {
+                          'startX': _number(_x, 'X'),
+                          'startY': _number(_y, 'Y'),
+                          'endX': _number(_endX, '终点 X'),
+                          'endY': _number(_endY, '终点 Y'),
+                          'mask': _mask,
+                        });
+                      }),
+                      enabled: !_cancelPreviewPending,
+                      icon: Icons.route,
+                    ),
+                    _button(
+                      '预览删除相连网络',
+                      () => _guard(() async {
+                        await _requestPreview('rulesPreviewNetwork', {
+                          ..._point(),
+                          'mask': _mask,
+                        });
+                      }),
+                      enabled: !_cancelPreviewPending,
+                      icon: Icons.preview,
                     ),
                   ],
                 ),
@@ -960,6 +1103,88 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
     );
   }
 
+  Widget _buildPreview(List<Object?> names, List<Object?> colors) {
+    final preview = _preview;
+    final removing = preview?['kind'] == 'removeNetwork';
+    final counts = _list(preview?['colourCounts']);
+    return TerraPanel(
+      key: const ValueKey('circuit-preview-panel'),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            _previewRequested
+                ? '正在计算线路预览…'
+                : removing
+                ? '相连网络删除预览'
+                : '自动布线预览',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          if (preview != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${_integer(preview['count'])} 个线格 · ${counts.fold<int>(0, (total, value) => total + _integer(value))} 条色线',
+              key: const ValueKey('circuit-preview-count'),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
+              children: [
+                for (var channel = 0; channel < 4; channel++)
+                  Text(
+                    '${channel < names.length ? names[channel] : '通道 ${channel + 1}'} ${_integer(counts[channel])}',
+                    style: TextStyle(
+                      color: channel < colors.length
+                          ? _color(colors[channel], TerraColors.muted)
+                          : TerraColors.muted,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              removing
+                  ? '画布标出了将删除的线格与线色。同一格可含多色，其他线色保留。确认前不会修改电路。'
+                  : '画布显示规则引擎计算的完整路径与线色。同一格可含多色，确认前不会修改电路。',
+            ),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (preview != null)
+                FilledButton.icon(
+                  key: const ValueKey('circuit-confirm-preview'),
+                  onPressed: _busy || _committingPreview
+                      ? null
+                      : _commitPreview,
+                  icon: Icon(removing ? Icons.delete_outline : Icons.check),
+                  label: Text(
+                    _committingPreview
+                        ? '正在提交…'
+                        : removing
+                        ? '确认删除网络'
+                        : '确认布线',
+                  ),
+                ),
+              OutlinedButton.icon(
+                key: const ValueKey('circuit-cancel-preview'),
+                onPressed: _cancelPreviewPending || _committingPreview
+                    ? null
+                    : _cancelPreview,
+                icon: const Icon(Icons.close),
+                label: const Text('取消预览'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStage(List<Object?> colors) => SizedBox(
     height: 360,
     child: LayoutBuilder(
@@ -1001,19 +1226,37 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
                     );
                   });
                 },
-                child: CustomPaint(
-                  painter: _CircuitSchematic(
-                    world: _world,
-                    definitions: _definitions,
-                    origin: _origin,
-                    cell: _cell,
-                    selection: _map(_snapshot['selection']),
-                    selected: _selected,
-                    wireColors: colors
-                        .map((v) => _color(v, TerraColors.muted))
-                        .toList(),
-                  ),
-                  size: Size.infinite,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CustomPaint(
+                      painter: _CircuitSchematic(
+                        world: _world,
+                        definitions: _definitions,
+                        origin: _origin,
+                        cell: _cell,
+                        selection: _map(_snapshot['selection']),
+                        selected: _selected,
+                        wireColors: colors
+                            .map((v) => _color(v, TerraColors.muted))
+                            .toList(),
+                      ),
+                    ),
+                    if (_preview != null)
+                      IgnorePointer(
+                        child: CustomPaint(
+                          key: const ValueKey('circuit-preview-overlay'),
+                          painter: _CircuitPreviewOverlay(
+                            preview: _preview!,
+                            origin: _origin,
+                            cell: _cell,
+                            wireColors: colors
+                                .map((v) => _color(v, TerraColors.muted))
+                                .toList(),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -1307,6 +1550,101 @@ class _CircuitPropertiesState extends State<_CircuitProperties> {
       ],
     ),
   );
+}
+
+/// Paints only the bounded, immutable cell list returned by the rules engine.
+/// No routing or network traversal is performed in the widget.
+class _CircuitPreviewOverlay extends CustomPainter {
+  static const maxCells = 60000;
+  final Map<String, Object?> preview;
+  final Offset origin;
+  final double cell;
+  final List<Color> wireColors;
+
+  const _CircuitPreviewOverlay({
+    required this.preview,
+    required this.origin,
+    required this.cell,
+    required this.wireColors,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.clipRect(Offset.zero & size);
+    final visible = Rect.fromLTWH(
+      origin.dx,
+      origin.dy,
+      size.width / cell,
+      size.height / cell,
+    );
+    final cells = <(int, int), int>{};
+    for (final raw in _list(preview['cells']).take(maxCells)) {
+      if (raw is! List || raw.length != 3) continue;
+      cells[(_integer(raw[0]), _integer(raw[1]))] = _integer(raw[2]);
+    }
+    final removing = preview['kind'] == 'removeNetwork';
+    for (final entry in cells.entries) {
+      final (x, y) = entry.key;
+      if (!visible.overlaps(Rect.fromLTWH(x.toDouble(), y.toDouble(), 1, 1))) {
+        continue;
+      }
+      final rect = Rect.fromLTWH(
+        (x - origin.dx) * cell,
+        (y - origin.dy) * cell,
+        cell,
+        cell,
+      );
+      final accent = removing ? TerraColors.red : TerraColors.mint;
+      canvas.drawRect(rect, Paint()..color = accent.withValues(alpha: .22));
+      canvas.drawRect(
+        rect.deflate(math.min(1, cell / 8)),
+        Paint()
+          ..color = accent.withValues(alpha: .8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.min(1.5, math.max(.5, cell / 8)),
+      );
+      for (var channel = 0; channel < 4; channel++) {
+        final bit = 1 << channel;
+        if (entry.value & bit == 0) continue;
+        final paint = Paint()
+          ..color = channel < wireColors.length
+              ? wireColors[channel]
+              : TerraColors.muted
+          ..strokeWidth = math.min(3, math.max(1, cell / 10))
+          ..strokeCap = StrokeCap.round;
+        final shift = (channel - 1.5) * math.min(3, cell / 8);
+        final center = rect.center + Offset(shift, shift);
+        var connected = false;
+        for (final (dx, dy) in const [(1, 0), (-1, 0), (0, 1), (0, -1)]) {
+          if ((cells[(x + dx, y + dy)] ?? 0) & bit == 0) continue;
+          canvas.drawLine(
+            center,
+            center + Offset(dx * cell / 2, dy * cell / 2),
+            paint,
+          );
+          connected = true;
+        }
+        if (!connected) {
+          canvas.drawCircle(center, math.min(3, math.max(1, cell / 8)), paint);
+        }
+      }
+      if (removing && cell >= 8) {
+        final cross = rect.deflate(cell * .22);
+        final paint = Paint()
+          ..color = Colors.white.withValues(alpha: .75)
+          ..strokeWidth = math.min(2, cell / 12);
+        canvas.drawLine(cross.topLeft, cross.bottomRight, paint);
+        canvas.drawLine(cross.topRight, cross.bottomLeft, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CircuitPreviewOverlay oldDelegate) =>
+      oldDelegate.preview != preview ||
+      oldDelegate.origin != origin ||
+      oldDelegate.cell != cell ||
+      oldDelegate.wireColors != wireColors;
 }
 
 class _CircuitSchematic extends CustomPainter {

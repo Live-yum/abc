@@ -274,7 +274,9 @@
 			files = ();
 			inputPaths = ();
 			name = "Build TerraForge Engine";
-			outputPaths = ();
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/libabc_engine.a",
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
 			shellScript = "/bin/bash \"$PROJECT_DIR/../tool/build_apple_engine.sh\"";

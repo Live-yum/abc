@@ -28,6 +28,9 @@ or desktop 64-bit processes.
 
 `flutter build apk --release --no-pub` invokes the NDK through Gradle's externalNativeBuild,
 using CMake 3.31.1. Gradle packages `libabc_engine.so` for the selected ABIs.
+CI installs the pinned CMake distribution in an isolated Python environment and
+sets Android's `cmake.dir` explicitly, so it does not depend on an SDK image
+already containing that exact CMake version.
 The release build has no signing configuration and produces an unsigned APK; no
 production signing or Play Store publishing is configured. A local debug build
 uses Android's normal development tooling.
@@ -55,8 +58,10 @@ Flutter JIT and debugger entitlements remain; release adds no network access.
 `flutter build ios --release --no-codesign` runs the CMake engine build for the
 selected iOS SDK. The shim and TerraWasm static archives are merged into
 `libabc_engine.a`, then force-loaded into Runner. The Dart adapter uses
-`DynamicLibrary.process()`. These unsigned builds cannot be installed as App Store
-or signed device distributions without a separately authorized signing workflow.
+`DynamicLibrary.process()`. The Xcode engine phase declares the archive as an
+output, allowing the linker to wait for its producer. These unsigned builds
+cannot be installed as App Store or signed device distributions without a
+separately authorized signing workflow.
 
 ## Verification status
 
@@ -68,6 +73,10 @@ the same generated corpus through `flutter_js` 0.8.7 QuickJS plus the native FFI
 engine. The Linux runtime smoke and full 15-demo bundle tests are mandatory.
 
 Android, unsigned iOS/macOS, Linux and Web compilation are separate CI jobs.
+Successful build jobs retain downloadable artifacts for 14 days, named with the
+source head commit. Web and Linux are tar archives; Apple archives preserve app
+bundle permissions and links. Android and Apple outputs remain unsigned. These
+are CI build artifacts, not GitHub Releases or deployed applications.
 Configured checks do not establish that a remote run has passed. A successful
 compilation alone does not prove real-device FFI loading, sandbox dialogs, or game
 save round trips; those need platform runtime testing. Public CI uses generated

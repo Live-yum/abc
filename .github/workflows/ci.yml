@@ -76,6 +76,13 @@ jobs:
           node --test test/web/circuit_rules_lifecycle.cjs
           node test/web/circuit_rules_worker_smoke.cjs
       - run: flutter build web --release --no-pub --no-web-resources-cdn
+      - run: tar -czf build/terraforge-web.tar.gz -C build/web .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraforge-web-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/terraforge-web.tar.gz
+          if-no-files-found: error
+          retention-days: 14
 
   native-contract:
     name: Native engine ASan and UBSan contracts
@@ -129,9 +136,7 @@ jobs:
       - name: Native application tests with synthetic fixtures
         run: flutter test --no-pub --concurrency=1
       - name: Native circuit and fragment integration
-        run: |
-          dart run native/circuit_edit_smoke.dart
-          dart run native/world_circuit_fragments_smoke.dart build/fragments.wld build/fragment-proof
+        run: flutter test --no-pub --concurrency=1 native/circuit_integration_test.dart
       - name: Generate authoritative source and Web parity corpus
         run: |
           TERRA_CIRCUIT_SOURCE="$PWD/vendor/viewer-circuit" \
@@ -159,7 +164,21 @@ jobs:
           java-version: '17'
       - uses: ./.github/actions/setup-flutter
       - run: flutter pub get --enforce-lockfile
+      - name: Install pinned CMake for Android Gradle
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cmake-3.31.1"
+          "$RUNNER_TEMP/cmake-3.31.1/bin/pip" install --disable-pip-version-check cmake==3.31.1
+          cmake_root="$("$RUNNER_TEMP/cmake-3.31.1/bin/python" -c 'import cmake, pathlib; print(pathlib.Path(cmake.CMAKE_BIN_DIR).parent)')"
+          "$cmake_root/bin/cmake" --version
+          echo "$cmake_root/bin" >> "$GITHUB_PATH"
+          printf 'cmake.dir=%s\n' "$cmake_root" >> android/local.properties
       - run: flutter build apk --release --no-pub
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraforge-android-unsigned-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
   apple:
     name: macOS and unsigned iOS builds
@@ -175,7 +194,24 @@ jobs:
         run: flutter build macos --release --no-pub --config-only
       - name: Build macOS without signing
         run: xcodebuild -workspace macos/Runner.xcworkspace -scheme Runner -configuration Release -derivedDataPath build/macos-ci CODE_SIGNING_ALLOWED=NO build
+      - name: Verify macOS JavaScriptCore and native circuit runtime
+        run: |
+          export TERRAFORGE_ENGINE_LIBRARY="$PWD/build/macos-ci/Build/Products/Release/terraforge.app/Contents/Frameworks/libabc_engine.dylib"
+          test -f "$TERRAFORGE_ENGINE_LIBRARY"
+          flutter test --no-pub --concurrency=1 native/circuit_rules_runtime_smoke_test.dart native/circuit_rules_bundle_test.dart
       - run: flutter build ios --release --no-pub --no-codesign
+      - name: Package unsigned Apple apps
+        run: |
+          tar -czf build/terraforge-macos-unsigned.tar.gz -C build/macos-ci/Build/Products/Release terraforge.app
+          tar -czf build/terraforge-ios-unsigned.tar.gz -C build/ios/iphoneos Runner.app
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraforge-apple-unsigned-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/terraforge-macos-unsigned.tar.gz
+            build/terraforge-ios-unsigned.tar.gz
+          if-no-files-found: error
+          retention-days: 14
 
   linux:
     name: Linux desktop build
@@ -190,3 +226,10 @@ jobs:
       - uses: ./.github/actions/setup-flutter
       - run: flutter pub get --enforce-lockfile
       - run: flutter build linux --release --no-pub
+      - run: tar -czf build/terraforge-linux.tar.gz -C build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraforge-linux-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/terraforge-linux.tar.gz
+          if-no-files-found: error
+          retention-days: 14

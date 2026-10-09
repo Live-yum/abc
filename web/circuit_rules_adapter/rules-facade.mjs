@@ -5,11 +5,13 @@ import { DEFINITIONS, PALETTE, TARGET, LIMITS, WIRE_COLORS, WIRE_NAMES } from 'a
 import { newDocument, parseDocument, serializeDocument } from 'authoritative:model';
 import { createCircuitComputation } from 'authoritative:computation-session';
 import { circuitEditorBytes } from 'authoritative:memory';
+import { traceNetwork } from 'authoritative:routing';
 
 const SOURCE_COMMIT = __CIRCUIT_SOURCE_COMMIT__;
 const MAX_REPLY = 16 * 1024 * 1024;
 const MAX_RETAINED = 256 * 1024 * 1024;
 const MAX_EDIT_AREA = 250000;
+const MAX_PREVIEW_CELLS = 60000;
 const DEMOS = Object.freeze(['hello', 'register', 'logic', 'timer', 'pixel', 'gallery', 'lighting', 'lighting-extra', 'mechanisms', 'devices', 'effects', 'pulse', 'remaining', 'support', 'storage']);
 const fail = (code, message) => Object.assign(new Error(message), { code });
 const arity = (args, min, max = min) => {
@@ -39,7 +41,8 @@ export function createRulesFacade(tx) {
   }
   const computation = createCircuitComputation(tx, { admitBytes });
   function editorBytes(session) {
-    return circuitEditorBytes({ editor: session.editor, world: session.editor.world, baseline: session.baseline, trace: [], events: [] });
+    return circuitEditorBytes({ editor: session.editor, world: session.editor.world, baseline: session.baseline, trace: [], events: [] })
+      + (session.preview?.cells.length || 0) * 128;
   }
   function sessionFor(id = activeId) {
     if (!Number.isSafeInteger(id) || !editors.has(id)) throw fail('STALE_OPERATION', 'Circuit editor is closed or unavailable');
@@ -54,7 +57,10 @@ export function createRulesFacade(tx) {
     return { id, generation: s.generation, document: documentText(serializeDocument(editor.document)),
       dirty: editor.dirty, revision: editor.revision, canUndo: editor.undoStack.length > 0,
       canRedo: editor.redoStack.length > 0, selection: editor.selection,
-      clipboardAvailable: editor.clipboard !== null, canReset: s.baseline !== null };
+      clipboardAvailable: editor.clipboard !== null, canReset: s.baseline !== null,
+      preview: s.preview ? { kind: s.preview.kind, token: s.preview.token, editorId: id,
+        generation: s.preview.generation, revision: s.preview.revision,
+        cells: s.preview.cells, count: s.preview.cells.length, colourCounts: s.preview.colourCounts } : null };
   }
   function openEditor(document, replaceActive) {
     // Validate completely before releasing the existing, recoverable document.
@@ -67,7 +73,7 @@ export function createRulesFacade(tx) {
     if (replaceActive && activeId !== null) closeEditor(activeId);
     if (nextId >= Number.MAX_SAFE_INTEGER) throw fail('CIRCUIT_LIMIT', 'Circuit editor IDs exhausted');
     const id = ++nextId;
-    editors.set(id, { editor, baseline: null, computationId: null, generation: ++generation });
+    editors.set(id, { editor, baseline: null, computationId: null, generation: ++generation, preview: null });
     activeId = id;
     return snapshot(id);
   }
@@ -84,11 +90,68 @@ export function createRulesFacade(tx) {
     if (!object(r) || !Number.isSafeInteger(r.width) || !Number.isSafeInteger(r.height) || r.width < 1 || r.height < 1 || r.width * r.height > MAX_EDIT_AREA) throw fail('CIRCUIT_LIMIT', 'Editor selection exceeds the operation budget');
     point(r, world); point({ x: r.x + r.width - 1, y: r.y + r.height - 1 }, world);
   }
+  function wireMask(mask) {
+    if (!Number.isSafeInteger(mask) || mask < 1 || mask > 15) throw fail('CIRCUIT_COMMAND', 'Select at least one of the four wire colours');
+  }
+  function preview(id, method, args) {
+    const s = sessionFor(id), e = s.editor, route = method === 'previewRoute';
+    // A failed or newer preview must never leave an older plan confirmable.
+    s.preview = null;
+    arity(args, route ? 4 : 3);
+    const start = args[0], end = route ? args[1] : null,
+      mask = args[route ? 2 : 1], token = args[route ? 3 : 2];
+    point(start, e.world); if (route) point(end, e.world); wireMask(mask);
+    if (typeof token !== 'string' || token.length === 0 || token.length > 128) throw fail('CIRCUIT_COMMAND', 'Invalid preview request token');
+    if (route && Math.abs(start.x - end.x) + Math.abs(start.y - end.y) + 1 > MAX_PREVIEW_CELLS) throw fail('CIRCUIT_LIMIT', 'Route preview exceeds 60000 cells; shorten the route');
+    // Reserve temporary traversal/A* state before entering the unchanged
+    // reference functions. Their operation limits also bound sparse worlds.
+    admitBytes(LIMITS.operations * 256 + (route ? LIMITS.route * 1536 : 0));
+    // The reference search tracks incoming direction, so a legal path may
+    // revisit a router. Transport each wire cell once without changing its path.
+    const network = route
+      ? new Map(e.route(start, end, mask).map(p => [`${p.x},${p.y}`, mask]))
+      : traceNetwork(e.world, [start], mask);
+    const cells = [...network].map(([key, bits]) => [...key.split(',').map(Number), bits]);
+    if (cells.length === 0) throw fail('CIRCUIT_COMMAND', 'No wires of the selected colours at this point');
+    if (cells.length > MAX_PREVIEW_CELLS) throw fail('CIRCUIT_LIMIT', 'Network preview exceeds 60000 cells; use a smaller network or fewer colours');
+    admitBytes(cells.length * 128);
+    const colourCounts = [0, 0, 0, 0];
+    for (const cell of cells) for (let colour = 0; colour < 4; colour++) if (cell[2] & (1 << colour)) colourCounts[colour]++;
+    s.preview = { kind: route ? 'route' : 'removeNetwork', token, generation: s.generation,
+      revision: e.revision, start, mask, cells, colourCounts };
+    try {
+      const result = snapshot(id);
+      boundedString(JSON.stringify(result), MAX_REPLY, 'Circuit preview reply');
+      return result;
+    } catch (error) { s.preview = null; throw error; }
+  }
+  function commitPreview(id, args) {
+    arity(args, 1);
+    const s = sessionFor(id), e = s.editor, plan = s.preview;
+    if (!plan || args[0] !== plan.token || plan.generation !== s.generation || plan.revision !== e.revision) throw fail('STALE_OPERATION', 'Circuit preview is stale; preview the operation again');
+    admitBytes(serializeDocument(e.document).length * 8 + plan.cells.length * 1024
+      + (plan.kind === 'removeNetwork' ? LIMITS.operations * 256 : 0));
+    // Consume before the transaction: repeated confirmation or a failed
+    // transaction must require a fresh preview, never apply an old plan twice.
+    s.preview = null;
+    releaseSimulation(s);
+    e.change(plan.kind, () => {
+      if (plan.kind === 'removeNetwork') e.removeNetwork(plan.start, plan.mask);
+      else for (const [x, y, bits] of plan.cells) e.world.paintWire(x, y, bits);
+      e.settleGates();
+    });
+    s.baseline = null; s.generation = ++generation;
+    return snapshot(id);
+  }
   function command(id, input) {
     const s = sessionFor(id), e = s.editor, world = e.world;
     if (!object(input) || Object.keys(input).some(k => !['method', 'args'].includes(k))) throw fail('CIRCUIT_COMMAND', 'Invalid editor command');
     const { method, args } = input;
     if (!Array.isArray(args)) throw fail('CIRCUIT_COMMAND', 'Editor command args must be an array');
+    if (method === 'previewRoute' || method === 'previewNetwork') return preview(id, method, args);
+    if (method === 'commitPreview') return commitPreview(id, args);
+    if (method === 'cancelPreview') { arity(args, 0); s.preview = null; return snapshot(id); }
+    s.preview = null;
     let run, changes = true, atomic = true;
     switch (method) {
       case 'paint':
@@ -128,6 +191,7 @@ export function createRulesFacade(tx) {
   }
   function simulate(command) {
     const s = sessionFor(), before = documentText(serializeDocument(s.editor.document));
+    s.preview = null;
     if (s.computationId === null) s.computationId = computation.invoke('open', [before]).id;
     const response = computation.invoke('execute', [s.computationId, command]);
     boundedString(response.packet, MAX_REPLY, 'Circuit execution packet');
@@ -154,12 +218,13 @@ export function createRulesFacade(tx) {
     const updated = parseDocument(documentText(text));
     s.baseline ||= before;
     s.editor.document = updated;
+    s.generation = ++generation;
     return { ...snapshot(), packet };
   }
   function invokeRaw(method, args) {
     if (disposed) throw fail('COMPUTATION_OWNER_LOST', 'Circuit rules owner is closed');
     switch (method) {
-      case 'capabilities': arity(args, 0); return { available: true, apiVersion: 1, sourceCommit: SOURCE_COMMIT, limits: { documentBytes: LIMITS.bytes, replyBytes: MAX_REPLY, sessions: 4, triggerPoints: 8192, stepTicks: 60, operations: LIMITS.operations }, methods: ['catalog', 'editor.new', 'editor.open', 'editor.demo', 'editor.snapshot', 'editor.command', 'editor.close', 'simulation.command', 'simulation.reset', 'simulation.cancel', 'open', 'execute', 'close'], demos: DEMOS };
+      case 'capabilities': arity(args, 0); return { available: true, apiVersion: 1, sourceCommit: SOURCE_COMMIT, limits: { documentBytes: LIMITS.bytes, replyBytes: MAX_REPLY, sessions: 4, triggerPoints: 8192, stepTicks: 60, operations: LIMITS.operations, previewCells: MAX_PREVIEW_CELLS, routeVisits: LIMITS.route }, methods: ['catalog', 'editor.new', 'editor.open', 'editor.demo', 'editor.snapshot', 'editor.command', 'editor.close', 'simulation.command', 'simulation.reset', 'simulation.cancel', 'open', 'execute', 'close'], demos: DEMOS };
       case 'catalog': arity(args, 0); return { target: TARGET, definitions: DEFINITIONS, palette: PALETTE, demos: DEMOS, wireColors: WIRE_COLORS, wireNames: WIRE_NAMES, limits: LIMITS };
       case 'editor.new': arity(args, 0, 1); return openEditor(newDocument(args[0]), true);
       case 'editor.open': arity(args, 1); return openEditor(documentText(args[0]), true);
@@ -168,8 +233,8 @@ export function createRulesFacade(tx) {
       case 'editor.command': arity(args, 1); return command(activeId, args[0]);
       case 'editor.close': arity(args, 0); return activeId === null ? null : closeEditor(activeId);
       case 'simulation.command': arity(args, 1); return simulate(args[0]);
-      case 'simulation.cancel': { arity(args, 0); const s = sessionFor(); releaseSimulation(s); s.generation = ++generation; return snapshot(); }
-      case 'simulation.reset': { arity(args, 0); const s = sessionFor(); releaseSimulation(s); if (s.baseline !== null) { s.editor.document = parseDocument(s.baseline); s.baseline = null; } s.generation = ++generation; return snapshot(); }
+      case 'simulation.cancel': { arity(args, 0); const s = sessionFor(); s.preview = null; releaseSimulation(s); s.generation = ++generation; return snapshot(); }
+      case 'simulation.reset': { arity(args, 0); const s = sessionFor(); s.preview = null; releaseSimulation(s); if (s.baseline !== null) { s.editor.document = parseDocument(s.baseline); s.baseline = null; } s.generation = ++generation; return snapshot(); }
       case 'createDemo': arity(args, 1); return openEditor(createDemo(args[0]), false);
       case 'openDocument': arity(args, 1); return openEditor(documentText(args[0]), false);
       case 'snapshot': arity(args, 1); return snapshot(args[0]);

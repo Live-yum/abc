@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +39,7 @@ Map<String, Object?> fixture({bool dirty = false}) => {
   'snapshot': {
     'id': 1,
     'generation': 1,
+    'revision': 1,
     'dirty': dirty,
     'canUndo': true,
     'canRedo': false,
@@ -95,6 +97,25 @@ Map<String, Object?> fixture({bool dirty = false}) => {
   },
 };
 
+Map<String, Object?> previewFixture({String kind = 'route'}) {
+  final state = fixture();
+  (state['snapshot'] as Map)['preview'] = {
+    'kind': kind,
+    'token': 'owner-issued-preview-token',
+    'editorId': 1,
+    'generation': 1,
+    'revision': 1,
+    'cells': [
+      [0, 0, 3],
+      [0, 1, 1],
+      [1, 1, 2],
+    ],
+    'count': 3,
+    'colourCounts': [2, 2, 0, 0],
+  };
+  return state;
+}
+
 Future<void> mount(
   WidgetTester tester,
   Map<String, Object?> state,
@@ -126,7 +147,363 @@ Future<void> tapText(WidgetTester tester, String text) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> tapChip(WidgetTester tester, String label) async {
+  final chip = find.ancestor(
+    of: find.text(label),
+    matching: find.byType(FilterChip),
+  );
+  await tester.ensureVisible(chip);
+  await tester.tap(chip);
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  testWidgets(
+    'route preview uses original endpoints and commits only its token',
+    (tester) async {
+      addTearDown(tester.view.reset);
+      final calls = <(String, Map<String, Object?>)>[];
+      final commit = Completer<void>();
+      Future<void> dispatch(String name, Map<String, Object?> args) {
+        calls.add((name, args));
+        return name == 'rulesCommitPreview' ? commit.future : Future.value();
+      }
+
+      await mount(tester, fixture(), dispatch);
+      await tapChip(tester, '蓝线');
+      for (final entry in {
+        'X': '4',
+        'Y': '6',
+        '终点 X': '8',
+        '终点 Y': '9',
+      }.entries) {
+        final field = find.byKey(ValueKey('circuit-${entry.key}'));
+        await tester.ensureVisible(field);
+        await tester.enterText(field, entry.value);
+      }
+      await tapText(tester, '预览自动布线');
+      expect(calls.map((call) => [call.$1, call.$2]), [
+        [
+          'rulesPreviewRoute',
+          {'startX': 4, 'startY': 6, 'endX': 8, 'endY': 9, 'mask': 3},
+        ],
+      ]);
+      final state = previewFixture();
+      final originalDocument = jsonEncode(state['document']);
+      await mount(tester, state, dispatch);
+      expect(
+        find.byKey(const ValueKey('circuit-preview-overlay')),
+        findsOneWidget,
+      );
+      expect(find.text('3 个线格 · 4 条色线'), findsOneWidget);
+      expect(find.text('红线 2'), findsOneWidget);
+      expect(find.text('蓝线 2'), findsOneWidget);
+      expect(find.text('绿线 0'), findsOneWidget);
+      expect(find.text('黄线 0'), findsOneWidget);
+      final confirm = find.byKey(const ValueKey('circuit-confirm-preview'));
+      await tester.ensureVisible(confirm);
+      // Two taps before rebuilding must still submit the owner token only once.
+      await tester.tap(confirm);
+      await tester.tap(confirm);
+      await tester.pump();
+      expect(calls.last.$1, 'rulesCommitPreview');
+      expect(calls.last.$2, {'token': 'owner-issued-preview-token'});
+      expect(calls.length, 2);
+      expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+      expect(jsonEncode(state['document']), originalDocument);
+      commit.complete();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('circuit-preview-overlay')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'network deletion is previewed and cancel makes no document edit',
+    (tester) async {
+      addTearDown(tester.view.reset);
+      final calls = <(String, Map<String, Object?>)>[];
+      Future<void> dispatch(String name, Map<String, Object?> args) async {
+        calls.add((name, args));
+      }
+
+      await mount(tester, fixture(), dispatch);
+      await tapText(tester, '预览删除相连网络');
+      expect(calls.map((call) => [call.$1, call.$2]), [
+        [
+          'rulesPreviewNetwork',
+          {'x': 0, 'y': 0, 'mask': 1},
+        ],
+      ]);
+      final state = previewFixture(kind: 'removeNetwork');
+      final originalDocument = jsonEncode(state['document']);
+      await mount(tester, state, dispatch);
+      expect(find.text('确认删除网络'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('circuit-preview-overlay')),
+        findsOneWidget,
+      );
+      await tapText(tester, '取消预览');
+      expect(calls.last.$1, 'rulesCancelPreview');
+      expect(calls.last.$2, isEmpty);
+      expect(calls.length, 2);
+      expect(jsonEncode(state['document']), originalDocument);
+      expect(find.text('确认删除网络'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('circuit-preview-overlay')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('network canvas tool requests a preview instead of deleting', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    final calls = <(String, Map<String, Object?>)>[];
+    await mount(tester, fixture(), (name, args) async {
+      calls.add((name, args));
+    });
+    final tool = find.byKey(const ValueKey('circuit-tool-inspect'));
+    await tester.ensureVisible(tool);
+    await tester.tap(tool);
+    await tester.pumpAndSettle();
+    final network = find.text('删除相连网络').last;
+    await tester.ensureVisible(network);
+    await tester.tap(network);
+    await tester.pumpAndSettle();
+    final stage = find.byKey(const ValueKey('authoritative-circuit-stage'));
+    await tester.ensureVisible(stage);
+    await tester.tapAt(tester.getTopLeft(stage) + const Offset(36, 60));
+    await tester.pumpAndSettle();
+    expect(calls.map((call) => [call.$1, call.$2]), [
+      [
+        'rulesPreviewNetwork',
+        {'x': 1, 'y': 2, 'mask': 1},
+      ],
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('pending preview can be cancelled and late results stay hidden', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    final calls = <String>[];
+    final pending = Completer<void>();
+    Future<void> dispatch(String name, Map<String, Object?> args) {
+      calls.add(name);
+      return name == 'rulesPreviewRoute' ? pending.future : Future.value();
+    }
+
+    await mount(tester, fixture(), dispatch);
+    await tester.ensureVisible(find.text('预览自动布线'));
+    await tester.tap(find.text('预览自动布线'));
+    await tester.pump();
+    final cancel = find.byKey(const ValueKey('circuit-cancel-preview'));
+    expect(tester.widget<OutlinedButton>(cancel).onPressed, isNotNull);
+    await tester.ensureVisible(cancel);
+    await tester.tap(cancel);
+    await tester.pump();
+    expect(calls, ['rulesPreviewRoute', 'rulesCancelPreview']);
+    pending.complete();
+    await tester.pumpAndSettle();
+    await mount(tester, previewFixture(), dispatch);
+    expect(find.byKey(const ValueKey('circuit-preview-overlay')), findsNothing);
+    expect(find.byKey(const ValueKey('circuit-confirm-preview')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('owner-busy preview still allows cancellation', (tester) async {
+    addTearDown(tester.view.reset);
+    final state = previewFixture()..['busy'] = true;
+    final calls = <String>[];
+    await mount(tester, state, (name, args) async {
+      calls.add(name);
+    });
+    final confirm = find.byKey(const ValueKey('circuit-confirm-preview'));
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+    final cancel = find.byKey(const ValueKey('circuit-cancel-preview'));
+    await tester.ensureVisible(cancel);
+    await tester.tap(cancel);
+    await tester.pump();
+    expect(calls, ['rulesCancelPreview']);
+    expect(find.byKey(const ValueKey('circuit-preview-overlay')), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final input in ['终点 X', 'X', 'colour', 'tool']) {
+    testWidgets('$input change cancels the displayed preview', (tester) async {
+      addTearDown(tester.view.reset);
+      final calls = <String>[];
+      final state = previewFixture();
+      final originalDocument = jsonEncode(state['document']);
+      await mount(tester, state, (name, args) async {
+        calls.add(name);
+      });
+      if (input == 'colour') {
+        await tapChip(tester, '蓝线');
+      } else if (input == 'tool') {
+        final tool = find.byKey(const ValueKey('circuit-tool-inspect'));
+        await tester.ensureVisible(tool);
+        await tester.tap(tool);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('平移画布').last);
+        await tester.pumpAndSettle();
+      } else {
+        final field = find.byKey(ValueKey('circuit-$input'));
+        await tester.ensureVisible(field);
+        await tester.enterText(field, '7');
+        await tester.pumpAndSettle();
+      }
+      expect(calls, ['rulesCancelPreview']);
+      expect(
+        find.byKey(const ValueKey('circuit-preview-overlay')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('circuit-confirm-preview')),
+        findsNothing,
+      );
+      expect(jsonEncode(state['document']), originalDocument);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'new document identity removes stale preview and clears endpoints',
+    (tester) async {
+      addTearDown(tester.view.reset);
+      Future<void> dispatch(String name, Map<String, Object?> args) async {}
+      await mount(tester, fixture(), dispatch);
+      final endpoint = find.byKey(const ValueKey('circuit-终点 X'));
+      await tester.ensureVisible(endpoint);
+      await tester.enterText(endpoint, '29');
+      await mount(tester, previewFixture(), dispatch);
+      expect(
+        find.byKey(const ValueKey('circuit-preview-overlay')),
+        findsOneWidget,
+      );
+      final newer = previewFixture();
+      (newer['snapshot'] as Map)['id'] = 2;
+      await mount(tester, newer, dispatch);
+      expect(
+        find.byKey(const ValueKey('circuit-preview-overlay')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('circuit-confirm-preview')),
+        findsNothing,
+      );
+      expect(tester.widget<TextField>(endpoint).controller!.text, '0');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final changed in ['generation', 'revision']) {
+    testWidgets('new $changed removes a stale preview', (tester) async {
+      addTearDown(tester.view.reset);
+      Future<void> dispatch(String name, Map<String, Object?> args) async {}
+      await mount(tester, previewFixture(), dispatch);
+      expect(
+        find.byKey(const ValueKey('circuit-preview-overlay')),
+        findsOneWidget,
+      );
+      final newer = previewFixture();
+      (newer['snapshot'] as Map)[changed] = 2;
+      await mount(tester, newer, dispatch);
+      expect(
+        find.byKey(const ValueKey('circuit-preview-overlay')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('circuit-confirm-preview')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('rejected route has no confirmable edit and preserves document', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    final state = fixture();
+    final originalDocument = jsonEncode(state['document']);
+    final calls = <String>[];
+    await mount(tester, state, (name, args) async {
+      calls.add(name);
+      throw StateError('没有可用路径');
+    });
+    await tapText(tester, '预览自动布线');
+    expect(calls, ['rulesPreviewRoute']);
+    expect(find.textContaining('没有可用路径'), findsOneWidget);
+    expect(find.byKey(const ValueKey('circuit-preview-overlay')), findsNothing);
+    expect(find.byKey(const ValueKey('circuit-confirm-preview')), findsNothing);
+    expect(jsonEncode(state['document']), originalDocument);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed commit shows the owner error without duplicate edits', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    final pending = Completer<void>();
+    final calls = <(String, Map<String, Object?>)>[];
+    Future<void> dispatch(String name, Map<String, Object?> args) {
+      calls.add((name, args));
+      return pending.future;
+    }
+
+    final state = previewFixture(kind: 'removeNetwork');
+    final originalDocument = jsonEncode(state['document']);
+    await mount(tester, state, dispatch);
+    final confirm = find.byKey(const ValueKey('circuit-confirm-preview'));
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm);
+    await tester.tap(confirm);
+    await tester.pump();
+    expect(calls.length, 1);
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+    // The owner catches backend failures and publishes an error with the
+    // unchanged document, rather than throwing through the UI callback.
+    final rejected = {...state, 'error': '预览提交被规则引擎拒绝'};
+    await mount(tester, rejected, dispatch);
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('预览提交被规则引擎拒绝'), findsOneWidget);
+    expect(calls.length, 1);
+    expect(calls.single.$1, 'rulesCommitPreview');
+    expect(calls.single.$2, {'token': 'owner-issued-preview-token'});
+    expect(jsonEncode(rejected['document']), originalDocument);
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('preview controls and masked counts fit a narrow phone', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    await mount(
+      tester,
+      previewFixture(kind: 'removeNetwork'),
+      (name, args) async {},
+      width: 320,
+    );
+    await tester.ensureVisible(find.text('确认删除网络'));
+    await tester.pump();
+    expect(find.text('3 个线格 · 4 条色线'), findsOneWidget);
+    expect(find.text('取消预览'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('circuit-终点 X')));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('edit generations retain the current sparse viewport', (
     tester,
   ) async {

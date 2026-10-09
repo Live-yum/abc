@@ -15,8 +15,8 @@
   },
   "helper": {
     "path": "tool/build_circuit_rules.mjs",
-    "bytes": 6801,
-    "sha256": "d4a687fafe9145a0cce8cb819dd1c24ea421ea078e18e83d0632b3e72f853482"
+    "bytes": 6851,
+    "sha256": "1f4ef082587ead85204a627934b34bc4c57131bf34f32e3ee57f448758cc11a8"
   },
   "modules": [
     {
@@ -233,8 +233,8 @@
     },
     {
       "path": "web/circuit_rules_adapter/rules-facade.mjs",
-      "bytes": 13709,
-      "sha256": "a8760838e7322ccaf354ac0bd32831c44b7e9750d7d3d6c90a869c9aa72900bc"
+      "bytes": 17936,
+      "sha256": "d8a410913630478db33a3c17b7284870c4410423d38d568feaf0217abb81ae44"
     },
     {
       "path": "web/circuit_rules_adapter/web-entry.mjs",
@@ -267,13 +267,13 @@
   "outputs": [
     {
       "path": "assets/private/circuit_rules_native.js",
-      "bytes": 376956,
-      "sha256": "6601e4c4a6320d42578e6662f50e9880d7df5c0e7ddf8d3beaecfc204aaf4958"
+      "bytes": 379304,
+      "sha256": "a90f71eb90aff74ef1e610879304b2458660c0257dead66608ad7f41addc1eb5"
     },
     {
       "path": "web/engine/circuit_rules_web.js",
-      "bytes": 374952,
-      "sha256": "2ae54b9d8e0f29ed31008aa341bb61e478ac737dd101c51041894bcbdaab610f"
+      "bytes": 377302,
+      "sha256": "258360c069b79eba23d8ebbf1d331d6f28e8db8020ba83b6146bb2667d868b81"
     }
   ]
 }

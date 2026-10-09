@@ -86,5 +86,4 @@ Future<void> main() async {
   stdout.writeln(
     'Actual native per-colour network preview/delete/cancel/undo, safe A* route/core readback, and settings-preserving clipboard passed',
   );
-  exit(0);
 }

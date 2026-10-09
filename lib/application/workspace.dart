@@ -494,7 +494,8 @@ class Workspace extends TerraController {
       if (_busy &&
           action != 'rulesClose' &&
           action != 'rulesToggleRun' &&
-          action != 'rulesPause') {
+          action != 'rulesPause' &&
+          action != 'rulesCancelPreview') {
         return;
       }
       _stopCircuit();

@@ -39,9 +39,10 @@ required for the native/WASM transfer proof:
 
 ```sh
 python3 native/generate_circuit_fragment_fixture.py /tmp/abc-circuit-fragments.wld
-TERRAFORGE_ENGINE_LIBRARY=/path/to/libabc_engine.so dart run \
-  native/world_circuit_fragments_smoke.dart /tmp/abc-circuit-fragments.wld \
-  /tmp/abc-circuit-fragment-proof
+TERRAFORGE_ENGINE_LIBRARY=/path/to/libabc_engine.so \
+  TERRAFORGE_FRAGMENT_FIXTURE=/tmp/abc-circuit-fragments.wld \
+  TERRAFORGE_FRAGMENT_PROOF_DIR=/tmp/abc-circuit-fragment-proof \
+  flutter test --no-pub native/circuit_integration_test.dart
 node test/web/world_circuit_fragments_smoke.cjs /path/to/world.js \
   /path/to/world.wasm /tmp/abc-circuit-fragments.wld
 # Optional exact native/WASM byte comparison uses the native proof directory:

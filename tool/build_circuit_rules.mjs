@@ -33,6 +33,7 @@ const aliases = {
   model: 'features/circuit/domain/model.mjs',
   'computation-session': 'features/circuit/services/computation-session.mjs',
   memory: 'features/circuit/services/memory.mjs',
+  routing: 'features/circuit/domain/routing.mjs',
   'native-traversal': 'features/circuit/runtime/native-traversal.mjs',
 };
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
