@@ -37,18 +37,27 @@ jobs:
           echo "PUB_CACHE=$RUNNER_TEMP/pub-cache" >> "$GITHUB_ENV"
           "$sdk/bin/flutter" --version
       - name: Prepare independent Android project
+        timeout-minutes: 5
         run: |
           set -euo pipefail
-          flutter create --platforms=android --org=app.local --project-name=bds_location "$RUNNER_TEMP/bds-build"
+          flutter create --no-pub --platforms=android --org=app.local --project-name=bds_location "$RUNNER_TEMP/bds-build"
           cp examples/bds_location/pubspec.yaml examples/bds_location/analysis_options.yaml examples/bds_location/README.md "$RUNNER_TEMP/bds-build/"
           rm "$RUNNER_TEMP/bds-build/test/widget_test.dart"
           cp -R examples/bds_location/lib examples/bds_location/test examples/bds_location/ci "$RUNNER_TEMP/bds-build/"
           cd "$RUNNER_TEMP/bds-build"
           python3 ci/prepare_android.py
-          flutter pub get
+      - name: Resolve app dependencies
+        timeout-minutes: 5
+        run: cd "$RUNNER_TEMP/bds-build" && flutter pub get
+      - name: Analyze application
+        timeout-minutes: 3
+        run: |
+          cd "$RUNNER_TEMP/bds-build"
           dart format lib test
           flutter analyze --no-pub
-          flutter test --no-pub --reporter expanded
+      - name: Test permissions, cancellation, timeout, and screen
+        timeout-minutes: 3
+        run: cd "$RUNNER_TEMP/bds-build" && flutter test --no-pub --reporter expanded --timeout=30s
       - name: Build split release APKs with ephemeral test signing
         run: |
           set -euo pipefail

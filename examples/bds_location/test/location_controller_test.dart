@@ -43,7 +43,8 @@ void main() {
     expect(model.finalElapsed, isNotNull);
     expect(gateway.stream.hasListener, false);
     model.dispose();
-    await gateway.stream.close();
+    unawaited(gateway.stream.close());
+    await tester.pump();
   });
   testWidgets('service disabled offers settings without starting location', (tester) async {
     final gateway = FakeGateway()..enabled = false;
