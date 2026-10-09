@@ -1,0 +1,97 @@
+{
+  "source_repository": "https://github.com/misprit7/computerraria",
+  "source_commit": "0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8",
+  "license": "MIT; Copyright (c) 2023 Xander Naumenko",
+  "compiler": "rustc 1.85.1 (4eb161250 2025-03-15)",
+  "target": "riscv32i-unknown-none-elf",
+  "program_source_unchanged": true,
+  "build_only_fix": "Add non-riscv cfg attributes to SpriteGrid struct and impl",
+  "hardware_reset_pc": 0,
+  "runtime_validation": "Not yet executed on fresh actual wired CPU in this research task",
+  "binary_static_validation": {
+    "machine": 243,
+    "flags": 0,
+    "code_bytes": 2004,
+    "instruction_width": 32,
+    "no_M_extension_in_OP": true,
+    "opcode_counts": {
+      "0x17": 9,
+      "0x13": 179,
+      "0x23": 106,
+      "0x37": 8,
+      "0x33": 83,
+      "0x67": 11,
+      "0x6f": 13,
+      "0x3": 34,
+      "0x63": 58
+    }
+  },
+  "files": [
+    {
+      "path": "upstream/LICENSE",
+      "bytes": 1073,
+      "sha256": "c046a3b23796a077fff90096c2ff2b3e9b0501f459407949f3a5817ce56f730c"
+    },
+    {
+      "path": "upstream/app/pong/src/main.rs",
+      "bytes": 4267,
+      "sha256": "15122e0035f48ad98c3b77222fa47dbfe81888f95dfc469705431916a2a62052"
+    },
+    {
+      "path": "upstream/app/tdriver/src/lib.rs",
+      "bytes": 2455,
+      "sha256": "433a62ad74d658255a6c08055747160467148af4a465883f395415cab2669eb5"
+    },
+    {
+      "path": "upstream/app/tdriver/src/graphics.rs",
+      "bytes": 14423,
+      "sha256": "9e0e5c463f17536c81c80cfc728b4b52fb8464901d0cc6ebea225b868829a153"
+    },
+    {
+      "path": "upstream/app/tdriver/link.x",
+      "bytes": 723,
+      "sha256": "570081a43384194837d874991c8f2b5c4bd8344e04db926bbd6717c685c6dc27"
+    },
+    {
+      "path": "pong-build/app/tdriver/src/graphics.rs",
+      "bytes": 14497,
+      "sha256": "6aa7d7a3e966b282eff91e67fdcff791049ef65db4ce45e3f1e04768dfaaf404"
+    },
+    {
+      "path": "pong-build-fix.patch",
+      "bytes": 577,
+      "sha256": "b79bf11f0e28f6799b14b503ded82986da53058acffc3e038222e34204f4d7d9"
+    },
+    {
+      "path": "build-pong.sh",
+      "bytes": 1262,
+      "sha256": "2fe2f89b6a0bf57a829d69946367645fea019b23133f24ad19f4f145aa0f3877"
+    },
+    {
+      "path": "elf-to-rom.py",
+      "bytes": 2866,
+      "sha256": "18439b9c67a697f5afbc57355cc36dbde04e1fa9b1c2699b062d73144cc36ff1"
+    },
+    {
+      "path": "pong-build/output/pong.bin",
+      "bytes": 2288,
+      "sha256": "d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d"
+    },
+    {
+      "path": "pong-build/output/pong.elf",
+      "bytes": 20420,
+      "sha256": "4ac484d740ed7e485a53c9232ded661f9d82c9e82800c2d6dbba41e9dabd67d5"
+    },
+    {
+      "path": "pong-build/output/pong.txt",
+      "bytes": 6864,
+      "sha256": "cc002bd14ee3be359c09699731da64cebd294946d0a863ca46e05e2c1f8d3816"
+    },
+    {
+      "path": "pong-build/output/rustc-version.txt",
+      "bytes": 196,
+      "sha256": "e569d7e196207e57f20aae13320a6b747b909de88c603c401bdb14ee3eeb121c"
+    }
+  ],
+  "integration_note": "The build script now uses rustc on PATH (or COMPUTERRARIA_RUSTC), preserving installed toolchain locations. The following build-script hash reflects this packaging adaptation. Runtime verification is recorded separately in docs/COMPUTERRARIA.md."
+}

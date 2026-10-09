@@ -1,0 +1,211 @@
+{
+  "schema": "abc.sparse-lamp-query-evidence.v1",
+  "status": "passed-bounded-local-regression",
+  "baselineCommit": "9bb73baeaeacd296ccdd64c58753f449d1398cde",
+  "scope": "One first uncached four-anchor query per identified native library after import, plus synthetic sequential-oracle comparisons and one full actual WLD ON lifecycle per Native/Node backend. OS page cache uncontrolled. Not browser timing or steady Pong FPS.",
+  "source": {
+    "publicRepository": "https://github.com/misprit7/computerraria",
+    "bytes": 405983441,
+    "sha256": "55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33"
+  },
+  "baselineQuery": {
+    "source_sha256": "55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33",
+    "library_sha256": "9cd9d9892755956897591a2c4c74a60a6fb27816cc0b410b381d561fcc5e004e",
+    "parse_seconds": 1.1885824969940586,
+    "compile_seconds": 9.232927884993842,
+    "query_seconds": 3.40202725699055,
+    "records": [
+      [
+        2853,
+        1236,
+        0,
+        419
+      ],
+      [
+        15140,
+        4249,
+        0,
+        419
+      ],
+      [
+        2853,
+        4287,
+        0,
+        419
+      ],
+      [
+        2854,
+        4287,
+        0,
+        419
+      ]
+    ],
+    "io": {
+      "read_events": 388,
+      "read_bytes": 405811366,
+      "steps": 125573,
+      "jumps": []
+    },
+    "stats": [
+      2,
+      13,
+      15200,
+      7200,
+      7007,
+      499,
+      1704,
+      30,
+      15140,
+      7131,
+      72939714,
+      42603353,
+      13641575,
+      5121746,
+      15200,
+      13,
+      126704394,
+      145729458,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scope": "streamed native C engine via Python; exact four initialization anchors; no UI timing"
+  },
+  "candidateQuery": {
+    "source_sha256": "55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33",
+    "library_sha256": "3f06f7d83a74a67c8ea26f6fa7a40158d2a53884edf3bc1d768fb067d6e9c058",
+    "parse_seconds": 1.2509736829961184,
+    "compile_seconds": 9.723159758999827,
+    "query_seconds": 0.019727870996575803,
+    "records": [
+      [
+        2853,
+        1236,
+        0,
+        419
+      ],
+      [
+        15140,
+        4249,
+        0,
+        419
+      ],
+      [
+        2853,
+        4287,
+        0,
+        419
+      ],
+      [
+        2854,
+        4287,
+        0,
+        419
+      ]
+    ],
+    "io": {
+      "read_events": 3,
+      "read_bytes": 2213188,
+      "steps": 736,
+      "jumps": [
+        [
+          2854,
+          15104
+        ]
+      ]
+    },
+    "stats": [
+      2,
+      13,
+      15200,
+      7200,
+      7007,
+      499,
+      1704,
+      30,
+      15140,
+      7131,
+      72939714,
+      42603353,
+      13641575,
+      5121746,
+      15200,
+      13,
+      126704394,
+      145729458,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scope": "streamed native C engine via Python; exact four initialization anchors; no UI timing"
+  },
+  "exactRecordsAndStats": true,
+  "reproducibleContract": {
+    "status": "passed",
+    "semantic_entries": 48,
+    "semantic_sha256": "b3ea7200d120fa3b4841a151662fb1625159b1dbb72906d414f7619790acac8b",
+    "oracle_source_sha256": "169c75466e3a42c5156bbb3dec1bfdf3e8945d9e494d3733f9352ac787de3748",
+    "oracle": "checked-in v8 sequential query driver, compiled with the current surrounding engine in a temporary source tree",
+    "candidate_library_sha256": "3f06f7d83a74a67c8ea26f6fa7a40158d2a53884edf3bc1d768fb067d6e9c058"
+  },
+  "fullWorld": {
+    "nativeProjectionSha256": "4dcc293b11252755fc4192e1af5120758ceca7dcc704c0f34ad3f4a5797328c1",
+    "webProjectionSha256": "e459ef345801800116b1d08f0a0d9c522a14c4769ad7e9de151f75da4467c4ac",
+    "eachMatchesItsV8Projection": true,
+    "sameModeNativeWebMatches": true,
+    "covers": [
+      "48 physical CPU signatures",
+      "ROM mutation negative control",
+      "23 physical input probes",
+      "Moving Pong display and RAM",
+      "Idle mode switch",
+      "Complete WLD save and reopen",
+      "Zero engine, bridge and file owners after close"
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "native/vendor/TerraWasm/src/terra_circuit_query.c",
+      "bytes": 20267,
+      "sha256": "141d6b96c20cfdb96fbe804d29e9007486462acca785c7a0e4aa8bd6269a42df"
+    },
+    {
+      "path": "native/vendor/TerraWasm/SOURCE_MANIFEST.json",
+      "bytes": 16564,
+      "sha256": "a74ae0de4b2a94300d7d0b639261845e8c6a6d2e18638cc38441b948696d46ad"
+    },
+    {
+      "path": "web/engine/manifest.json",
+      "bytes": 929,
+      "sha256": "ffc13b42a878bd15ee226d3603c575d291afb066aa3bfa71312dc3a911b0acb8"
+    },
+    {
+      "path": "web/engine/world.wasm",
+      "bytes": 406930,
+      "sha256": "a9af2ce7aed0b4304c21f59e4500fd9116221588840e39af1e453459d8bf4a08"
+    },
+    {
+      "path": "build/native-query/libabc_engine.so",
+      "bytes": 1085368,
+      "sha256": "3f06f7d83a74a67c8ea26f6fa7a40158d2a53884edf3bc1d768fb067d6e9c058"
+    }
+  ],
+  "reports": {
+    "public-baseline.json": "d713bc4e161d6f9072c085bc1e8ed45a795f5d1fe44c3866b60a3c145930e2cf",
+    "public-candidate-final.json": "5acda00f1d32f84567d05f60a310343823654a77ebe0aa4fe69b6767826e82a7",
+    "full-native-on.json": "7d2b2fc822576c64166f8d2bbe1b30cceb6786cf1c870d82f1fc7b2ed0ed0911",
+    "full-web-on.json": "4370292b1310eaa2c0f5be39a05370a664ecf7c3168f1ccd0969b8b3bd087c60",
+    "reproducible-differential.json": "13113262f8926dac01467998588c3854d8462ebe7381e4e93b4fa775966c7325"
+  },
+  "limitations": [
+    "No new browser or target-device load-time claim. Final exact-head CI and browser reset/memory validation remain required.",
+    "An initial Native save attempt failed because its temporary filesystem lacked space. It is retained as failed evidence; the complete success used a dedicated workspace temporary directory.",
+    "OFF and ON keep their distinct PixelBox semantics. This shared query optimization adds no slower product mode and does not change physical simulation."
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "commit": "a5612b474fc8dc50d41b3bc6b87234d30ba97e02",
+  "status": "baseline-measured-comparison-inconclusive",
+  "scope": "Five Linux llvmpipe profile processes; each 2 warmup + 8 measured lifecycles using public synthetic small fixtures",
+  "comparison": "No baseline run selected; no regression acceptance established",
+  "frameCaveat": "Actual Flutter FrameTiming work durations. Display refresh unknown; nominal budget is not measured device calibration, FPS or compositor loss. P95 here uses nearest lower empirical sample.",
+  "memoryCaveat": "After-close GC-requested samples include retained benchmark measurements and renderer caches; trends do not alone prove leaks or stability.",
+  "runs": [
+    {
+      "report": "ui-profile.run-1.json",
+      "sha256": "8d8c737432498fb2b444c5a4abbf0ec9569df76a2c76c6ea54a7208fc7864080",
+      "elapsedSeconds": 701.245378342,
+      "operationKinds": 152,
+      "controllerVariants": 102,
+      "refreshRateHz": 0.0,
+      "frameBudgetSource": "60Hz fallback; verify device",
+      "warmFrames": 14633,
+      "buildFrameDurations": {
+        "count": 14633,
+        "medianMs": 0.672,
+        "p95Ms": 12.604,
+        "maxMs": 33.647
+      },
+      "rasterFrameDurations": {
+        "count": 14633,
+        "medianMs": 24.37,
+        "p95Ms": 42.132,
+        "maxMs": 83.686
+      },
+      "afterCloseWarmFirstRssMiB": 705.91796875,
+      "afterCloseLastRssMiB": 746.578125,
+      "observedMaxRssMiB": 772.12109375,
+      "afterCloseWarmFirstDartHeapMiB": 36.63401794433594,
+      "afterCloseLastDartHeapMiB": 39.46258544921875,
+      "retainedMeasurementFrames": [
+        7114,
+        23640
+      ]
+    },
+    {
+      "report": "ui-profile.run-2.json",
+      "sha256": "d4c10878e5660442c1c56ee7b624565e5957c37bf4fd2e7d05af0c3284335ca9",
+      "elapsedSeconds": 655.5641600060001,
+      "operationKinds": 152,
+      "controllerVariants": 102,
+      "refreshRateHz": 0.0,
+      "frameBudgetSource": "60Hz fallback; verify device",
+      "warmFrames": 14824,
+      "buildFrameDurations": {
+        "count": 14824,
+        "medianMs": 0.679,
+        "p95Ms": 12.812,
+        "maxMs": 38.077
+      },
+      "rasterFrameDurations": {
+        "count": 14824,
+        "medianMs": 24.316,
+        "p95Ms": 41.425,
+        "maxMs": 66.038
+      },
+      "afterCloseWarmFirstRssMiB": 688.98046875,
+      "afterCloseLastRssMiB": 778.203125,
+      "observedMaxRssMiB": 812.53515625,
+      "afterCloseWarmFirstDartHeapMiB": 39.920745849609375,
+      "afterCloseLastDartHeapMiB": 38.80351257324219,
+      "retainedMeasurementFrames": [
+        6912,
+        23672
+      ]
+    },
+    {
+      "report": "ui-profile.run-3.json",
+      "sha256": "e651650f42d7014e104a442d8a9a1f641423f9a1b24e8d88bcf82de145061f4e",
+      "elapsedSeconds": 657.9015244739999,
+      "operationKinds": 152,
+      "controllerVariants": 102,
+      "refreshRateHz": 0.0,
+      "frameBudgetSource": "60Hz fallback; verify device",
+      "warmFrames": 14648,
+      "buildFrameDurations": {
+        "count": 14648,
+        "medianMs": 0.693,
+        "p95Ms": 12.859,
+        "maxMs": 43.405
+      },
+      "rasterFrameDurations": {
+        "count": 14648,
+        "medianMs": 24.596,
+        "p95Ms": 42.301,
+        "maxMs": 67.044
+      },
+      "afterCloseWarmFirstRssMiB": 618.265625,
+      "afterCloseLastRssMiB": 800.375,
+      "observedMaxRssMiB": 833.3046875,
+      "afterCloseWarmFirstDartHeapMiB": 39.227325439453125,
+      "afterCloseLastDartHeapMiB": 43.42286682128906,
+      "retainedMeasurementFrames": [
+        7105,
+        23613
+      ]
+    },
+    {
+      "report": "ui-profile.run-4.json",
+      "sha256": "5e9ec18dcad1274746a2fe9a07fabaebd59a43e71bd957d92f6d15cffa161ac7",
+      "elapsedSeconds": 656.4263008620001,
+      "operationKinds": 152,
+      "controllerVariants": 102,
+      "refreshRateHz": 0.0,
+      "frameBudgetSource": "60Hz fallback; verify device",
+      "warmFrames": 14529,
+      "buildFrameDurations": {
+        "count": 14529,
+        "medianMs": 0.733,
+        "p95Ms": 13.297,
+        "maxMs": 44.296
+      },
+      "rasterFrameDurations": {
+        "count": 14529,
+        "medianMs": 25.163,
+        "p95Ms": 43.638,
+        "maxMs": 77.201
+      },
+      "afterCloseWarmFirstRssMiB": 642.53125,
+      "afterCloseLastRssMiB": 721.5,
+      "observedMaxRssMiB": 757.48828125,
+      "afterCloseWarmFirstDartHeapMiB": 36.556793212890625,
+      "afterCloseLastDartHeapMiB": 43.4058837890625,
+      "retainedMeasurementFrames": [
+        7040,
+        23469
+      ]
+    },
+    {
+      "report": "ui-profile.run-5.json",
+      "sha256": "1ddfedc27a2cff75e5f15386be5fc24e587c83c12e64c3d1ac7151608a0f480f",
+      "elapsedSeconds": 658.9853749120002,
+      "operationKinds": 152,
+      "controllerVariants": 102,
+      "refreshRateHz": 0.0,
+      "frameBudgetSource": "60Hz fallback; verify device",
+      "warmFrames": 14278,
+      "buildFrameDurations": {
+        "count": 14278,
+        "medianMs": 0.7455,
+        "p95Ms": 13.377,
+        "maxMs": 47.997
+      },
+      "rasterFrameDurations": {
+        "count": 14278,
+        "medianMs": 25.423,
+        "p95Ms": 43.902,
+        "maxMs": 89.545
+      },
+      "afterCloseWarmFirstRssMiB": 712.140625,
+      "afterCloseLastRssMiB": 771.0390625,
+      "observedMaxRssMiB": 775.796875,
+      "afterCloseWarmFirstDartHeapMiB": 40.270751953125,
+      "afterCloseLastDartHeapMiB": 38.71403503417969,
+      "retainedMeasurementFrames": [
+        6938,
+        23056
+      ]
+    }
+  ]
+}

@@ -1,0 +1,205 @@
+{
+  "commit": "366ebc57751cadfb077f968f4d5069028b3bf9a6",
+  "files": [
+    {
+      "path": "features/circuit/domain/actuation-data.mjs",
+      "sha": "aba1195cad9a065e6bfc26397c722e9f3dd57e6a",
+      "size": 3920
+    },
+    {
+      "path": "features/circuit/domain/actuation.mjs",
+      "sha": "210ecffa967585f9e452a20049e8190b56746b15",
+      "size": 6062
+    },
+    {
+      "path": "features/circuit/domain/catalog.mjs",
+      "sha": "41ebd3571ea4e4cae426b3c7ccf7b7259b42153f",
+      "size": 9868
+    },
+    {
+      "path": "features/circuit/domain/compat.mjs",
+      "sha": "eda352c272b932b2477d268132feec8ac0281565",
+      "size": 573
+    },
+    {
+      "path": "features/circuit/domain/device-state.mjs",
+      "sha": "b495a5338de0fcd90668bdd1ba799982ecb1852d",
+      "size": 6618
+    },
+    {
+      "path": "features/circuit/domain/devices-catalog.mjs",
+      "sha": "9ff2763f9399e17a1f969d34e776634f895a624b",
+      "size": 9695
+    },
+    {
+      "path": "features/circuit/domain/editor.mjs",
+      "sha": "baf0e2c72bf1be509b2d935f467ac9a0c2ff36f5",
+      "size": 30098
+    },
+    {
+      "path": "features/circuit/domain/effect-state.mjs",
+      "sha": "de1877b9e9ef40310668faac4d68afb8d2b4f749",
+      "size": 4874
+    },
+    {
+      "path": "features/circuit/domain/effects-catalog.mjs",
+      "sha": "be3514e1e61588bf399aa56b17cb00e4a516e46a",
+      "size": 7090
+    },
+    {
+      "path": "features/circuit/domain/engine.mjs",
+      "sha": "d578db61738e58ce1dfbe18ccbea6b0f8c0efbdf",
+      "size": 23499
+    },
+    {
+      "path": "features/circuit/domain/hello-example.mjs",
+      "sha": "5dc21bd30f3fbc08c7ee5cf5b34b5724a2edd5de",
+      "size": 4297
+    },
+    {
+      "path": "features/circuit/domain/lighting-batch1-catalog.mjs",
+      "sha": "4347c67fa219419f8a37007f59e7d2c40e158b98",
+      "size": 16032
+    },
+    {
+      "path": "features/circuit/domain/lighting-catalog.mjs",
+      "sha": "5013fdd8bfe8a3bf4d7bb4e58c5cc9256a27ec9d",
+      "size": 796
+    },
+    {
+      "path": "features/circuit/domain/lighting-extra-catalog.mjs",
+      "sha": "3105c47b654b84d474cda94e5d6a8fab9ab6bdcb",
+      "size": 10917
+    },
+    {
+      "path": "features/circuit/domain/mechanical-state.mjs",
+      "sha": "87fce1b0d475fecd347989bf61c4f9dc12e58480",
+      "size": 3162
+    },
+    {
+      "path": "features/circuit/domain/mechanism-state.mjs",
+      "sha": "fbd30d49289cf7741d7b187f6ff213f636f01065",
+      "size": 5540
+    },
+    {
+      "path": "features/circuit/domain/mechanisms-catalog.mjs",
+      "sha": "eb922cb864c1940a728131944af25f76f07c230c",
+      "size": 12212
+    },
+    {
+      "path": "features/circuit/domain/model.mjs",
+      "sha": "26f0902d8042c20c4844a622ce2daaf2f103d0a0",
+      "size": 13881
+    },
+    {
+      "path": "features/circuit/domain/native-tile-data.mjs",
+      "sha": "819dbf980ae89a8e5ef1b657f6908b45a14d877a",
+      "size": 114027
+    },
+    {
+      "path": "features/circuit/domain/native-tiles.mjs",
+      "sha": "ccb8bbaf1927ae6d5783c947feddd8ea7b60283d",
+      "size": 1718
+    },
+    {
+      "path": "features/circuit/domain/object-records.mjs",
+      "sha": "ee005f2394097277ae530edc9439e2ff842bbf81",
+      "size": 5368
+    },
+    {
+      "path": "features/circuit/domain/object-text.mjs",
+      "sha": "750f70983ca04034fdc7120eab5a158886cf4659",
+      "size": 5154
+    },
+    {
+      "path": "features/circuit/domain/one-shot-state.mjs",
+      "sha": "b2341d434a773c639079ab61a2ab747f2c4ef52f",
+      "size": 3132
+    },
+    {
+      "path": "features/circuit/domain/one-shot.mjs",
+      "sha": "88435adaa9c0f55847c32ac1a3a68147ff3a9f85",
+      "size": 4354
+    },
+    {
+      "path": "features/circuit/domain/placement-support-data.mjs",
+      "sha": "5658c52fe3e2b87496c8fc02d478e282250942b6",
+      "size": 23215
+    },
+    {
+      "path": "features/circuit/domain/placement-supports.mjs",
+      "sha": "a79ebe5073f5364a27134df893b7ba07f646959a",
+      "size": 24233
+    },
+    {
+      "path": "features/circuit/domain/pulse-catalog.mjs",
+      "sha": "e02c6543e63b66f953f8d7e38ca1a4ba9a09392e",
+      "size": 3085
+    },
+    {
+      "path": "features/circuit/domain/pulse-state.mjs",
+      "sha": "3f5350b80cdb16b38061909494c446740430c8b9",
+      "size": 4285
+    },
+    {
+      "path": "features/circuit/domain/register-example.mjs",
+      "sha": "2a909bef7585bb5d8e5cd06b69d84202adc6f8ef",
+      "size": 2915
+    },
+    {
+      "path": "features/circuit/domain/remaining-catalog.mjs",
+      "sha": "40cf5a5e40d9a11e875b60e928b987f9de42e519",
+      "size": 48962
+    },
+    {
+      "path": "features/circuit/domain/remaining-state.mjs",
+      "sha": "0731c71088ab62136e42fc58aea218b220be67e6",
+      "size": 9082
+    },
+    {
+      "path": "features/circuit/domain/routing.mjs",
+      "sha": "4c5132b6d95b4cc375e792c181f944d72023245b",
+      "size": 6600
+    },
+    {
+      "path": "features/circuit/domain/storage-catalog.mjs",
+      "sha": "9510fffd8792aabb5c4e6a8802d757779411f450",
+      "size": 30033
+    },
+    {
+      "path": "features/circuit/domain/storage-state.mjs",
+      "sha": "ebd71dcd6885c21f7f785e98222f253ec5353c41",
+      "size": 4103
+    },
+    {
+      "path": "features/circuit/domain/support-state.mjs",
+      "sha": "90b60906bc818e4cc558982c1651f0c2ce56baf9",
+      "size": 3852
+    },
+    {
+      "path": "features/circuit/domain/world-tile.mjs",
+      "sha": "9ebcfab225aaaafe546b7a9f4bfadcebba1f7d42",
+      "size": 4142
+    },
+    {
+      "path": "features/circuit/runtime/native-traversal.mjs",
+      "sha": "b1a466da2e1dbe3f11b07deb4c29637ceba04a43",
+      "size": 7262
+    },
+    {
+      "path": "features/circuit/services/computation-session.mjs",
+      "sha": "a021e3853a0d9c90c30c3c13ebc684ea39c05df5",
+      "size": 8981
+    },
+    {
+      "path": "features/circuit/services/memory.mjs",
+      "sha": "0566504a08b76c1e6c53dca40b46e7e4d76a8b55",
+      "size": 1720
+    },
+    {
+      "path": "shared/circuit-object-protocol.mjs",
+      "sha": "b79ca310c79e76241c43dcec244d876799c8d220",
+      "size": 3652
+    }
+  ]
+}

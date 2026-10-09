@@ -1,0 +1,202 @@
+{
+  "schema": "abc.local-host-wld-regression.v1",
+  "status": "passed",
+  "scope": "One fresh process per host and mode, original complete WLD, physical CPU/input/Pong, complete save/reopen, actual-worker smoke first. This is not the three-repetition clean-CI campaign or browser UI timing.",
+  "artifacts": {
+    "build/native-host-final/libabc_engine.so": {
+      "bytes": 1085368,
+      "sha256": "9cd9d9892755956897591a2c4c74a60a6fb27816cc0b410b381d561fcc5e004e"
+    },
+    "web/engine/world.js": {
+      "bytes": 21694,
+      "sha256": "50bb9a182ac1c596d5c67b84ced4d77c69a29d6bf41a4346807d46920962b47d"
+    },
+    "web/engine/world.wasm": {
+      "bytes": 406833,
+      "sha256": "e3221f879223fdc82f5bf22c00a987f98f1283f79435efb2d43de9f88551e941"
+    },
+    "assets/computer/pong.bin": {
+      "bytes": 2288,
+      "sha256": "d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d"
+    },
+    "public-computerraria.wld": {
+      "bytes": 405983441,
+      "sha256": "55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33"
+    }
+  },
+  "sourceAndEngineArtifactsUnchangedAfterRuns": true,
+  "actualWorkerSmoke": {
+    "status": "passed",
+    "sourcePreserved": true,
+    "sha256": "dfa35e7b1dd313324a6804cafacf61840fc4e12295de224d40614812d606fdde",
+    "scope": "Node actual worker WASM direct bridge parity, real thread termination, stale handles, reopen; not browser lifecycle proof"
+  },
+  "reports": {
+    "native-standard.json": {
+      "sha256": "eec4d94a3e50954ae27e89280425d66054d51bedf8eb086ddc3e3f83a05e611e",
+      "status": "passed",
+      "nativeBytesAfterClose": 0,
+      "executionFile": "native-standard.execution.json"
+    },
+    "native-optimized.json": {
+      "sha256": "d1cee30754cddc533de2290859e0e05dea46f53e6ecb8b4849f9172a7beab557",
+      "status": "passed",
+      "nativeBytesAfterClose": 0,
+      "executionFile": "native-optimized.execution.json"
+    },
+    "web-standard.json": {
+      "sha256": "7a848834857f0fbdb22de1014184b68eb6212c8e1377741c6ac97b8f194b7701",
+      "status": "passed",
+      "nativeBytesAfterClose": 0,
+      "executionFile": "web-standard.execution.json",
+      "bridgeBytesAfterClose": 0,
+      "openFilesAfterClose": 0,
+      "peakOpenFiles": 2
+    },
+    "web-optimized.json": {
+      "sha256": "b6098cb2535d57c97c75a95c9acdc4758800a5853851cabb3b79bb8a312cca6b",
+      "status": "passed",
+      "nativeBytesAfterClose": 0,
+      "executionFile": "web-optimized.execution.json",
+      "bridgeBytesAfterClose": 0,
+      "openFilesAfterClose": 0,
+      "peakOpenFiles": 2
+    }
+  },
+  "exactOldNewProjection": {
+    "native-standard": true,
+    "native-optimized": true,
+    "web-standard": true,
+    "web-optimized": true
+  },
+  "exactOffOnCpuRamInputProjection": true,
+  "exactSameModeNativeWebProjection": true,
+  "metrics": {
+    "native-standard": {
+      "backend": "native",
+      "mode": "standard",
+      "pixelRule": "game-tripwire-crossing",
+      "displayCompatibility": {
+        "status": "unsupported-under-game-rules",
+        "expectedBehavior": "recorded-without-pong-display-claim"
+      },
+      "clockMeasurementScope": "native-awaited-clock-command-v1",
+      "compoundRoundTrip": null,
+      "measuredClockSamples": 12,
+      "clockPulsesPerSecond": 1042.2787905766054,
+      "importMs": 12695,
+      "saveMs": 9329,
+      "oldImportMs": 16645,
+      "oldSaveMs": 13007,
+      "importReductionPercent": 23.73085010513668,
+      "saveReductionPercent": 28.277081571461522,
+      "elapsedMilliseconds": 52814,
+      "oldElapsedMilliseconds": 65896,
+      "maximumResidentSetSizeBytes": 398839808,
+      "memoryMeasurement": "Linux getrusage RUSAGE_CHILDREN peak RSS, includes complete child process including save/reopen",
+      "importRssBytes": 343261184,
+      "reportedPeakRssBytes": 361140224,
+      "oldReportedPeakRssBytes": 368050176
+    },
+    "native-optimized": {
+      "backend": "native",
+      "mode": "optimized",
+      "pixelRule": "wirehead-color-pair-wave",
+      "displayCompatibility": {
+        "status": "supported",
+        "expectedBehavior": "moving-pong"
+      },
+      "clockMeasurementScope": "native-awaited-clock-command-v1",
+      "compoundRoundTrip": null,
+      "measuredClockSamples": 12,
+      "clockPulsesPerSecond": 6207.5905576728,
+      "importMs": 12983,
+      "saveMs": 10056,
+      "oldImportMs": 15653,
+      "oldSaveMs": 13072,
+      "importReductionPercent": 17.05743307992078,
+      "saveReductionPercent": 23.07221542227662,
+      "elapsedMilliseconds": 50762,
+      "oldElapsedMilliseconds": 60456,
+      "maximumResidentSetSizeBytes": 405704704,
+      "memoryMeasurement": "Linux getrusage RUSAGE_CHILDREN peak RSS, includes complete child process including save/reopen",
+      "importRssBytes": 341852160,
+      "reportedPeakRssBytes": 360656896,
+      "oldReportedPeakRssBytes": 368513024
+    },
+    "web-standard": {
+      "backend": "web",
+      "mode": "standard",
+      "pixelRule": "game-tripwire-crossing",
+      "displayCompatibility": {
+        "status": "unsupported-under-game-rules",
+        "expectedBehavior": "recorded-without-pong-display-claim"
+      },
+      "clockMeasurementScope": "node-bridge-clock-stage-v1",
+      "compoundRoundTrip": {
+        "scope": "node-loopback-clock-and-selected-display-v1",
+        "samples": 12,
+        "medianMs": 134.46665100000064,
+        "p95Ms": 142.98981800000183,
+        "maxMs": 142.98981800000183
+      },
+      "measuredClockSamples": 12,
+      "clockPulsesPerSecond": 961.0693295848829,
+      "importMs": 17907.17323,
+      "saveMs": 14801.383507000002,
+      "oldImportMs": 22718.209112,
+      "oldSaveMs": 19119.720497000002,
+      "importReductionPercent": 21.177003250043857,
+      "saveReductionPercent": 22.58577467530225,
+      "elapsedMilliseconds": 71075.245521,
+      "oldElapsedMilliseconds": 85538.139304,
+      "maximumResidentSetSizeBytes": 297566208,
+      "memoryMeasurement": "Linux getrusage RUSAGE_CHILDREN peak RSS, includes complete child process including save/reopen",
+      "importRssBytes": 281624576,
+      "reportedPeakRssBytes": 297566208,
+      "oldReportedPeakRssBytes": 313622528
+    },
+    "web-optimized": {
+      "backend": "web",
+      "mode": "optimized",
+      "pixelRule": "wirehead-color-pair-wave",
+      "displayCompatibility": {
+        "status": "supported",
+        "expectedBehavior": "moving-pong"
+      },
+      "clockMeasurementScope": "node-bridge-clock-stage-v1",
+      "compoundRoundTrip": {
+        "scope": "node-loopback-clock-and-selected-display-v1",
+        "samples": 12,
+        "medianMs": 21.26314850000017,
+        "p95Ms": 23.36507200000051,
+        "maxMs": 23.36507200000051
+      },
+      "measuredClockSamples": 12,
+      "clockPulsesPerSecond": 6047.621975623601,
+      "importMs": 17448.556,
+      "saveMs": 14615.269788999998,
+      "oldImportMs": 22577.144217999998,
+      "oldSaveMs": 19328.816004000004,
+      "importReductionPercent": 22.71584115545998,
+      "saveReductionPercent": 24.386109392445768,
+      "elapsedMilliseconds": 65796.413373,
+      "oldElapsedMilliseconds": 80617.63176300001,
+      "maximumResidentSetSizeBytes": 298971136,
+      "memoryMeasurement": "Linux getrusage RUSAGE_CHILDREN peak RSS, includes complete child process including save/reopen",
+      "importRssBytes": 279318528,
+      "reportedPeakRssBytes": 298446848,
+      "oldReportedPeakRssBytes": 319176704
+    }
+  },
+  "limitations": [
+    "OFF retains game PixelBox rules and the actual Pong monitor is dark; moving Pong display is unsupported in that mode.",
+    "ON uses WireHead-style per-pixel wave pairing and verifies at least three actual moving-ball monitor states.",
+    "Full-WLD compound RPC uses Node same-process loopback and actual transferable ArrayBuffers; immutable file Blobs retained by identity. This does not prove browser File transfer, thread termination or UI FPS.",
+    "Import/save comparisons are single local runs per host; timing changes are observations, not a statistical speedup or browser promise.",
+    "Reported Native peak RSS is sampled before save; getrusage peak RSS covers the whole process. No pre-change whole-process getrusage peak was captured, so full-lifecycle memory reduction is not claimed.",
+    "A final pure-WLD long soak and the three-repetition clean-CI campaign are outside this bounded local regression."
+  ],
+  "baselineCommit": "a5612b474fc8dc50d41b3bc6b87234d30ba97e02",
+  "candidateIdentity": "Local host-hashing/owner-lifecycle source snapshot; bind to listed engine hashes, not an unassigned Git commit"
+}

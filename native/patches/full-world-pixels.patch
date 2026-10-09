@@ -1,0 +1,1278 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -50,2 +49,0 @@
+-    "${SRC_DIR}/terra_circuit_twld.c"
+-    "${SRC_DIR}/terra_circuit_twld_session.c"
+@@ -387 +384,0 @@
+-            add_terra_contract(terra_circuit_twld_unit tests/circuit_twld_unit.c ZLIB::ZLIB)
+--- a/README.md
++++ b/README.md
+@@ -142 +142 @@
+-新增的 [file-backed circuit world ABI v1](docs/CIRCUIT_WORLD_ABI_V1.md) 在 WLD/all 中实现整图网络预编译、紧凑状态、原生门/像素规则与流式 WLD/TWLD 读写。原有稀疏 traversal ABI 继续服务临时小电路。独立 PLR 不编入这些功能。
++本地补丁的 file-backed circuit world ABI v2 在 WLD/all 中实现整图网络预编译、紧凑状态、原生门/像素规则与单个 WLD 的流式读写。begin 仅接受 world、scratch、memory budget 与输出句柄四个参数；调用前应核对 build info 的 circuitWorldAbiVersion=2。原有稀疏 traversal ABI 继续服务临时小电路。独立 PLR 不编入这些功能。
+@@ -145 +145 @@
+-| 功能集合 | 本轮 Web Wasm 测量 | Wasm 功能预算 |
++| 功能集合 | 上游历史 Web Wasm 参考（非当前交付） | Wasm 功能预算 |
+@@ -151 +151,7 @@
+-以上数值来自 Emscripten 5.0.7 对本轮完整源码的发布前构建；正式提交会改变编译身份和文件摘要，精确交付尺寸以随包 manifest 为准。WLD/all 分别保留约 23/30 KiB 功能余量，独立 PLR 预算不变。新增代码的成本包括网络编译、紧凑状态、原版延迟门求值、取消回滚和流式保存。小程序主流程使用单个 `.wld`；原版单色像素盒按逐 `TripWire` 规则执行，`.twld` 彩屏不是使用或验收前提。
++以上尺寸仅保留为上游历史参考，不表示本地补丁后的交付大小。当前产物的尺寸、摘要、编译器与来源以随包 manifest 和实际 build info 为准。本地主流程仅使用单个 `.wld`，只保存 WLD；不含模组附属文件解析、彩色像素映射或游戏运行时。
++
++电路优化默认关闭。OFF 保留原版单色 PixelBox（type 445）逐 `TripWire` 双轴交叉 XOR 翻转。ON 启用设备去重 generation，并按 WireHead 式普通 PixelBox 规则，在同一门波内累计不同颜色实际网络组的命中奇偶性，于波末按组对数量的奇偶性翻转每个像素；跨波不累计。两模式共享物理门 VM，但像素执行边界不同。ON 并非完整 WireHead 模拟，也不复制其组对字典覆盖多个像素的行为。若某个像素同色的两个真实连接轴属于不同网络，启用 ON 返回 `TCW_UNSUPPORTED=-7`，保持当前模式与状态；无像素世界仍可启用。切换只在空闲边界生效，切换动作本身保留像素、ROM/RAM、输入和 RNG。来源与 MIT 声明见 [WireHead reference](../../../vendor/wirehead/README.md)。
++
++`circuitWorldWireHeadPixels=1` 明确标识 ON 规则能力。非 SAVE 的 READY 保留字：bit 0 始终为 0，bit 1 为 ON 模式，bit 2 为拓扑兼容资格，bit 3 为已选择 ON 像素规则；SAVE 的该字段为 0。主机在调用四参数 begin 前检查 `circuitWorldAbiVersion=2`，启用 ON 前检查其专用能力。
++
++冷加载优化在完整解码和校验每条 WLD 记录的前提下，仅枚举带线路与逻辑门的行，保持列、颜色、行顺序及原有交叉路由；分页并查集热循环使用内部访问器，瓦片读取合并重复边界检查并缓存同次读取的 future-layout 判定。编译临时行索引随后释放。优化不引入 CPU 指令解释器，不改变共享门 VM，也不减少输入校验范围。
+@@ -154 +160 @@
+-功能预算按实际新代码单独分配；所有 wrapper 上限仍为 128 KiB，WLD Web 的 64 MiB 初始内存和 160 MiB 最大线性内存保持原值。`scripts/check-artifact-size.mjs` 对每个 profile 校验尺寸与摘要，超过各自预算仍会失败。
++功能预算按实际新代码单独分配；所有 wrapper 上限仍为 128 KiB，本地 WLD Web 构建使用 64 MiB 初始内存，最大线性内存由构建参数指定（当前构建脚本为 256 MiB）。`scripts/check-artifact-size.mjs` 对每个 profile 校验尺寸与摘要，超过各自预算仍会失败。
+--- a/exports.wld.web.txt
++++ b/exports.wld.web.txt
+@@ -1,0 +2,4 @@
++_terra_sha256_create
++_terra_sha256_update
++_terra_sha256_final
++_terra_sha256_destroy
+--- a/include/terra_circuit_twld.h
++++ /dev/null
+@@ -1,64 +0,0 @@
+-#ifndef TERRA_CIRCUIT_TWLD_H
+-#define TERRA_CIRCUIT_TWLD_H
+-#include <stdint.h>
+-#ifdef __cplusplus
+-extern "C" {
+-#endif
+-
+-typedef struct TerraTwld TerraTwld;
+-typedef struct TerraTwldTile {
+-    uint32_t x, y;
+-    uint16_t saved_type;
+-    int16_t frame_x, frame_y;
+-    uint8_t paint, framed, color_pixel_box;
+-} TerraTwldTile;
+-enum TerraTwldEntityKind { TERRA_TWLD_TRAINING_DUMMY = 1, TERRA_TWLD_LOGIC_SENSOR = 2 };
+-typedef struct TerraTwldEntity { uint32_t x, y, kind; } TerraTwldEntity;
+-typedef struct TerraTwldCallbacks {
+-    int32_t (*tile)(void* context, const TerraTwldTile* tile);
+-    /* Optional fixed-size edit during output replay. saved_type, x/y, framed and
+-     * color_pixel_box cannot change. All unrecognized mod records remain intact. */
+-    int32_t (*patch)(void* context, TerraTwldTile* tile);
+-    int32_t (*output)(void* context, const uint8_t* bytes, uint32_t count);
+-    int32_t (*entity)(void* context, const TerraTwldEntity* entity);
+-} TerraTwldCallbacks;
+-typedef struct TerraTwldStats {
+-    uint64_t compressed_bytes, expanded_bytes, world_cells, mod_tiles, color_pixels;
+-    uint32_t map_entries, pass, complete, allocated_bytes, peak_bytes;
+-    uint32_t training_dummies, logic_sensors;
+-} TerraTwldStats;
+-enum TerraTwldStatus {
+-    TERRA_TWLD_OK = 0, TERRA_TWLD_MORE = 1,
+-    TERRA_TWLD_INVALID = -1, TERRA_TWLD_STATE = -2,
+-    TERRA_TWLD_OOM = -3, TERRA_TWLD_LIMIT = -4,
+-    TERRA_TWLD_FORMAT = -5, TERRA_TWLD_TRUNCATED = -6,
+-    TERRA_TWLD_CALLBACK = -7, TERRA_TWLD_CHANGED = -8
+-};
+-
+-/* Streaming gzip/NBT codec. The first pass reads metadata and skips large byte
+- * arrays. Rewind then feed the SAME compressed bytes to decode tileData using
+- * that map; this is required because tileMap follows tileData in actual tModLoader
+- * files. Buffers are bounded independently of the expanded world size. */
+-int32_t terra_twld_create(uint32_t width, uint32_t height, uint32_t max_bytes,
+-                          const TerraTwldCallbacks* callbacks, void* context,
+-                          TerraTwld** out);
+-int32_t terra_twld_feed(TerraTwld* codec, const uint8_t* bytes, uint32_t count, uint32_t final);
+-/* emit_output=1 streams a gzip result through callbacks.output. NBT bytes not
+- * explicitly patched are preserved exactly, including unknown tags and mods.
+- * Output callbacks must write to a staging sink and commit only after final OK. */
+-int32_t terra_twld_rewind(TerraTwld* codec, uint32_t emit_output);
+-/* Discard an incomplete or failed second pass after metadata was successfully
+- * read. Original map, compressed size and source CRC remain immutable. The next
+- * rewind starts again at source offset zero; feed is rejected until then.
+- * This performs no allocation and is also valid after a completed replay.
+- * Discard any staged output and callback-owned partial results separately.
+- * Failed rewind allocation/budget admission also leaves a retryable idle replay. */
+-int32_t terra_twld_abort_replay(TerraTwld* codec);
+-int32_t terra_twld_set_budget(TerraTwld* codec, uint32_t max_bytes);
+-void terra_twld_stats(const TerraTwld* codec, TerraTwldStats* out);
+-void terra_twld_destroy(TerraTwld* codec);
+-
+-#ifdef __cplusplus
+-}
+-#endif
+-#endif
+--- a/include/terra_circuit_world.h
++++ b/include/terra_circuit_world.h
+@@ -11 +11 @@
+-#define TERRA_CIRCUIT_WORLD_ABI 1u
++#define TERRA_CIRCUIT_WORLD_ABI 2u
+@@ -19 +19 @@
+-    TCW_FRAGMENTS = 7, TCW_EXTRACT = 8
++    TCW_FRAGMENTS = 7, TCW_EXTRACT = 8, TCW_PIXELS = 9, TCW_OPTIMIZATION = 10
+@@ -29,5 +29,4 @@
+- * Non-SAVE READY.reserved bit 0 identifies native WireHead pixel-wave rules.
+- * They are selected ONLY by a TWLD tile-map entry named WireHead/ColorPixelBox,
+- * never by the filename or saved numeric mod ID. Ordinary worlds retain vanilla
+- * per-TripWire PixelBox rules; the mod profile reproduces its documented same-
+- * colour custom pixel and cross-colour monochrome gate-wave pairing. */
++ * Non-SAVE READY.reserved bit 1 reports optimization (default OFF), bit 2
++ * reports compatible PixelBox topology, and bit 3 reports active WireHead-style
++ * same-wave different-colour pairing. Bit 0 remains reserved and always zero.
++ * OFF uses vanilla per-TripWire horizontal/vertical crossing rules. */
+@@ -47,3 +46,2 @@
+- * SAVE writes to a distinct
+- * source_id, plus aux_source_id when a TWLD sidecar was attached. Its final READY
+- * has result_kind=TCW_SAVE, result_count=WLD bytes, reserved=TWLD bytes.
++ * SAVE writes one WLD to a distinct source_id; aux_source_id must be zero. Its
++ * final READY has result_kind=TCW_SAVE, result_count=WLD bytes, reserved=0.
+@@ -53,0 +52,13 @@
++/* PIXELS uses a bounded x/y/width/height rectangle (area <=65536), flags=0.
++ * It returns only actual retained pixel tiles, sorted x then y; non-pixel cells
++ * are absent. Records match VIEWPORT's 16-byte layout. Wire masks derive from
++ * compiled ports; frames derive from the live pixel state. No source rescan,
++ * CPU decode, display-controller shortcut or framebuffer write is performed. */
++/* OPTIMIZATION uses mask=0 (vanilla pixel rule and per-trip mask clear,
++ * default) or 1 (generation dedup and WireHead-style ordinary PixelBox pairing
++ * across TripWire calls in the same gate wave). Only an idle boundary accepts
++ * the switch; switching itself preserves pixel frames, ROM/RAM, input and RNG.
++ * Both modes retain compiled topology and lazy lamps. Enabling returns
++ * TCW_UNSUPPORTED without changing state when a pixel's same-colour connected
++ * H/V axes have distinct networks that WireHead would merge. No-pixel worlds
++ * remain supported. This is not an unrestricted WireHead topology emulator. */
+@@ -67 +78 @@
+- * 1=incomplete/ambiguous object geometry, 2=section-backed object, 4=modded tile,
++ * 1=incomplete/ambiguous object geometry, 2=section-backed object, 4=reserved,
+@@ -94,2 +105,2 @@
+- * a new empty writable file, distinct from the world's immutable source. A zero
+- * twld_source_id means absent. Optional TWLD input is gzip/NBT streamed in C. */
++ * a new empty writable file, distinct from the world's immutable WLD source.
++ * ABI 2 accepts only the WLD and scratch sources. */
+@@ -97 +108 @@
+-    uint32_t twld_source_id, uint32_t twld_size, uint32_t max_bytes, uint32_t* out_handle);
++    uint32_t max_bytes, uint32_t* out_handle);
+--- a/src/terra_abi.c
++++ b/src/terra_abi.c
+@@ -83,0 +84 @@
++#define TERRAX_CIRCUIT_WORLD_ABI 2
+@@ -85,0 +87 @@
++#define TERRAX_CIRCUIT_WORLD_ABI 0
+@@ -95 +97 @@
+-    ",\"circuitWorldAbiVersion\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
++    ",\"circuitWorldAbiVersion\":" TERRAX_STRINGIFY(TERRAX_CIRCUIT_WORLD_ABI)
+@@ -97,0 +100,3 @@
++    ",\"circuitWorldPixels\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
++    ",\"circuitWorldOptimization\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
++    ",\"circuitWorldWireHeadPixels\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
+--- a/src/terra_circuit_compile.c
++++ b/src/terra_circuit_compile.c
+@@ -9,0 +10,5 @@
++/* Private hot-loop accessors preserve the paged layout and its allocation
++ * contract. Avoid crossing a translation-unit boundary for every DSU edge. */
++static inline uint32_t compile_word(const CxWords* words,uint32_t i){return words->pages[i/CX_WORDS][i&(CX_WORDS-1u)];}
++static inline void compile_set_word(CxWords* words,uint32_t i,uint32_t value){words->pages[i/CX_WORDS][i&(CX_WORDS-1u)]=value;}
++static inline uint32_t compile_wire_mask(const TxTile* t){return t->wire_red|(t->wire_blue<<1)|(t->wire_green<<2)|(t->wire_yellow<<3);}
+@@ -11 +16 @@
+-    while(cx_word(&w->parents,a)!=a){uint32_t p=cx_word(&w->parents,a);uint32_t pp=cx_word(&w->parents,p);cx_set_word(&w->parents,a,pp);a=pp;}return a;
++    for(;;){uint32_t p=compile_word(&w->parents,a);if(p==a)return a;uint32_t pp=compile_word(&w->parents,p);compile_set_word(&w->parents,a,pp);a=pp;}
+@@ -16 +21 @@
+-        uint32_t id=++w->labels_count;if(!cx_words_size(w,&w->parents,id+1u))return 0;cx_set_word(&w->parents,id,id);return id;
++        uint32_t id=++w->labels_count;if(!cx_words_size(w,&w->parents,id+1u))return 0;compile_set_word(&w->parents,id,id);return id;
+@@ -25 +30 @@
+-    a=root(w,a);b=root(w,b);if(a>b){uint32_t t=a;a=b;b=t;}cx_set_word(&w->parents,b,a);return a;
++    a=root(w,a);b=root(w,b);if(a>b){uint32_t t=a;a=b;b=t;}compile_set_word(&w->parents,b,a);return a;
+@@ -57,0 +63,28 @@
++/* Keep the original column/colour/row visit order, including every junction
++ * and PixelBox route. A gap in a colour's list is an unwired cell and breaks
++ * vertical connectivity. The previous frontier is read-only until all four
++ * colours finish; zeroed ids provide the next frontier's unwired cells. */
++static int sparse_wires(CxWorld* w,uint32_t* work){
++    while(*work&&w->col_colour<4u){
++        uint32_t c=w->col_colour;
++        const uint32_t* rows=w->compile_rows+c*w->height;
++        if(w->col_row==w->compile_wire_count[c]){++w->col_colour;w->col_row=0;w->up=0;continue;}
++        uint32_t index=w->col_row,y=rows[index];TxTile* t=w->column+y;
++        uint32_t left=w->front[y*4u+c],up=index&&rows[index-1u]+1u==y?w->up:0,right,down;
++        if(t->active&&(t->type==424u||t->type==445u)){
++            int route=t->type==424u?t->frame_x/18:0;
++            if(route<0||route>2)right=down=join(w,left,up);
++            else if(route==1){join(w,left,up);right=down=make_label(w);}
++            else if(route==2){right=up?up:make_label(w);down=left?left:make_label(w);}
++            else{right=left?left:make_label(w);down=up?up:make_label(w);}
++        }else right=down=join(w,left,up);
++        if(w->error)return -(int)w->error;
++        w->ids[y*4u+c]=right;w->up=down;
++        if(w->phase==CX_COUNT&&w->pixel_at_y[y])cx_pixel_ports(w,y,c,right,down);
++        ++w->col_row;--*work;
++    }
++    if(w->col_colour<4u)return TCW_CONTINUE;
++    memcpy(w->front,w->ids,w->height*16u);
++    if(w->phase==CX_COUNT)cx_devices_bind_column(w);
++    w->col_stage=4;w->emit_y=w->emit_colour=w->emit_phase=0;return 2;
++}
+@@ -60 +93,11 @@
+-    if(w->col_stage==0&&w->y==0){if(!checkpoint(w))return TCW_MEMORY;w->col_stage=1;}
++    int compiling=w->phase==CX_TOPOLOGY||w->phase==CX_COUNT||w->phase==CX_WRITE;
++    if(w->col_stage==0&&w->y==0){
++        if(!checkpoint(w))return TCW_MEMORY;
++        if(compiling){
++            memset(w->compile_wire_count,0,sizeof(w->compile_wire_count));w->compile_gate_count=0;
++            memset(w->ids,0,w->height*16u);memset(w->gate_at_y,0,w->height*4u);
++            if(w->phase==CX_TOPOLOGY)w->column_gates[w->x]=w->gate_cursor;
++            else w->gate_cursor=w->column_gates[w->x];
++        }
++        w->col_stage=1;
++    }
+@@ -62,0 +106 @@
++        uint32_t mask=compiling?compile_wire_mask(&t):0;
+@@ -65 +109 @@
+-        if(w->phase==CX_TOPOLOGY){uint32_t wires=cx_wire_mask(&t);if(wires){w->wire_cells+=run;if(w->x<w->min_x)w->min_x=w->x;if(w->x>w->max_x)w->max_x=w->x;if(w->y<w->min_y)w->min_y=w->y;if(w->y+run-1u>w->max_y)w->max_y=w->y+run-1u;}
++        if(w->phase==CX_TOPOLOGY){uint32_t wires=mask;if(wires){w->wire_cells+=run;if(w->x<w->min_x)w->min_x=w->x;if(w->x>w->max_x)w->max_x=w->x;if(w->y<w->min_y)w->min_y=w->y;if(w->y+run-1u>w->max_y)w->max_y=w->y+run-1u;}
+@@ -68,2 +112,20 @@
+-        w->y+=run;--*work;if(w->y==w->height){int s=cx_mod_column(w);if(s)return s;memset(w->pixel_at_y,0,w->height*4u);if(w->phase==CX_COUNT){s=cx_devices_column(w);if(s)return s;}w->col_stage=2;w->col_colour=0;w->col_row=0;w->up=0;}
+-    }
++        if(compiling){
++            /* Decode and validate every source record, but enumerate only the
++             * circuit-bearing rows. Border wires retain the existing two-tile
++             * exclusion; border and unwired gates still receive IDs. */
++            uint32_t first=w->y<2u?2u:w->y,end=w->y+run;
++            if(w->height>4u&&w->width>4u&&w->x>=2u&&w->x<w->width-2u){
++                if(end>w->height-2u)end=w->height-2u;
++                for(uint32_t c=0;c<4;c++)if(mask&(1u<<c)){
++                    uint32_t* rows=w->compile_rows+c*w->height;
++                    for(uint32_t y=first;y<end;y++)rows[w->compile_wire_count[c]++]=y;
++                }
++            }
++            if(t.active&&t.type==420u)for(uint32_t i=0;i<run;i++){
++                uint32_t y=w->y+i;w->gate_at_y[y]=++w->gate_cursor;
++                w->compile_rows[w->height*4u+w->compile_gate_count++]=y;
++            }
++        }
++        w->y+=run;--*work;if(w->y==w->height){memset(w->pixel_at_y,0,w->height*4u);if(w->phase==CX_COUNT){int s=cx_devices_column(w);if(s)return s;}w->col_stage=2;w->col_colour=0;w->col_row=0;w->up=0;}
++    }
++    if(compiling&&w->col_stage==2)return sparse_wires(w,work);
+@@ -73,2 +135,2 @@
+-        if(cx_inside_wiring(w,w->x,y)&&(cx_wire_mask(t)&(1u<<c))){
+-            if(t->active&&(t->type==424u||(t->type==445u&&!w->twld_state)||t->type==0xfffeu)){
++        if(cx_inside_wiring(w,w->x,y)&&(compile_wire_mask(t)&(1u<<c))){
++            if(t->active&&(t->type==424u||t->type==445u)){
+@@ -105 +167 @@
+-    for(uint32_t c=0;c<4;c++)g->nets[c]=(y+2u==w->height&&cx_inside_wiring(w,w->x,y-1u)&&cx_wire_mask(w->column+y)&(1u<<c))?w->ids[(y-1u)*4u+c]:w->ids[y*4u+c];
++    for(uint32_t c=0;c<4;c++)g->nets[c]=(y+2u==w->height&&cx_inside_wiring(w,w->x,y-1u)&&compile_wire_mask(w->column+y)&(1u<<c))?w->ids[(y-1u)*4u+c]:w->ids[y*4u+c];
+@@ -117 +179 @@
+-    uint32_t prev=cx_word(&w->previous_gate,net),delta=gate-prev;
++    uint32_t prev=compile_word(&w->previous_gate,net),delta=gate-prev;
+@@ -121,6 +183,6 @@
+-        uint32_t old=cx_word(&w->code_ends,net);if(!old)++w->action_count;
+-        if(n>UINT32_MAX-old||mn>UINT32_MAX-cx_word(&w->member_ends,net))return cx_fail(w,TCW_MEMORY,"one compiled circuit net exceeds the address space");
+-        cx_set_word(&w->code_ends,net,old+n);cx_set_word(&w->member_ends,net,cx_word(&w->member_ends,net)+mn);
+-        cx_set_word(&w->previous_gate,net,gate);return TCW_OK;
+-    }
+-    if(!w->record_length){memcpy(w->record,data,n);memcpy(w->record+n,member,mn);w->record_length=n;w->record_member_length=mn;w->record_position=0;w->record_store=cx_word(&w->code_ends,net);}
++        uint32_t old=compile_word(&w->code_ends,net);if(!old)++w->action_count;
++        if(n>UINT32_MAX-old||mn>UINT32_MAX-compile_word(&w->member_ends,net))return cx_fail(w,TCW_MEMORY,"one compiled circuit net exceeds the address space");
++        compile_set_word(&w->code_ends,net,old+n);compile_set_word(&w->member_ends,net,compile_word(&w->member_ends,net)+mn);
++        compile_set_word(&w->previous_gate,net,gate);return TCW_OK;
++    }
++    if(!w->record_length){memcpy(w->record,data,n);memcpy(w->record+n,member,mn);w->record_length=n;w->record_member_length=mn;w->record_position=0;w->record_store=compile_word(&w->code_ends,net);}
+@@ -130 +192 @@
+-    while(w->record_position<w->record_length+w->record_member_length){uint32_t mpos=w->record_position-w->record_length;uint32_t pos=cx_word(&w->member_ends,net)+mpos,bytes=w->record_member_length-mpos,bound=CX_PAGE_SIZE-(pos&(CX_PAGE_SIZE-1u));if(bytes>bound)bytes=bound;
++    while(w->record_position<w->record_length+w->record_member_length){uint32_t mpos=w->record_position-w->record_length;uint32_t pos=compile_word(&w->member_ends,net)+mpos,bytes=w->record_member_length-mpos,bound=CX_PAGE_SIZE-(pos&(CX_PAGE_SIZE-1u));if(bytes>bound)bytes=bound;
+@@ -133,2 +195,2 @@
+-    cx_set_word(&w->code_ends,net,cx_word(&w->code_ends,net)+w->record_length);cx_set_word(&w->member_ends,net,cx_word(&w->member_ends,net)+w->record_member_length);
+-    cx_set_word(&w->previous_gate,net,gate);w->record_length=0;return TCW_OK;
++    compile_set_word(&w->code_ends,net,compile_word(&w->code_ends,net)+w->record_length);compile_set_word(&w->member_ends,net,compile_word(&w->member_ends,net)+w->record_member_length);
++    compile_set_word(&w->previous_gate,net,gate);w->record_length=0;return TCW_OK;
+@@ -137,2 +199 @@
+-    while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y,gate=w->gate_at_y[y];
+-        if(!gate){++w->emit_y;--*work;continue;}
++    while(*work&&w->emit_y<w->compile_gate_count){uint32_t y=w->compile_rows[w->height*4u+w->emit_y],gate=w->gate_at_y[y];
+@@ -142 +203 @@
+-            for(uint32_t c=0;c<4;c++){uint32_t net=(y+2u==w->height&&cx_inside_wiring(w,w->x,y-1u)&&cx_wire_mask(w->column+y)&(1u<<c))?w->ids[(y-1u)*4u+c]:w->ids[y*4u+c];if(net){n+=cx_var_put(record+n,net);++no;}}
++            for(uint32_t c=0;c<4;c++){uint32_t net=(y+2u==w->height&&cx_inside_wiring(w,w->x,y-1u)&&compile_wire_mask(w->column+y)&(1u<<c))?w->ids[(y-1u)*4u+c]:w->ids[y*4u+c];if(net){n+=cx_var_put(record+n,net);++no;}}
+@@ -159 +220 @@
+-    return w->emit_y==w->height?TCW_OK:TCW_CONTINUE;
++    return w->emit_y==w->compile_gate_count?TCW_OK:TCW_CONTINUE;
+@@ -162,0 +224,2 @@
++    if((uint64_t)w->height*20u>UINT32_MAX)return 0;
++    w->compile_rows=(uint32_t*)cx_alloc(w,w->height*20u);if(!w->compile_rows)return 0;
+@@ -205 +268 @@
+-        if(!w->intern_stage){w->intern_end=cx_word(&w->code_ends,g);w->intern_member_end=cx_word(&w->member_ends,g);w->intern_copy=w->intern_member_copy=0;
++        if(!w->intern_stage){w->intern_end=compile_word(&w->code_ends,g);w->intern_member_end=compile_word(&w->member_ends,g);w->intern_copy=w->intern_member_copy=0;
+@@ -251 +314 @@
+-        else{w->phase=CX_FLUSH;w->flush_index=0;}
++        else{cx_free(w,w->compile_rows);w->compile_rows=NULL;w->phase=CX_FLUSH;w->flush_index=0;}
+@@ -255 +318 @@
+-        while(*work&&w->phase_cursor<=w->labels_count){uint32_t i=w->phase_cursor++,value=cx_word(&w->parents,i);--*work;
++        while(*work&&w->phase_cursor<=w->labels_count){uint32_t i=w->phase_cursor++,value=compile_word(&w->parents,i);--*work;
+@@ -257,2 +320,2 @@
+-            else if(w->phase==CX_NUMBER){if(value==i)cx_set_word(&w->parents,i,0x80000000u|++w->networks);}
+-            else if(w->phase==CX_REMAP){if(!(value&0x80000000u))cx_set_word(&w->parents,i,cx_word(&w->parents,value));}
++            else if(w->phase==CX_NUMBER){if(value==i)compile_set_word(&w->parents,i,0x80000000u|++w->networks);}
++            else if(w->phase==CX_REMAP){if(!(value&0x80000000u))compile_set_word(&w->parents,i,compile_word(&w->parents,value));}
+@@ -270 +333 @@
+-        while(*work&&w->phase_cursor<=w->networks){uint32_t g=w->phase_cursor++,n=cx_word(&w->code_ends,g),m=cx_word(&w->member_ends,g);--*work;
++        while(*work&&w->phase_cursor<=w->networks){uint32_t g=w->phase_cursor++,n=compile_word(&w->code_ends,g),m=compile_word(&w->member_ends,g);--*work;
+@@ -272 +335 @@
+-            cx_set_word(&w->code_ends,g,w->layout_code);cx_set_word(&w->member_ends,g,w->layout_member);cx_set_word(&w->previous_gate,g,0);w->layout_code+=n;w->layout_member+=m;
++            compile_set_word(&w->code_ends,g,w->layout_code);compile_set_word(&w->member_ends,g,w->layout_member);compile_set_word(&w->previous_gate,g,0);w->layout_code+=n;w->layout_member+=m;
+@@ -277 +340 @@
+-        for(uint32_t g=1;g<=w->networks;g++)cx_set_word(&w->member_ends,g,cx_word(&w->member_ends,g)+w->code_size);
++        for(uint32_t g=1;g<=w->networks;g++)compile_set_word(&w->member_ends,g,compile_word(&w->member_ends,g)+w->code_size);
+--- a/src/terra_circuit_devices.c
++++ b/src/terra_circuit_devices.c
+@@ -10,0 +11 @@
++extern void tx_set_error(const char*,const char*);
+@@ -23,0 +25,8 @@
++    /* Complete the previous pixel column's right-neighbour evidence without
++     * rescanning the world or retaining a world-sized adjacency map. */
++    for(uint32_t i=w->pixel_column_first;i<w->pixel_count;i++){
++        CxPixel* p=w->pixels+i;
++        if(p->x+1u==w->x&&cx_inside_wiring(w,w->x,p->y))
++            p->connected_h|=(uint8_t)(cx_wire_mask(w->column+p->y)&(p->cell_word>>24));
++    }
++    w->pixel_column_first=w->pixel_count;
+@@ -27 +36,7 @@
+-        if(t->type==445u||t->type==0xfffeu){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->custom=t->type==0xfffeu;p->state=p->initial=p->custom?(uint8_t)((t->frame_x/18)&3u)|((uint8_t)((t->frame_y/18)&3u)<<2):(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;}
++        if(t->type==445u){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->cell_word=t->type|((uint32_t)(t->active|(t->actuator<<1)|(t->inactive<<2)|(t->wall?16u:0u))<<16)|(cx_wire_mask(t)<<24);p->state=p->initial=(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;
++            if(cx_inside_wiring(w,w->x,y)){
++                uint32_t mask=cx_wire_mask(t);
++                if(w->x&&cx_inside_wiring(w,w->x-1u,y))p->connected_h=(uint8_t)(mask&cx_wire_mask(w->previous_columns[(w->x-1u)&1u]+y));
++                if(y&&cx_inside_wiring(w,w->x,y-1u))p->connected_v|=(uint8_t)(mask&cx_wire_mask(w->column+y-1u));
++                if(y+1u<w->height&&cx_inside_wiring(w,w->x,y+1u))p->connected_v|=(uint8_t)(mask&cx_wire_mask(w->column+y+1u));
++            }}
+@@ -37,0 +53,4 @@
++int cx_pixel_topology_supported(const CxPixel* p){
++    for(uint32_t c=0;c<4;c++)if((p->connected_h&p->connected_v&(1u<<c))&&p->h[c]!=p->v[c])return 0;
++    return 1;
++}
+@@ -40 +59,2 @@
+-    uint64_t count=0;for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(w->twld_state&&p->custom&&p->h[c]==p->v[c])continue;count+=p->h[c]!=0;if(!w->twld_state||p->custom)count+=p->v[c]!=0;}
++    w->pixel_compat_unsupported=0;for(uint32_t i=0;i<w->pixel_count;i++)w->pixel_compat_unsupported+=!cx_pixel_topology_supported(w->pixels+i);
++    uint64_t count=0;for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;count+=p->h[c]!=0;count+=p->v[c]!=0;}
+@@ -47 +67 @@
+-    for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(w->twld_state&&p->custom&&p->h[c]==p->v[c])continue;if(p->h[c])w->ports[w->port_count++]=(CxPort){p->h[c],i,0,(uint8_t)c,0};if((!w->twld_state||p->custom)&&p->v[c])w->ports[w->port_count++]=(CxPort){p->v[c],i,1,(uint8_t)c,0};}
++    for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(p->h[c])w->ports[w->port_count++]=(CxPort){p->h[c],i,0,(uint8_t)c,0};if(p->v[c])w->ports[w->port_count++]=(CxPort){p->v[c],i,1,(uint8_t)c,0};}
+@@ -56 +76,4 @@
+-int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->twld_state)w->pixel_touched_count=0;for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
++/* Device dedup belongs to one TripWire. Epochs avoid clearing every unrelated
++ * switch for each gate output; wrapping the epoch restores an empty generation.
++ * Epoch state is transient, so cancellation starts fresh on the next trip. */
++int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->optimization)w->pixel_touched_count=0;if(w->optimization){if(++w->wire_trip_epoch==0u){for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_epoch=0;w->wire_trip_epoch=1u;}}else for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
+@@ -65 +88 @@
+-        if(port->axis==3u){CxDevice* d=w->devices+port->pixel;uint32_t x=d->x-(uint32_t)(d->tile.frame_x%36/18),y=d->y-(uint32_t)(d->tile.frame_y%36/18);CxDevice* base=cx_device_find(w,x,y);if(!base)continue;uint32_t bit=1u<<port->colour;if(base->wire_hit_mask&bit)continue;
++        if(port->axis==3u){CxDevice* d=w->devices+port->pixel;uint32_t x=d->x-(uint32_t)(d->tile.frame_x%36/18),y=d->y-(uint32_t)(d->tile.frame_y%36/18);CxDevice* base=cx_device_find(w,x,y);if(!base)continue;if(w->optimization&&base->wire_hit_epoch!=w->wire_trip_epoch){base->wire_hit_epoch=w->wire_trip_epoch;base->wire_hit_mask=0;}uint32_t bit=1u<<port->colour;if(base->wire_hit_mask&bit)continue;
+@@ -69,2 +92,11 @@
+-        CxPixel* p=w->pixels+port->pixel;if(!p->marked){p->marked=1;w->pixel_touched[w->pixel_touched_count++]=port->pixel;}uint8_t bit=(uint8_t)(1u<<port->colour);
+-        if(w->twld_state){if(port->axis)p->hit_v^=bit;else p->hit_h^=bit;}else if(port->axis)p->hit_v|=bit;else p->hit_h|=bit;
++        CxPixel* p=w->pixels+port->pixel;uint8_t bit=(uint8_t)(1u<<port->colour);
++        if(w->optimization){
++            /* One group per colour: ignore the compiler's disconnected axis
++             * stub, and count a shared H/V group only once. An isolated wire
++             * uses its vertical seed, matching direct rectangle triggering. */
++            uint32_t chosen=(p->connected_h&bit)?p->h[port->colour]:p->v[port->colour];
++            if(port->net!=chosen||(port->axis&&p->h[port->colour]==chosen))continue;
++        }
++        if(!p->marked){p->marked=1;w->pixel_touched[w->pixel_touched_count++]=port->pixel;}
++        if(w->optimization)p->hit_h^=bit;
++        else if(port->axis)p->hit_v|=bit;else p->hit_h|=bit;
+@@ -75,3 +107,8 @@
+-        if(p->custom){uint8_t both=p->hit_h&p->hit_v;for(uint32_t c=0;c<4;c++)if(both&(1u<<c))p->state^=(uint8_t)(1u<<(3u-c));}
+-        else if(w->twld_state){uint32_t n=(uint32_t)__builtin_popcount((unsigned)p->hit_h);p->state^=(uint8_t)((n*(n-1u)/2u)&1u);}
+-        else if(p->hit_h&&p->hit_v)p->state^=1u;
++        if(w->optimization){
++            /* WireHead Accelerator records each group hit within one gate
++             * wave and toggles once for every differently coloured pair.
++             * Modulo two, C(popcount(group-hit parities),2) is equivalent,
++             * including repeated group hits in distinct TripWire calls. */
++            uint32_t n=(uint32_t)__builtin_popcount((unsigned)p->hit_h);
++            p->state^=(uint8_t)((n*(n-1u)/2u)&1u);
++        }else if(p->hit_h&&p->hit_v)p->state^=1u;
+@@ -81,3 +118,16 @@
+-int cx_trip_end(void* context){CxWorld* w=(CxWorld*)context;return w->twld_state?0:pixel_pass(w);}
+-int cx_wave_begin(void* context){(void)context;return 0;}
+-int cx_wave_end(void* context){CxWorld* w=(CxWorld*)context;return w->twld_state?pixel_pass(w):0;}
++int cx_trip_end(void* context){CxWorld* w=(CxWorld*)context;return w->optimization?0:pixel_pass(w);}
++int cx_pixel_wave_end(void* context){CxWorld* w=(CxWorld*)context;return w->optimization?pixel_pass(w):0;}
++int cx_set_optimization(CxWorld* w,uint32_t enabled){
++    if(w->phase!=CX_IDLE||w->event.kind)return TCW_STATE;
++    if(enabled>1u)return TCW_INVALID;
++    if(enabled&&w->pixel_compat_unsupported){
++        tx_set_error("TERRAX_CIRCUIT_UNSUPPORTED", "WireHead pixel topology requires merging differently connected axes of the same wire colour");
++        return TCW_UNSUPPORTED;
++    }
++    if(w->optimization!=enabled){
++        for(uint32_t i=0;i<w->device_count;i++){w->devices[i].wire_hit_mask=0;w->devices[i].wire_hit_epoch=0;}
++        for(uint32_t i=0;i<w->pixel_count;i++)w->pixels[i].hit_h=w->pixels[i].hit_v=w->pixels[i].marked=0;
++        w->pixel_touched_count=0;w->wire_trip_epoch=0;w->optimization=enabled;
++    }
++    return TCW_OK;
++}
+--- a/src/terra_circuit_fragments.inc
++++ b/src/terra_circuit_fragments.inc
+@@ -52 +52 @@
+-static int cf_known_single(uint32_t type){return type==19||type==427||(type>=435&&type<=439)||type==135||type==136||type==137||type==141||type==144||type==314||type==419||type==420||type==424||type==428||type==442||type==445||type==0xfffeu;}
++static int cf_known_single(uint32_t type){return type==19||type==427||(type>=435&&type<=439)||type==135||type==136||type==137||type==141||type==144||type==314||type==419||type==420||type==424||type==428||type==442||type==445;}
+@@ -54 +54 @@
+-    if(t->actuator||tx_tile_needs_section(t->type)||t->type==0xfffeu)return 1;
++    if(t->actuator||tx_tile_needs_section(t->type))return 1;
+@@ -73 +73 @@
+-    if(tx_tile_needs_section(t->type))flags|=2;if(t->type==0xfffeu)flags|=4;
++    if(tx_tile_needs_section(t->type))flags|=2;
+@@ -214 +214 @@
+-    if(cmd->kind==TCW_EXTRACT&&(cmd->flags&1)&&(!cmd->aux_source_id||cmd->aux_source_id==w->world_source||cmd->aux_source_id==w->scratch_source||cmd->aux_source_id==w->twld_source||cmd->width<32||cmd->width>CO_LIMIT||!cmd->height||cmd->height>CO_COUNT))return TCW_INVALID;
++    if(cmd->kind==TCW_EXTRACT&&(cmd->flags&1)&&(!cmd->aux_source_id||cmd->aux_source_id==w->world_source||cmd->aux_source_id==w->scratch_source||cmd->width<32||cmd->width>CO_LIMIT||!cmd->height||cmd->height>CO_COUNT))return TCW_INVALID;
+--- a/src/terra_circuit_query.c
++++ b/src/terra_circuit_query.c
+@@ -18,2 +18,2 @@
+-static int routing(CxWorld* w,const TxTile* t){if(!t->active)return -1;if(t->type==424u){int r=t->frame_x/18;return r>=0&&r<=2?r:-1;}if(t->type==0xfffeu||(t->type==445u&&!w->twld_state))return 0;return -1;}
+-static uint32_t entering_net(CxWorld* w,const CxBinding* b,uint32_t colour,uint32_t direction){int r=routing(w,&b->tile);int other=r==0?direction>=2u:r==1?(direction==1u||direction==3u):r==2?(direction==1u||direction==2u):0;return other?b->opposite[colour]:b->nets[colour];}
++static int routing(const TxTile* t){if(!t->active)return -1;if(t->type==424u){int r=t->frame_x/18;return r>=0&&r<=2?r:-1;}if(t->type==445u)return 0;return -1;}
++static uint32_t entering_net(const CxBinding* b,uint32_t colour,uint32_t direction){int r=routing(&b->tile);int other=r==0?direction>=2u:r==1?(direction==1u||direction==3u):r==2?(direction==1u||direction==2u):0;return other?b->opposite[colour]:b->nets[colour];}
+@@ -21,3 +21,8 @@
+-    if(!(cx_wire_mask(&b->tile)&(1u<<colour)))return 0;if(cx_inside_wiring(w,b->x,b->y))return b->nets[colour];
+-    const int dx[4]={0,0,1,-1},dy[4]={1,-1,0,0};int r=routing(w,&b->tile);
+-    for(uint32_t d=0;d<4u;d++){if(r>=0&&d!=(r==1?3u:r==2?2u:0u))continue;int64_t x=(int64_t)b->x+dx[d],y=(int64_t)b->y+dy[d];if(x<0||y<0||!cx_inside_wiring(w,(uint32_t)x,(uint32_t)y))continue;CxBinding* inside=find_binding(w,(uint32_t)x,(uint32_t)y);if(inside)return entering_net(w,inside,colour,d);}
++    if(!(cx_wire_mask(&b->tile)&(1u<<colour)))return 0;if(cx_inside_wiring(w,b->x,b->y)){
++        if(w->optimization&&b->tile.active&&b->tile.type==445u){
++            uint32_t i=cx_pixel_find(w,b->x,b->y);if(i!=CX_NONE){CxPixel* p=w->pixels+i;return (p->connected_h&(1u<<colour))?p->h[colour]:p->v[colour];}
++        }
++        return b->nets[colour];
++    }
++    const int dx[4]={0,0,1,-1},dy[4]={1,-1,0,0};int r=routing(&b->tile);
++    for(uint32_t d=0;d<4u;d++){if(r>=0&&d!=(r==1?3u:r==2?2u:0u))continue;int64_t x=(int64_t)b->x+dx[d],y=(int64_t)b->y+dy[d];if(x<0||y<0||!cx_inside_wiring(w,(uint32_t)x,(uint32_t)y))continue;CxBinding* inside=find_binding(w,(uint32_t)x,(uint32_t)y);if(inside)return entering_net(inside,colour,d);}
+@@ -52 +57 @@
+-    uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);if(t.type==0xfffeu)flags|=8u;
++    uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);
+@@ -56 +61,14 @@
+-    while(*work&&w->x<w->query_x1){int status=cx_scan_step(w,work);if(status<0||w->event.kind)return status;if(status!=2)return TCW_CONTINUE;
++    while(*work&&w->x<w->query_x1){
++        /* READ_LAMPS needs only requested columns. Resume from the next
++         * checkpoint only at a completed-column boundary, never while a
++         * column or its duplicate points are still being consumed. */
++        if(w->command.kind==TCW_READ_LAMPS&&w->col_stage==0&&w->y==0&&w->point_index<w->point_count){
++            uint32_t next=w->points[w->point_index].x;
++            if(w->checkpoint_index[next/CX_CHECK_COLUMNS].column>w->x){
++                seek_checkpoint(w,next);
++                /* Bound each step to one frontier restore and let hosts
++                 * observe cancellation before reading the new interval. */
++                *work=0;return TCW_CONTINUE;
++            }
++        }
++        int status=cx_scan_step(w,work);if(status<0||w->event.kind)return status;if(status!=2)return TCW_CONTINUE;
+@@ -101,0 +120,17 @@
++static int query_pixels(CxWorld* w,const TerraCircuitWorldCommand* cmd){
++    if(!cmd->width||!cmd->height||cmd->x>=w->width||cmd->y>=w->height||cmd->width>w->width-cmd->x||cmd->height>w->height-cmd->y||(uint64_t)cmd->width*cmd->height>65536u||cmd->data_count||cmd->flags)return TCW_INVALID;
++    uint32_t lo=0,hi=w->pixel_count;
++    while(lo<hi){uint32_t m=lo+(hi-lo)/2u;if(w->pixels[m].x<cmd->x)lo=m+1u;else hi=m;}
++    uint32_t first=lo,count=0;
++    for(uint32_t i=first;i<w->pixel_count&&w->pixels[i].x<cmd->x+cmd->width;i++)if(w->pixels[i].y>=cmd->y&&w->pixels[i].y<cmd->y+cmd->height)++count;
++    int s=reserve_result(w,count);if(s)return s;
++    w->result_count=0;
++    for(uint32_t i=first;i<w->pixel_count&&w->pixels[i].x<cmd->x+cmd->width;i++){
++        CxPixel* p=w->pixels+i;if(p->y<cmd->y||p->y>=cmd->y+cmd->height)continue;
++        uint32_t* out=w->result+w->result_count++*4u;
++        out[0]=p->x;out[1]=p->y;out[2]=p->cell_word;
++        if(out[2]&(2u<<16)){CxDevice* d=cx_device_find(w,p->x,p->y);if(d)out[2]=(out[2]&~(4u<<16))|((uint32_t)d->tile.inactive<<18);}
++        out[3]=18u*p->state;
++    }
++    w->command=*cmd;cx_emit(w,TCW_RESULT,0,0,w->result_count*16u,w->result);w->event.result_kind=TCW_PIXELS;w->event.result_count=w->result_count;return TCW_CONTINUE;
++}
+@@ -104 +139 @@
+-    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=1||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_EXTRACT||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
++    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=TERRA_CIRCUIT_WORLD_ABI||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_OPTIMIZATION||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
+@@ -106,0 +142,6 @@
++    if(cmd.kind==TCW_OPTIMIZATION){
++        if(cmd.mask>1u||cmd.data_count||cmd.flags)return TCW_INVALID;
++        int status=cx_set_optimization(w,cmd.mask);if(status)return status;
++        w->command=cmd;return TCW_OK;
++    }
++    if(cmd.kind==TCW_PIXELS)return query_pixels(w,&cmd);
+@@ -111 +152 @@
+-    if(cmd.kind==TCW_SAVE){if(!cmd.source_id||cmd.source_id==w->world_source||cmd.source_id==w->scratch_source||cmd.source_id==w->twld_source)return TCW_INVALID;if(w->twld&&(!cmd.aux_source_id||cmd.aux_source_id==cmd.source_id||cmd.aux_source_id==w->world_source||cmd.aux_source_id==w->scratch_source||cmd.aux_source_id==w->twld_source))return TCW_INVALID;w->command=cmd;w->output_source=cmd.source_id;w->output_offset=0;w->output_length=0;w->save_cursor=0;w->twld_saved_size=0;w->phase=CX_SAVE_PREFIX;w->input_length=0;return TCW_OK;}
++    if(cmd.kind==TCW_SAVE){if(!cmd.source_id||cmd.source_id==w->world_source||cmd.source_id==w->scratch_source||cmd.aux_source_id)return TCW_INVALID;w->command=cmd;w->output_source=cmd.source_id;w->output_offset=0;w->output_length=0;w->save_cursor=0;w->phase=CX_SAVE_PREFIX;w->input_length=0;return TCW_OK;}
+@@ -141 +182 @@
+-            while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y;TxTile t=w->column[y];cx_current_tile(w,w->x,y,point_gate(w,y),&t,w->ids+y*4u);if(t.type==0xfffeu&&!cx_mod_vanilla(w,w->x,y,&t))return TCW_FORMAT;t.same=0;
++            while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y;TxTile t=w->column[y];cx_current_tile(w,w->x,y,point_gate(w,y),&t,w->ids+y*4u);t.same=0;
+--- a/src/terra_circuit_rules.c
++++ b/src/terra_circuit_rules.c
+@@ -116 +116 @@
+-    cb.trip_begin=cx_trip_begin;cb.net_hit=cx_net_hit;cb.trip_end=cx_trip_end;cb.wave_begin=cx_wave_begin;cb.wave_end=cx_wave_end;
++    cb.trip_begin=cx_trip_begin;cb.net_hit=cx_net_hit;cb.trip_end=cx_trip_end;cb.wave_end=cx_pixel_wave_end;
+@@ -132 +132 @@
+-    else if(t->active&&(t->type==445u||t->type==0xfffeu)){uint32_t i=cx_pixel_find(w,x,y);if(i!=CX_NONE){CxPixel* p=w->pixels+i;t->frame_x=(int16_t)(18u*(p->custom?p->state&3u:p->state));if(p->custom)t->frame_y=(int16_t)(18u*((p->state>>2)&3u));}}
++    else if(t->active&&t->type==445u){uint32_t i=cx_pixel_find(w,x,y);if(i!=CX_NONE)t->frame_x=(int16_t)(18u*w->pixels[i].state);}
+--- a/src/terra_circuit_twld.c
++++ /dev/null
+@@ -1,602 +0,0 @@
+-/* tModLoader gzip TagCompound/NBT and TileIO stream codec.
+- * TileIO reference: tModLoader/tModLoader@2da2c59a6fd84990a5e01e48bc0e99dd0de87ee2,
+- * patches/tModLoader/Terraria/ModLoader/IO/TileIO_Basic.cs.
+- * Metadata is read before a second streaming pass because tileMap can occur after
+- * a several-hundred-megabyte tileData array. No expanded world array is retained.
+- */
+-#include "terra_circuit_twld.h"
+-#include <limits.h>
+-#include <stddef.h>
+-#include <string.h>
+-#include <zlib.h>
+-
+-extern uint8_t* tx_persistent_alloc(uint32_t size);
+-extern void tx_persistent_free(void* pointer);
+-
+-#define TW_BUFFER 65536u
+-#define TW_OVERHEAD 128u
+-#define TW_KNOWN 1u
+-#define TW_FRAMED 2u
+-#define TW_COLOR 4u
+-
+-enum TwState { TW_ROOT, TW_TAG, TW_NAME_LENGTH, TW_NAME, TW_SCALAR,
+-    TW_STRING_LENGTH, TW_STRING, TW_LIST, TW_ARRAY_LENGTH,
+-    TW_ARRAY, TW_TILES, TW_DONE };
+-enum TwRole { TW_OTHER, TW_ROOT_ROLE, TW_TILES_ROLE, TW_TILE_DATA,
+-    TW_TILE_MAP, TW_MAP_ENTRY, TW_ENTRY_VALUE, TW_ENTRY_MOD,
+-    TW_ENTRY_NAME, TW_ENTRY_FRAMED, TW_ENTITY_LIST, TW_ENTITY,
+-    TW_ENTITY_X, TW_ENTITY_Y };
+-typedef union TwAllocation { struct { uint32_t bytes; } value; max_align_t alignment; } TwAllocation;
+-typedef struct TwContainer { uint32_t type, role, remaining, element; } TwContainer;
+-
+-struct TerraTwld {
+-    TerraTwldCallbacks callbacks;
+-    void* context;
+-    z_stream inflater, deflater;
+-    uint32_t inflater_ready, deflater_ready, stream_end, output_enabled;
+-    uint32_t width, height, maximum, allocated, peak, pass, complete;
+-    uint32_t metadata_ready, replay_idle;
+-    uint64_t compressed, expanded, cells, mod_tiles, color_pixels;
+-    uint64_t source_bytes;
+-    uint32_t crc, source_crc, map_count, saw_map, saw_tiles;
+-    uint8_t* map;
+-    uint8_t *inflate_buffer, *deflate_buffer;
+-    TwContainer* stack;
+-    uint32_t depth, stack_capacity;
+-    uint32_t state, type, role, root_name, need, have, array_multiplier;
+-    uint8_t small[8];
+-    char text[64];
+-    uint32_t text_length, text_count;
+-    uint64_t remaining, tile_index;
+-    uint8_t tile_record[7];
+-    uint32_t tile_have, tile_need;
+-    uint16_t tile_type;
+-    uint32_t entry_value, entry_has_value, entry_framed, entry_mod, entry_name;
+-    uint32_t entry_x, entry_y, entry_has_x, entry_has_y, training_dummies, logic_sensors;
+-    int32_t error;
+-};
+-
+-static void* tw_allocate(TerraTwld* t, uint32_t bytes) {
+-    uint64_t requested = (uint64_t)bytes + sizeof(TwAllocation);
+-    uint64_t charged = requested + TW_OVERHEAD;
+-    if (requested > UINT32_MAX || t->allocated > t->maximum || charged > (uint64_t)t->maximum - t->allocated) {
+-        t->error = TERRA_TWLD_LIMIT; return NULL;
+-    }
+-    TwAllocation* a = (TwAllocation*)tx_persistent_alloc((uint32_t)requested);
+-    if (!a) { t->error = TERRA_TWLD_OOM; return NULL; }
+-    a->value.bytes = (uint32_t)charged;
+-    t->allocated += (uint32_t)charged;
+-    if (t->allocated > t->peak) t->peak = t->allocated;
+-    return a + 1;
+-}
+-static void tw_free(TerraTwld* t, void* pointer) {
+-    if (!pointer) return;
+-    TwAllocation* a = (TwAllocation*)pointer - 1;
+-    t->allocated -= a->value.bytes;
+-    tx_persistent_free(a);
+-}
+-static voidpf tw_zalloc(voidpf opaque, uInt items, uInt size) {
+-    TerraTwld* t = (TerraTwld*)opaque;
+-    uint64_t bytes = (uint64_t)items * size;
+-    if (bytes > UINT32_MAX) { t->error = TERRA_TWLD_LIMIT; return NULL; }
+-    return tw_allocate(t, (uint32_t)bytes);
+-}
+-static void tw_zfree(voidpf opaque, voidpf address) { tw_free((TerraTwld*)opaque, address); }
+-static uint32_t tw_be(const uint8_t* p, uint32_t bytes) {
+-    uint32_t value = 0;
+-    for (uint32_t i = 0; i < bytes; ++i) value = (value << 8) | p[i];
+-    return value;
+-}
+-
+-static int32_t tw_output(TerraTwld* t, const uint8_t* bytes, uint32_t count, int finish) {
+-    if (!t->output_enabled) return 0;
+-    t->deflater.next_in = (Bytef*)bytes; t->deflater.avail_in = count;
+-    int code;
+-    do {
+-        t->deflater.next_out = t->deflate_buffer; t->deflater.avail_out = TW_BUFFER;
+-        code = deflate(&t->deflater, finish ? Z_FINISH : Z_NO_FLUSH);
+-        if (code != Z_OK && code != Z_STREAM_END) return t->error ? t->error : TERRA_TWLD_FORMAT;
+-        uint32_t size = TW_BUFFER - t->deflater.avail_out;
+-        if (size && t->callbacks.output(t->context, t->deflate_buffer, size) < 0) return TERRA_TWLD_CALLBACK;
+-    } while (t->deflater.avail_in || !t->deflater.avail_out || (finish && code != Z_STREAM_END));
+-    return 0;
+-}
+-
+-static void tw_need(TerraTwld* t, uint32_t state, uint32_t bytes) {
+-    t->state = state; t->need = bytes; t->have = 0;
+-}
+-static int32_t tw_begin_value(TerraTwld* t, uint32_t type, uint32_t role);
+-
+-static int32_t tw_finish_value(TerraTwld* t) {
+-    while (t->depth) {
+-        TwContainer* parent = &t->stack[t->depth - 1];
+-        if (parent->type == 10) { t->state = TW_TAG; return 0; }
+-        if (parent->type != 9 || !parent->remaining) return TERRA_TWLD_FORMAT;
+-        if (--parent->remaining) {
+-            uint32_t role = parent->role == TW_TILE_MAP ? TW_MAP_ENTRY :
+-                parent->role == TW_ENTITY_LIST ? TW_ENTITY : TW_OTHER;
+-            return tw_begin_value(t, parent->element, role);
+-        }
+-        --t->depth;
+-    }
+-    t->state = TW_DONE; return 0;
+-}
+-
+-static int32_t tw_push(TerraTwld* t, uint32_t type, uint32_t role, uint32_t count, uint32_t element) {
+-    if (t->depth == t->stack_capacity) {
+-        if (t->stack_capacity > UINT32_MAX / 2u / sizeof(TwContainer)) return TERRA_TWLD_LIMIT;
+-        uint32_t size = t->stack_capacity ? t->stack_capacity * 2u : 16u;
+-        TwContainer* stack = (TwContainer*)tw_allocate(t, size * (uint32_t)sizeof(TwContainer));
+-        if (!stack) return t->error;
+-        if (t->depth) memcpy(stack, t->stack, t->depth * sizeof(TwContainer));
+-        tw_free(t, t->stack); t->stack = stack; t->stack_capacity = size;
+-    }
+-    t->stack[t->depth++] = (TwContainer){type, role, count, element};
+-    if (role == TW_MAP_ENTRY || role == TW_ENTITY) {
+-        t->entry_value = t->entry_has_value = t->entry_framed = t->entry_mod = t->entry_name = 0;
+-        t->entry_x = t->entry_y = t->entry_has_x = t->entry_has_y = 0;
+-    }
+-    return 0;
+-}
+-
+-static int32_t tw_begin_value(TerraTwld* t, uint32_t type, uint32_t role) {
+-    t->type = type; t->role = role;
+-    if ((role == TW_ROOT_ROLE || role == TW_TILES_ROLE || role == TW_MAP_ENTRY || role == TW_ENTITY) && type != 10)
+-        return TERRA_TWLD_FORMAT;
+-    if ((role == TW_TILE_MAP || role == TW_ENTITY_LIST) && type != 9) return TERRA_TWLD_FORMAT;
+-    if (role == TW_TILE_DATA && type != 7) return TERRA_TWLD_FORMAT;
+-    switch (type) {
+-    case 1: tw_need(t, TW_SCALAR, 1); return 0;
+-    case 2: tw_need(t, TW_SCALAR, 2); return 0;
+-    case 3: case 5: tw_need(t, TW_SCALAR, 4); return 0;
+-    case 4: case 6: tw_need(t, TW_SCALAR, 8); return 0;
+-    case 7: t->array_multiplier = 1; tw_need(t, TW_ARRAY_LENGTH, 4); return 0;
+-    case 8: tw_need(t, TW_STRING_LENGTH, 2); return 0;
+-    case 9: tw_need(t, TW_LIST, 5); return 0;
+-    case 10: {
+-        int32_t status = tw_push(t, 10, role, 0, 0);
+-        if (status < 0) return status;
+-        t->state = TW_TAG; return 0;
+-    }
+-    case 11: t->array_multiplier = 4; tw_need(t, TW_ARRAY_LENGTH, 4); return 0;
+-    case 12: t->array_multiplier = 8; tw_need(t, TW_ARRAY_LENGTH, 4); return 0;
+-    default: return TERRA_TWLD_FORMAT;
+-    }
+-}
+-
+-static uint32_t tw_name_role(const TerraTwld* t) {
+-    if (t->root_name) return TW_ROOT_ROLE;
+-    if (!t->depth || t->text_length >= sizeof(t->text)) return TW_OTHER;
+-    uint32_t parent = t->stack[t->depth - 1].role;
+-    if (parent == TW_ROOT_ROLE && !strcmp(t->text, "tiles")) return TW_TILES_ROLE;
+-    if (parent == TW_ROOT_ROLE && !strcmp(t->text, "tileEntities")) return TW_ENTITY_LIST;
+-    if (parent == TW_TILES_ROLE) {
+-        if (!strcmp(t->text, "tileData")) return TW_TILE_DATA;
+-        if (!strcmp(t->text, "tileMap")) return TW_TILE_MAP;
+-    }
+-    if (parent == TW_MAP_ENTRY) {
+-        if (!strcmp(t->text, "value")) return TW_ENTRY_VALUE;
+-        if (!strcmp(t->text, "mod")) return TW_ENTRY_MOD;
+-        if (!strcmp(t->text, "name")) return TW_ENTRY_NAME;
+-        if (!strcmp(t->text, "framed")) return TW_ENTRY_FRAMED;
+-    }
+-    if (parent == TW_ENTITY) {
+-        if (!strcmp(t->text, "mod")) return TW_ENTRY_MOD;
+-        if (!strcmp(t->text, "name")) return TW_ENTRY_NAME;
+-        if (!strcmp(t->text, "X")) return TW_ENTITY_X;
+-        if (!strcmp(t->text, "Y")) return TW_ENTITY_Y;
+-    }
+-    return TW_OTHER;
+-}
+-
+-static int32_t tw_finish_entry(TerraTwld* t) {
+-    if (!t->entry_has_value || t->entry_value > UINT16_MAX || !t->entry_value) return TERRA_TWLD_FORMAT;
+-    uint8_t flags = TW_KNOWN | (t->entry_framed ? TW_FRAMED : 0u) |
+-        ((t->entry_mod && t->entry_name) ? TW_COLOR : 0u);
+-    if (t->pass == 1) {
+-        if (t->map[t->entry_value]) return TERRA_TWLD_FORMAT;
+-        t->map[t->entry_value] = flags; ++t->map_count;
+-    } else if (t->map[t->entry_value] != flags) return TERRA_TWLD_CHANGED;
+-    return 0;
+-}
+-
+-static int32_t tw_finish_entity(TerraTwld* t) {
+-    if (t->pass == 1 || !t->entry_mod || !t->entry_name) return 0;
+-    if (!t->entry_has_x || !t->entry_has_y || t->entry_x >= t->width || t->entry_y >= t->height)
+-        return TERRA_TWLD_FORMAT;
+-    TerraTwldEntity entity = {t->entry_x, t->entry_y, t->entry_name};
+-    if (entity.kind == TERRA_TWLD_TRAINING_DUMMY) ++t->training_dummies;
+-    else if (entity.kind == TERRA_TWLD_LOGIC_SENSOR) ++t->logic_sensors;
+-    if (t->callbacks.entity && t->callbacks.entity(t->context, &entity) < 0) return TERRA_TWLD_CALLBACK;
+-    return 0;
+-}
+-
+-static int32_t tw_record(TerraTwld* t) {
+-    if (t->tile_index >= t->cells) return TERRA_TWLD_FORMAT;
+-    uint8_t flags = t->map[t->tile_type];
+-    TerraTwldTile tile;
+-    memset(&tile, 0, sizeof(tile));
+-    tile.x = (uint32_t)(t->tile_index / t->height);
+-    tile.y = (uint32_t)(t->tile_index % t->height);
+-    tile.saved_type = t->tile_type; tile.paint = t->tile_record[2];
+-    tile.framed = !!(flags & TW_FRAMED); tile.color_pixel_box = !!(flags & TW_COLOR);
+-    if (tile.framed) {
+-        tile.frame_x = (int16_t)((uint16_t)t->tile_record[3] | ((uint16_t)t->tile_record[4] << 8));
+-        tile.frame_y = (int16_t)((uint16_t)t->tile_record[5] | ((uint16_t)t->tile_record[6] << 8));
+-    }
+-    if (t->callbacks.tile && t->callbacks.tile(t->context, &tile) < 0) return TERRA_TWLD_CALLBACK;
+-    if (t->output_enabled && t->callbacks.patch) {
+-        TerraTwldTile previous = tile;
+-        if (t->callbacks.patch(t->context, &tile) < 0) return TERRA_TWLD_CALLBACK;
+-        if (tile.x != previous.x || tile.y != previous.y || tile.saved_type != previous.saved_type ||
+-            tile.framed != previous.framed || tile.color_pixel_box != previous.color_pixel_box) return TERRA_TWLD_CALLBACK;
+-        t->tile_record[2] = tile.paint;
+-        if (tile.framed) {
+-            t->tile_record[3] = (uint8_t)tile.frame_x; t->tile_record[4] = (uint8_t)((uint16_t)tile.frame_x >> 8);
+-            t->tile_record[5] = (uint8_t)tile.frame_y; t->tile_record[6] = (uint8_t)((uint16_t)tile.frame_y >> 8);
+-        }
+-    }
+-    int32_t status = tw_output(t, t->tile_record, t->tile_need, 0);
+-    if (status < 0) return status;
+-    ++t->tile_index; ++t->mod_tiles;
+-    if (tile.color_pixel_box) ++t->color_pixels;
+-    t->tile_have = 0; t->tile_need = 2;
+-    return 0;
+-}
+-
+-static uint32_t tw_zero_prefix(const uint8_t* data, uint32_t size) {
+-    uint32_t count = 0;
+-    while (size - count >= 8) {
+-        uint64_t value; memcpy(&value, data + count, 8);
+-        if (value) break;
+-        count += 8;
+-    }
+-    while (count < size && data[count] == 0) ++count;
+-    return count;
+-}
+-
+-static int32_t tw_parse_tiles(TerraTwld* t, const uint8_t* bytes, uint32_t size, uint32_t* consumed) {
+-    uint32_t index = 0;
+-    if ((uint64_t)size > t->remaining) size = (uint32_t)t->remaining;
+-    while (index < size) {
+-        if (!t->tile_have && t->tile_need == 2) {
+-            uint32_t zeros = tw_zero_prefix(bytes + index, size - index) & ~1u;
+-            if (zeros) {
+-                if (t->tile_index + zeros / 2u > t->cells) return TERRA_TWLD_FORMAT;
+-                int32_t status = tw_output(t, bytes + index, zeros, 0);
+-                if (status < 0) return status;
+-                t->tile_index += zeros / 2u; index += zeros;
+-                continue;
+-            }
+-        }
+-        uint32_t chunk = t->tile_need - t->tile_have;
+-        if (chunk > size - index) chunk = size - index;
+-        memcpy(t->tile_record + t->tile_have, bytes + index, chunk);
+-        t->tile_have += chunk; index += chunk;
+-        if (t->tile_have != t->tile_need) continue;
+-        if (t->tile_need == 2) {
+-            t->tile_type = (uint16_t)t->tile_record[0] | ((uint16_t)t->tile_record[1] << 8);
+-            if (!t->tile_type) {
+-                if (++t->tile_index > t->cells) return TERRA_TWLD_FORMAT;
+-                int32_t status = tw_output(t, t->tile_record, 2, 0);
+-                if (status < 0) return status;
+-                t->tile_have = 0;
+-            } else {
+-                uint8_t flags = t->map[t->tile_type];
+-                if (!(flags & TW_KNOWN)) return TERRA_TWLD_FORMAT;
+-                t->tile_need = flags & TW_FRAMED ? 7u : 3u;
+-            }
+-        } else {
+-            int32_t status = tw_record(t);
+-            if (status < 0) return status;
+-        }
+-    }
+-    t->remaining -= index;
+-    *consumed = index;
+-    if (!t->remaining) {
+-        if (t->tile_have || t->tile_index != t->cells) return TERRA_TWLD_FORMAT;
+-        return tw_finish_value(t);
+-    }
+-    return 0;
+-}
+-
+-static int32_t tw_finish_scalar(TerraTwld* t) {
+-    uint32_t value;
+-    switch (t->state) {
+-    case TW_NAME_LENGTH:
+-        t->text_length = tw_be(t->small, 2); t->text_count = 0;
+-        memset(t->text, 0, sizeof(t->text)); t->state = TW_NAME;
+-        if (!t->text_length) {
+-            uint32_t role = tw_name_role(t); t->root_name = 0;
+-            return tw_begin_value(t, t->type, role);
+-        }
+-        return 0;
+-    case TW_SCALAR:
+-        if (t->role == TW_ENTRY_VALUE || t->role == TW_ENTRY_FRAMED ||
+-            t->role == TW_ENTITY_X || t->role == TW_ENTITY_Y) {
+-            if (t->type < 1 || t->type > 3) return TERRA_TWLD_FORMAT;
+-            value = tw_be(t->small, t->need);
+-            if (t->role == TW_ENTRY_VALUE) {
+-                if (!value || value > UINT16_MAX || t->entry_has_value) return TERRA_TWLD_FORMAT;
+-                t->entry_value = value; t->entry_has_value = 1;
+-            } else if (t->role == TW_ENTRY_FRAMED) {
+-                if (value > 1u) return TERRA_TWLD_FORMAT;
+-                t->entry_framed = value;
+-            } else if (t->role == TW_ENTITY_X) {
+-                if (t->entry_has_x) return TERRA_TWLD_FORMAT;
+-                t->entry_x = value; t->entry_has_x = 1;
+-            } else {
+-                if (t->entry_has_y) return TERRA_TWLD_FORMAT;
+-                t->entry_y = value; t->entry_has_y = 1;
+-            }
+-        }
+-        return tw_finish_value(t);
+-    case TW_STRING_LENGTH:
+-        t->text_length = tw_be(t->small, 2); t->text_count = 0;
+-        memset(t->text, 0, sizeof(t->text)); t->state = TW_STRING;
+-        return t->text_length ? 0 : tw_finish_value(t);
+-    case TW_LIST: {
+-        uint32_t element = t->small[0]; value = tw_be(t->small + 1, 4);
+-        if (value > INT32_MAX || element > 12u || (value && !element)) return TERRA_TWLD_FORMAT;
+-        if (t->role == TW_TILE_MAP) {
+-            if (t->saw_map || (value && element != 10)) return TERRA_TWLD_FORMAT;
+-            t->saw_map = 1;
+-        }
+-        if (!value) return tw_finish_value(t);
+-        uint32_t role = t->role;
+-        int32_t status = tw_push(t, 9, role, value, element);
+-        if (status < 0) return status;
+-        return tw_begin_value(t, element, role == TW_TILE_MAP ? TW_MAP_ENTRY :
+-            role == TW_ENTITY_LIST ? TW_ENTITY : TW_OTHER);
+-    }
+-    case TW_ARRAY_LENGTH:
+-        value = tw_be(t->small, 4);
+-        if (value > INT32_MAX) return TERRA_TWLD_FORMAT;
+-        t->remaining = (uint64_t)value * t->array_multiplier;
+-        if (t->role == TW_TILE_DATA) {
+-            if (t->saw_tiles) return TERRA_TWLD_FORMAT;
+-            t->saw_tiles = 1;
+-            if (t->pass == 2) {
+-                t->tile_index = t->tile_have = 0; t->tile_need = 2;
+-                t->state = TW_TILES;
+-                if (!t->remaining) return TERRA_TWLD_FORMAT;
+-                return 0;
+-            }
+-        }
+-        t->state = TW_ARRAY;
+-        return t->remaining ? 0 : tw_finish_value(t);
+-    default: return TERRA_TWLD_FORMAT;
+-    }
+-}
+-
+-static int32_t tw_parse(TerraTwld* t, const uint8_t* bytes, uint32_t size) {
+-    uint32_t index = 0;
+-    while (index < size) {
+-        uint32_t chunk = 1;
+-        int32_t status;
+-        if (t->state == TW_TILES) {
+-            status = tw_parse_tiles(t, bytes + index, size - index, &chunk);
+-            if (status < 0) return status;
+-            if (!chunk) return TERRA_TWLD_FORMAT;
+-            index += chunk; continue;
+-        }
+-        if (t->state == TW_ARRAY) {
+-            chunk = size - index;
+-            if ((uint64_t)chunk > t->remaining) chunk = (uint32_t)t->remaining;
+-            status = tw_output(t, bytes + index, chunk, 0);
+-            if (status < 0) return status;
+-            index += chunk; t->remaining -= chunk;
+-            if (!t->remaining) { status = tw_finish_value(t); if (status < 0) return status; }
+-            continue;
+-        }
+-        if (t->state == TW_NAME || t->state == TW_STRING) {
+-            chunk = t->text_length - t->text_count;
+-            if (chunk > size - index) chunk = size - index;
+-            status = tw_output(t, bytes + index, chunk, 0);
+-            if (status < 0) return status;
+-            uint32_t capture = sizeof(t->text) - 1u;
+-            if (t->text_count < capture) {
+-                uint32_t take = chunk;
+-                if (take > capture - t->text_count) take = capture - t->text_count;
+-                memcpy(t->text + t->text_count, bytes + index, take);
+-            }
+-            t->text_count += chunk; index += chunk;
+-            if (t->text_count == t->text_length) {
+-                if (t->state == TW_NAME) {
+-                    uint32_t role = tw_name_role(t); t->root_name = 0;
+-                    status = tw_begin_value(t, t->type, role);
+-                } else {
+-                    if (t->text_length < sizeof(t->text)) {
+-                        int entity = t->depth && t->stack[t->depth - 1].role == TW_ENTITY;
+-                        if (t->role == TW_ENTRY_MOD) t->entry_mod = !strcmp(t->text, entity ? "Terraria" : "WireHead");
+-                        if (t->role == TW_ENTRY_NAME) {
+-                            t->entry_name = entity ? (!strcmp(t->text, "TETrainingDummy") ? TERRA_TWLD_TRAINING_DUMMY :
+-                                !strcmp(t->text, "TELogicSensor") ? TERRA_TWLD_LOGIC_SENSOR : 0u) :
+-                                (uint32_t)!strcmp(t->text, "ColorPixelBox");
+-                        }
+-                    }
+-                    status = tw_finish_value(t);
+-                }
+-                if (status < 0) return status;
+-            }
+-            continue;
+-        }
+-        if (t->state == TW_ROOT || t->state == TW_TAG) {
+-            uint8_t type = bytes[index++];
+-            status = tw_output(t, &type, 1, 0); if (status < 0) return status;
+-            if (t->state == TW_ROOT) {
+-                if (type != 10) return TERRA_TWLD_FORMAT;
+-                t->root_name = 1;
+-            } else if (!type) {
+-                if (!t->depth || t->stack[t->depth - 1].type != 10) return TERRA_TWLD_FORMAT;
+-                uint32_t role = t->stack[--t->depth].role;
+-                if (role == TW_MAP_ENTRY) { status = tw_finish_entry(t); if (status < 0) return status; }
+-                if (role == TW_ENTITY) { status = tw_finish_entity(t); if (status < 0) return status; }
+-                status = tw_finish_value(t); if (status < 0) return status;
+-                continue;
+-            } else if (type > 12u) return TERRA_TWLD_FORMAT;
+-            t->type = type; tw_need(t, TW_NAME_LENGTH, 2);
+-            continue;
+-        }
+-        if (t->state == TW_DONE) return TERRA_TWLD_FORMAT;
+-        if (!t->need || t->need > sizeof(t->small) || t->have >= t->need) return TERRA_TWLD_FORMAT;
+-        chunk = t->need - t->have;
+-        if (chunk > size - index) chunk = size - index;
+-        status = tw_output(t, bytes + index, chunk, 0); if (status < 0) return status;
+-        memcpy(t->small + t->have, bytes + index, chunk);
+-        t->have += chunk; index += chunk;
+-        if (t->have == t->need) { status = tw_finish_scalar(t); if (status < 0) return status; }
+-    }
+-    return 0;
+-}
+-
+-static int32_t tw_inflate_start(TerraTwld* t) {
+-    memset(&t->inflater, 0, sizeof(t->inflater));
+-    t->inflater.zalloc = tw_zalloc; t->inflater.zfree = tw_zfree; t->inflater.opaque = t;
+-    int status = inflateInit2(&t->inflater, 31);
+-    if (status != Z_OK) return t->error ? t->error : TERRA_TWLD_FORMAT;
+-    t->inflater_ready = 1; return 0;
+-}
+-
+-int32_t terra_twld_create(uint32_t width, uint32_t height, uint32_t max_bytes,
+-                          const TerraTwldCallbacks* callbacks, void* context,
+-                          TerraTwld** out) {
+-    if (!out || !width || !height) return TERRA_TWLD_INVALID;
+-    *out = NULL;
+-    if (!max_bytes) max_bytes = UINT32_MAX;
+-    if ((uint64_t)sizeof(TerraTwld) + TW_OVERHEAD > max_bytes) return TERRA_TWLD_LIMIT;
+-    TerraTwld* t = (TerraTwld*)tx_persistent_alloc((uint32_t)sizeof(TerraTwld));
+-    if (!t) return TERRA_TWLD_OOM;
+-    memset(t, 0, sizeof(*t));
+-    if (callbacks) t->callbacks = *callbacks;
+-    t->context = context; t->width = width; t->height = height; t->cells = (uint64_t)width * height;
+-    t->maximum = max_bytes; t->allocated = t->peak = (uint32_t)sizeof(TerraTwld) + TW_OVERHEAD;
+-    t->pass = 1; t->state = TW_ROOT;
+-    t->map = (uint8_t*)tw_allocate(t, 65536u);
+-    t->inflate_buffer = (uint8_t*)tw_allocate(t, TW_BUFFER);
+-    if (!t->map || !t->inflate_buffer) {
+-        int32_t status = t->error; terra_twld_destroy(t); return status;
+-    }
+-    memset(t->map, 0, 65536u);
+-    int32_t status = tw_inflate_start(t);
+-    if (status < 0) { terra_twld_destroy(t); return status; }
+-    *out = t; return 0;
+-}
+-
+-int32_t terra_twld_feed(TerraTwld* t, const uint8_t* bytes, uint32_t count, uint32_t final) {
+-    if (!t || (count && !bytes) || final > 1u) return TERRA_TWLD_INVALID;
+-    if (t->complete || t->replay_idle || t->error) return t->error ? t->error : TERRA_TWLD_STATE;
+-    if (t->allocated > t->maximum) { t->error = TERRA_TWLD_LIMIT; return t->error; }
+-    if (t->stream_end && count) { t->error = TERRA_TWLD_FORMAT; return t->error; }
+-    if (count) t->crc = (uint32_t)crc32(t->crc, bytes, count);
+-    t->compressed += count;
+-    t->inflater.next_in = (Bytef*)bytes; t->inflater.avail_in = count;
+-    while (!t->stream_end && (t->inflater.avail_in || final)) {
+-        uint32_t before = t->inflater.avail_in;
+-        t->inflater.next_out = t->inflate_buffer; t->inflater.avail_out = TW_BUFFER;
+-        int code = inflate(&t->inflater, Z_NO_FLUSH);
+-        if (code != Z_OK && code != Z_STREAM_END && code != Z_BUF_ERROR) {
+-            t->error = t->error ? t->error : TERRA_TWLD_FORMAT; return t->error;
+-        }
+-        uint32_t produced = TW_BUFFER - t->inflater.avail_out;
+-        if (produced) {
+-            int32_t status = tw_parse(t, t->inflate_buffer, produced);
+-            t->expanded += produced;
+-            if (status < 0) { t->error = status; return status; }
+-        }
+-        if (code == Z_STREAM_END) {
+-            t->stream_end = 1;
+-            if (t->inflater.avail_in) { t->error = TERRA_TWLD_FORMAT; return t->error; }
+-            break;
+-        }
+-        if (!produced && before == t->inflater.avail_in) break;
+-        if (!t->inflater.avail_in && t->inflater.avail_out && !final) break;
+-    }
+-    if (!final) return TERRA_TWLD_MORE;
+-    if (!t->stream_end || t->state != TW_DONE || t->depth) { t->error = TERRA_TWLD_TRUNCATED; return t->error; }
+-    if (!t->saw_tiles || !t->saw_map) { t->error = TERRA_TWLD_FORMAT; return t->error; }
+-    if (t->pass == 1) { t->source_bytes = t->compressed; t->source_crc = t->crc; }
+-    else if (t->compressed != t->source_bytes || t->crc != t->source_crc) { t->error = TERRA_TWLD_CHANGED; return t->error; }
+-    int32_t status = tw_output(t, NULL, 0, 1);
+-    if (status < 0) { t->error = status; return status; }
+-    t->complete = 1;
+-    if (t->pass == 1) t->metadata_ready = 1;
+-    return TERRA_TWLD_OK;
+-}
+-
+-static void tw_close_streams(TerraTwld* t) {
+-    if (t->inflater_ready) { inflateEnd(&t->inflater); t->inflater_ready = 0; }
+-    if (t->deflater_ready) { deflateEnd(&t->deflater); t->deflater_ready = 0; }
+-}
+-
+-static void tw_reset_replay(TerraTwld* t) {
+-    t->pass = 2; t->complete = t->stream_end = t->depth = t->saw_map = t->saw_tiles = 0;
+-    t->state = TW_ROOT; t->root_name = t->need = t->have = 0;
+-    t->compressed = t->expanded = t->mod_tiles = t->color_pixels = 0;
+-    t->training_dummies = t->logic_sensors = 0;
+-    t->remaining = t->tile_index = t->tile_have = t->tile_need = 0;
+-    t->crc = t->output_enabled = 0; t->error = 0;
+-}
+-
+-int32_t terra_twld_abort_replay(TerraTwld* t) {
+-    if (!t) return TERRA_TWLD_INVALID;
+-    if (!t->metadata_ready) return TERRA_TWLD_STATE;
+-    if (t->pass == 1) return TERRA_TWLD_OK;
+-    tw_close_streams(t);
+-    tw_free(t, t->deflate_buffer); t->deflate_buffer = NULL;
+-    tw_reset_replay(t); t->replay_idle = 1;
+-    return TERRA_TWLD_OK;
+-}
+-
+-int32_t terra_twld_rewind(TerraTwld* t, uint32_t emit_output) {
+-    if (!t || emit_output > 1u) return TERRA_TWLD_INVALID;
+-    if (!t->metadata_ready || (!t->complete && !t->replay_idle) || t->error ||
+-        (emit_output && !t->callbacks.output)) return TERRA_TWLD_STATE;
+-    tw_close_streams(t);
+-    tw_reset_replay(t); t->replay_idle = 0;
+-    if (t->allocated > t->maximum) {
+-        terra_twld_abort_replay(t); return TERRA_TWLD_LIMIT;
+-    }
+-    t->output_enabled = emit_output;
+-    int32_t status = tw_inflate_start(t);
+-    if (status < 0) { terra_twld_abort_replay(t); return status; }
+-    if (emit_output) {
+-        if (!t->deflate_buffer) t->deflate_buffer = (uint8_t*)tw_allocate(t, TW_BUFFER);
+-        if (!t->deflate_buffer) {
+-            status = t->error; terra_twld_abort_replay(t); return status;
+-        }
+-        memset(&t->deflater, 0, sizeof(t->deflater));
+-        t->deflater.zalloc = tw_zalloc; t->deflater.zfree = tw_zfree; t->deflater.opaque = t;
+-        if (deflateInit2(&t->deflater, 6, Z_DEFLATED, 31, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+-            status = t->error ? t->error : TERRA_TWLD_FORMAT;
+-            terra_twld_abort_replay(t); return status;
+-        }
+-        t->deflater_ready = 1;
+-    }
+-    return 0;
+-}
+-
+-int32_t terra_twld_set_budget(TerraTwld* t, uint32_t max_bytes) {
+-    if (!t) return TERRA_TWLD_INVALID;
+-    t->maximum = max_bytes ? max_bytes : UINT32_MAX;
+-    return t->allocated <= t->maximum ? 0 : TERRA_TWLD_LIMIT;
+-}
+-
+-void terra_twld_stats(const TerraTwld* t, TerraTwldStats* out) {
+-    if (!out) return;
+-    memset(out, 0, sizeof(*out)); if (!t) return;
+-    out->compressed_bytes = t->compressed; out->expanded_bytes = t->expanded;
+-    out->world_cells = t->cells; out->mod_tiles = t->mod_tiles; out->color_pixels = t->color_pixels;
+-    out->map_entries = t->map_count; out->pass = t->pass; out->complete = t->complete;
+-    out->allocated_bytes = t->allocated; out->peak_bytes = t->peak;
+-    out->training_dummies = t->training_dummies; out->logic_sensors = t->logic_sensors;
+-}
+-
+-void terra_twld_destroy(TerraTwld* t) {
+-    if (!t) return;
+-    if (t->inflater_ready) inflateEnd(&t->inflater);
+-    if (t->deflater_ready) deflateEnd(&t->deflater);
+-    tw_free(t, t->stack); tw_free(t, t->map);
+-    tw_free(t, t->inflate_buffer); tw_free(t, t->deflate_buffer);
+-    tx_persistent_free(t);
+-}
+--- a/src/terra_circuit_twld_session.c
++++ /dev/null
+@@ -1,60 +0,0 @@
+-#include "terra_circuit_world_internal.h"
+-#include <limits.h>
+-#include <string.h>
+-
+-static int32_t collect_tile(void* context,const TerraTwldTile* tile){
+-    CxWorld* w=(CxWorld*)context;if(w->twld_mode!=1u||!tile->color_pixel_box)return 0;
+-    if(w->mod_count==w->mod_capacity){uint32_t n=w->mod_capacity?w->mod_capacity*2u:256u;if(n<w->mod_capacity||(uint64_t)n*sizeof(CxModTile)>UINT32_MAX)return -1;CxModTile* p=(CxModTile*)cx_alloc(w,n*sizeof(CxModTile));if(!p)return -1;if(w->mod_count)memcpy(p,w->mods,w->mod_count*sizeof(CxModTile));cx_free(w,w->mods);w->mods=p;w->mod_capacity=n;}
+-    CxModTile* m=w->mods+w->mod_count++;memset(m,0,sizeof(*m));m->tile=*tile;w->twld_state|=1u;return 0;
+-}
+-static int32_t patch_tile(void* context,TerraTwldTile* tile){
+-    CxWorld* w=(CxWorld*)context;if(!tile->color_pixel_box)return 0;uint32_t p=cx_pixel_find(w,tile->x,tile->y);if(p==CX_NONE)return 0;uint8_t state=w->pixels[p].state;tile->frame_x=(int16_t)(18*(state&3u));tile->frame_y=(int16_t)(18*((state>>2)&3u));return 0;
+-}
+-static int32_t output_bytes(void* context,const uint8_t* bytes,uint32_t count){
+-    CxWorld* w=(CxWorld*)context;if(count>w->output_capacity-w->output_length)return -1;memcpy(w->output+w->output_length,bytes,count);w->output_length+=count;return 0;
+-}
+-int cx_twld_begin(CxWorld* w){
+-    if(!w->twld_source)return TCW_OK;
+-    TerraTwldCallbacks cb;memset(&cb,0,sizeof(cb));cb.tile=collect_tile;cb.patch=patch_tile;cb.output=output_bytes;
+-    uint32_t available=w->maximum>w->bytes?w->maximum-w->bytes:1u;
+-    int s=terra_twld_create(w->width,w->height,available,&cb,w,&w->twld);if(s<0)return cx_fail(w,TCW_MEMORY,"TWLD streaming decoder allocation failed");
+-    w->twld_mode=0;w->twld_cursor=0;w->phase=CX_TWLD;w->input_length=0;return TCW_OK;
+-}
+-int cx_twld_save_begin(CxWorld* w){
+-    if(!w->twld)return TCW_OK;if(!w->command.aux_source_id)return cx_fail(w,TCW_INVALID,"saving a WLD with mod pixels requires a TWLD output source");
+-    TerraVmStats vm;memset(&vm,0,sizeof(vm));if(w->vm)terra_vm_stats(w->vm,&vm);uint64_t used=(uint64_t)w->bytes+vm.allocated_bytes;
+-    if(used>=w->maximum||terra_twld_set_budget(w->twld,w->maximum-(uint32_t)used)<0)return cx_fail(w,TCW_MEMORY,"TWLD output does not fit the remaining session memory budget");
+-    int s=terra_twld_rewind(w->twld,1);if(s<0)return cx_fail(w,s==TERRA_TWLD_OOM||s==TERRA_TWLD_LIMIT?TCW_MEMORY:TCW_FORMAT,"TWLD cannot begin a lossless output replay");
+-    w->twld_mode=2;w->twld_cursor=0;w->twld_output_offset=0;w->output_length=0;w->phase=CX_TWLD;w->input_length=0;return TCW_OK;
+-}
+-void cx_twld_cancel_save(CxWorld* w){
+-    if(w->twld&&w->phase==CX_TWLD&&w->twld_mode==2u){terra_twld_abort_replay(w->twld);w->twld_cursor=0;w->twld_output_offset=0;w->twld_saved_size=0;w->output_length=0;w->input_length=0;}
+-}
+-int cx_twld_step(CxWorld* w,uint32_t* work){
+-    if(w->twld_mode==2u&&w->output_length)return cx_emit(w,TCW_WRITE,w->command.aux_source_id,w->twld_output_offset,w->output_length,w->output);
+-    while(*work&&w->twld_cursor<w->twld_size){
+-        /* 4 KiB compressed input also bounds the worst-case inflate work and the
+-         * fixed-size frame rewrite's pending gzip output. */
+-        uint32_t n=w->twld_size-w->twld_cursor;if(n>4096u)n=4096u;
+-        if(w->input_offset!=w->twld_cursor||w->input_length!=n){w->read_target=2;return cx_emit(w,TCW_READ,w->twld_source,w->twld_cursor,n,NULL);}
+-        uint32_t final=w->twld_cursor+n==w->twld_size;int s=terra_twld_feed(w->twld,w->input,n,final);w->input_length=0;--*work;
+-        if(s<0)return cx_fail(w,s==TERRA_TWLD_OOM||s==TERRA_TWLD_LIMIT?TCW_MEMORY:TCW_FORMAT,"TWLD gzip/NBT replay failed validation");w->twld_cursor+=n;
+-        if(w->twld_mode==2u&&w->output_length)return cx_emit(w,TCW_WRITE,w->command.aux_source_id,w->twld_output_offset,w->output_length,w->output);
+-    }
+-    if(w->twld_cursor<w->twld_size)return TCW_CONTINUE;
+-    if(w->twld_mode==0u){int s=terra_twld_rewind(w->twld,0);if(s<0)return cx_fail(w,TCW_FORMAT,"TWLD metadata replay cannot be initialized");w->twld_mode=1;w->twld_cursor=0;w->input_length=0;return TCW_OK;}
+-    if(w->twld_mode==1u){w->phase=CX_TOPOLOGY;cx_scan_reset(w);return TCW_OK;}
+-    w->twld_saved_size=w->twld_output_offset;w->phase=CX_IDLE;return TCW_OK;
+-}
+-int cx_mod_column(CxWorld* w){
+-    if(!w->mod_count)return TCW_OK;
+-    uint32_t lo=0,hi=w->mod_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;if(w->mods[m].tile.x<w->x)lo=m+1;else hi=m;}
+-    while(lo<w->mod_count&&w->mods[lo].tile.x==w->x){CxModTile* m=w->mods+lo++;uint32_t y=m->tile.y;if(y>=w->height)return TCW_FORMAT;
+-        if(w->phase==CX_TOPOLOGY){m->vanilla=w->column[y];if(!m->vanilla.active)++w->devices_count;}
+-        w->column[y].active=1;w->column[y].type=0xfffeu;w->column[y].frame_x=m->tile.frame_x;w->column[y].frame_y=m->tile.frame_y;w->column[y].tile_color=m->tile.paint;
+-    }return TCW_OK;
+-}
+-int cx_mod_vanilla(CxWorld* w,uint32_t x,uint32_t y,TxTile* out){
+-    uint32_t lo=0,hi=w->mod_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;TerraTwldTile* t=&w->mods[m].tile;if(t->x<x||(t->x==x&&t->y<y))lo=m+1;else hi=m;}
+-    if(lo==w->mod_count||w->mods[lo].tile.x!=x||w->mods[lo].tile.y!=y)return 0;*out=w->mods[lo].vanilla;return 1;
+-}
+--- a/src/terra_circuit_world.c
++++ b/src/terra_circuit_world.c
+@@ -1 +1 @@
+-/* Streaming, bounded-memory WLD circuit session. See docs/CIRCUIT_WORLD_ABI_V1.md. */
++/* Streaming, bounded-memory WLD circuit session, circuit-world ABI 2. */
+@@ -23,2 +23,2 @@
+-static uint32_t vm_bytes(CxWorld* w) { uint32_t bytes=0;TerraVmStats s;if(w->vm){terra_vm_stats(w->vm,&s);bytes=s.allocated_bytes;}TerraTwldStats t;if(w->twld){terra_twld_stats(w->twld,&t);bytes+=t.allocated_bytes;}return bytes; }
+-uint32_t cx_vm_available(CxWorld* w){uint64_t used=w->bytes;TerraTwldStats t;if(w->twld){terra_twld_stats(w->twld,&t);used+=t.allocated_bytes;}return used<w->maximum?w->maximum-(uint32_t)used:0u;}
++static uint32_t vm_bytes(CxWorld* w) { uint32_t bytes=0;TerraVmStats s;if(w->vm){terra_vm_stats(w->vm,&s);bytes=s.allocated_bytes;}return bytes; }
++uint32_t cx_vm_available(CxWorld* w){uint64_t used=w->bytes;return used<w->maximum?w->maximum-(uint32_t)used:0u;}
+@@ -82 +82 @@
+-    memset(&w->event,0,sizeof(w->event));w->event.abi_version=1;w->event.kind=kind;
++    memset(&w->event,0,sizeof(w->event));w->event.abi_version=TERRA_CIRCUIT_WORLD_ABI;w->event.kind=kind;
+@@ -133 +133 @@
+-    if(!w)return;terra_vm_destroy(w->vm);w->vm=NULL;terra_twld_destroy(w->twld);w->twld=NULL;
++    if(!w)return;terra_vm_destroy(w->vm);w->vm=NULL;
+@@ -138,0 +139 @@
++    RELEASE(compile_rows);
+@@ -141 +142 @@
+-    RELEASE(points);RELEASE(result);RELEASE(output);RELEASE(general_snapshot);RELEASE(mods);RELEASE(ports);RELEASE(pixel_touched);RELEASE(pixel_snapshot);
++    RELEASE(points);RELEASE(result);RELEASE(output);RELEASE(general_snapshot);RELEASE(ports);RELEASE(pixel_touched);RELEASE(pixel_snapshot);
+@@ -148 +149 @@
+-int32_t terra_circuit_world_begin(uint32_t world_handle,uint32_t scratch_source_id,uint32_t twld_source_id,uint32_t twld_size,uint32_t max_bytes,uint32_t* out_handle){
++int32_t terra_circuit_world_begin(uint32_t world_handle,uint32_t scratch_source_id,uint32_t max_bytes,uint32_t* out_handle){
+@@ -151 +152 @@
+-    if(!world||!scratch_source_id||scratch_source_id==world->stream_source_id||scratch_source_id==twld_source_id||(!twld_source_id&&twld_size))return TCW_INVALID;
++    if(!world||!scratch_source_id||scratch_source_id==world->stream_source_id)return TCW_INVALID;
+@@ -158 +159 @@
+-    w->id=next_session++;w->world_handle=world_handle;w->world=world;w->scratch_source=scratch_source_id;w->twld_source=twld_source_id;w->twld_size=twld_size;
++    w->id=next_session++;w->world_handle=world_handle;w->world=world;w->scratch_source=scratch_source_id;
+@@ -170 +170,0 @@
+-    if(twld_source_id){int status=cx_twld_begin(w);if(status<0){destroy(w);return status;}}
+@@ -190,2 +190 @@
+-        else if(w->phase==CX_SAVE_PATCH){int s=cx_twld_save_begin(w);if(s<0)return s;if(!w->twld)w->phase=CX_IDLE;}
+-        else if(w->phase==CX_TWLD&&w->twld_mode==2u){w->twld_output_offset+=w->event.length;w->output_length=0;}
++        else if(w->phase==CX_SAVE_PATCH)w->phase=CX_IDLE;
+@@ -215 +213,0 @@
+-        else if(w->phase==CX_TWLD)status=cx_twld_step(w,&work);
+@@ -219 +217 @@
+-        if(status<0){cx_fragments_cancel(w);if(w->vm){cx_twld_cancel_save(w);cx_operation_rollback(w);w->phase=CX_IDLE;memset(&w->event,0,sizeof(w->event));}else w->phase=CX_FAILED;return status;}
++        if(status<0){cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;memset(&w->event,0,sizeof(w->event));}else w->phase=CX_FAILED;return status;}
+@@ -223,2 +221,2 @@
+-    memset(out,0,sizeof(*out));out->abi_version=1;out->kind=w->phase==CX_IDLE?TCW_READY:TCW_MORE;out->phase=w->phase;out->completed=w->x;out->total=w->width;
+-    if(w->phase==CX_IDLE){out->result_kind=w->command.kind;out->reserved=w->twld_state&1u;if(w->command.kind==TCW_SAVE){out->source_id=w->output_source;out->result_count=w->save_result_size;out->reserved=w->twld_saved_size;}else if(w->command.kind==TCW_FRAGMENTS||w->command.kind==TCW_EXTRACT)out->result_count=cx_fragments_result_count(w);}
++    memset(out,0,sizeof(*out));out->abi_version=TERRA_CIRCUIT_WORLD_ABI;out->kind=w->phase==CX_IDLE?TCW_READY:TCW_MORE;out->phase=w->phase;out->completed=w->x;out->total=w->width;
++    if(w->phase==CX_IDLE){out->result_kind=w->command.kind;out->reserved=(w->optimization?10u:0u)|(w->pixel_compat_unsupported?0u:4u);if(w->command.kind==TCW_SAVE){out->source_id=w->output_source;out->result_count=w->save_result_size;out->reserved=0;}else if(w->command.kind==TCW_FRAGMENTS||w->command.kind==TCW_EXTRACT)out->result_count=cx_fragments_result_count(w);}
+@@ -230 +228 @@
+-    *out=(TerraCircuitWorldStats){1,w->phase,w->width,w->height,(uint32_t)w->world->spawnTileX,(uint32_t)w->world->spawnTileY,
++    *out=(TerraCircuitWorldStats){TERRA_CIRCUIT_WORLD_ABI,w->phase,w->width,w->height,(uint32_t)w->world->spawnTileX,(uint32_t)w->world->spawnTileY,
+@@ -234 +232 @@
+-int32_t terra_circuit_world_cancel(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;cx_fragments_cancel(w);if(w->vm){cx_twld_cancel_save(w);cx_operation_rollback(w);w->phase=CX_IDLE;}else w->phase=CX_CANCELLED;memset(&w->event,0,sizeof(w->event));w->tick_remaining=w->tick_stage=w->trigger_remaining=0;return TCW_OK;}
++int32_t terra_circuit_world_cancel(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;}else w->phase=CX_CANCELLED;memset(&w->event,0,sizeof(w->event));w->tick_remaining=w->tick_stage=w->trigger_remaining=0;return TCW_OK;}
+--- a/src/terra_circuit_world_internal.h
++++ b/src/terra_circuit_world_internal.h
+@@ -5 +4,0 @@
+-#include "terra_circuit_twld.h"
+@@ -20 +19 @@
+-    CX_FAILED, CX_CANCELLED, CX_TWLD, CX_TICKS, CX_FRAGMENTS
++    CX_FAILED, CX_CANCELLED, CX_TICKS, CX_FRAGMENTS
+@@ -43 +42 @@
+-typedef struct CxDevice { uint32_t x,y,nets[4],pulse_nets[4],gate; TxTile tile,initial; uint32_t cooldown,saved_cooldown,wire_hit_mask; int32_t can_deactivate; } CxDevice;
++typedef struct CxDevice { uint32_t x,y,nets[4],pulse_nets[4],gate; TxTile tile,initial; uint32_t cooldown,saved_cooldown,wire_hit_mask,wire_hit_epoch; int32_t can_deactivate; } CxDevice;
+@@ -45,2 +44 @@
+-typedef struct CxPixel { uint32_t x,y,h[4],v[4]; uint8_t state,initial,hit_h,hit_v,custom,marked; uint8_t reserved[2]; } CxPixel;
+-typedef struct CxModTile { TerraTwldTile tile; TxTile vanilla; } CxModTile;
++typedef struct CxPixel { uint32_t x,y,h[4],v[4],cell_word; uint8_t state,initial,hit_h,hit_v,marked; uint8_t connected_h,connected_v,reserved; } CxPixel;
+@@ -53,3 +50,0 @@
+-    uint32_t twld_source, twld_size, twld_state;
+-    TerraTwld* twld; uint32_t twld_cursor,twld_mode,twld_output_offset,twld_saved_size;
+-    CxModTile* mods; uint32_t mod_count,mod_capacity,mod_cursor;
+@@ -61,0 +57,2 @@
++    /* Compile-only sparse row lists: four wire colours, followed by gates. */
++    uint32_t* compile_rows; uint32_t compile_wire_count[4],compile_gate_count;
+@@ -88,0 +86 @@
++    uint32_t pixel_column_first,pixel_compat_unsupported;
+@@ -92 +90 @@
+-    uint32_t vm_trip_index;
++    uint32_t vm_trip_index,wire_trip_epoch,optimization;
+@@ -153,5 +150,0 @@
+-int cx_twld_begin(CxWorld*);
+-int cx_twld_step(CxWorld*,uint32_t*);
+-int cx_twld_save_begin(CxWorld*);
+-void cx_twld_cancel_save(CxWorld*);
+-int cx_mod_column(CxWorld*);
+@@ -165,2 +158,3 @@
+-int cx_wave_begin(void*);
+-int cx_wave_end(void*);
++int cx_pixel_wave_end(void*);
++int cx_set_optimization(CxWorld*,uint32_t);
++int cx_pixel_topology_supported(const CxPixel*);
+@@ -177 +170,0 @@
+-int cx_mod_vanilla(CxWorld*,uint32_t,uint32_t,TxTile*);
+--- a/src/terra_wld.c
++++ b/src/terra_wld.c
+@@ -865,2 +865,5 @@
+-#define TILE_U8(value) do { if (!terra_reader_has(*off,1u,end)) return 0; (value)=rd_u8(p,end,off); } while (0)
+-#define TILE_U16(value) do { if (!terra_reader_has(*off,2u,end)) return 0; (value)=rd_u16le(p,end,off); } while (0)
++/* Keep every payload bounded, but perform each check and little-endian
++     * read together. The generic rd_u16le helper repeated the same check and
++     * forced an out-of-line call for each framed tile field. */
++#define TILE_U8(value) do { uint32_t at=*off; if (at>=end) return 0; (value)=p[at]; *off=at+1u; } while (0)
++#define TILE_U16(value) do { uint32_t at=*off; if (at>end||2u>end-at) return 0; (value)=(uint16_t)(p[at]|((uint32_t)p[at+1u]<<8)); *off=at+2u; } while (0)
+@@ -873 +876,2 @@
+-    if (tx_world_is_future(w) && ((f4&0xe1u) || (f2&0x80u))) return 0;
++    int future=tx_world_is_future(w);
++    if (future && ((f4&0xe1u) || (f2&0x80u))) return 0;
+@@ -877 +881 @@
+-        if (tx_world_is_future(w) && t->type>=w->tile_type_count) return 0;
++        if (future && t->type>=w->tile_type_count) return 0;

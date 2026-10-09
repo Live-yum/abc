@@ -1,0 +1,14 @@
+[target.riscv32i-unknown-none-elf]
+rustflags = ["-C", "link-arg=-Tlink.x"]
+
+[env]
+EMU_TICK_RATE = "100"
+
+[alias]
+rbuild = "build --target riscv32i-unknown-none-elf --release"
+rb = "rbuild"
+
+rdoc = "doc --target riscv32i-unknown-none-elf --release"
+rd = "rdoc"
+
+

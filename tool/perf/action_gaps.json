@@ -1,0 +1,1356 @@
+{
+  "schema": "abc.performance-action-gaps.v1",
+  "note": "Source-complete dispatcher inventory. Declared is not executed. Join IDs with passed per-runtime reports; preserve gaps and parameter variants.",
+  "actions": [
+    {
+      "controller": "Workspace",
+      "action": "achievementCompleteKnown",
+      "operationIds": [
+        "workspace.achievements.complete"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "achievementCondition",
+      "operationIds": [
+        "workspace.achievements.counter"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "achievementNew",
+      "operationIds": [
+        "workspace.achievements.new"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "achievementToggle",
+      "operationIds": [
+        "workspace.achievements.toggle"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "activateOnlineResources",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Online resource service local transport/storage suite owned separately; dispatcher activation needs a matching measured row."
+    },
+    {
+      "controller": "Workspace",
+      "action": "addMarker",
+      "operationIds": [
+        "workspace.markers.add"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "applyPlayerConversion",
+      "operationIds": [
+        "workspace.conversion.apply"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "bestiaryEntry",
+      "operationIds": [
+        "workspace.bestiary.entry"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "bestiaryUnlockKnown",
+      "operationIds": [
+        "workspace.bestiary.unlock"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "cancelPlayerConversion",
+      "operationIds": [
+        "workspace.conversion.cancel"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "chestBestPrefixes",
+      "operationIds": [
+        "workspace.chests.best-prefix"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "chestClear",
+      "operationIds": [
+        "workspace.chests.clear"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "chestOrganize",
+      "operationIds": [
+        "workspace.chests.organize"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitCancelEdit",
+      "operationIds": [
+        "workspace.legacy-circuit.cancel"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitConfirmEdit",
+      "operationIds": [
+        "workspace.legacy-circuit.confirm"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitCopy",
+      "operationIds": [
+        "workspace.legacy-circuit.copy"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitCut",
+      "operationIds": [
+        "workspace.legacy-circuit.cut"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitMirror",
+      "operationIds": [
+        "workspace.legacy-circuit.mirror"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitNetworkPreview",
+      "operationIds": [
+        "workspace.legacy-circuit.network-preview"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitPaste",
+      "operationIds": [
+        "workspace.legacy-circuit.paste"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitPlace",
+      "operationIds": [
+        "workspace.legacy-circuit.place"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitRotate",
+      "operationIds": [
+        "workspace.legacy-circuit.rotate"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitRoutePreview",
+      "operationIds": [
+        "workspace.legacy-circuit.route-preview"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitSelect",
+      "operationIds": [
+        "workspace.legacy-circuit.select"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitStep",
+      "operationIds": [
+        "workspace.legacy-circuit.tick"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitToggle",
+      "operationIds": [
+        "workspace.legacy-circuit.run-start",
+        "workspace.legacy-circuit.run-stop"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "circuitTrigger",
+      "operationIds": [
+        "workspace.legacy-circuit.trigger"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "clear",
+      "operationIds": [
+        "workspace.canvas.circuit.clear",
+        "workspace.canvas.fusion.clear",
+        "workspace.canvas.pixel.clear"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "clearResourceMemory",
+      "operationIds": [
+        "resources.clear-memory"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "closeMap",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "MAP codec/generation suite and profile application coverage owned separately; direct dispatcher timing not claimed here."
+    },
+    {
+      "controller": "Workspace",
+      "action": "cloudDiscardUpload",
+      "operationIds": [
+        "workspace.cloud.discard"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "cloudDownload",
+      "operationIds": [
+        "workspace.cloud.download"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "cloudPrepareUpload",
+      "operationIds": [
+        "workspace.cloud.prepare",
+        "workspace.cloud.reprepare"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "cloudRecommendationDownload",
+      "operationIds": [
+        "workspace.cloud.recommendation-download"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "cloudUploadPrepared",
+      "operationIds": [
+        "workspace.cloud.upload"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "dismissError",
+      "operationIds": [
+        "workspace.error.dismiss"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "editMapRect",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "MAP codec/generation suite and profile application coverage owned separately; direct dispatcher timing not claimed here."
+    },
+    {
+      "controller": "Workspace",
+      "action": "export",
+      "operationIds": [
+        "workspace.achievements.export",
+        "workspace.canvas.circuit.export",
+        "workspace.canvas.fusion.export",
+        "workspace.canvas.pixel.export",
+        "workspace.fragments.export",
+        "workspace.mapping.export",
+        "workspace.markers.export",
+        "workspace.objects.export",
+        "workspace.pixel.png-export",
+        "workspace.player.catalog-export",
+        "workspace.plr.export",
+        "workspace.region.project-export",
+        "workspace.rules.export",
+        "workspace.vault.export",
+        "workspace.wld.export",
+        "workspace.world.map-png-export",
+        "workspace.public.world-export",
+        "workspace.public.conversion-export"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "exportMap",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "MAP codec/generation suite and profile application coverage owned separately; direct dispatcher timing not claimed here."
+    },
+    {
+      "controller": "Workspace",
+      "action": "fusionDiscardPlacement",
+      "operationIds": [
+        "workspace.placement.discard"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "fusionInsert",
+      "operationIds": [
+        "workspace.placement.insert"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "fusionPlace",
+      "operationIds": [
+        "workspace.placement.restage",
+        "workspace.placement.stage"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "fusionRegion",
+      "operationIds": [
+        "workspace.placement.region-load",
+        "workspace.region.load",
+        "workspace.region.object-load",
+        "workspace.public.placement-readback"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "generate",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "unsupported-service",
+      "reason": "Application explicitly reports no connected generation service; only failure behavior is available, not successful generation latency."
+    },
+    {
+      "controller": "Workspace",
+      "action": "generateMapFromWorld",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "MAP codec/generation suite and profile application coverage owned separately; direct dispatcher timing not claimed here."
+    },
+    {
+      "controller": "Workspace",
+      "action": "import",
+      "operationIds": [
+        "resources.import",
+        "resources.reload",
+        "workspace.achievements.catalog-import",
+        "workspace.achievements.import",
+        "workspace.canvas.circuit.import",
+        "workspace.canvas.fusion.import",
+        "workspace.canvas.pixel.import",
+        "workspace.catalog.import",
+        "workspace.catalog.player-import",
+        "workspace.catalog.world-import",
+        "workspace.conversion.import",
+        "workspace.fragments.import",
+        "workspace.mapping.import",
+        "workspace.markers.import",
+        "workspace.objects.import",
+        "workspace.pixel.image-import",
+        "workspace.region.project-import",
+        "workspace.rules.import",
+        "workspace.vault.import",
+        "workspace.wld.import"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "importMap",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "MAP codec/generation suite and profile application coverage owned separately; direct dispatcher timing not claimed here."
+    },
+    {
+      "controller": "Workspace",
+      "action": "locate",
+      "operationIds": [
+        "workspace.world.locate"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "mappingSave",
+      "operationIds": [
+        "workspace.terrain.mapping"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "markerClear",
+      "operationIds": [
+        "workspace.markers.clear"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "markerRemove",
+      "operationIds": [
+        "workspace.markers.remove"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "markerRender",
+      "operationIds": [
+        "workspace.markers.render"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "markerStyle",
+      "operationIds": [
+        "workspace.markers.style"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "markerToggle",
+      "operationIds": [
+        "workspace.markers.toggle"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "markerVisibility",
+      "operationIds": [
+        "workspace.markers.hide",
+        "workspace.markers.show"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "newPlayer",
+      "operationIds": [
+        "workspace.plr.new"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "openFile",
+      "operationIds": [
+        "workspace.vault.open"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "openSynthetic",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "qa-only",
+      "reason": "QA-only asset entry is disabled unless TERRAFORGE_QA is compiled true. This suite imports the same original synthetic files through the real FileGateway; it does not claim timing of this disabled production entry."
+    },
+    {
+      "controller": "Workspace",
+      "action": "paint",
+      "operationIds": [
+        "workspace.canvas.circuit.paint",
+        "workspace.canvas.fusion.paint",
+        "workspace.canvas.pixel.paint",
+        "workspace.pixel.prepare-paint",
+        "workspace.region.paint"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "pixelMatch",
+      "operationIds": [
+        "workspace.pixel.match"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "playerBestPrefixes",
+      "operationIds": [
+        "workspace.player.best-prefix"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "playerSlotEdit",
+      "operationIds": [
+        "workspace.player.catalog-slot",
+        "workspace.plr.slot-edit"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "preparePlayerConversion",
+      "operationIds": [
+        "workspace.conversion.prepare",
+        "workspace.conversion.reprepare"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "redo",
+      "operationIds": [
+        "workspace.canvas.circuit.redo",
+        "workspace.canvas.fusion.redo",
+        "workspace.canvas.pixel.redo",
+        "workspace.plr.redo",
+        "workspace.region.redo",
+        "workspace.wld.redo"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "redoMap",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "MAP codec/generation suite and profile application coverage owned separately; direct dispatcher timing not claimed here."
+    },
+    {
+      "controller": "Workspace",
+      "action": "regionBrush",
+      "operationIds": [
+        "workspace.region.brush"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "regionBrushClear",
+      "operationIds": [
+        "workspace.region.brush-clear"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "regionEdit",
+      "operationIds": [
+        "workspace.region.edit"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "regionSelect",
+      "operationIds": [
+        "workspace.region.select"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "resize",
+      "operationIds": [
+        "workspace.canvas.circuit.resize",
+        "workspace.canvas.fusion.resize",
+        "workspace.canvas.pixel.resize",
+        "workspace.pixel.prepare-canvas"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "restoreFile",
+      "operationIds": [
+        "workspace.vault.restore"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "schemeClone",
+      "operationIds": [
+        "workspace.schemes.clone"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "schemeCreate",
+      "operationIds": [
+        "workspace.schemes.create"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "schemeDelete",
+      "operationIds": [
+        "workspace.schemes.delete"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "schemeRename",
+      "operationIds": [
+        "workspace.schemes.rename"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "schemeSelect",
+      "operationIds": [
+        "workspace.schemes.select"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "schemeSetDefault",
+      "operationIds": [
+        "workspace.schemes.default"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "settings",
+      "operationIds": [
+        "workspace.settings.change"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "stageBestiary",
+      "operationIds": [
+        "workspace.bestiary.patch"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "stageChest",
+      "operationIds": [
+        "workspace.chests.catalog-slot",
+        "workspace.chests.rename",
+        "workspace.chests.slot-decrease"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "stageInventory",
+      "operationIds": [
+        "workspace.plr.inventory-edit"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "stagePlayer",
+      "operationIds": [
+        "workspace.plr.attribute-edit"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "stageWorld",
+      "operationIds": [
+        "workspace.wld.header-edit",
+        "workspace.wld.reject-edit"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "strokeEnd",
+      "operationIds": [
+        "workspace.canvas.circuit.stroke-end",
+        "workspace.canvas.fusion.stroke-end",
+        "workspace.canvas.pixel.stroke-end",
+        "workspace.region.stroke-end"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "strokeStart",
+      "operationIds": [
+        "workspace.canvas.circuit.stroke-start",
+        "workspace.canvas.fusion.stroke-start",
+        "workspace.canvas.pixel.stroke-start",
+        "workspace.region.stroke-start"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "terrainApply",
+      "operationIds": [
+        "workspace.terrain.apply"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "terrainPreview",
+      "operationIds": [
+        "workspace.terrain.preview"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "trashFile",
+      "operationIds": [
+        "workspace.vault.trash"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "undo",
+      "operationIds": [
+        "workspace.canvas.circuit.undo",
+        "workspace.canvas.circuit.undo-clear",
+        "workspace.canvas.fusion.undo",
+        "workspace.canvas.fusion.undo-clear",
+        "workspace.canvas.pixel.undo",
+        "workspace.canvas.pixel.undo-clear",
+        "workspace.chests.undo",
+        "workspace.conversion.undo",
+        "workspace.legacy-circuit.undo",
+        "workspace.placement.undo",
+        "workspace.plr.undo",
+        "workspace.region.undo",
+        "workspace.wld.undo"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "undoMap",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "MAP codec/generation suite and profile application coverage owned separately; direct dispatcher timing not claimed here."
+    },
+    {
+      "controller": "Workspace",
+      "action": "validate",
+      "operationIds": [
+        "workspace.world.validate"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitCancel",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitChooseWorld",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitClose",
+      "operationIds": [
+        "workspace.fragments.close",
+        "workspace.tcw.close"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitExtract",
+      "operationIds": [
+        "workspace.fragments.extract"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitFragments",
+      "operationIds": [
+        "workspace.fragments.list"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitImport",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitInput",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitLoadPong",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitLoadProgram",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitOpen",
+      "operationIds": [
+        "workspace.fragments.open",
+        "workspace.tcw.open",
+        "workspace.tcw.reopen"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitOptimization",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitPause",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitRefreshDisplay",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitReleaseKeys",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitReset",
+      "operationIds": [
+        "workspace.tcw.reset"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitSave",
+      "operationIds": [
+        "workspace.tcw.save"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitStep",
+      "operationIds": [
+        "workspace.tcw.tick"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitToggle",
+      "operationIds": [
+        "workspace.tcw.run-start",
+        "workspace.tcw.run-stop"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitTrigger",
+      "operationIds": [
+        "workspace.tcw.trigger"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitViewport",
+      "operationIds": [
+        "workspace.tcw.viewport"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldOverlay",
+      "operationIds": [
+        "workspace.wld.overlay"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldPresetClone",
+      "operationIds": [
+        "workspace.rules.preset-clone"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldRulesApply",
+      "operationIds": [
+        "workspace.rules.apply"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldRulesPreview",
+      "operationIds": [
+        "workspace.rules.preview"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldRulesSave",
+      "operationIds": [
+        "workspace.rules.save"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "write",
+      "operationIds": [
+        "workspace.region.write"
+      ],
+      "status": "declared",
+      "availability": "available",
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesCancelPreview",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesClose",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesCommitPreview",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesDebug",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesDemo",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesEdit",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesExport",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesImport",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesNew",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesOpen",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesPause",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesPreviewNetwork",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesPreviewRoute",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesRecover",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesReset",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesSimulate",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    },
+    {
+      "controller": "CircuitRulesWorkspace",
+      "action": "rulesToggleRun",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
+    }
+  ]
+}

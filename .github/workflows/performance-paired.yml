@@ -1,0 +1,153 @@
+name: Fixed-pin paired performance diagnostic
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - .github/workflows/performance-paired.yml
+      - tool/perf/paired_*.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paired-performance-${{ github.ref }}
+  # Preserve every process in a started diagnostic, including slow attempts.
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  PAIR_WORKFLOW_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  scope:
+    name: Check whether this push changed the fixed-pin diagnostic
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.PAIR_WORKFLOW_HEAD }}
+          persist-credentials: false
+          fetch-depth: 2
+      - id: scope
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tool/perf')
+          from paired_contract import diagnostic_changed
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          enabled = os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch'
+          if not enabled:
+              # PR path filters use the complete PR diff. Compare this push's
+              # before/head instead, so later unrelated pushes do not rerun.
+              before = event.get('before') if event.get('action') == 'synchronize' else event['pull_request']['base']['sha']
+              assert isinstance(before, str) and re.fullmatch(r'[0-9a-f]{40}', before), 'Missing prior push head; use manual dispatch'
+              subprocess.run(['git', 'fetch', '--no-tags', '--depth=1', 'origin', before], check=True)
+              changed = subprocess.check_output(['git', 'diff', '--name-only', before, 'HEAD'], text=True).splitlines()
+              enabled = diagnostic_changed(changed)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('run=' + str(enabled).lower() + '\n')
+          PY
+
+  paired:
+    name: Fixed a5612b4 vs cddd936 / ${{ matrix.suite }} / 3 pairs
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.job_minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: native
+            job_minutes: 180
+          - suite: wasm
+            job_minutes: 180
+          - suite: map-generation
+            job_minutes: 120
+          - suite: map-dart2js
+            job_minutes: 120
+    steps:
+      - name: Check out workflow and diagnostic code at the requested PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.PAIR_WORKFLOW_HEAD }}
+          persist-credentials: false
+      - name: Check out immutable baseline product
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: a5612b474fc8dc50d41b3bc6b87234d30ba97e02
+          path: build/pair-baseline
+          persist-credentials: false
+      - name: Check out immutable candidate product
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: cddd936f95d31b14a76503e13ffc89173110a057
+          path: build/pair-candidate
+          persist-credentials: false
+      - name: Install one shared immutable Flutter SDK
+        uses: ./build/pair-candidate/.github/actions/setup-flutter
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Install existing native build dependencies
+        if: matrix.suite == 'native' || matrix.suite == 'map-generation'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake zlib1g-dev
+      - name: Install one shared pinned official Emscripten SDK
+        if: matrix.suite == 'wasm'
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 5.0.7 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          test "$(git -C "$RUNNER_TEMP/emsdk" rev-parse HEAD)" = "41190c21c662e9cc1962aea94e71cbae9fd2fc87"
+          "$RUNNER_TEMP/emsdk/emsdk" install 5.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 5.0.7
+      - name: Locate the existing QuickJS package path
+        run: echo "LIBQUICKJSC_TEST_PATH=$PUB_CACHE/hosted/pub.dev/flutter_js-0.8.7/linux/shared/libquickjs_c_bridge_plugin.so" >> "$GITHUB_ENV"
+      - name: Build both fixed products sequentially before any measurement
+        env:
+          PAIR_SUITE: ${{ matrix.suite }}
+        shell: bash
+        run: |
+          if test "$PAIR_SUITE" = wasm; then source "$RUNNER_TEMP/emsdk/emsdk_env.sh"; fi
+          python3 tool/perf/paired_runner.py prepare --suite "$PAIR_SUITE" \
+            --workflow-root . --baseline build/pair-baseline --candidate build/pair-candidate \
+            --output "build/paired/$PAIR_SUITE"
+      - name: Six serial fresh processes in AB BA AB order on this same runner
+        env:
+          PAIR_SUITE: ${{ matrix.suite }}
+        shell: bash
+        run: |
+          if test "$PAIR_SUITE" = wasm; then source "$RUNNER_TEMP/emsdk/emsdk_env.sh"; fi
+          python3 tool/perf/paired_runner.py run --suite "$PAIR_SUITE" \
+            --workflow-root . --baseline build/pair-baseline --candidate build/pair-candidate \
+            --output "build/paired/$PAIR_SUITE"
+      - name: Validate retained attempts and use the frozen unmodified comparator
+        if: always()
+        env:
+          PAIR_SUITE: ${{ matrix.suite }}
+        run: >-
+          python3 tool/perf/paired_validate.py --suite "$PAIR_SUITE"
+          --candidate build/pair-candidate --output "build/paired/$PAIR_SUITE"
+      - name: Publish the limited diagnostic scope
+        if: always()
+        env:
+          PAIR_SUITE: ${{ matrix.suite }}
+        run: |
+          if test -f "build/paired/$PAIR_SUITE/paired-summary.md"; then
+            cat "build/paired/$PAIR_SUITE/paired-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: paired-fixed-pins-${{ matrix.suite }}-attempt-${{ github.run_attempt }}
+          path: build/paired/${{ matrix.suite }}/
+          if-no-files-found: error
+          retention-days: 30

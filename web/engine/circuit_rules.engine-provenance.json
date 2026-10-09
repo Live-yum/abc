@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "source": "Built from the authorized vendored, locally patched TerraWasm source subset; clean WLD/PLR build verified using Emscripten 5.0.7.",
+  "distribution": "User-authorized inclusion of verified engine artifacts in abc source and builds; retain source attribution and provenance. Game artwork, executables and personal saves remain excluded.",
+  "buildInfo": {
+    "abiVersion": 1,
+    "stream": {
+      "version": 2,
+      "inputLease": true,
+      "editPlan": true,
+      "pngColumnCursors": true,
+      "stampTiles": true,
+      "stampObjects": 1
+    },
+    "worldWorkspaceAbiVersion": 1,
+    "pixelWorkspaceAbiVersion": 1,
+    "circuitAbiVersion": 1,
+    "circuitWorldAbiVersion": 2,
+    "circuitWorldFragmentObjects": 1,
+    "circuitWorldFragmentSupports": 1,
+    "circuitWorldPixels": 1,
+    "circuitWorldOptimization": 1,
+    "circuitWorldWireHeadPixels": 1,
+    "playerWorkspaceAbiVersion": 0,
+    "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
+    "dirty": true,
+    "compiler": "emscripten-5.0.7",
+    "target": "web",
+    "featureSet": "wld",
+    "viewerWebProfile": true,
+    "initialMemory": 67108864,
+    "maxMemory": 268435456,
+    "commonFlagsText": "-O3 @@ -fno-exceptions @@ -fno-rtti @@ -sUSE_ZLIB=1 @@ -sALLOW_MEMORY_GROWTH=1 @@ -sMODULARIZE=1 @@ -sERROR_ON_UNDEFINED_SYMBOLS=1 @@ --no-entry",
+    "targetFlagsText": "--post-js=memory-growth-limit.js @@ -sEXPORTED_FUNCTIONS=@exported_functions_web.json @@ -Oz @@ -flto @@ -sEXPORTED_RUNTIME_METHODS=['HEAPU8','HEAPU32'] @@ -sINITIAL_MEMORY=67108864 @@ -sMAXIMUM_MEMORY=268435456 @@ -sEXPORT_NAME='TerraWorldWasmWeb' @@ -sENVIRONMENT=web,worker @@ -sFILESYSTEM=0"
+  },
+  "artifacts": [
+    {
+      "path": "web/engine/world.js",
+      "bytes": 21694,
+      "sha256": "50bb9a182ac1c596d5c67b84ced4d77c69a29d6bf41a4346807d46920962b47d"
+    },
+    {
+      "path": "web/engine/world.wasm",
+      "bytes": 406930,
+      "sha256": "a9af2ce7aed0b4304c21f59e4500fd9116221588840e39af1e453459d8bf4a08"
+    },
+    {
+      "path": "web/engine/player.js",
+      "bytes": 64516,
+      "sha256": "dc3fb611b14adccc891042f6e3f9754b42c96c947548f02740835a28046cd7d8"
+    },
+    {
+      "path": "web/engine/player.wasm",
+      "bytes": 66343,
+      "sha256": "0ffbcb5a3a9c075f34751ee51fa23762cce369f3500f98ae710f8d756130461b"
+    }
+  ],
+  "sourceManifest": {
+    "path": "native/vendor/TerraWasm/SOURCE_MANIFEST.json",
+    "sha256": "a74ae0de4b2a94300d7d0b639261845e8c6a6d2e18638cc38441b948696d46ad"
+  }
+}

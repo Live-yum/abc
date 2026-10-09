@@ -1,0 +1,188 @@
+{
+  "schema": "abc.computerraria.pureWldAcceptance.summary.v1",
+  "measurement_date": "2026-10-09",
+  "input_format": "wld-only",
+  "circuit_world_abi_version": 2,
+  "host": "Native engine via Dart owner and Node 24.19.0 File/Blob with ABC Web WASM",
+  "wasm_sha256": "b3ace044d3b466eee338d25c87dd034c10cc8e73ec1c07e5f900bf42c694e7b8",
+  "loader_sha256": "957c19caf1995131ac8bc462d66f0cf81df2a0be48adb1ae1070c7cdb4366e87",
+  "source_report_sha256": {
+    "optimized_no_reset_continuation": "e36720261044a51948ccc52c7c1a4e673f7fb25407735452f83f2e67c9e02293",
+    "final_backend_summary": "6939e76d2dab9ae947225554dd68736aa813c333b057c81561e4752f1667adfd",
+    "native_standard": "20a2ab42f95c6cc55cf88c77ce93f2aaa9a4dadb75ec8470043f02074897473f",
+    "native_optimized": "9768c4788c0e8b36b6f84cd7f4e9df1c4e6eabaa8ddc396527ec6b7959e3bf20",
+    "node_standard": "288164725f0d83f7399b3fa3ce2b657c3f5a3b5fa60296aa040bbfb497114122",
+    "node_optimized": "bfd4eedd5051b1fe6c1b5b0f63445ca57e18300959775edb585d377dee316ce4"
+  },
+  "input": {
+    "origin": "Public upstream Computerraria WLD",
+    "bytes": 405983441,
+    "width": 15200,
+    "height": 7200,
+    "private_source_included": false
+  },
+  "off_on_comparison": {
+    "cpu_48_word_signature_equal": true,
+    "one_bit_rom_negative_control_signature_equal": true,
+    "input_23_probe_signatures_equal": true,
+    "pong_12_ready_and_ram_stack_checkpoints_equal": true,
+    "checkpoint_scope": "Passive ready lamp and 1088 bytes covering RAM prefix and Pong stack; no reset-bus sampling",
+    "saved_ram_equal": true,
+    "cross_mode_display_equality_required": false,
+    "display_boundary": "OFF game-tripwire crossing remains expected-dark in this world. ON WireHead-style group-pair parity drives the actual 3072 monochrome PixelBoxes and produces moving Pong."
+  },
+  "validation": {
+    "node_off_on_acceptance": "passed; one fresh local process per mode",
+    "strict_report_validator": "passed",
+    "initial_layered_native_acceptance": "passed",
+    "final_merged_native_same_artifact_acceptance": "passed; one fresh local process per mode",
+    "on_no_reset_saved_continuation": "passed",
+    "current_flutter_ui_acceptance": "pending",
+    "exact_head_ci": "pending",
+    "final_pure_wld_long_soak": "not run"
+  },
+  "measurement_limits": [
+    "Node compound RPC loopback uses real RPC/structuredClone ArrayBuffer transfers with both endpoints on one thread. File/Blob handles are retained by identity; this is not browser transfer or threading evidence.",
+    "Clock-command throughput excludes the display read and compound round trip. The compound metric includes both; neither is browser FPS, Flutter frame timing or actual displayed-frame latency.",
+    "Twelve 128-pulse Pong clock batches per mode are bounded diagnostic measurements, not a sustained throughput guarantee.",
+    "Single-WLD save/reopen checks and the separate ON no-reset continuation comparison cover different bounded workloads; neither establishes arbitrary-program continuation.",
+    "This is physical CPU, input, pixel and save evidence for the named Native/WASM artifacts, not complete game or WireHead parity.",
+    "Isolated Native loading optimization timings have different artifact provenance and do not measure this WASM artifact.",
+    "Native rates measure the awaited clock command; Node rates measure the bridge clock-command stage. These are distinct host measurement boundaries, not a common browser/UI latency metric.",
+    "Final pure-WLD long soak and the three-repetition clean-CI campaign have not been completed."
+  ],
+  "on_no_reset_saved_continuation": {
+    "status": "passed",
+    "wasm_sha256": "b3ace044d3b466eee338d25c87dd034c10cc8e73ec1c07e5f900bf42c694e7b8",
+    "save_at_physical_pulses": 5120,
+    "continuation_checkpoints_per_branch": 32,
+    "physical_pulses_per_checkpoint": 128,
+    "continuation_physical_pulses": 4096,
+    "exact_live_reopened_checkpoint_equality": true,
+    "exact_saved_reopened_initial_state": true,
+    "reset_or_rom_rewrite_after_reopen": false,
+    "scope": {
+      "mono_pixels": 3072,
+      "cpu_area_lamps": 654,
+      "input_area_lamps": 45,
+      "ram_words": 272,
+      "ram_bytes": 1088,
+      "ram_coverage": "First 64 bytes and final 1024 bytes including the current Pong stack; not all physical RAM",
+      "cpu_coverage": "Selected physical CPU-area lamps plus ready lamp; not a complete architectural register map"
+    },
+    "distinct_states": {
+      "mono": 21,
+      "ram": 33,
+      "cpu_area_lamps": 33,
+      "input_area_lamps": 33
+    },
+    "held_up_paddle_center": {
+      "initial": 24.5,
+      "final": 23.5
+    },
+    "brief_up_down_presses": "No observed paddle movement in these bounded traces; no claim of brief-key consumption behavior or real UI input latency.",
+    "elapsed_seconds": 88.609935304,
+    "native_bytes_after_close": 0,
+    "bridge_bytes_after_close": 0,
+    "open_files_after_close": 0
+  },
+  "scope": "One fresh local process per backend and mode; separate ON Node saved continuation. Not the three-repetition clean-CI campaign or actual browser/Flutter UI timing.",
+  "native_library_sha256": "d033ffd68651f3d7abda7b329ac46e576caa1400bdf73d340e8bd7cf48ebf9d7",
+  "original_public_wld_sha256_after_runs": "55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33",
+  "original_public_wld_unchanged": true,
+  "node_runs": [
+    {
+      "mode": "OFF",
+      "status": "passed",
+      "pixel_rule": "game-tripwire-crossing",
+      "display_status": "expected-dark",
+      "cpu_signature_words": 48,
+      "input_probes": 23,
+      "pong_checkpoints": 12,
+      "single_wld_save_and_reopen": "passed",
+      "reopened_ram_exact": true,
+      "reopened_display_exact": true,
+      "native_bytes_after_close": 0,
+      "bridge_bytes_after_close": 0,
+      "open_files_after_close": 0,
+      "pong_clock_diagnostics": {
+        "batches": 12,
+        "pulses": 1536,
+        "clock_command_milliseconds": 1569.4552319999893,
+        "clock_command_pulses_per_second": 978.6835385184216,
+        "compound_round_trip_median_milliseconds": 130.959687999999
+      }
+    },
+    {
+      "mode": "ON",
+      "status": "passed",
+      "pixel_rule": "wirehead-color-pair-wave",
+      "display_status": "moving",
+      "cpu_signature_words": 48,
+      "input_probes": 23,
+      "pong_checkpoints": 12,
+      "single_wld_save_and_reopen": "passed",
+      "reopened_ram_exact": true,
+      "reopened_display_exact": true,
+      "native_bytes_after_close": 0,
+      "bridge_bytes_after_close": 0,
+      "open_files_after_close": 0,
+      "pong_clock_diagnostics": {
+        "batches": 12,
+        "pulses": 1536,
+        "clock_command_milliseconds": 262.67090100000496,
+        "clock_command_pulses_per_second": 5847.621469117247,
+        "compound_round_trip_median_milliseconds": 22.043436500000098
+      }
+    }
+  ],
+  "native_runs": [
+    {
+      "mode": "OFF",
+      "status": "passed",
+      "pixel_rule": "game-tripwire-crossing",
+      "display_status": "expected-dark",
+      "cpu_signature_words": 48,
+      "input_probes": 23,
+      "pong_checkpoints": 12,
+      "single_wld_save_and_reopen": "passed",
+      "reopened_ram_exact": true,
+      "reopened_display_exact": true,
+      "native_bytes_after_close": 0,
+      "pong_clock_diagnostics": {
+        "clock_measurement_scope": "native-awaited-clock-command-v1",
+        "batches": 12,
+        "pulses": 1536,
+        "clock_command_pulses_per_second": 1012.4780003559493
+      }
+    },
+    {
+      "mode": "ON",
+      "status": "passed",
+      "pixel_rule": "wirehead-color-pair-wave",
+      "display_status": "moving",
+      "cpu_signature_words": 48,
+      "input_probes": 23,
+      "pong_checkpoints": 12,
+      "single_wld_save_and_reopen": "passed",
+      "reopened_ram_exact": true,
+      "reopened_display_exact": true,
+      "native_bytes_after_close": 0,
+      "pong_clock_diagnostics": {
+        "clock_measurement_scope": "native-awaited-clock-command-v1",
+        "batches": 12,
+        "pulses": 1536,
+        "clock_command_pulses_per_second": 6013.671706770861
+      }
+    }
+  ],
+  "same_mode_native_node_comparison": {
+    "cpu_signature_equal": true,
+    "negative_control_signature_equal": true,
+    "input_probe_signatures_equal": true,
+    "pong_ready_ram_stack_checkpoints_equal": true,
+    "complete_monochrome_display_hashes_equal": true,
+    "saved_ram_equal": true,
+    "saved_wld_output_hash_equal": true
+  }
+}

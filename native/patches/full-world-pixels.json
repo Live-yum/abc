@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "id": "full-world-pixels-v5-sparse-lamp-checkpoints",
+  "baseSourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
+  "baseDistributedManifestSha256": "9b55c8ad55a4ce8ad848c58e8c9ec80fb78285405f6a7cccc44c8c95b74dbb7a",
+  "supersedes": {
+    "id": "full-world-pixels-v4-wld-host-hashing",
+    "manifestSha256": "a7331e085e0fd5714788974701d853727296ee0cb7e9d64d9a3929efc355aa7e",
+    "distributedManifestSha256": "ff15c09cdcb2cf204a9aa8abcc721d219d5e4639e42837c709b73211c43e5c21",
+    "prior": {
+      "id": "full-world-pixels-v3-wld-only",
+      "manifestSha256": "a5bb31a966d8625f16ae095c90d5d1ee0b90da5bc81e34dc481842af0cc76a48",
+      "distributedManifestSha256": "a51b6c058eb3709a5bd958c7fbde79e0d3a239b6b787a74eb4a7fa7e3749e399",
+      "prior": {
+        "id": "full-world-pixels-v2-wld-only",
+        "manifestSha256": "6cffadaaa4efd8bac51b0ba381baef2281e47caf559a7f20ef3425c8be8e05cf",
+        "distributedManifestSha256": "f76b42b4434ca53cda9e489d04dd5ddb34395ff99a8b0bace15f8d809d48153e",
+        "prior": {
+          "id": "full-world-pixels-v1",
+          "manifestSha256": "ee3bb706e7f4cd9437faaa61247182bc5943957b0a93c63dcc21082fb2efa824",
+          "distributedManifestSha256": "539e4369e9517bad5c1d2337241c51d37150eef983376c069b48947783c1cd7c"
+        }
+      }
+    }
+  },
+  "reviewedPurpose": "Cumulative pure-WLD circuit-world ABI 2 with four-argument begin, bounded retained-pixel query and no sidecar parser/session/source/save or custom color mapping. Default OFF retains vanilla per-TripWire type-445 horizontal/vertical crossing XOR. ON combines device generation dedup with WireHead-style per-pixel different-colour connected-group pair parity at each shared physical gate-wave boundary; incompatible same-colour dual-axis topology rejects ON with TCW_UNSUPPORTED without mutation. This is a restricted pixel rule, not a full WireHead topology emulator or its multi-pixel dictionary-overwrite behavior. Idle switching preserves frames, ROM/RAM, input and RNG. Shared physical gate-wave VM execution remains unchanged. Cold-load compilation enumerates wired/gate rows in original order, uses inline paged DSU accessors and bounds-checked tile reads without duplicate checks; every input tile record remains decoded and validated and temporary row indexes are freed after compilation. Export the four existing incremental SHA-256 functions in the WLD Web profile for bounded native hashing by the host; the existing C hash implementation is byte-identical to the frozen v3 source. Sparse READ_LAMPS queries restore existing 64-column checkpoints only at complete-column boundaries when the next requested point has a later checkpoint, preserve original point order/duplicates, and yield immediately after each restore. Compilation, source validation, viewport, write, trigger, simulation and save semantics are unchanged.",
+  "runtimeContract": {
+    "circuitWorldAbiVersion": 2,
+    "circuitWorldWireHeadPixels": 1,
+    "readyReservedBits": {
+      "0": "reserved zero",
+      "1": "optimization ON",
+      "2": "compatible PixelBox topology",
+      "3": "ON pixel rule selected"
+    },
+    "saveReserved": 0,
+    "defaultOptimization": false
+  },
+  "referenceSources": [
+    {
+      "repository": "https://github.com/misprit7/WireHead",
+      "commit": "e6009d010ca54ff43d04b44697accc7115807b9c",
+      "reviewedFiles": [
+        "Accelerator.cs",
+        "WiringWrapper.cs"
+      ],
+      "license": "MIT",
+      "attribution": "Copyright (c) 2023 Xander Naumenko",
+      "distribution": "Rule adaptation and permission notices only; no mod or game runtime bundled."
+    }
+  ],
+  "attributionFiles": [
+    {
+      "path": "vendor/wirehead/LICENSE",
+      "bytes": 1073,
+      "sha256": "c046a3b23796a077fff90096c2ff2b3e9b0501f459407949f3a5817ce56f730c"
+    },
+    {
+      "path": "vendor/wirehead/README.md",
+      "bytes": 657,
+      "sha256": "4e49c4f138a42d3be17af24d37225dff4e99b5d260273d1ae3f4f3d09bf6534a"
+    },
+    {
+      "path": "assets/computer/WIREHEAD_LICENSE.txt",
+      "bytes": 1073,
+      "sha256": "c046a3b23796a077fff90096c2ff2b3e9b0501f459407949f3a5817ce56f730c"
+    }
+  ],
+  "patch": {
+    "path": "native/patches/full-world-pixels.patch",
+    "sha256": "466734396d82ac88e0dd8b4ef71b8756c414ccb1ab8c1378bd1049f86e59b498",
+    "bytes": 82990
+  },
+  "files": [
+    {
+      "path": "CMakeLists.txt",
+      "beforeSha256": "bc180b08dd16d190e17d2d149e3fddbb8216be6d642c6d8969ceeaeb53d8a53c",
+      "beforeBytes": 25671,
+      "afterSha256": "e9d473343c337306af0e17256be7ef3a71ea18872a24144b89cd3b916a017da5",
+      "afterBytes": 25494
+    },
+    {
+      "path": "README.md",
+      "beforeSha256": "606997a6056d091a62f86cd084dfdc7c030a9a5571596c5e73d928ff663722c8",
+      "beforeBytes": 21780,
+      "afterSha256": "313a422441afd1ef68ab88cdfc1c0abdd9f2b48e4d2aee786263e898c5402231",
+      "afterBytes": 23389
+    },
+    {
+      "path": "exports.wld.web.txt",
+      "beforeSha256": "89dd71783a62d2306d2e9465dd8f64ac7c1021ed03310f0c05a485f63c9b2d0f",
+      "beforeBytes": 2625,
+      "afterSha256": "3893755c3b53d084244ad7810b464b7bb655dd4897432841e7fceba14bda933a",
+      "afterBytes": 2709
+    },
+    {
+      "path": "include/terra_circuit_world.h",
+      "beforeSha256": "6728a2c78cc025aa40e34660217d7b5323485898dac8b780ffb3bfecb9712f8f",
+      "beforeBytes": 6543,
+      "afterSha256": "41bb49cd77e237dc8bd44119f2d44ff52addeda80ebd39f506647e454bc01f80",
+      "afterBytes": 7405
+    },
+    {
+      "path": "src/terra_abi.c",
+      "beforeSha256": "fbf85a40d92725a4ec4961947d7043dd0f102189e176a52c3d86406dd0753bdc",
+      "beforeBytes": 4304,
+      "afterSha256": "4f98355e039052130029940cf2e10eae935995961f8ce4a9af512f7db027418c",
+      "afterBytes": 4604
+    },
+    {
+      "path": "src/terra_circuit_compile.c",
+      "beforeSha256": "898ac2650b453e830011debf95dd35d463a4e296fc076e4e12400cc5da2e14cb",
+      "beforeBytes": 22785,
+      "afterSha256": "0952d1dc46dabadde739c858ec7c05fb1802b5548ed4b862774e402e64a83233",
+      "afterBytes": 26672
+    },
+    {
+      "path": "src/terra_circuit_devices.c",
+      "beforeSha256": "4b584e668f1c20492974d84d2e523de82c5875482fec77f005d377f550e66174",
+      "beforeBytes": 15719,
+      "afterSha256": "4a1955f40f5f92e1718f7cd1c4003f5956056a067026a2d2b4230d3877e9964e",
+      "afterBytes": 18670
+    },
+    {
+      "path": "src/terra_circuit_fragments.inc",
+      "beforeSha256": "3b41226db51e75819e3f03cc84d23ac7788ced0316690700c5f95fc329bd99ba",
+      "beforeBytes": 21162,
+      "afterSha256": "f007bf4e99679c8f7f11857140eeb5999d200278357a49d472d7b284d3eb9557",
+      "afterBytes": 21064
+    },
+    {
+      "path": "src/terra_circuit_query.c",
+      "beforeSha256": "adede2c3dd371f18e5804b0a27b91a7df18f7196ac986873212849659c0afa8c",
+      "beforeBytes": 18110,
+      "afterSha256": "141d6b96c20cfdb96fbe804d29e9007486462acca785c7a0e4aa8bd6269a42df",
+      "afterBytes": 20267
+    },
+    {
+      "path": "src/terra_circuit_rules.c",
+      "beforeSha256": "00d0232156f2a24c5b1e7033433ce0edccceaf813bf98aa12cb44f39c4847e56",
+      "beforeBytes": 13513,
+      "afterSha256": "35277f86b3c91afdbc3537fa7b19ffd8c0b83a47545c1ae3e78f05a6fa832829",
+      "afterBytes": 13374
+    },
+    {
+      "path": "src/terra_circuit_world.c",
+      "beforeSha256": "af78e5cf1e7884d97a16a516390d7ffbf1786a66a928509ab0402bdbbc112cfd",
+      "beforeBytes": 19491,
+      "afterSha256": "21ec49bf23773d62bf4d0515340b0250c2e395d5c3f685103053fee03531ae76",
+      "afterBytes": 18842
+    },
+    {
+      "path": "src/terra_circuit_world_internal.h",
+      "beforeSha256": "2d982d3f755a6100515322fd8a26cf9acb1fe20a1c86f459abdc2a9b6265d452",
+      "beforeBytes": 9555,
+      "afterSha256": "d85f28f916e568608a309ba335941e52717503781a3fb3bc4c0fd5f04f9e8044",
+      "afterBytes": 9371
+    },
+    {
+      "path": "src/terra_wld.c",
+      "beforeSha256": "587e2b89e36770fb8849fcd19a7cb7e799a13b9e1b6b71cb13b69880e6b2383e",
+      "beforeBytes": 105256,
+      "afterSha256": "8b4bcec36063ff7116bfcfdf130429ea6a923bcbf959d0a9235e83a7b00ab8fc",
+      "afterBytes": 105514
+    }
+  ],
+  "removedFiles": [
+    {
+      "path": "include/terra_circuit_twld.h",
+      "beforeSha256": "3bdbbdb72fc4061b42381f014c43ad49e22f4ef86d879f2a015658dcc05b3843",
+      "beforeBytes": 3167
+    },
+    {
+      "path": "src/terra_circuit_twld.c",
+      "beforeSha256": "ceb78d7d05e8e299e20cbac897c850d17ca9f08337adbedec28a596f23657d89",
+      "beforeBytes": 27757
+    },
+    {
+      "path": "src/terra_circuit_twld_session.c",
+      "beforeSha256": "dcfdd538e09f4625519fe0e0d4d0371fd9900965b039e14579124aa9263427a4",
+      "beforeBytes": 5190
+    }
+  ]
+}

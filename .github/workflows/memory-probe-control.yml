@@ -1,0 +1,139 @@
+name: Fixed-product paired memory measurement control
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - .github/workflows/memory-probe-control.yml
+      - integration_test/computer_memory_probe_control_test.dart
+      - integration_test/support/computer_memory_probe_telemetry.dart
+      - tool/perf/memory_probe_control*
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fixed-memory-probe-control-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  MEMORY_CONTROL_WORKFLOW_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  scope:
+    name: Run only when this push changes the control
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.MEMORY_CONTROL_WORKFLOW_HEAD }}
+          persist-credentials: false
+          fetch-depth: 2
+      - id: scope
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          enabled = os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch'
+          if not enabled:
+              before = event.get('before') if event.get('action') == 'synchronize' else event['pull_request']['base']['sha']
+              assert isinstance(before, str) and re.fullmatch('[0-9a-f]{40}', before), 'Missing before SHA; use manual dispatch'
+              subprocess.run(['git', 'fetch', '--no-tags', '--depth=1', 'origin', before], check=True)
+              paths = subprocess.check_output(['git', 'diff', '--name-only', before, 'HEAD'], text=True).splitlines()
+              explicit = {'.github/workflows/memory-probe-control.yml', 'integration_test/computer_memory_probe_control_test.dart', 'integration_test/support/computer_memory_probe_telemetry.dart'}
+              enabled = any(p in explicit or p.startswith('tool/perf/memory_probe_control') for p in paths)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('run=' + str(enabled).lower() + '\n')
+          PY
+
+  paired-control:
+    name: Two bounded processes / no-world probes and product OS-only
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      TERRA_PERF_RUNNER: ubuntu-24.04-xvfb
+    steps:
+      - name: Check out only the diagnostic definitions at the workflow head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.MEMORY_CONTROL_WORKFLOW_HEAD }}
+          persist-credentials: false
+      - name: Check out the unchanged original measured product
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 51bc8eaa76b145b0d9bec3c95977779af43b676c
+          path: build/memory-probe-control-source
+          persist-credentials: false
+      - name: Install original Linux profile and display dependencies
+        timeout-minutes: 10
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev zlib1g-dev xvfb mesa-utils
+      - uses: ./build/memory-probe-control-source/.github/actions/setup-flutter
+      - name: Overlay only reviewed diagnostic files and record a local derived tree
+        run: |
+          python3 tool/perf/memory_probe_control_prepare.py --workflow-root . --source build/memory-probe-control-source --output build/memory-probe-control-derivation
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path('build/memory-probe-control-derivation/derivation.json').resolve()
+          data = json.loads(path.read_text())
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('ABC_CONTROL_BASE_COMMIT=' + data['baseCommit'] + '\n')
+              output.write('ABC_CONTROL_DERIVED_COMMIT=' + data['derivedCommit'] + '\n')
+              output.write('ABC_PERF_COMMIT=' + data['derivedCommit'] + '\n')
+              output.write('ABC_CONTROL_DERIVATION=' + str(path) + '\n')
+          PY
+      - name: Resolve the fixed lockfile and pinned public WLD
+        working-directory: build/memory-probe-control-source
+        timeout-minutes: 10
+        run: |
+          flutter pub get --enforce-lockfile
+          python3 tool/computerraria_inputs.py
+          mkdir -p build/memory-probe-control-tmp
+          echo "TMPDIR=$PWD/build/memory-probe-control-tmp" >> "$GITHUB_ENV"
+          echo "COMPUTERRARIA_WLD=$PWD/build/public-computerraria/computerraria.wld" >> "$GITHUB_ENV"
+          xvfb-run -a -s '-screen 0 1440x1000x24' glxinfo -B > build/memory-probe-control-glxinfo.txt
+          renderer="$(sed -n 's/^OpenGL renderer string: //p' build/memory-probe-control-glxinfo.txt)"
+          test -n "$renderer"
+          echo "TERRA_PERF_RENDERER=$renderer" >> "$GITHUB_ENV"
+      - name: Lightweight contracts and Dart syntax before the two processes
+        working-directory: build/memory-probe-control-source
+        timeout-minutes: 3
+        run: |
+          python3 -m unittest discover -s tool/perf -p 'memory_probe_control*_test.py' -v
+          dart format --output=none --set-exit-if-changed integration_test/computer_memory_probe_control_test.dart integration_test/support/computer_memory_probe_telemetry.dart
+          flutter analyze --no-pub integration_test/computer_memory_probe_control_test.dart integration_test/support/computer_memory_probe_telemetry.dart
+      - name: Run exactly one process per independent arm
+        working-directory: build/memory-probe-control-source
+        timeout-minutes: 38
+        run: >-
+          xvfb-run -a -s '-screen 0 1440x1000x24'
+          python3 tool/perf/memory_probe_control_run.py
+          build/memory-probe-control-evidence
+      - name: Preserve derivation and renderer with partial or complete evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p build/memory-probe-control-source/build/memory-probe-control-evidence/provenance
+          cp build/memory-probe-control-derivation/* build/memory-probe-control-source/build/memory-probe-control-evidence/provenance/ 2>/dev/null || true
+          cp build/memory-probe-control-source/build/memory-probe-control-glxinfo.txt build/memory-probe-control-source/build/memory-probe-control-evidence/provenance/ 2>/dev/null || true
+          echo 'Two fixed-51bc measurement controls only. Original +199.051 MiB released-point and +205.461 MiB matched-quiet growth remain unresolved. No product leak-free, plateau, or FPS certification.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        timeout-minutes: 5
+        with:
+          name: fixed-memory-probe-control-${{ env.MEMORY_CONTROL_WORKFLOW_HEAD }}-attempt-${{ github.run_attempt }}
+          path: build/memory-probe-control-source/build/memory-probe-control-evidence/
+          if-no-files-found: error
+          retention-days: 30

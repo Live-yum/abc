@@ -1,0 +1,9 @@
+# Typed world property editing
+
+The world inspector now exposes searchable, grouped decoded scalar properties rather than only six basic fields. Common labels are translated, with the actual engine field name retained alongside the control.
+
+Supported controls include known progression flags, time/day/night, blood moon/eclipse, rain and wind, invasion counters, name/seed, game mode and spawn. Boolean controls submit typed booleans. Numeric dialogs reject non-finite values, incorrect integers, invalid spawn coordinates and known out-of-range values. Floating-schema fields accept decimals even when JSON decoded their current zero as an integer.
+
+This remains a conservative property editor, not a claim that every normalized header key is writable. The engine emits default values for some fields absent from older file versions. Unknown fields, structural dimensions/IDs/format metadata and unsupported version-dependent keys are read-only. Seed requires version179; game mode is limited to0–1 in v139,0–2 in v208 and0–3 from v209. Future versions above326 are locked even without an explicit read-only flag. The safe progression set uses a conservative v139 floor; some valid older/newer fields remain intentionally unexposed for editing until their compatibility profiles and tests are added.
+
+The controller routes each confirmed edit through the existing candidate encode/read-back transaction; it does not mutate picked source files. A real native v139 test changes a boss flag, blood moon, fractional time and rain intensity, exports, proves unsupported normalized future-field rejection preserves the candidate, then undoes all four changes to byte-identical original data. Eight widget tests cover typed inputs, cancellation, version protection, structural fields, search and390px layout.

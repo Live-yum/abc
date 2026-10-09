@@ -1,0 +1,16 @@
+{
+  "name": "terraforge-build-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reproducible build tools for the authorized TerraForge circuit rules subset.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:circuit-rules": "node tool/build_circuit_rules.mjs",
+    "verify:sources": "python3 tool/verify_authorized_sources.py"
+  },
+  "devDependencies": {
+    "esbuild": "0.20.1"
+  }
+}

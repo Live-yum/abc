@@ -1,0 +1,1057 @@
+{
+  "schema": "abc.performance-action-catalog.v1",
+  "reportSchema": "tool/perf/report.schema.json",
+  "note": "Only operation rows actually present in a passed measured report count as measured. Parameter variants below are explicit; one import/undo/export row is never all formats. The parent coverage matrix must retain unmeasured dispatch actions.",
+  "coreFamilies": {
+    "wld": [
+      "bestiary-edit",
+      "chest-edit",
+      "close",
+      "export",
+      "header-edit",
+      "inspect",
+      "open",
+      "preview",
+      "reject-mutation",
+      "reopen",
+      "untouched-export"
+    ],
+    "plr": [
+      "attribute-edit",
+      "close",
+      "export",
+      "inspect",
+      "inventory-edit",
+      "open",
+      "project-135",
+      "project-218",
+      "project-279",
+      "project-326",
+      "project-38",
+      "reject-mutation",
+      "reopen",
+      "untouched-export"
+    ],
+    "region": [
+      "objects",
+      "read",
+      "read-large-world",
+      "reject-recover",
+      "replace",
+      "replace-large-world",
+      "stamp",
+      "stamp-objects"
+    ],
+    "pixel": [
+      "match",
+      "write"
+    ],
+    "rules": [
+      "batch-update",
+      "batch-update-large-world",
+      "biome-corruption",
+      "biome-crimson",
+      "biome-hallow",
+      "biome-purify"
+    ],
+    "tcw": [
+      "close",
+      "close-large-world",
+      "export",
+      "export-large-world",
+      "open",
+      "open-large-world",
+      "reject-recover",
+      "reopen",
+      "reopen-large-world",
+      "tick60",
+      "tick60-large-world",
+      "trigger",
+      "trigger-large-world",
+      "viewport",
+      "viewport-large-world"
+    ],
+    "circuit": [
+      "close",
+      "copy",
+      "demo-close",
+      "demo-load",
+      "demo-reopen",
+      "demo-reset",
+      "demo-run60",
+      "demo-trigger",
+      "load",
+      "paint",
+      "paste",
+      "place",
+      "redo",
+      "reject-command",
+      "reopen",
+      "reset",
+      "rotate",
+      "route",
+      "route-confirm",
+      "run60",
+      "select",
+      "tick",
+      "traverse-0",
+      "traverse-1",
+      "traverse-2",
+      "traverse-3",
+      "trigger",
+      "undo"
+    ],
+    "vault": [
+      "list",
+      "put",
+      "read",
+      "reject-duplicate",
+      "reject-missing",
+      "remove"
+    ],
+    "resources": [
+      "clear-memory",
+      "import",
+      "reject-invalid",
+      "reload"
+    ]
+  },
+  "workspaceActions": [
+    {
+      "id": "resources.clear-memory",
+      "action": "clearResourceMemory",
+      "requires": "verified-resource-pack"
+    },
+    {
+      "id": "resources.import",
+      "action": "import",
+      "args": {
+        "kind": "resources"
+      },
+      "requires": "verified-resource-pack"
+    },
+    {
+      "id": "resources.reload",
+      "action": "import",
+      "args": {
+        "kind": "resources"
+      },
+      "requires": "verified-resource-pack"
+    },
+    {
+      "id": "workspace.achievements.catalog-import",
+      "action": "import",
+      "variant": "achievements.catalog-import"
+    },
+    {
+      "id": "workspace.achievements.complete",
+      "action": "achievementCompleteKnown",
+      "variant": "achievements.complete"
+    },
+    {
+      "id": "workspace.achievements.counter",
+      "action": "achievementCondition",
+      "variant": "achievements.counter"
+    },
+    {
+      "id": "workspace.achievements.export",
+      "action": "export",
+      "variant": "achievements.export"
+    },
+    {
+      "id": "workspace.achievements.import",
+      "action": "import",
+      "variant": "achievements.import"
+    },
+    {
+      "id": "workspace.achievements.new",
+      "action": "achievementNew",
+      "variant": "achievements.new"
+    },
+    {
+      "id": "workspace.achievements.toggle",
+      "action": "achievementToggle",
+      "variant": "achievements.toggle"
+    },
+    {
+      "id": "workspace.bestiary.entry",
+      "action": "bestiaryEntry",
+      "variant": "bestiary.entry"
+    },
+    {
+      "id": "workspace.bestiary.patch",
+      "action": "stageBestiary",
+      "variant": "bestiary.patch"
+    },
+    {
+      "id": "workspace.bestiary.unlock",
+      "action": "bestiaryUnlockKnown",
+      "variant": "bestiary.unlock"
+    },
+    {
+      "id": "workspace.canvas.circuit.clear",
+      "action": "clear",
+      "variant": "canvas.circuit.clear"
+    },
+    {
+      "id": "workspace.canvas.circuit.export",
+      "action": "export",
+      "variant": "canvas.circuit.export"
+    },
+    {
+      "id": "workspace.canvas.circuit.import",
+      "action": "import",
+      "variant": "canvas.circuit.import"
+    },
+    {
+      "id": "workspace.canvas.circuit.paint",
+      "action": "paint",
+      "variant": "canvas.circuit.paint"
+    },
+    {
+      "id": "workspace.canvas.circuit.redo",
+      "action": "redo",
+      "variant": "canvas.circuit.redo"
+    },
+    {
+      "id": "workspace.canvas.circuit.resize",
+      "action": "resize",
+      "variant": "canvas.circuit.resize"
+    },
+    {
+      "id": "workspace.canvas.circuit.stroke-end",
+      "action": "strokeEnd",
+      "variant": "canvas.circuit.stroke-end"
+    },
+    {
+      "id": "workspace.canvas.circuit.stroke-start",
+      "action": "strokeStart",
+      "variant": "canvas.circuit.stroke-start"
+    },
+    {
+      "id": "workspace.canvas.circuit.undo",
+      "action": "undo",
+      "variant": "canvas.circuit.undo"
+    },
+    {
+      "id": "workspace.canvas.circuit.undo-clear",
+      "action": "undo",
+      "variant": "canvas.circuit.undo-clear"
+    },
+    {
+      "id": "workspace.canvas.fusion.clear",
+      "action": "clear",
+      "variant": "canvas.fusion.clear"
+    },
+    {
+      "id": "workspace.canvas.fusion.export",
+      "action": "export",
+      "variant": "canvas.fusion.export"
+    },
+    {
+      "id": "workspace.canvas.fusion.import",
+      "action": "import",
+      "variant": "canvas.fusion.import"
+    },
+    {
+      "id": "workspace.canvas.fusion.paint",
+      "action": "paint",
+      "variant": "canvas.fusion.paint"
+    },
+    {
+      "id": "workspace.canvas.fusion.redo",
+      "action": "redo",
+      "variant": "canvas.fusion.redo"
+    },
+    {
+      "id": "workspace.canvas.fusion.resize",
+      "action": "resize",
+      "variant": "canvas.fusion.resize"
+    },
+    {
+      "id": "workspace.canvas.fusion.stroke-end",
+      "action": "strokeEnd",
+      "variant": "canvas.fusion.stroke-end"
+    },
+    {
+      "id": "workspace.canvas.fusion.stroke-start",
+      "action": "strokeStart",
+      "variant": "canvas.fusion.stroke-start"
+    },
+    {
+      "id": "workspace.canvas.fusion.undo",
+      "action": "undo",
+      "variant": "canvas.fusion.undo"
+    },
+    {
+      "id": "workspace.canvas.fusion.undo-clear",
+      "action": "undo",
+      "variant": "canvas.fusion.undo-clear"
+    },
+    {
+      "id": "workspace.canvas.pixel.clear",
+      "action": "clear",
+      "variant": "canvas.pixel.clear"
+    },
+    {
+      "id": "workspace.canvas.pixel.export",
+      "action": "export",
+      "variant": "canvas.pixel.export"
+    },
+    {
+      "id": "workspace.canvas.pixel.import",
+      "action": "import",
+      "variant": "canvas.pixel.import"
+    },
+    {
+      "id": "workspace.canvas.pixel.paint",
+      "action": "paint",
+      "variant": "canvas.pixel.paint"
+    },
+    {
+      "id": "workspace.canvas.pixel.redo",
+      "action": "redo",
+      "variant": "canvas.pixel.redo"
+    },
+    {
+      "id": "workspace.canvas.pixel.resize",
+      "action": "resize",
+      "variant": "canvas.pixel.resize"
+    },
+    {
+      "id": "workspace.canvas.pixel.stroke-end",
+      "action": "strokeEnd",
+      "variant": "canvas.pixel.stroke-end"
+    },
+    {
+      "id": "workspace.canvas.pixel.stroke-start",
+      "action": "strokeStart",
+      "variant": "canvas.pixel.stroke-start"
+    },
+    {
+      "id": "workspace.canvas.pixel.undo",
+      "action": "undo",
+      "variant": "canvas.pixel.undo"
+    },
+    {
+      "id": "workspace.canvas.pixel.undo-clear",
+      "action": "undo",
+      "variant": "canvas.pixel.undo-clear"
+    },
+    {
+      "id": "workspace.catalog.import",
+      "action": "import",
+      "variant": "catalog.import"
+    },
+    {
+      "id": "workspace.catalog.player-import",
+      "action": "import",
+      "variant": "catalog.player-import"
+    },
+    {
+      "id": "workspace.catalog.world-import",
+      "action": "import",
+      "variant": "catalog.world-import"
+    },
+    {
+      "id": "workspace.chests.best-prefix",
+      "action": "chestBestPrefixes",
+      "variant": "chests.best-prefix"
+    },
+    {
+      "id": "workspace.chests.catalog-slot",
+      "action": "stageChest",
+      "variant": "chests.catalog-slot"
+    },
+    {
+      "id": "workspace.chests.clear",
+      "action": "chestClear",
+      "variant": "chests.clear"
+    },
+    {
+      "id": "workspace.chests.organize",
+      "action": "chestOrganize",
+      "variant": "chests.organize"
+    },
+    {
+      "id": "workspace.chests.rename",
+      "action": "stageChest",
+      "variant": "chests.rename"
+    },
+    {
+      "id": "workspace.chests.slot-decrease",
+      "action": "stageChest",
+      "variant": "chests.slot-decrease"
+    },
+    {
+      "id": "workspace.chests.undo",
+      "action": "undo",
+      "variant": "chests.undo"
+    },
+    {
+      "id": "workspace.cloud.discard",
+      "action": "cloudDiscardUpload",
+      "variant": "cloud.discard"
+    },
+    {
+      "id": "workspace.cloud.download",
+      "action": "cloudDownload",
+      "variant": "cloud.download"
+    },
+    {
+      "id": "workspace.cloud.prepare",
+      "action": "cloudPrepareUpload",
+      "variant": "cloud.prepare"
+    },
+    {
+      "id": "workspace.cloud.recommendation-download",
+      "action": "cloudRecommendationDownload",
+      "variant": "cloud.recommendation-download"
+    },
+    {
+      "id": "workspace.cloud.reprepare",
+      "action": "cloudPrepareUpload",
+      "variant": "cloud.reprepare"
+    },
+    {
+      "id": "workspace.cloud.upload",
+      "action": "cloudUploadPrepared",
+      "variant": "cloud.upload"
+    },
+    {
+      "id": "workspace.conversion.apply",
+      "action": "applyPlayerConversion",
+      "variant": "conversion.apply"
+    },
+    {
+      "id": "workspace.conversion.cancel",
+      "action": "cancelPlayerConversion",
+      "variant": "conversion.cancel"
+    },
+    {
+      "id": "workspace.conversion.import",
+      "action": "import",
+      "variant": "conversion.import"
+    },
+    {
+      "id": "workspace.conversion.prepare",
+      "action": "preparePlayerConversion",
+      "variant": "conversion.prepare"
+    },
+    {
+      "id": "workspace.conversion.reprepare",
+      "action": "preparePlayerConversion",
+      "variant": "conversion.reprepare"
+    },
+    {
+      "id": "workspace.conversion.undo",
+      "action": "undo",
+      "variant": "conversion.undo"
+    },
+    {
+      "id": "workspace.error.dismiss",
+      "action": "dismissError",
+      "variant": "error.dismiss"
+    },
+    {
+      "id": "workspace.fragments.close",
+      "action": "worldCircuitClose",
+      "variant": "fragments.close"
+    },
+    {
+      "id": "workspace.fragments.export",
+      "action": "export",
+      "variant": "fragments.export"
+    },
+    {
+      "id": "workspace.fragments.extract",
+      "action": "worldCircuitExtract",
+      "variant": "fragments.extract"
+    },
+    {
+      "id": "workspace.fragments.import",
+      "action": "import",
+      "variant": "fragments.import"
+    },
+    {
+      "id": "workspace.fragments.list",
+      "action": "worldCircuitFragments",
+      "variant": "fragments.list"
+    },
+    {
+      "id": "workspace.fragments.open",
+      "action": "worldCircuitOpen",
+      "variant": "fragments.open"
+    },
+    {
+      "id": "workspace.legacy-circuit.cancel",
+      "action": "circuitCancelEdit",
+      "variant": "legacy-circuit.cancel"
+    },
+    {
+      "id": "workspace.legacy-circuit.confirm",
+      "action": "circuitConfirmEdit",
+      "variant": "legacy-circuit.confirm"
+    },
+    {
+      "id": "workspace.legacy-circuit.copy",
+      "action": "circuitCopy",
+      "variant": "legacy-circuit.copy"
+    },
+    {
+      "id": "workspace.legacy-circuit.cut",
+      "action": "circuitCut",
+      "variant": "legacy-circuit.cut"
+    },
+    {
+      "id": "workspace.legacy-circuit.mirror",
+      "action": "circuitMirror",
+      "variant": "legacy-circuit.mirror"
+    },
+    {
+      "id": "workspace.legacy-circuit.network-preview",
+      "action": "circuitNetworkPreview",
+      "variant": "legacy-circuit.network-preview"
+    },
+    {
+      "id": "workspace.legacy-circuit.paste",
+      "action": "circuitPaste",
+      "variant": "legacy-circuit.paste"
+    },
+    {
+      "id": "workspace.legacy-circuit.place",
+      "action": "circuitPlace",
+      "variant": "legacy-circuit.place"
+    },
+    {
+      "id": "workspace.legacy-circuit.rotate",
+      "action": "circuitRotate",
+      "variant": "legacy-circuit.rotate"
+    },
+    {
+      "id": "workspace.legacy-circuit.route-preview",
+      "action": "circuitRoutePreview",
+      "variant": "legacy-circuit.route-preview"
+    },
+    {
+      "id": "workspace.legacy-circuit.run-start",
+      "action": "circuitToggle",
+      "variant": "legacy-circuit.run-start"
+    },
+    {
+      "id": "workspace.legacy-circuit.run-stop",
+      "action": "circuitToggle",
+      "variant": "legacy-circuit.run-stop"
+    },
+    {
+      "id": "workspace.legacy-circuit.select",
+      "action": "circuitSelect",
+      "variant": "legacy-circuit.select"
+    },
+    {
+      "id": "workspace.legacy-circuit.tick",
+      "action": "circuitStep",
+      "variant": "legacy-circuit.tick"
+    },
+    {
+      "id": "workspace.legacy-circuit.trigger",
+      "action": "circuitTrigger",
+      "variant": "legacy-circuit.trigger"
+    },
+    {
+      "id": "workspace.legacy-circuit.undo",
+      "action": "undo",
+      "variant": "legacy-circuit.undo"
+    },
+    {
+      "id": "workspace.mapping.export",
+      "action": "export",
+      "variant": "mapping.export"
+    },
+    {
+      "id": "workspace.mapping.import",
+      "action": "import",
+      "variant": "mapping.import"
+    },
+    {
+      "id": "workspace.markers.add",
+      "action": "addMarker",
+      "variant": "markers.add"
+    },
+    {
+      "id": "workspace.markers.clear",
+      "action": "markerClear",
+      "variant": "markers.clear"
+    },
+    {
+      "id": "workspace.markers.export",
+      "action": "export",
+      "variant": "markers.export"
+    },
+    {
+      "id": "workspace.markers.hide",
+      "action": "markerVisibility",
+      "variant": "markers.hide"
+    },
+    {
+      "id": "workspace.markers.import",
+      "action": "import",
+      "variant": "markers.import"
+    },
+    {
+      "id": "workspace.markers.remove",
+      "action": "markerRemove",
+      "variant": "markers.remove"
+    },
+    {
+      "id": "workspace.markers.render",
+      "action": "markerRender",
+      "variant": "markers.render"
+    },
+    {
+      "id": "workspace.markers.show",
+      "action": "markerVisibility",
+      "variant": "markers.show"
+    },
+    {
+      "id": "workspace.markers.style",
+      "action": "markerStyle",
+      "variant": "markers.style"
+    },
+    {
+      "id": "workspace.markers.toggle",
+      "action": "markerToggle",
+      "variant": "markers.toggle"
+    },
+    {
+      "id": "workspace.objects.export",
+      "action": "export",
+      "variant": "objects.export"
+    },
+    {
+      "id": "workspace.objects.import",
+      "action": "import",
+      "variant": "objects.import"
+    },
+    {
+      "id": "workspace.pixel.image-import",
+      "action": "import",
+      "variant": "pixel.image-import"
+    },
+    {
+      "id": "workspace.pixel.match",
+      "action": "pixelMatch",
+      "variant": "pixel.match"
+    },
+    {
+      "id": "workspace.pixel.png-export",
+      "action": "export",
+      "variant": "pixel.png-export"
+    },
+    {
+      "id": "workspace.pixel.prepare-canvas",
+      "action": "resize",
+      "variant": "pixel.prepare-canvas"
+    },
+    {
+      "id": "workspace.pixel.prepare-paint",
+      "action": "paint",
+      "variant": "pixel.prepare-paint"
+    },
+    {
+      "id": "workspace.placement.discard",
+      "action": "fusionDiscardPlacement",
+      "variant": "placement.discard"
+    },
+    {
+      "id": "workspace.placement.insert",
+      "action": "fusionInsert",
+      "variant": "placement.insert"
+    },
+    {
+      "id": "workspace.placement.region-load",
+      "action": "fusionRegion",
+      "variant": "placement.region-load"
+    },
+    {
+      "id": "workspace.placement.restage",
+      "action": "fusionPlace",
+      "variant": "placement.restage"
+    },
+    {
+      "id": "workspace.placement.stage",
+      "action": "fusionPlace",
+      "variant": "placement.stage"
+    },
+    {
+      "id": "workspace.placement.undo",
+      "action": "undo",
+      "variant": "placement.undo"
+    },
+    {
+      "id": "workspace.player.best-prefix",
+      "action": "playerBestPrefixes",
+      "variant": "player.best-prefix"
+    },
+    {
+      "id": "workspace.player.catalog-export",
+      "action": "export",
+      "variant": "player.catalog-export"
+    },
+    {
+      "id": "workspace.player.catalog-slot",
+      "action": "playerSlotEdit",
+      "variant": "player.catalog-slot"
+    },
+    {
+      "id": "workspace.plr.attribute-edit",
+      "action": "stagePlayer",
+      "args": {
+        "field": "statLife"
+      }
+    },
+    {
+      "id": "workspace.plr.export",
+      "action": "export",
+      "args": {
+        "kind": "player"
+      }
+    },
+    {
+      "id": "workspace.plr.inventory-edit",
+      "action": "stageInventory"
+    },
+    {
+      "id": "workspace.plr.new",
+      "action": "newPlayer"
+    },
+    {
+      "id": "workspace.plr.redo",
+      "action": "redo",
+      "args": {
+        "canvas": "player"
+      }
+    },
+    {
+      "id": "workspace.plr.slot-edit",
+      "action": "playerSlotEdit",
+      "variant": "decrease existing stack and favorite"
+    },
+    {
+      "id": "workspace.plr.undo",
+      "action": "undo",
+      "args": {
+        "canvas": "player"
+      }
+    },
+    {
+      "id": "workspace.public.conversion-export",
+      "action": "export",
+      "variant": "public.conversion-export"
+    },
+    {
+      "id": "workspace.public.placement-readback",
+      "action": "fusionRegion",
+      "variant": "public.placement-readback"
+    },
+    {
+      "id": "workspace.public.world-export",
+      "action": "export",
+      "variant": "public.world-export"
+    },
+    {
+      "id": "workspace.region.brush",
+      "action": "regionBrush",
+      "variant": "region.brush"
+    },
+    {
+      "id": "workspace.region.brush-clear",
+      "action": "regionBrushClear",
+      "variant": "region.brush-clear"
+    },
+    {
+      "id": "workspace.region.edit",
+      "action": "regionEdit",
+      "variant": "region.edit"
+    },
+    {
+      "id": "workspace.region.load",
+      "action": "fusionRegion"
+    },
+    {
+      "id": "workspace.region.object-load",
+      "action": "fusionRegion",
+      "variant": "region.object-load"
+    },
+    {
+      "id": "workspace.region.paint",
+      "action": "paint",
+      "variant": "region.paint"
+    },
+    {
+      "id": "workspace.region.project-export",
+      "action": "export",
+      "variant": "region.project-export"
+    },
+    {
+      "id": "workspace.region.project-import",
+      "action": "import",
+      "variant": "region.project-import"
+    },
+    {
+      "id": "workspace.region.redo",
+      "action": "redo",
+      "args": {
+        "canvas": "fusion"
+      }
+    },
+    {
+      "id": "workspace.region.select",
+      "action": "regionSelect",
+      "variant": "region.select"
+    },
+    {
+      "id": "workspace.region.stroke-end",
+      "action": "strokeEnd",
+      "variant": "region.stroke-end"
+    },
+    {
+      "id": "workspace.region.stroke-start",
+      "action": "strokeStart",
+      "variant": "region.stroke-start"
+    },
+    {
+      "id": "workspace.region.undo",
+      "action": "undo",
+      "args": {
+        "canvas": "fusion"
+      }
+    },
+    {
+      "id": "workspace.region.write",
+      "action": "write",
+      "args": {
+        "source": "fusion",
+        "mode": "replace"
+      }
+    },
+    {
+      "id": "workspace.rules.apply",
+      "action": "worldRulesApply",
+      "args": {
+        "confirmed": true
+      }
+    },
+    {
+      "id": "workspace.rules.export",
+      "action": "export",
+      "variant": "rules.export"
+    },
+    {
+      "id": "workspace.rules.import",
+      "action": "import",
+      "variant": "rules.import"
+    },
+    {
+      "id": "workspace.rules.preset-clone",
+      "action": "worldPresetClone",
+      "variant": "rules.preset-clone"
+    },
+    {
+      "id": "workspace.rules.preview",
+      "action": "worldRulesPreview"
+    },
+    {
+      "id": "workspace.rules.save",
+      "action": "worldRulesSave",
+      "variant": "rules.save"
+    },
+    {
+      "id": "workspace.schemes.clone",
+      "action": "schemeClone",
+      "variant": "schemes.clone"
+    },
+    {
+      "id": "workspace.schemes.create",
+      "action": "schemeCreate",
+      "variant": "schemes.create"
+    },
+    {
+      "id": "workspace.schemes.default",
+      "action": "schemeSetDefault",
+      "variant": "schemes.default"
+    },
+    {
+      "id": "workspace.schemes.delete",
+      "action": "schemeDelete",
+      "variant": "schemes.delete"
+    },
+    {
+      "id": "workspace.schemes.rename",
+      "action": "schemeRename",
+      "variant": "schemes.rename"
+    },
+    {
+      "id": "workspace.schemes.select",
+      "action": "schemeSelect",
+      "variant": "schemes.select"
+    },
+    {
+      "id": "workspace.settings.change",
+      "action": "settings",
+      "variant": "settings.change"
+    },
+    {
+      "id": "workspace.tcw.close",
+      "action": "worldCircuitClose",
+      "args": {
+        "discard": true
+      }
+    },
+    {
+      "id": "workspace.tcw.open",
+      "action": "worldCircuitOpen"
+    },
+    {
+      "id": "workspace.tcw.reopen",
+      "action": "worldCircuitOpen",
+      "variant": "tcw.reopen"
+    },
+    {
+      "id": "workspace.tcw.reset",
+      "action": "worldCircuitReset"
+    },
+    {
+      "id": "workspace.tcw.run-start",
+      "action": "worldCircuitToggle",
+      "variant": "tcw.run-start"
+    },
+    {
+      "id": "workspace.tcw.run-stop",
+      "action": "worldCircuitToggle",
+      "variant": "tcw.run-stop"
+    },
+    {
+      "id": "workspace.tcw.save",
+      "action": "worldCircuitSave",
+      "variant": "tcw.save"
+    },
+    {
+      "id": "workspace.tcw.tick",
+      "action": "worldCircuitStep"
+    },
+    {
+      "id": "workspace.tcw.trigger",
+      "action": "worldCircuitTrigger"
+    },
+    {
+      "id": "workspace.tcw.viewport",
+      "action": "worldCircuitViewport",
+      "variant": "tcw.viewport"
+    },
+    {
+      "id": "workspace.terrain.apply",
+      "action": "terrainApply",
+      "args": {
+        "confirmed": true
+      }
+    },
+    {
+      "id": "workspace.terrain.mapping",
+      "action": "mappingSave"
+    },
+    {
+      "id": "workspace.terrain.preview",
+      "action": "terrainPreview"
+    },
+    {
+      "id": "workspace.vault.export",
+      "action": "export",
+      "variant": "vault.export"
+    },
+    {
+      "id": "workspace.vault.import",
+      "action": "import",
+      "variant": "vault.import"
+    },
+    {
+      "id": "workspace.vault.open",
+      "action": "openFile",
+      "variant": "vault.open"
+    },
+    {
+      "id": "workspace.vault.restore",
+      "action": "restoreFile",
+      "variant": "vault.restore"
+    },
+    {
+      "id": "workspace.vault.trash",
+      "action": "trashFile",
+      "variant": "vault.trash"
+    },
+    {
+      "id": "workspace.wld.export",
+      "action": "export",
+      "args": {
+        "kind": "world"
+      }
+    },
+    {
+      "id": "workspace.wld.header-edit",
+      "action": "stageWorld",
+      "args": {
+        "field": "name"
+      }
+    },
+    {
+      "id": "workspace.wld.import",
+      "action": "import",
+      "args": {
+        "kind": "world"
+      }
+    },
+    {
+      "id": "workspace.wld.overlay",
+      "action": "worldOverlay"
+    },
+    {
+      "id": "workspace.wld.redo",
+      "action": "redo",
+      "args": {
+        "canvas": "world"
+      }
+    },
+    {
+      "id": "workspace.wld.reject-edit",
+      "action": "stageWorld",
+      "outcome": "expected-rejection"
+    },
+    {
+      "id": "workspace.wld.undo",
+      "action": "undo",
+      "args": {
+        "canvas": "world"
+      }
+    },
+    {
+      "id": "workspace.world.locate",
+      "action": "locate",
+      "variant": "world.locate"
+    },
+    {
+      "id": "workspace.world.map-png-export",
+      "action": "export",
+      "variant": "world.map-png-export"
+    },
+    {
+      "id": "workspace.world.validate",
+      "action": "validate",
+      "variant": "world.validate"
+    }
+  ],
+  "externalCoverage": [
+    "Actual MAP load/decode/edit/export/reopen, generated MAP ABI",
+    "Profile app UI/raster frame timing and gestures",
+    "Cloud and online resource client contracts, with fake-transport timing explicitly separate from network performance"
+  ]
+}

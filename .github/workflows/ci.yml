@@ -1,0 +1,286 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CI: 'true'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks-and-web:
+    name: Analyze, tests, and Web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-flutter
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run verify:sources
+      - name: Verify the bundled offline CJK font and public fixture downloader
+        run: |
+          python3 -m venv "$RUNNER_TEMP/font-tools"
+          "$RUNNER_TEMP/font-tools/bin/python" -m pip install --disable-pip-version-check fonttools==4.61.1
+          "$RUNNER_TEMP/font-tools/bin/python" tool/verify_cjk_font.py
+          python3 -m unittest discover -s tool -p 'computerraria_inputs_test.py'
+      - run: npm run build:circuit-rules
+      - name: Check reproducible rules artifacts
+        run: git diff --exit-code -- assets/private/circuit_rules_native.js assets/private/circuit_rules.provenance.json web/engine/circuit_rules_web.js
+      - run: flutter pub get --enforce-lockfile
+      - name: Rebuild and verify the binary MAP owner
+        run: |
+          bash tool/build_map_worker.sh
+          git diff --exit-code -- web/engine/map_worker.js
+      - run: dart format --output=none --set-exit-if-changed lib test native integration_test test_driver tool/perf tool/map_worker.dart
+      - run: flutter analyze --no-pub
+      - name: Performance report validation and false-pass protections
+        run: python3 -m unittest discover -s tool/perf -p '*test*.py'
+      - run: flutter test --no-pub --concurrency=1 --coverage
+      - name: Install pinned official Emscripten
+        run: |
+          git clone --depth 1 --branch 5.0.7 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          test "$(git -C "$RUNNER_TEMP/emsdk" rev-parse HEAD)" = "41190c21c662e9cc1962aea94e71cbae9fd2fc87"
+          "$RUNNER_TEMP/emsdk/emsdk" install 5.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 5.0.7
+      - name: Build authoritative Web engines
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          ABC_WEB_OUTPUT="$PWD/web/engine" bash tool/build_web_engine.sh
+      - name: Real Web engine contracts with synthetic fixtures
+        run: |
+          mkdir -p build
+          python3 native/generate_world_fixture.py build/synthetic.wld
+          python3 native/generate_region_object_fixture.py build/objects.wld
+          python3 native/generate_circuit_fixture.py build/circuit.wld
+          python3 native/generate_circuit_fragment_fixture.py build/fragments.wld
+          export TERRA_WORLD_RUNTIME="$PWD/web/engine/world.js"
+          export TERRA_PLAYER_RUNTIME="$PWD/web/engine/player.js"
+          export TERRA_WLD_FIXTURE="$PWD/build/synthetic.wld"
+          export TERRA_OBJECT_FIXTURE="$PWD/build/objects.wld"
+          node tool/test_web_engine.mjs
+          TERRA_WLD_FIXTURE="$PWD/build/circuit.wld" node tool/test_web_engine.mjs
+          node test/web/world_export_smoke.cjs
+          node test/web/engine_worker_lifecycle.cjs
+          node test/web/document_worker_retirement_contract.cjs
+          node test/web/world_worker_retirement_contract.cjs
+          node test/web/world_circuit_cleanup_contract.cjs
+          node test/web/world_circuit_hash_contract.cjs
+          node test/web/world_circuit_streaming_hash_contract.cjs
+          node test/web/world_circuit_streaming_contract.cjs
+          node test/web/world_circuit_optimization_contract.cjs
+          node test/web/world_circuit_fragments_contract.cjs
+          node test/web/engine_worker_smoke.cjs
+          node test/web/document_worker_retirement_smoke.cjs
+          node tool/test_web_region.mjs
+          node tool/test_web_markers.mjs
+          node tool/test_web_world_rules.mjs
+          node tool/test_web_circuit.mjs
+          node tool/test_web_binary_map.mjs
+          node test/web/world_circuit_smoke.cjs web/engine/world.js web/engine/world.wasm build/circuit.wld
+          node test/web/world_circuit_fragments_smoke.cjs web/engine/world.js web/engine/world.wasm build/fragments.wld
+      - name: Actual binary MAP worker lifecycle contracts
+        run: |
+          dart run tool/perf/write_map_fixture.dart build/synthetic.map
+          TERRA_MAP_FIXTURE="$PWD/build/synthetic.map" node tool/test_map_worker.cjs
+      - name: Authoritative source and actual Web-worker parity
+        run: |
+          export TERRA_CIRCUIT_SOURCE="$PWD/vendor/viewer-circuit"
+          export TERRA_WORLD_RUNTIME="$PWD/web/engine/world.js"
+          node tool/test_circuit_rules.mjs
+          node --test test/web/circuit_rules_lifecycle.cjs
+          node test/web/circuit_rules_worker_smoke.cjs
+      - name: Offline online-resource storage and public transport contracts
+        run: |
+          node test/web/online_resource_storage_smoke.cjs
+          dart compile js -o build/public_resource_client_contract.js test/web/public_resource_client_contract.dart
+          node test/web/public_resource_client_contract.cjs build/public_resource_client_contract.js
+      - run: flutter build web --release --no-pub --no-web-resources-cdn --no-wasm-dry-run
+      - run: tar -czf build/terraforge-web.tar.gz -C build/web .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraforge-web-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/terraforge-web.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  native-contract:
+    name: Native engine ASan and UBSan contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-flutter
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run verify:sources
+      - run: npm run build:circuit-rules
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake zlib1g-dev
+      - run: flutter pub get --enforce-lockfile
+      - name: Generate synthetic fixtures
+        run: |
+          mkdir -p build
+          python3 native/generate_world_fixture.py build/synthetic.wld
+          python3 native/generate_circuit_fixture.py build/circuit.wld
+          python3 native/generate_circuit_fragment_fixture.py build/fragments.wld
+          python3 native/generate_region_object_fixture.py build/objects.wld
+          dart run native/generate_player_fixture.dart build/synthetic-player.json
+      - name: Build instrumented C engine
+        run: |
+          cmake -S native -B build/native -DABC_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/native --parallel 2
+          for contract in circuit_device_epoch_contract circuit_wld_pixel_contract; do
+            cc -g -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer -I native/vendor/TerraWasm/include -I native/vendor/TerraWasm/src "native/$contract.c" build/native/terra/libterrax_world_static.a -lm -lz -o "build/$contract"
+          done
+          cc -g -fsanitize=address,undefined -fno-omit-frame-pointer -I native native/native_contract.c -L build/native -labc_engine -Wl,-rpath,"$PWD/build/native" -o build/native_contract
+          cc -g -fsanitize=address,undefined -fno-omit-frame-pointer -I native native/region_contract.c -L build/native -labc_engine -Wl,-rpath,"$PWD/build/native" -o build/region_contract
+      - name: Verify high-address WLD, PLR and region round trips
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          build/native_contract build/synthetic.wld build/synthetic-player.json
+          build/circuit_device_epoch_contract
+          build/circuit_wld_pixel_contract
+          build/region_contract build/objects.wld
+      - name: Build complete native application engine
+        run: |
+          cmake -S native -B build/native-release -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-release --parallel 2
+          echo "TERRAFORGE_ENGINE_LIBRARY=$PWD/build/native-release/libabc_engine.so" >> "$GITHUB_ENV"
+          echo "TERRAFORGE_WORLD_FIXTURE=$PWD/build/synthetic.wld" >> "$GITHUB_ENV"
+          echo "TERRAFORGE_CIRCUIT_FIXTURE=$PWD/build/circuit.wld" >> "$GITHUB_ENV"
+          quickjs="$PUB_CACHE/hosted/pub.dev/flutter_js-0.8.7/linux/shared/libquickjs_c_bridge_plugin.so"
+          test -f "$quickjs"
+          echo "LIBQUICKJSC_TEST_PATH=$quickjs" >> "$GITHUB_ENV"
+      - name: Native sparse lamp checkpoints, cancellation and source paths
+        run: >-
+          python3 tool/test_sparse_lamp_queries.py
+          --library build/native-release/libabc_engine.so
+          --expect-checkpoint-jump
+          --compare-sequential
+          --output build/sparse-lamp-query-contract.json
+      - name: Native application tests with synthetic fixtures
+        run: flutter test --no-pub --concurrency=1
+      - name: Native circuit and fragment integration
+        run: flutter test --no-pub --concurrency=1 native/circuit_integration_test.dart
+      - name: Generate authoritative source and Web parity corpus
+        run: |
+          TERRA_CIRCUIT_SOURCE="$PWD/vendor/viewer-circuit" \
+          TERRA_WORLD_RUNTIME="$PWD/web/engine/world.js" \
+          TERRA_CIRCUIT_CORPUS="$PWD/qa-evidence/circuit-rules-corpus.json" \
+          node tool/test_circuit_rules.mjs
+      - name: QuickJS full rules runtime, all demos and shared corpus
+        run: |
+          flutter test --no-pub --concurrency=1 \
+            native/circuit_rules_runtime_smoke_test.dart \
+            native/circuit_rules_bundle_test.dart \
+            native/circuit_rules_corpus_test.dart
+
+  android:
+    name: Android unsigned release build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: ./.github/actions/setup-flutter
+      - run: flutter pub get --enforce-lockfile
+      - name: Install pinned CMake for Android Gradle
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cmake-3.31.1"
+          "$RUNNER_TEMP/cmake-3.31.1/bin/pip" install --disable-pip-version-check cmake==3.31.1
+          cmake_root="$("$RUNNER_TEMP/cmake-3.31.1/bin/python" -c 'import cmake, pathlib; print(pathlib.Path(cmake.CMAKE_BIN_DIR).parent)')"
+          "$cmake_root/bin/cmake" --version
+          echo "$cmake_root/bin" >> "$GITHUB_PATH"
+          printf 'cmake.dir=%s\n' "$cmake_root" >> android/local.properties
+      # Flutter 3.47 filters dev-only native plugins during mode-specific
+      # tooling generation. --no-pub would retain pub-get's debug registrant.
+      - run: flutter build apk --release
+      - run: git diff --exit-code -- pubspec.lock
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraforge-android-unsigned-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  apple:
+    name: macOS and unsigned iOS builds
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-flutter
+      - run: flutter pub get --enforce-lockfile
+      - name: Configure macOS release
+        run: flutter build macos --release --no-pub --config-only
+      - name: Build macOS without signing
+        run: xcodebuild -workspace macos/Runner.xcworkspace -scheme Runner -configuration Release -derivedDataPath build/macos-ci CODE_SIGNING_ALLOWED=NO build
+      - name: Verify macOS JavaScriptCore and native circuit runtime
+        run: |
+          export TERRAFORGE_ENGINE_LIBRARY="$PWD/build/macos-ci/Build/Products/Release/terraforge.app/Contents/Frameworks/libabc_engine.dylib"
+          test -f "$TERRAFORGE_ENGINE_LIBRARY"
+          flutter test --no-pub --concurrency=1 native/circuit_rules_runtime_smoke_test.dart native/circuit_rules_bundle_test.dart
+      - run: flutter build ios --release --no-pub --no-codesign
+      - name: Package unsigned Apple apps
+        run: |
+          tar -czf build/terraforge-macos-unsigned.tar.gz -C build/macos-ci/Build/Products/Release terraforge.app
+          tar -czf build/terraforge-ios-unsigned.tar.gz -C build/ios/iphoneos Runner.app
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraforge-apple-unsigned-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/terraforge-macos-unsigned.tar.gz
+            build/terraforge-ios-unsigned.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    name: Linux desktop build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev zlib1g-dev
+      - uses: ./.github/actions/setup-flutter
+      - run: flutter pub get --enforce-lockfile
+      - name: Verify Linux QuickJS bundle installation
+        run: python3 tool/linux_bundle_test.py
+      - run: flutter build linux --release --no-pub
+      - run: test -f build/linux/x64/release/bundle/lib/libquickjs_c_bridge_plugin.so
+      - run: tar -czf build/terraforge-linux.tar.gz -C build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraforge-linux-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/terraforge-linux.tar.gz
+          if-no-files-found: error
+          retention-days: 14

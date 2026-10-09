@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "commit": "a5612b474fc8dc50d41b3bc6b87234d30ba97e02",
+  "artifactMainDartSha256": "053b676bd4426ba5aa1d6a6f7710bf4b83f2c8c0c72831bedad2a94fae9e3644",
+  "input": {
+    "publicRepository": "https://github.com/misprit7/computerraria",
+    "wldBytes": 405983441,
+    "width": 15200,
+    "height": 7200,
+    "version": 279,
+    "sha256": "55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33"
+  },
+  "environment": "Cloud Linux Chrome, exact CI release Web artifact, fresh owned Chrome processes, OS page cache uncontrolled",
+  "timingBoundary": "First source hashing event to final monochrome initialization ready; excludes chooser and is not first presented frame",
+  "memoryNotes": [
+    "PSS covers only the task-owned Chrome process tree. Renderer RSS overlaps that tree and must not be added.",
+    "WASM capacity is linear-memory capacity, not process RSS.",
+    "HWM was observed to decrease for the same process identity; report maximum observed HWM, not an infallible OS peak.",
+    "Run 1 and run 2 close measurements are after loading only. Run 3 continued to Pong; no equivalent close row."
+  ],
+  "runs": [
+    {
+      "run": "run1",
+      "hashToFinalReadySeconds": 41.05,
+      "baselineMiB": {
+        "rssBytes": 775.18359375,
+        "pssBytes": 421.740234375,
+        "ussBytes": 300.9296875
+      },
+      "treePeakMiB": {
+        "rssBytes": 1043.83203125,
+        "pssBytes": 680.81640625,
+        "ussBytes": 555.30859375
+      },
+      "treePeakDeltaMiB": {
+        "rssBytes": 268.6484375,
+        "pssBytes": 259.076171875,
+        "ussBytes": 254.37890625
+      },
+      "rendererPeakMiB": {
+        "rssBytes": 441.6328125,
+        "kernelHwmBytes": 446.12890625,
+        "pssBytes": 391.8232421875,
+        "ussBytes": 371.6875
+      },
+      "wasmCapacityMiB": 159.3125,
+      "engineActiveMiB": 120.85674476623535,
+      "enginePeakMiB": 138.94986152648926,
+      "rssSamplingMs": {
+        "count": 3926,
+        "median": 10.135531425476074,
+        "p95": 14.880657196044922,
+        "max": 57.93166160583496
+      },
+      "pssSamplingMs": {
+        "median": 104.72583770751953,
+        "p95": 109.15446281433105,
+        "max": 115.48590660095215
+      },
+      "postCloseTreeMiB": {
+        "rssBytes": 954.51953125,
+        "pssBytes": 593.09765625,
+        "ussBytes": 466.4921875
+      }
+    },
+    {
+      "run": "run2",
+      "hashToFinalReadySeconds": 41.944,
+      "baselineMiB": {
+        "rssBytes": 774.9140625,
+        "pssBytes": 421.7119140625,
+        "ussBytes": 300.890625
+      },
+      "treePeakMiB": {
+        "rssBytes": 1057.17578125,
+        "pssBytes": 689.458984375,
+        "ussBytes": 562.90625
+      },
+      "treePeakDeltaMiB": {
+        "rssBytes": 282.26171875,
+        "pssBytes": 267.7470703125,
+        "ussBytes": 262.015625
+      },
+      "rendererPeakMiB": {
+        "rssBytes": 450.7734375,
+        "kernelHwmBytes": 454.63671875,
+        "pssBytes": 400.0205078125,
+        "ussBytes": 378.13671875
+      },
+      "wasmCapacityMiB": 159.3125,
+      "engineActiveMiB": 120.85674476623535,
+      "enginePeakMiB": 138.94986152648926,
+      "rssSamplingMs": {
+        "count": 4135,
+        "median": 10.111570358276367,
+        "p95": 13.491392135620117,
+        "max": 39.74556922912598
+      },
+      "pssSamplingMs": {
+        "median": 101.93884372711182,
+        "p95": 107.78689384460449,
+        "max": 112.1985912322998
+      },
+      "postCloseTreeMiB": {
+        "rssBytes": 955.35546875,
+        "pssBytes": 593.271484375,
+        "ussBytes": 466.7265625
+      }
+    },
+    {
+      "run": "run3",
+      "hashToFinalReadySeconds": 38.646,
+      "baselineMiB": {
+        "rssBytes": 775.6484375,
+        "pssBytes": 422.3818359375,
+        "ussBytes": 301.5390625
+      },
+      "treePeakMiB": {
+        "rssBytes": 1051.66796875,
+        "pssBytes": 690.6669921875,
+        "ussBytes": 564.16015625
+      },
+      "treePeakDeltaMiB": {
+        "rssBytes": 276.01953125,
+        "pssBytes": 268.28515625,
+        "ussBytes": 262.62109375
+      },
+      "rendererPeakMiB": {
+        "rssBytes": 448.328125,
+        "kernelHwmBytes": 451.16015625,
+        "pssBytes": 403.34765625,
+        "ussBytes": 381.5
+      },
+      "wasmCapacityMiB": 159.3125,
+      "engineActiveMiB": 120.8099308013916,
+      "enginePeakMiB": 138.94986152648926,
+      "rssSamplingMs": {
+        "count": 3756,
+        "median": 10.126829147338867,
+        "p95": 14.790534973144531,
+        "max": 74.36108589172363
+      },
+      "pssSamplingMs": {
+        "median": 103.58595848083496,
+        "p95": 108.76107215881348,
+        "max": 115.80204963684082
+      }
+    }
+  ],
+  "knownDefects": [
+    "A separate pre-baseline reset after Pong produced Chrome Error 9; cause is not proven to be OOM.",
+    "At this commit, close releases active engine allocations and scratch storage but retains the worker and 159.3125 MiB WASM capacity."
+  ],
+  "freshOnPixelProof": {
+    "physicalPulses": 25728,
+    "pixelCount": 3072,
+    "litPixels": 22,
+    "binaryPixelDifferences": 0,
+    "rgbaSha256": "11098cf6eb9c16cee1eb99a7cb97e3c132b74c1413cd2c66cb603856cba999ff",
+    "limits": "Single paused fresh-ON frame compared with physical native replay; not FPS or reset-stability acceptance."
+  }
+}

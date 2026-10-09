@@ -1,0 +1,336 @@
+name: Public performance evidence
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      baseline_run_id:
+        description: Override the versioned same-repository baseline; empty uses run 37909644872 (a5612b4)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  ABC_PERF_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+  ABC_PERF_TIER: ci
+  ABC_PERF_CYCLES: '25'
+  ABC_PERF_WARMUP: '5'
+  # First complete five-process calibration, verified at a5612b4.
+  ABC_PERF_BASELINE_RUN_ID: ${{ inputs.baseline_run_id || '37909644872' }}
+
+jobs:
+  native:
+    name: Native core and controller actions (3 processes)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-performance
+      - name: Build release engine with read-only allocation counters
+        run: |
+          sudo apt-get update && sudo apt-get install -y build-essential cmake zlib1g-dev
+          cmake -S native -B build/native-perf -DCMAKE_BUILD_TYPE=Release -DABC_PERF_COUNTERS=ON
+          cmake --build build/native-perf --parallel 2
+          echo "TERRAFORGE_ENGINE_LIBRARY=$PWD/build/native-perf/libabc_engine.so" >> "$GITHUB_ENV"
+          quickjs="$PUB_CACHE/hosted/pub.dev/flutter_js-0.8.7/linux/shared/libquickjs_c_bridge_plugin.so"
+          test -f "$quickjs"
+          echo "LIBQUICKJSC_TEST_PATH=$quickjs" >> "$GITHUB_ENV"
+      - name: Three full sequential independent Native workloads
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite native --runs 3
+          --timeout-seconds 1500 --output-dir build/perf/raw/native
+          --report-env ABC_PERF_REPORT -- flutter test --no-pub --concurrency=1
+          test/performance/native_actions_test.dart
+      - name: Verify public modern fixture and three sequential dispatcher workloads
+        if: ${{ !cancelled() }}
+        run: |
+          python3 tool/perf/generate_synthetic_modern_world.py build/perf/fixtures/synthetic-modern.wld
+          cmp assets/qa/synthetic-modern.wld build/perf/fixtures/synthetic-modern.wld
+          python3 tool/perf/verify_synthetic_modern_world.py "$TERRAFORGE_ENGINE_LIBRARY"
+          python3 tool/perf/run_ci_suite.py --suite public-dispatch --runs 3 \
+            --timeout-seconds 300 --output-dir build/perf/raw/native \
+            --report-env ABC_DISPATCH_PERF_REPORT -- flutter test --no-pub --concurrency=1 \
+            test/performance/public_dispatch_actions_test.dart
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-raw-native
+          path: build/perf/raw/native/
+          if-no-files-found: warn
+          retention-days: 30
+
+  wasm:
+    name: Release WASM actions (3 processes)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-performance
+      - name: Build pinned release WASM into ignored build output
+        run: |
+          git clone --depth 1 --branch 5.0.7 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          test "$(git -C "$RUNNER_TEMP/emsdk" rev-parse HEAD)" = "41190c21c662e9cc1962aea94e71cbae9fd2fc87"
+          "$RUNNER_TEMP/emsdk/emsdk" install 5.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 5.0.7
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          ABC_WEB_OUTPUT="$PWD/build/engine-web" bash tool/build_web_engine.sh
+          echo "TERRA_WORLD_RUNTIME=$PWD/build/engine-web/world.js" >> "$GITHUB_ENV"
+          echo "TERRA_PLAYER_RUNTIME=$PWD/build/engine-web/player.js" >> "$GITHUB_ENV"
+      - name: Three full sequential independent WASM workloads
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite wasm --runs 3
+          --timeout-seconds 1500 --output-dir build/perf/raw/wasm
+          --report-env ABC_PERF_REPORT -- node --expose-gc tool/perf/benchmark_wasm.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-raw-wasm
+          path: |
+            build/perf/raw/wasm/
+            build/engine-web/manifest.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  services:
+    name: Synthetic cloud and resource service actions (3 processes each)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-performance
+      - name: Three cloud protocol and native vault workloads
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite cloud --runs 3
+          --timeout-seconds 300 --output-dir build/perf/raw/services
+          --report-env ABC_CLOUD_PERF_REPORT -- flutter test --no-pub --concurrency=1
+          test/performance/cloud_actions_test.dart
+      - name: Three resource transport, codec and native storage workloads
+        if: ${{ !cancelled() }}
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite resources --runs 3
+          --timeout-seconds 300 --output-dir build/perf/raw/services
+          --report-env ABC_RESOURCE_PERF_REPORT -- flutter test --no-pub --concurrency=1
+          test/performance/online_resources_test.dart
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-raw-services
+          path: build/perf/raw/services/
+          if-no-files-found: warn
+          retention-days: 30
+
+  binary-map:
+    name: Binary MAP ${{ matrix.suite }} (3 processes)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [generation, aot, dart2js, owner]
+    env:
+      ABC_MAP_PROVENANCE: engine-generated-from-original-synthetic-world
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-performance
+      - name: Compile actual MAP codec and isolate owner
+        env:
+          MAP_SUITE: ${{ matrix.suite }}
+        run: |
+          case "$MAP_SUITE" in
+            generation|owner)
+              sudo apt-get update && sudo apt-get install -y build-essential cmake zlib1g-dev
+              cmake -S native -B build/native-perf -DCMAKE_BUILD_TYPE=Release -DABC_PERF_COUNTERS=ON
+              cmake --build build/native-perf --parallel 2
+              if test "$MAP_SUITE" = owner; then
+                dart compile exe -DABC_MAP_BUILD_MODE=aot tool/perf/map_owner_native.dart -o build/perf/map-owner
+                python3 tool/perf/generate_native_map.py --library build/native-perf/libabc_engine.so --input build/perf/fixtures/synthetic-medium.wld --output build/perf/fixtures/generated.map --report build/perf/fixture-generation.json --fixture-id original-synthetic-world --provenance original-synthetic --iterations 2
+                dart run tool/perf/write_map_fixture.dart build/perf/fixtures/synthetic.map
+              fi
+              ;;
+            aot)
+              dart compile exe -DABC_MAP_BUILD_MODE=aot tool/perf/map_actions.dart -o build/perf/map-actions
+              ;;
+            dart2js)
+              dart compile js -O2 tool/perf/map_actions_web.dart -o build/perf/map-actions.js
+              dart run tool/perf/write_map_fixture.dart build/perf/fixtures/synthetic.map
+              ;;
+          esac
+      - name: Binary MAP generation (first use plus 25 repeated cycles)
+        if: ${{ matrix.suite == 'generation' }}
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite map-generation --runs 3
+          --timeout-seconds 600 --output-dir build/perf/raw/map --
+          python3 tool/perf/generate_native_map.py --library build/native-perf/libabc_engine.so
+          --input build/perf/fixtures/synthetic-medium.wld --output build/perf/fixtures/generated.map
+          --fixture-id original-synthetic-world --provenance original-synthetic --iterations 26 --report {report}
+      - name: AOT binary MAP codec (first use plus 25 repeated cycles)
+        if: ${{ matrix.suite == 'aot' }}
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite map-aot --runs 3
+          --timeout-seconds 900 --output-dir build/perf/raw/map --
+          build/perf/map-actions --iterations 26 --output {report}
+      - name: Dart2JS binary MAP codec (first use plus 25 repeated cycles)
+        if: ${{ matrix.suite == 'dart2js' }}
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite map-dart2js --runs 3
+          --timeout-seconds 900 --output-dir build/perf/raw/map --
+          node tool/perf/run_map_web.cjs build/perf/map-actions.js {report}
+          build/perf/fixtures/synthetic.map repository-authored 26
+      - name: Actual isolate ownership and responsiveness (first use plus 25 repeated cycles)
+        if: ${{ matrix.suite == 'owner' }}
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite map-owner --runs 3
+          --timeout-seconds 600 --output-dir build/perf/raw/map --
+          build/perf/map-owner build/perf/fixtures/generated.map {report} 26
+      - name: Actual Dart2JS worker ownership contracts and timer observations
+        if: ${{ !cancelled() && matrix.suite == 'owner' }}
+        run: |
+          mkdir -p build/perf/raw/map
+          TERRA_MAP_FIXTURE="$PWD/build/perf/fixtures/synthetic.map" \
+          ABC_MAP_WORKER_REPORT="$PWD/build/perf/raw/map/worker-contract.json" \
+          node tool/test_map_worker.cjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-raw-map-${{ matrix.suite }}
+          path: build/perf/raw/map/
+          if-no-files-found: warn
+          retention-days: 30
+
+  ui-profile:
+    name: Actual Linux Flutter profile frames (5 processes)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      TERRA_PERF_ITERATIONS: '8'
+      TERRA_PERF_WARMUP: '2'
+      TERRA_PERF_RUNNER: ubuntu-24.04-xvfb
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install real Linux profile build and display dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev zlib1g-dev xvfb mesa-utils
+      - name: Verify Linux QuickJS bundle installation
+        run: python3 tool/linux_bundle_test.py
+      - uses: ./.github/actions/setup-performance
+      - name: Record actual software renderer provenance
+        run: |
+          mkdir -p build/perf/raw/ui
+          xvfb-run -a -s '-screen 0 1440x1000x24' glxinfo -B > build/perf/raw/ui/glxinfo.txt
+          cat build/perf/raw/ui/glxinfo.txt
+          renderer="$(sed -n 's/^OpenGL renderer string: //p' build/perf/raw/ui/glxinfo.txt)"
+          test -n "$renderer"
+          echo "TERRA_PERF_RENDERER=$renderer" >> "$GITHUB_ENV"
+      - name: Five sequential real profile application lifecycles
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite ui-profile --runs 5
+          --timeout-seconds 900 --output-dir build/perf/raw/ui --
+          xvfb-run -a -s "-screen 0 1440x1000x24" bash tool/perf/ui_profile.sh linux {report}
+      - name: Preserve complete profile application bundle, including on failure
+        if: always()
+        run: |
+          if test -d build/linux/x64/profile/bundle; then
+            tar -czf build/perf/linux-profile-bundle.tar.gz -C build/linux/x64/profile bundle
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-raw-ui
+          path: build/perf/raw/ui/
+          if-no-files-found: warn
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-linux-profile-bundle
+          path: build/perf/linux-profile-bundle.tar.gz
+          if-no-files-found: warn
+          retention-days: 30
+
+  performance-report:
+    name: Actual action coverage and baseline comparison
+    permissions:
+      contents: read
+      actions: read
+    needs: [native, wasm, services, binary-map, ui-profile]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: perf-raw-*
+          path: build/perf/candidate
+      - name: Verify the optional same-repository baseline run
+        if: ${{ env.ABC_PERF_BASELINE_RUN_ID != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASELINE_RUN_ID: ${{ env.ABC_PERF_BASELINE_RUN_ID }}
+        run: |
+          options=()
+          if test "$BASELINE_RUN_ID" = '37909644872'; then
+            options+=(--expected-commit a5612b474fc8dc50d41b3bc6b87234d30ba97e02)
+          fi
+          python3 tool/perf/verify_baseline.py --repository "$GITHUB_REPOSITORY" --run-id "$BASELINE_RUN_ID" --output build/perf/summary/baseline-run.json "${options[@]}"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: ${{ success() && env.ABC_PERF_BASELINE_RUN_ID != '' }}
+        with:
+          pattern: perf-raw-*
+          path: build/perf/baseline
+          repository: ${{ github.repository }}
+          run-id: ${{ env.ABC_PERF_BASELINE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Assemble measured and declared coverage, keeping all gaps
+        if: always()
+        run: python3 tool/perf/coverage_report.py --reports build/perf/candidate --output build/perf/summary
+      - name: Validate every independent run and compare when a baseline was selected
+        if: always()
+        env:
+          BASELINE_RUN_ID: ${{ env.ABC_PERF_BASELINE_RUN_ID }}
+        run: |
+          options=()
+          if test -n "$BASELINE_RUN_ID"; then
+            options+=(--baseline-requested --baseline build/perf/baseline --baseline-run-metadata build/perf/summary/baseline-run.json)
+          fi
+          python3 tool/perf/compare_ci.py --candidate build/perf/candidate --output build/perf/summary "${options[@]}"
+      - name: Publish explicit comparison status to job summary
+        if: always()
+        run: |
+          if test -f build/perf/summary/comparison.md; then
+            cat build/perf/summary/comparison.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-coverage-and-comparison
+          path: build/perf/summary/
+          if-no-files-found: error
+          retention-days: 30

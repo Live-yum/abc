@@ -1,0 +1,15 @@
+name: Set up verified Flutter
+description: Install Flutter 3.47.6 from the official repository and verify its immutable revision.
+runs:
+  using: composite
+  steps:
+    - name: Install Flutter 3.47.6
+      shell: bash
+      run: |
+        set -euo pipefail
+        sdk="$RUNNER_TEMP/flutter-3.47.6"
+        git clone --depth 1 --branch 3.47.6 https://github.com/flutter/flutter.git "$sdk"
+        test "$(git -C "$sdk" rev-parse HEAD)" = "5fc346839b5d0eef006ed8404392afb4dfae428d"
+        echo "$sdk/bin" >> "$GITHUB_PATH"
+        echo "PUB_CACHE=$RUNNER_TEMP/pub-cache" >> "$GITHUB_ENV"
+        "$sdk/bin/flutter" --version

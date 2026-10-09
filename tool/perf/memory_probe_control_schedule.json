@@ -1,0 +1,763 @@
+{
+  "schema": "abc.memory-probe-control-schedule.v1",
+  "source": {
+    "repository": "Live-yum/abc",
+    "commit": "51bc8eaa76b145b0d9bec3c95977779af43b676c",
+    "runId": "37945670140",
+    "url": "https://github.com/Live-yum/abc/actions/runs/37945670140",
+    "reportSha256": "16d8f3139d6ce141e597b87db27a42e68719ce3278e5bb696a56cf7f191c4711",
+    "zipSha256": "8c423f2880dc9f1156537d8ac10432634d4c914a866e6d1e40954da0cef2b072"
+  },
+  "units": "microseconds relative to original baseline checkpoint start; no original PID/path",
+  "plannedCycles": 8,
+  "plannedVmProbes": 17,
+  "points": [
+    {
+      "cycle": -1,
+      "phase": "baseline",
+      "startOffsetUs": 0,
+      "vmStartOffsetUs": 8537,
+      "vmEndOffsetUs": 323220,
+      "endOffsetUs": 339219
+    },
+    {
+      "cycle": 0,
+      "phase": "after-close-retained",
+      "startOffsetUs": 44762054,
+      "vmStartOffsetUs": 44771987,
+      "vmEndOffsetUs": 45017498,
+      "endOffsetUs": 45026240
+    },
+    {
+      "cycle": 0,
+      "phase": "after-close-released",
+      "startOffsetUs": 46403602,
+      "vmStartOffsetUs": 46412165,
+      "vmEndOffsetUs": 46627818,
+      "endOffsetUs": 46636378
+    },
+    {
+      "cycle": 1,
+      "phase": "after-close-retained",
+      "startOffsetUs": 88695866,
+      "vmStartOffsetUs": 88704421,
+      "vmEndOffsetUs": 88927676,
+      "endOffsetUs": 88937693
+    },
+    {
+      "cycle": 1,
+      "phase": "after-close-released",
+      "startOffsetUs": 90303410,
+      "vmStartOffsetUs": 90312044,
+      "vmEndOffsetUs": 90518061,
+      "endOffsetUs": 90527336
+    },
+    {
+      "cycle": 2,
+      "phase": "after-close-retained",
+      "startOffsetUs": 151746899,
+      "vmStartOffsetUs": 151755526,
+      "vmEndOffsetUs": 151991035,
+      "endOffsetUs": 151999949
+    },
+    {
+      "cycle": 2,
+      "phase": "after-close-released",
+      "startOffsetUs": 153386495,
+      "vmStartOffsetUs": 153394972,
+      "vmEndOffsetUs": 153603263,
+      "endOffsetUs": 153612111
+    },
+    {
+      "cycle": 3,
+      "phase": "after-close-retained",
+      "startOffsetUs": 214045870,
+      "vmStartOffsetUs": 214055774,
+      "vmEndOffsetUs": 214299116,
+      "endOffsetUs": 214308440
+    },
+    {
+      "cycle": 3,
+      "phase": "after-close-released",
+      "startOffsetUs": 215686522,
+      "vmStartOffsetUs": 215694979,
+      "vmEndOffsetUs": 215948718,
+      "endOffsetUs": 215958001
+    },
+    {
+      "cycle": 4,
+      "phase": "after-close-retained",
+      "startOffsetUs": 259661891,
+      "vmStartOffsetUs": 259670815,
+      "vmEndOffsetUs": 259894194,
+      "endOffsetUs": 259903068
+    },
+    {
+      "cycle": 4,
+      "phase": "after-close-released",
+      "startOffsetUs": 261269572,
+      "vmStartOffsetUs": 261278381,
+      "vmEndOffsetUs": 261510360,
+      "endOffsetUs": 261519784
+    },
+    {
+      "cycle": 5,
+      "phase": "after-close-retained",
+      "startOffsetUs": 303561911,
+      "vmStartOffsetUs": 303571214,
+      "vmEndOffsetUs": 303806043,
+      "endOffsetUs": 303822962
+    },
+    {
+      "cycle": 5,
+      "phase": "after-close-released",
+      "startOffsetUs": 305186473,
+      "vmStartOffsetUs": 305194929,
+      "vmEndOffsetUs": 305427675,
+      "endOffsetUs": 305436720
+    },
+    {
+      "cycle": 6,
+      "phase": "after-close-retained",
+      "startOffsetUs": 369612893,
+      "vmStartOffsetUs": 369622267,
+      "vmEndOffsetUs": 369855465,
+      "endOffsetUs": 369865951
+    },
+    {
+      "cycle": 6,
+      "phase": "after-close-released",
+      "startOffsetUs": 371253852,
+      "vmStartOffsetUs": 371263390,
+      "vmEndOffsetUs": 371492330,
+      "endOffsetUs": 371501838
+    },
+    {
+      "cycle": 7,
+      "phase": "after-close-retained",
+      "startOffsetUs": 431029899,
+      "vmStartOffsetUs": 431039491,
+      "vmEndOffsetUs": 431298402,
+      "endOffsetUs": 431308393
+    },
+    {
+      "cycle": 7,
+      "phase": "after-close-released",
+      "startOffsetUs": 432686456,
+      "vmStartOffsetUs": 432696308,
+      "vmEndOffsetUs": 432914568,
+      "endOffsetUs": 432923724
+    }
+  ],
+  "boundaries": [
+    {
+      "cycle": 0,
+      "phase": "cycle-start",
+      "offsetUs": 339272
+    },
+    {
+      "cycle": 0,
+      "phase": "cancelled-import-start",
+      "offsetUs": 381746
+    },
+    {
+      "cycle": 0,
+      "phase": "cancelled-import-end",
+      "offsetUs": 498080
+    },
+    {
+      "cycle": 0,
+      "phase": "initial-import-start",
+      "offsetUs": 519414
+    },
+    {
+      "cycle": 0,
+      "phase": "initial-import-ready",
+      "offsetUs": 19197839
+    },
+    {
+      "cycle": 0,
+      "phase": "reset-original-start",
+      "offsetUs": 24160337
+    },
+    {
+      "cycle": 0,
+      "phase": "reset-original-ready",
+      "offsetUs": 43395204
+    },
+    {
+      "cycle": 0,
+      "phase": "cycle-disposed",
+      "offsetUs": 43473151
+    },
+    {
+      "cycle": 0,
+      "phase": "drain-start",
+      "offsetUs": 43473165
+    },
+    {
+      "cycle": 0,
+      "phase": "drain-end",
+      "offsetUs": 44762044
+    },
+    {
+      "cycle": 0,
+      "phase": "retained-point",
+      "offsetUs": 44762052
+    },
+    {
+      "cycle": 0,
+      "phase": "released-prefix",
+      "offsetUs": 45092422
+    },
+    {
+      "cycle": 0,
+      "phase": "drain-start",
+      "offsetUs": 45092424
+    },
+    {
+      "cycle": 0,
+      "phase": "drain-end",
+      "offsetUs": 46396988
+    },
+    {
+      "cycle": 0,
+      "phase": "released-point",
+      "offsetUs": 46403601
+    },
+    {
+      "cycle": 0,
+      "phase": "cycle-end",
+      "offsetUs": 46645090
+    },
+    {
+      "cycle": 1,
+      "phase": "cycle-start",
+      "offsetUs": 46645094
+    },
+    {
+      "cycle": 1,
+      "phase": "initial-import-start",
+      "offsetUs": 46688273
+    },
+    {
+      "cycle": 1,
+      "phase": "initial-import-ready",
+      "offsetUs": 65527941
+    },
+    {
+      "cycle": 1,
+      "phase": "reset-original-start",
+      "offsetUs": 68252462
+    },
+    {
+      "cycle": 1,
+      "phase": "reset-original-ready",
+      "offsetUs": 87337007
+    },
+    {
+      "cycle": 1,
+      "phase": "cycle-disposed",
+      "offsetUs": 87403928
+    },
+    {
+      "cycle": 1,
+      "phase": "drain-start",
+      "offsetUs": 87403933
+    },
+    {
+      "cycle": 1,
+      "phase": "drain-end",
+      "offsetUs": 88695857
+    },
+    {
+      "cycle": 1,
+      "phase": "retained-point",
+      "offsetUs": 88695864
+    },
+    {
+      "cycle": 1,
+      "phase": "released-prefix",
+      "offsetUs": 88999407
+    },
+    {
+      "cycle": 1,
+      "phase": "drain-start",
+      "offsetUs": 88999409
+    },
+    {
+      "cycle": 1,
+      "phase": "drain-end",
+      "offsetUs": 90296827
+    },
+    {
+      "cycle": 1,
+      "phase": "released-point",
+      "offsetUs": 90303409
+    },
+    {
+      "cycle": 1,
+      "phase": "cycle-end",
+      "offsetUs": 90536848
+    },
+    {
+      "cycle": 2,
+      "phase": "cycle-start",
+      "offsetUs": 90536850
+    },
+    {
+      "cycle": 2,
+      "phase": "initial-import-start",
+      "offsetUs": 90565354
+    },
+    {
+      "cycle": 2,
+      "phase": "initial-import-ready",
+      "offsetUs": 109094699
+    },
+    {
+      "cycle": 2,
+      "phase": "export-close",
+      "offsetUs": 131498119
+    },
+    {
+      "cycle": 2,
+      "phase": "saved-reopen-start",
+      "offsetUs": 131540283
+    },
+    {
+      "cycle": 2,
+      "phase": "saved-reopen-ready",
+      "offsetUs": 150351612
+    },
+    {
+      "cycle": 2,
+      "phase": "cycle-disposed",
+      "offsetUs": 150452998
+    },
+    {
+      "cycle": 2,
+      "phase": "drain-start",
+      "offsetUs": 150453004
+    },
+    {
+      "cycle": 2,
+      "phase": "drain-end",
+      "offsetUs": 151746892
+    },
+    {
+      "cycle": 2,
+      "phase": "retained-point",
+      "offsetUs": 151746898
+    },
+    {
+      "cycle": 2,
+      "phase": "released-prefix",
+      "offsetUs": 152076834
+    },
+    {
+      "cycle": 2,
+      "phase": "drain-start",
+      "offsetUs": 152076836
+    },
+    {
+      "cycle": 2,
+      "phase": "drain-end",
+      "offsetUs": 153379945
+    },
+    {
+      "cycle": 2,
+      "phase": "released-point",
+      "offsetUs": 153386494
+    },
+    {
+      "cycle": 2,
+      "phase": "cycle-end",
+      "offsetUs": 153621398
+    },
+    {
+      "cycle": 3,
+      "phase": "cycle-start",
+      "offsetUs": 153621400
+    },
+    {
+      "cycle": 3,
+      "phase": "initial-import-start",
+      "offsetUs": 153654170
+    },
+    {
+      "cycle": 3,
+      "phase": "initial-import-ready",
+      "offsetUs": 172402239
+    },
+    {
+      "cycle": 3,
+      "phase": "export-close",
+      "offsetUs": 193285836
+    },
+    {
+      "cycle": 3,
+      "phase": "saved-reopen-start",
+      "offsetUs": 193312495
+    },
+    {
+      "cycle": 3,
+      "phase": "saved-reopen-ready",
+      "offsetUs": 212653341
+    },
+    {
+      "cycle": 3,
+      "phase": "cycle-disposed",
+      "offsetUs": 212736709
+    },
+    {
+      "cycle": 3,
+      "phase": "drain-start",
+      "offsetUs": 212736715
+    },
+    {
+      "cycle": 3,
+      "phase": "drain-end",
+      "offsetUs": 214045857
+    },
+    {
+      "cycle": 3,
+      "phase": "retained-point",
+      "offsetUs": 214045868
+    },
+    {
+      "cycle": 3,
+      "phase": "released-prefix",
+      "offsetUs": 214388583
+    },
+    {
+      "cycle": 3,
+      "phase": "drain-start",
+      "offsetUs": 214388586
+    },
+    {
+      "cycle": 3,
+      "phase": "drain-end",
+      "offsetUs": 215679910
+    },
+    {
+      "cycle": 3,
+      "phase": "released-point",
+      "offsetUs": 215686521
+    },
+    {
+      "cycle": 3,
+      "phase": "cycle-end",
+      "offsetUs": 215967725
+    },
+    {
+      "cycle": 4,
+      "phase": "cycle-start",
+      "offsetUs": 215967727
+    },
+    {
+      "cycle": 4,
+      "phase": "initial-import-start",
+      "offsetUs": 215998299
+    },
+    {
+      "cycle": 4,
+      "phase": "initial-import-ready",
+      "offsetUs": 234754304
+    },
+    {
+      "cycle": 4,
+      "phase": "reset-original-start",
+      "offsetUs": 239510295
+    },
+    {
+      "cycle": 4,
+      "phase": "reset-original-ready",
+      "offsetUs": 258322584
+    },
+    {
+      "cycle": 4,
+      "phase": "cycle-disposed",
+      "offsetUs": 258372583
+    },
+    {
+      "cycle": 4,
+      "phase": "drain-start",
+      "offsetUs": 258372588
+    },
+    {
+      "cycle": 4,
+      "phase": "drain-end",
+      "offsetUs": 259661883
+    },
+    {
+      "cycle": 4,
+      "phase": "retained-point",
+      "offsetUs": 259661889
+    },
+    {
+      "cycle": 4,
+      "phase": "released-prefix",
+      "offsetUs": 259970572
+    },
+    {
+      "cycle": 4,
+      "phase": "drain-start",
+      "offsetUs": 259970574
+    },
+    {
+      "cycle": 4,
+      "phase": "drain-end",
+      "offsetUs": 261262913
+    },
+    {
+      "cycle": 4,
+      "phase": "released-point",
+      "offsetUs": 261269571
+    },
+    {
+      "cycle": 4,
+      "phase": "cycle-end",
+      "offsetUs": 261529844
+    },
+    {
+      "cycle": 5,
+      "phase": "cycle-start",
+      "offsetUs": 261529847
+    },
+    {
+      "cycle": 5,
+      "phase": "initial-import-start",
+      "offsetUs": 261563721
+    },
+    {
+      "cycle": 5,
+      "phase": "initial-import-ready",
+      "offsetUs": 280236458
+    },
+    {
+      "cycle": 5,
+      "phase": "reset-original-start",
+      "offsetUs": 282943681
+    },
+    {
+      "cycle": 5,
+      "phase": "reset-original-ready",
+      "offsetUs": 302219969
+    },
+    {
+      "cycle": 5,
+      "phase": "cycle-disposed",
+      "offsetUs": 302271137
+    },
+    {
+      "cycle": 5,
+      "phase": "drain-start",
+      "offsetUs": 302271141
+    },
+    {
+      "cycle": 5,
+      "phase": "drain-end",
+      "offsetUs": 303561905
+    },
+    {
+      "cycle": 5,
+      "phase": "retained-point",
+      "offsetUs": 303561909
+    },
+    {
+      "cycle": 5,
+      "phase": "released-prefix",
+      "offsetUs": 303877614
+    },
+    {
+      "cycle": 5,
+      "phase": "drain-start",
+      "offsetUs": 303877616
+    },
+    {
+      "cycle": 5,
+      "phase": "drain-end",
+      "offsetUs": 305179901
+    },
+    {
+      "cycle": 5,
+      "phase": "released-point",
+      "offsetUs": 305186472
+    },
+    {
+      "cycle": 5,
+      "phase": "cycle-end",
+      "offsetUs": 305445341
+    },
+    {
+      "cycle": 6,
+      "phase": "cycle-start",
+      "offsetUs": 305445343
+    },
+    {
+      "cycle": 6,
+      "phase": "initial-import-start",
+      "offsetUs": 305479816
+    },
+    {
+      "cycle": 6,
+      "phase": "initial-import-ready",
+      "offsetUs": 324472662
+    },
+    {
+      "cycle": 6,
+      "phase": "export-close",
+      "offsetUs": 348471436
+    },
+    {
+      "cycle": 6,
+      "phase": "saved-reopen-start",
+      "offsetUs": 348495164
+    },
+    {
+      "cycle": 6,
+      "phase": "saved-reopen-ready",
+      "offsetUs": 368243548
+    },
+    {
+      "cycle": 6,
+      "phase": "cycle-disposed",
+      "offsetUs": 368323334
+    },
+    {
+      "cycle": 6,
+      "phase": "drain-start",
+      "offsetUs": 368323340
+    },
+    {
+      "cycle": 6,
+      "phase": "drain-end",
+      "offsetUs": 369612886
+    },
+    {
+      "cycle": 6,
+      "phase": "retained-point",
+      "offsetUs": 369612892
+    },
+    {
+      "cycle": 6,
+      "phase": "released-prefix",
+      "offsetUs": 369946124
+    },
+    {
+      "cycle": 6,
+      "phase": "drain-start",
+      "offsetUs": 369946126
+    },
+    {
+      "cycle": 6,
+      "phase": "drain-end",
+      "offsetUs": 371246896
+    },
+    {
+      "cycle": 6,
+      "phase": "released-point",
+      "offsetUs": 371253849
+    },
+    {
+      "cycle": 6,
+      "phase": "cycle-end",
+      "offsetUs": 371510992
+    },
+    {
+      "cycle": 7,
+      "phase": "cycle-start",
+      "offsetUs": 371510994
+    },
+    {
+      "cycle": 7,
+      "phase": "initial-import-start",
+      "offsetUs": 371552959
+    },
+    {
+      "cycle": 7,
+      "phase": "initial-import-ready",
+      "offsetUs": 390307709
+    },
+    {
+      "cycle": 7,
+      "phase": "export-close",
+      "offsetUs": 410562864
+    },
+    {
+      "cycle": 7,
+      "phase": "saved-reopen-start",
+      "offsetUs": 410597180
+    },
+    {
+      "cycle": 7,
+      "phase": "saved-reopen-ready",
+      "offsetUs": 429641222
+    },
+    {
+      "cycle": 7,
+      "phase": "cycle-disposed",
+      "offsetUs": 429741124
+    },
+    {
+      "cycle": 7,
+      "phase": "drain-start",
+      "offsetUs": 429741129
+    },
+    {
+      "cycle": 7,
+      "phase": "drain-end",
+      "offsetUs": 431029894
+    },
+    {
+      "cycle": 7,
+      "phase": "retained-point",
+      "offsetUs": 431029898
+    },
+    {
+      "cycle": 7,
+      "phase": "released-prefix",
+      "offsetUs": 431384150
+    },
+    {
+      "cycle": 7,
+      "phase": "drain-start",
+      "offsetUs": 431384152
+    },
+    {
+      "cycle": 7,
+      "phase": "drain-end",
+      "offsetUs": 432679869
+    },
+    {
+      "cycle": 7,
+      "phase": "released-point",
+      "offsetUs": 432686455
+    },
+    {
+      "cycle": 7,
+      "phase": "cycle-end",
+      "offsetUs": 432932275
+    },
+    {
+      "cycle": 8,
+      "phase": "drain-start",
+      "offsetUs": 432932277
+    },
+    {
+      "cycle": 8,
+      "phase": "drain-end",
+      "offsetUs": 434229842
+    }
+  ],
+  "recordingStoppedOffsetUs": 434229867,
+  "drainPolicy": {
+    "frameBarriers": 3,
+    "barrierDelayMs": 16,
+    "quietMs": 1200,
+    "tailPrefixFlushesPerCycle": 2,
+    "capture": "all-callbacks-received-until-recordingStoppedUs"
+  },
+  "scope": "Synthesized timing-only configuration from one public CI observation. Does not carry original measurements or claim control/product equivalence."
+}

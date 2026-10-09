@@ -1,0 +1,22 @@
+name: Set up public performance fixtures
+description: Pinned SDK, original synthetic fixtures, reproducible rules and MAP worker.
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-flutter
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: '22'
+    - shell: bash
+      run: |
+        set -euo pipefail
+        npm ci --ignore-scripts --no-audit --no-fund
+        npm run verify:sources
+        npm run build:circuit-rules
+        flutter pub get --enforce-lockfile
+        bash tool/build_map_worker.sh
+        git diff --exit-code -- assets/private/circuit_rules_native.js assets/private/circuit_rules.provenance.json web/engine/circuit_rules_web.js web/engine/map_worker.js
+        mkdir -p build/perf/fixtures
+        python3 tool/perf/generate_synthetic_world.py build/perf/fixtures/synthetic-medium.wld
+        echo "ABC_PERF_SYNTHETIC_WORLD=$PWD/build/perf/fixtures/synthetic-medium.wld" >> "$GITHUB_ENV"
+        echo "ABC_PERF_FLUTTER_VERSION=$(cat .flutter-version)" >> "$GITHUB_ENV"
