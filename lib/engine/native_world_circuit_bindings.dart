@@ -158,6 +158,9 @@ class NativeWorldCircuitBindings {
     if (method != 'worldCircuitCommand') {
       throw const EngineException('Unknown circuit command');
     }
+    if (session.closing) {
+      throw const EngineException('Circuit session is closing');
+    }
     final words = (args[1] as List).cast<int>(),
         records = (args[2] as List).cast<int>();
     validateWorldCircuitCommand(words, records);
@@ -856,15 +859,38 @@ class NativeWorldCircuitBindings {
   }
 
   void _dispose(int id, _Session session) {
-    _check(_one('close')(id));
-    _sessions.remove(id);
-    try {
-      _checkWorld(
-        library.lookupFunction<_OneC, _OneD>('abc_world_close')(session.world),
-      );
-    } finally {
-      session.close();
+    session.closing = true;
+    if (!session.circuitClosed) {
+      _check(_one('close')(id));
+      session.circuitClosed = true;
     }
+    Object? failure;
+    StackTrace? failureStack;
+    try {
+      if (session.world != 0) {
+        _checkWorld(
+          library.lookupFunction<_OneC, _OneD>('abc_world_close')(
+            session.world,
+          ),
+        );
+        session.world = 0;
+      }
+    } catch (error, stack) {
+      failure = error;
+      failureStack = stack;
+    }
+    try {
+      session.close();
+    } catch (error, stack) {
+      failure ??= error;
+      failureStack ??= stack;
+    }
+    // Keep unfinished owners reachable for a close retry. Completed native
+    // closes and file closes must not be repeated on that retry.
+    if (failure != null) {
+      Error.throwWithStackTrace(failure, failureStack!);
+    }
+    _sessions.remove(id);
   }
 }
 
@@ -901,6 +927,7 @@ class _ReadWindow {
 class _Session {
   int world;
   final bool streamed;
+  bool closing = false, circuitClosed = false;
   String? sourceSha256;
   int readBytes = 0, readRequests = 0, maxReadBytes = 0;
   final Directory directory = Directory.systemTemp.createTempSync(
@@ -983,8 +1010,19 @@ class _Session {
   }
 
   void close() {
-    for (final f in files.values) {
-      f.closeSync();
+    Object? failure;
+    StackTrace? failureStack;
+    for (final entry in files.entries.toList()) {
+      try {
+        entry.value.closeSync();
+        files.remove(entry.key);
+      } catch (error, stack) {
+        failure ??= error;
+        failureStack ??= stack;
+      }
+    }
+    if (failure != null) {
+      Error.throwWithStackTrace(failure, failureStack!);
     }
     if (directory.existsSync()) directory.deleteSync(recursive: true);
   }
