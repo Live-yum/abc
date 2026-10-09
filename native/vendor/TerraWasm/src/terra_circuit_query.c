@@ -58,7 +58,20 @@ static void pack_cell(CxWorld* w,uint32_t x,uint32_t y,uint32_t* out){
     out[0]=x;out[1]=y;out[2]=t.type|(flags<<16)|(cx_wire_mask(&t)<<24);out[3]=(uint16_t)t.frame_x|((uint32_t)(uint16_t)t.frame_y<<16);
 }
 int cx_query_step(CxWorld* w,uint32_t* work){
-    while(*work&&w->x<w->query_x1){int status=cx_scan_step(w,work);if(status<0||w->event.kind)return status;if(status!=2)return TCW_CONTINUE;
+    while(*work&&w->x<w->query_x1){
+        /* READ_LAMPS needs only requested columns. Resume from the next
+         * checkpoint only at a completed-column boundary, never while a
+         * column or its duplicate points are still being consumed. */
+        if(w->command.kind==TCW_READ_LAMPS&&w->col_stage==0&&w->y==0&&w->point_index<w->point_count){
+            uint32_t next=w->points[w->point_index].x;
+            if(w->checkpoint_index[next/CX_CHECK_COLUMNS].column>w->x){
+                seek_checkpoint(w,next);
+                /* Bound each step to one frontier restore and let hosts
+                 * observe cancellation before reading the new interval. */
+                *work=0;return TCW_CONTINUE;
+            }
+        }
+        int status=cx_scan_step(w,work);if(status<0||w->event.kind)return status;if(status!=2)return TCW_CONTINUE;
         if(w->x>=w->query_x0){
             if(w->command.kind==TCW_VIEWPORT){
                 if((w->x-w->query_x0)%w->query_stride==0){if(w->emit_y<w->query_y0)w->emit_y=w->query_y0;while(*work&&w->emit_y<w->query_y1){if(w->result_count>=w->result_capacity)return TCW_INVALID;pack_cell(w,w->x,w->emit_y,w->result+w->result_count*4u);++w->result_count;w->emit_y+=w->query_stride;--*work;}if(w->emit_y<w->query_y1)return TCW_CONTINUE;}

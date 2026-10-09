@@ -1,34 +1,29 @@
-# Capability and evidence matrix
+# Capability and public evidence matrix
 
-Local source snapshot: 2026-10-09 UTC. “Implemented” means a reachable local code path with the bounded evidence below; it does not imply full upstream parity, a published feature release or target-device certification. See [the 38-action audit](action-parity-audit.md) for action-level scope.
+Snapshot: 2026-10-09 UTC. “Implemented” identifies a reachable code path with
+bounded evidence, not complete upstream parity or target-device certification.
+This document publishes only source-level capabilities, public synthetic tests,
+the public Computerraria world and public CI results. Additional local real-input
+validation exists; its private sample details and measurements are not disclosed
+here. Personal saves, private validation reports, resource atlases, game binaries
+and credentials are excluded from the public deliverable.
 
-The current candidate follows the latest request: **WLD only**. Companion-file
-parsing, device remapping, paired import/export, pairing records and the mod-only
-color display have been removed. Circuit ABI 2 and the rebuilt Native/WASM
-artifacts enforce the new contract. Native PixelBox and JavaScript ownership
-contracts, final Native/Node OFF/ON acceptance and Node ON saved continuation
-pass. OFF executes the physical
-CPU but its same-TripWire game PixelBox rule cannot display Pong in this WLD;
-ON uses WireHead-style group-pair parity to drive the real 3,072 monochrome
-pixels. Current Flutter UI, final pure-WLD long soak and exact-head CI
-still require fresh validation. The isolated loading comparison below does not
-measure final merged artifacts; historical multi-file measurements do not certify
-this candidate.
-
-Published head `73a2bd11` passed all five functional CI jobs. Its complete-world
-profile failed the brief-input paddle assertion; general performance passed
-seven sampling jobs and failed Linux UI on a missing bundled QuickJS library.
-Both have candidate fixes awaiting the new pure-WLD head.
+The current implementation is **WLD only**. Companion-file parsing, remapping,
+paired import/export and pairing records are removed. OFF keeps game-rule
+PixelBox crossings; ON uses the documented WireHead-style group-pair rule to
+operate the public world's 3,072 monochrome pixels. OFF executes the physical
+CPU but does not display Pong in this world. Neither path substitutes a host CPU
+interpreter. The latest query optimization preserves both modes' behavior.
 
 | Prototype area | Implemented locally | Evidence | Remaining work / limitation |
 |---|---|---|---|
-| World archive/viewer | Actual WLD import, metadata, map PNG, pan/zoom/coordinates, persistent styled item/entity markers with frame selectors, bounded viewport wire/liquid overlays, separate export | Native/Web contracts; two authorized real worlds (v319, 4200 × 1200; v326, 8400 × 2400); earlier synthetic browser flows | Overlay data covers the explicitly loaded viewport, at most 262,144 cells; final UI browser pass, target-device and in-game validation remain |
-| Binary exploration MAP | Legacy 135–319 and chunked 315 decode, grayscale exploration-light preview, bounded light/paint edits, undo/redo, checked export and WLD-generated MAP; native isolate/Web worker ownership | Original protocol fixtures, owner/lifecycle contracts and MAPs generated from two authorized real WLDs; see [MAP support](MAP_FORMAT.md) | No user-supplied/materialized real exploration MAP has been validated. Generated fully explored MAPs do not prove original exploration progress or game palette fidelity; browser/device interaction remains unverified |
-| World edits | Typed searchable progression/time/weather/basic header properties, spawn, chest slot/name/prefix editing, organize/clear and catalog-backed reforge; transactional candidate validation and undo/redo | Real-world Native/WASM header/chest edits, saved candidate/reopen and identical output bytes; Workspace original preservation and exact undo/redo | Unknown/structural and unsupported version-specific fields remain read-only; exhaustive historical section fixtures remain |
+| World archive/viewer | Actual WLD import, metadata, map PNG, pan/zoom/coordinates, persistent styled item/entity markers with frame selectors, bounded viewport wire/liquid overlays, separate export | Public synthetic Native/Web contracts and earlier synthetic browser flows; additional real-input validation remains local | Overlay data covers the explicitly loaded viewport, at most 262,144 cells; final UI browser pass, target-device and in-game validation remain |
+| Binary exploration MAP | Legacy 135–319 and chunked 315 decode, grayscale exploration-light preview, bounded light/paint edits, undo/redo, checked export and WLD-generated MAP; native isolate/Web worker ownership | Public synthetic protocol fixtures and owner/lifecycle contracts; see [MAP support](MAP_FORMAT.md) | No user-supplied/materialized real exploration MAP has been validated. Generated fully explored MAPs do not prove original exploration progress or game palette fidelity; browser/device interaction remains unverified |
+| World edits | Typed searchable progression/time/weather/basic header properties, spawn, chest slot/name/prefix editing, organize/clear and catalog-backed reforge; transactional candidate validation and undo/redo | Public synthetic Native/WASM header/chest edits and saved candidate/reopen; Workspace original preservation and exact undo/redo | Unknown/structural and unsupported version-specific fields remain read-only; exhaustive historical section fixtures remain |
 | Pixel workshop | Image decode budgets, drawing/fill/erase, grouped undo, PNG/project, authoritative RGB mapping | Domain/widget tests; actual core matching and safe pixel-write contracts | Matching resources must be imported; rendered appearance does not reproduce every game shader or paint effect |
 | Player laboratory | PLR open/create, stats/colors, inventory/equipment/loadouts, slot copy/paste and confirmed scoped best-prefix batches, buffs, research/Journey; reviewed version projection | Native/Web PLR round trips; native application conversion confirmation, stale-source rejection and undo | Only imported verified target profiles can be used; historical downgrade profiles incomplete; all-version in-game validation absent |
 | Circuit laboratory | Authoritative retained JavaScript editor/rules, 2,776 palette entries, 15 demos, properties/styles, clipboard transforms, bounded route/network preview-confirm-cancel, actual native traversal and Web worker; separate whole-world TCW trigger/step/run/save plus complete Computerraria WLD, physical Pong ROM/input/display, WLD export/resume and default-off optimization | 15-demo source/Web/native-transport parity: 1,180 packets and 12 structural changes; real embedded-native replay of a bounded 244-case corpus; 10 Web lifecycle tests; whole-world Native/Web timer/save/reopen; final pure-WLD Native/Node OFF/ON acceptance and Node ON continuation passed: OFF physical CPU, ON real monochrome Pong; one fresh process per backend/mode | Plans are limited to 60,000 cells and use unchanged reference routing/topology. OFF's game-rule PixelBoxes do not display Pong in this WLD. Exact a561 pure-WLD Chrome loads passed in three fresh processes; fresh ON Pong, UP/DOWN controls and a 3,072-pixel screenshot/native replay match are verified. A separate reset crashed Chrome with Error 9, and close retained WASM capacity; replacement-worker repair still requires browser verification. Node ON continuation is separately verified. Other current circuit-editor browser flows, Android/iOS/macOS complete-world execution and complete game behavior remain unverified |
-| Fusion canvas | All-layer region records, eight grouped continuous brushes, original-atlas static preview, complete object copy/paste, catalog-backed furniture placement/variants and display contents; 18 companion-bearing tile families / 11 tile-entity schemas | Native/Web placement and payload read-back, collision/stale-source rejection and exact undo; real-world region history and atlas PNG render; TCW command-8 tile/COB1 extraction matches across Native/WASM | Structural edits require verified geometry and complete objects. Unknown supports/frames/alternates stay blocked. Neighbor framing, paint, lighting and dynamic appearance remain approximate; browser interaction for this batch remains unverified |
+| Fusion canvas | All-layer region records, eight grouped continuous brushes, original-atlas static preview, complete object copy/paste, catalog-backed furniture placement/variants and display contents; 18 companion-bearing tile families / 11 tile-entity schemas | Public synthetic Native/Web placement and payload read-back, collision/stale-source rejection and exact undo; TCW command-8 tile/COB1 extraction matches across Native/WASM | Structural edits require verified geometry and complete objects. Unknown supports/frames/alternates stay blocked. Neighbor framing, paint, lighting and dynamic appearance remain approximate; browser interaction for this batch remains unverified |
 | World generation | Source-verified options/schema, submit/poll/cancel/retry routes, bounded forms and uncertain-submission guard | In-process HTTP/schema/UI contracts | No verified portable initial MEMBER login, supported live session or actual options/job/result validation |
 | Write into world | Pixel→region→WLD merge, Dirt0, wall/foreground/clear modes, bounds/collision checks, original retained; separate validated complete-object insertion | Native/Web byte-level layer preservation and application read-back/undo | Arbitrary framed structural replacement remains blocked; every reference switch/mapping combination has not been compared |
 | Save center | Persistent binary vault/history/trash, source-verified authenticated private downloads and multipart uploads, generated WLD upload preview, recommendation likes/ticket-download/count receipts/transfers, durable adoption and account/service-scoped recovery journals | Native vault recovery and application history; synthetic reference HTTP, durable adoption, cancellation, retry/account-isolation and reachable UI contracts | Supported initial account login and live transfers remain unmet. Optional player equipment preview generation is not provided; backend new uploads require a WeChat-linked MEMBER. No permanent purge |
@@ -37,133 +32,90 @@ Both have candidate fixes awaiting the new pure-WLD head.
 | Account/system | Source-verified profile nickname/avatar editor, explicit avatar loading, bounded remote-help viewer, manifest-pinned online resource installer with native/IndexedDB cache, atomic activation/recovery and revocation guards | Synthetic account/help/UI contracts, resource HTTP/integrity/storage/recovery tests and fake-fetch/IndexedDB contracts | No supported portable initial login or live service/content validation. Help is sanitized plain text, not full rich-text rendering. Online normalization omits unverified supplemental catalogs/atlases/profiles; offline cache knows only the last durable revocation state |
 | Web computation ownership | Dedicated workers for WLD/PLR document operations, generated MAP, TCW and legacy traversal, alongside separate region/rules/MAP owners; bounded serialized RPC with transfer, timeout/cancel/dispose and stale-handle rejection | Worker lifecycle contracts and actual WASM bootstrap through Node workers; see [ownership contract](web-computation-workers.md) | Node event-loop and direct-WASM evidence does not establish real browser frames, Flutter UI smoothness or target-device performance |
 
-## Bounded pure-WLD loading comparison
+## Public full-world loading evidence
 
-For the unchanged 405,983,441-byte public WLD, three fresh standalone Native
-C-host runs per variant reduced median load/compile time from **17.654 to
-9.664 seconds (45.26%)**. Optimized runs were 9.664 / 10.088 / 9.404 seconds;
-the maximum conservative observed process RSS was **143.871 MiB**, effectively
-unchanged from the 143.801 MiB baseline. Sparse compiler indexes and checked
-inline decoding preserve compiled topology; no persistent compiled cache is
-used. The timing belongs to isolated library `08fd4754…44d1f`, not the different
-final merged Native/WASM artifacts. Their equivalent loading measurements remain
-pending. A separate single Dart owner import took **14.874 seconds**; it is not
-the standalone C timing or a Flutter UI measurement.
+For the original 405,983,441-byte public Computerraria WLD, three fresh
+standalone Native C processes per variant reduced median load/compile time from
+17.654 to 9.664 seconds. This earlier isolated optimization preserves compiled
+topology and uses no persistent compiled cache. It does not measure Flutter or
+browser readiness, and OS page cache was uncontrolled.
 
-A private real WLD (v326, 8,400 × 2,400, 11,956,596 bytes) also used three fresh
-processes per variant. Standalone TCW open/full circuit compilation fell from
-**1.9931 to 0.5539 seconds median (72.21%)**, with equal compiled structures and
-zero tracked owners after close. This excludes ordinary preview/rendering and
-input hashing. The public report contains no private name, path, source hash or
-save bytes.
+The subsequent identified C-hash host build measured Native imports of
+12.695 / 12.983 seconds in OFF/ON and Node WASM imports of 17.907 / 17.449 seconds.
+These are one process per backend and mode. The old/new deterministic state
+projections and saved-WLD reopen match, and owned engine/storage/file counts
+return to zero. They are host-specific observations, not statistical speedup
+claims or UI timings. See the [public artifact-bound host comparison](evidence/host-wld-regression-2026-10-09.json).
 
-The separate [ordinary large-world load report](evidence/ordinary-large-world-load-2026-10-09.json)
-measures that v326 WLD through the final Native/WASM artifacts, without TCW
-compilation. Three fresh processes per backend each performed three warm
-reopens. Median summed file-read, runtime-initialization, ordinary-open/metadata
-and PNG phases were Native C/ctypes **0.163 seconds fresh / 0.149 warm** and
-Node WASM **0.378 / 0.333 seconds**. Metadata, PNG and reopen checks passed.
-These totals exclude process/interpreter startup and are not Flutter first-frame
-latency. Native generated 1,024 × 292 previews; Web generated 960 × 274 plus an
-internal 384-pixel-wide opening preview, so these workloads do not establish a
-strict cross-platform ranking. The nine warm samples per backend share three
-processes; fresh-process samples still had uncontrolled OS page cache.
+The final sparse lamp-query candidate uses existing checkpoints to skip columns
+with no requested point. The four initialization anchors replay 76 columns
+instead of 12,325; one Native query-only comparison measured 3.402 seconds versus
+0.0197 seconds, with identical output records and all physical-state statistics.
+The Native and Node ON full CPU/Pong/save/reopen projections match the prior
+version. A checked-in sequential oracle and bounded cancellation contracts make
+this reproducible from a clean checkout. This is neither total browser loading
+time nor a steady-state display FPS improvement. See [the method](sparse-lamp-queries.md)
+and [public query evidence](evidence/sparse-lamp-query-2026-10-09.json).
 
-OS page cache was uncontrolled in both comparisons; these are not verified
-cold-storage, browser or Flutter UI measurements. The unchanged
-[historical pure-WLD baseline report](evidence/standalone-native-load-2026-10-09.json)
-retains its sampling details and 65.57–65.79 MiB short-window closed RSS; complete
-resident-memory return is not claimed. See the
-[sanitized machine-readable comparison](evidence/standalone-native-load-optimization-2026-10-09.json)
-and [load-only protocol](../tool/perf/NATIVE_LOAD_PEAK.md).
+## Public browser baseline and remaining repair checks
 
-## Current pure-WLD physical execution evidence
+The exact a5612b4 CI release artifact loaded the public WLD in three fresh cloud
+Chrome processes. Hash start to final monochrome initialization took
+41.050 / 41.944 / 38.646 seconds. It excludes the chooser and is not the first
+presented frame. The owned Chrome process-tree PSS peaks were
+680.816 / 689.459 / 690.667 MiB, with at most a 268.285 MiB increase over the
+corresponding baseline. Renderer RSS and WASM capacity overlap those measurements
+and must not be added to them.
 
-Final Native `d033ffd6…bf9d7` and Node WASM `b3ace044…e7b8` passed OFF/ON
-acceptance, one fresh local process per backend/mode. Strict report validation
-passed. The modes match 48 CPU signatures, the one-bit ROM negative control,
-23 input probes, 12 ready/RAM/stack checkpoints and saved RAM. Same-mode
-Native/Node complete display and saved-WLD hashes also match. ON displays moving
-Pong through the real monochrome PixelBoxes; both modes pass single-WLD
-save/reopen, and the original public WLD remains unchanged. Across twelve
-128-pulse Pong batches, measured OFF/ON clock-command rates were Native
-**1,012 / 6,014 pulses/s** and Node **979 / 5,848 pulses/s**; Node median compound
-round trips were **131 / 22 ms**. Native awaited-command and Node bridge-stage
-boundaries differ. These diagnostics are not browser FPS.
+Fresh ON Pong and UP/DOWN input worked. All 3,072 binary pixels in one paused
+25,728-pulse screenshot match an independent physical native replay. This is
+correctness evidence, not FPS. A separate reset crashed Chrome with Error 9;
+OOM was not established as its cause. Close freed active engine allocations and
+scratch storage but retained the old worker's WASM capacity. The new safe worker
+retirement, output-release retries and reset/cancellation guards require fresh
+browser validation on the final artifact. See the [public browser evidence](evidence/browser-pure-wld-baseline-2026-10-09.json).
 
-A separate ON continuation run saved at 5,120 pulses, reopened without reset or
-ROM rewrite and matched all 32 subsequent 128-pulse checkpoints: full monochrome
-pixels, 654 CPU-area lamps, 45 input-area lamps and 272 RAM words. There were
-21 distinct display states and 33 states in each other probe set; held UP moved
-the paddle center from 24.5 to 23.5. Brief UP/DOWN did not move it in these traces.
-Native/bridge/file owners were zero after close. This is bounded physical-state
-evidence, not complete CPU-register/RAM coverage, actual UI latency or full game
-parity. Pure-WLD browser evidence and the remaining reset/memory limitations are
-recorded below. Target-device smoothness and final repair validation remain pending. See the [sanitized backend evidence](evidence/pure-wld-backend-acceptance-2026-10-09.json).
+## Public CI and synthetic UI performance
 
-## General UI performance baseline
+At head 9bb73baeaeacd296ccdd64c58753f449d1398cde, all five functional platform
+jobs passed, including Web, Android, Linux, macOS and unsigned iOS compilation.
+The Flutter test job reported 672 passed and 32 skipped. All eight new Workspace
+output-release/cancellation cases actually executed and passed. Of the skipped
+cases, 18 ran in the same-head Native job. Ten external-resource cases and one
+VM-service-specific lifecycle case were not executed in that campaign; three
+opt-in performance suites have separate jobs. Final source changes still require
+their own exact-head CI. Local Workspace compiler exits are retained as failed
+attempts, not reclassified as successful runs.
 
-The a5612b4 CI campaign completed five independent Linux profile processes,
-each with two warmup and eight measured workspace lifecycles: 152 UI operation
-kinds and 102 controller variants. The software renderer was llvmpipe. Across
-runs, measured raster-work medians were 24.316–25.423 ms and p95 values
-41.425–43.902 ms; these are actual FrameTiming durations, not inferred FPS.
-Display refresh was unavailable (reported 0 Hz). Final after-close RSS ranged
-721.5–800.4 MiB, and requested-GC Dart heaps 38.7–43.4 MiB. The harness retains
-its growing raw measurements, so these samples alone establish neither a leak
-nor stable long-term memory. No comparable baseline was selected: regression
-comparison remains **inconclusive**, despite successful workloads and CI.
-See the [five-process evidence](evidence/general-ui-baseline-2026-10-09.json).
+The a5612b4 general performance campaign completed five independent Linux
+profile processes, each with two warmup and eight measured lifecycles, covering
+152 UI operation kinds and 102 controller variants on public synthetic inputs.
+With llvmpipe, measured raster-work medians were 24.316–25.423 ms and p95 values
+41.425–43.902 ms. These are real FrameTiming durations, not inferred FPS. The
+reported display refresh was zero, so device refresh calibration is unavailable.
+After-close RSS ranged 721.5–800.4 MiB and requested-GC Dart heaps 38.7–43.4 MiB.
+The harness retains growing raw measurements; these samples alone establish
+neither a leak nor long-term memory stability. See the [public five-process evidence](evidence/general-ui-baseline-2026-10-09.json).
 
-## Verification history and current migration boundary
+That first campaign had no selected comparison baseline and remained
+**inconclusive** for regression acceptance despite successful workloads. New
+performance runs explicitly select the verified a5612b4 run, validate run/report
+identity, and retain environmental mismatches or failures. Headless zero-refresh
+reports do not establish target-device fluency. Android/iOS/macOS runtime,
+signed distribution, physical-device performance and in-game read-back remain
+unverified by compile-only results.
 
-- The next host-hashing/worker-lifecycle snapshot passes full static analysis, formatting of 276 Dart files, 61 performance-validator tests and the final 10 session-lifecycle tests. Four artifact-bound complete-WLD Native/Node runs pass with exact previous-state projections. Earlier focused hash and lifecycle suites passed 37 and 45 tests respectively. Eight added Workspace output-release/cancellation cases have not executed locally: their compiler exited before assertions on two attempts, without a source diagnostic. They remain required in the new exact-head CI; this is not a full local Flutter-suite pass. Actual browser memory recovery and reset stability also remain pending on the new Web artifact.
+## Remaining migration boundaries
 
-- Local Flutter Web O4 builds ended with `dart2js -9` without a Dart source diagnostic; the termination cause is not established. The exact a5612b4 CI O4 build subsequently succeeded and supplied the verified browser artifact. Its functional workflow passed 5/5 jobs, including Android, Linux and unsigned Apple builds. Its general performance workflow passed all 9 jobs, including five actual Linux profile lifecycles. The complete-world Native, WASM and Linux profile execution lanes passed, but their aggregate failed because the headless display reported a zero refresh rate. The repaired validator explicitly separates unavailable refresh calibration from correctness and awaits new-head CI.
-- The preceding published snapshot passed static analysis, formatting of 272 Dart files and 45 Python validator/helper tests. The scheduler then passed 31 focused cases and 15 runtime cases, and its self-contained Web build passed in 36.22 seconds. The held-input repair passed nine interaction regressions and its targeted analysis; final combined checks and exact-head CI are still required. Source/provenance verification covers 95 engine files and 40 retained viewer modules.
-- Local single-process aggregates did not complete: the shared Dart frontend compiler disappeared before a subsequent suite requested incremental compilation. This occurred with both private and public fixtures; no compiler exit signal or OOM cause was established. The latest public run had 284 passes, eight skips and no assertion failures before its external load watchdog ended it. Counts from interrupted runs overlap and are not added. A six-file public transition passed 37 tests with two private opt-in skips. Independently, published head `73a2bd11` passed its complete remote Flutter test suite; this does not verify later candidate edits.
-- The earlier pre-computer snapshot passed 537 aggregate cases with 15 skips, then a targeted 22-case run covered all 12 skipped functional cases (ten repeated), yielding 549 distinct functional passes. That historical result does not certify the new computer/font/memory changes.
-- MAP-worker compilation previously passed. The self-contained JavaScript Flutter Web release build with the bundled Chinese font passed in 35.0 seconds. Cloud Chrome then confirmed readable desktop/mobile Chinese body text and responsive layout, but exposed independent chip label styles with missing glyphs/contrast. The chip/navigation/input theme correction then passed a new self-contained Web release build in 37.0 seconds; Cloud Chrome subsequently verified readable chip/navigation/input labels on desktop and mobile. The existing non-fatal Cupertino icon-family warning remains; Material icons were emitted. Optional Flutter Wasm compilation remains unverified; the separately built TerraWasm world/player artifacts are a distinct target.
-- The historical [Computerraria](COMPUTERRARIA.md) implementation imported the unchanged 405,983,441-byte WLD plus the former companion input without a mod runtime, loads the actual upstream Pong binary into physical ROM lamps, executes physical clock/input wires, and reads both real display planes. Native and Node-hosted WASM each passed OFF/ON execution, 48 CPU signatures, 23 input probes, negative controls, state-preserving mode switches and paired save/reopen. Both modes and hosts match by state hashes. Local measured clock rates were Native OFF 1,090 / ON 6,335 pulses/s and Node WASM OFF 934 / ON 5,500 pulses/s; these are host-specific core rates, not Flutter FPS. Actual cloud Chromium verified full import, Pong, keyboard/touch input, preserved state across mode changes, cancellation/retry and close/reopen of the original pair. Actual Linux profile acceptance remains pending: explicit physical keys now pass, but the subsequent brief-input paddle-motion assertion failed. The candidate preserves the five-second bound while holding the input until decoded paddle motion and reports sensor acknowledgement separately from state observation. The subsequent 50-cycle Native full-world soak passed as described below.
-- Historical companion-format host-cadence evidence: the candidate kept the same 128 physical pulses, combined clock plus selected-monitor read in one worker request and coalesced image decoding without starvation. Both modes passed 45 full-world compound batches each, exact historical CPU/input/pixel/Pong/paired-save projections, and zero tracked owners after close. The final Web scheduler continues after the real worker message without an additional timer; unknown or immediate backends retain a fairness timer. Actual cloud Chrome measured OFF **1,031.2 pulses/s / 8.1 display reads/s**, ON **2,301.9 / 18.0**, versus the instrumented baseline ON 990.6 / 7.7. These are not raster FPS or a smooth-display acceptance pass. Mean ON batch duration was 52.47 ms (p95 73.60, max 109.20); mean owner continuation gap was below 0.01 ms, with no timer wait. Keyboard, touch, fresh monitor switching and repeated pause/resume passed. After pausing, 141,952 pulses and monitor pixels stayed unchanged for 24.65 seconds. The final graceful app close was not observed after a desktop observation error; browser closure was independently verified.
-- Historical companion-format continuation evidence: a same-program probe saved at 5,120 pulses, reopened without resetting or reloading ROM, then compared live and reopened branches at 32 subsequent 128-pulse checkpoints. Complete mono/color pixels, ready lamp, 654 CPU-area lamps, 45 input-area lamps, a 64-byte RAM prefix and 1,024-byte Pong stack matched exactly. Changing display/RAM states and actual held-UP paddle motion rule out two equally halted branches. Brief single UP/DOWN presses moved neither branch; their exact consumption cause is not established. Nine profile-interaction regressions pass, including held input, sensor-only directions, timeout and release; actual Linux profile execution remains required.
-- Before companion removal, a separate **load-only standalone Native C host** measured three fresh processes loading the former complete multi-file input and initializing both display planes. Maximum observed process RSS/HWM was **145.660 / 145.961 / 146.000 MiB**, with loading times **18.240 / 17.655 / 17.958 seconds**. Peaks occurred during final wiring compilation; stable loaded RSS was about 130 MiB and closed RSS 4.35–4.39 MiB. Engine allocation peak was 142.066 MiB. RSS was sampled about every 10 ms and PSS/USS every 100 ms, alongside kernel high-water marks; the largest observed measure is retained when sources differ. Fresh process does not imply a cold disk cache. This excludes Flutter, browser, program execution and export, and must not be substituted for application loading memory. The 192 MiB engine budget is not a process-memory cap.
-- Historical companion-format switch behavior retained the grouped/lazy implementation and per-trip clearing; ON added generation-stamped device deduplication. The current pure-WLD ON rule additionally uses WireHead-style group-pair PixelBox parity as described above, so old OFF/ON display-equality results do not apply. Neither is a complete WireHead implementation. No host RISC-V emulator substitutes for the physical circuit. The dedicated workflow repeats Native/Web OFF/ON three times and actual Linux profile three processes with two cycles per mode.
-- Historical companion-format soak evidence: a single-process Native full-world soak completed **50/50 cycles** in 1,260 seconds, alternating 25 OFF/25 ON. Every cycle verified the original world hash, 48 CPU signatures and identical complete Pong frame hash. After each close, native/bridge/world counters were zero and the file-descriptor count was 11. No forced GC or allocator trimming was used. Warm RSS ranged 308,666,368–380,256,256 bytes; its fitted slope was positive 276,043 bytes/cycle, so this is not an absolute no-leak claim. The final nine cycles were exactly 350,466,048 bytes; the process peak of 400,498,688 bytes was reached at cycle four and never increased. This measures the Release C engine through a Dart command-line harness, not Flutter UI memory or frame timing.
-- Eight actual native Workspace ownership cycles retained the same two isolate IDs/seven ports, zero open native worlds or owned bytes after close, and no output lease/temp-directory growth. A measurement bug that summed a shared isolate-group heap twice was corrected; reports now identify `vm-service-isolate-groups-v1`. This bounded ownership proof does not replace the full-world soak.
+- Live account access, portable initial login, real cloud transfers and generation jobs need a supported backend session and live validation. Synthetic HTTP contracts do not establish those outcomes.
+- Catalogs, textures and supported target profiles remain external inputs. The public repository does not redistribute game artwork or personal saves.
+- Historical format coverage, unknown structural fields, neighbor framing, lighting and complete game wiring behavior remain bounded as listed above.
+- A fresh browser pass for every editor, actual OS file chooser/share behavior, real exploration MAP progress and physical-device performance remain separate acceptance layers.
+- The PR remains draft and unmerged. Public source authorization does not create an upstream license grant. Original attribution and exact source/runtime closures remain in the third-party notices and integrity manifests.
 
-## Earlier verified evidence and its scope
-
-- Flutter 3.47.6 / Dart 3.13.5 is pinned to official revision `5fc346839b5d0eef006ed8404392afb4dfae428d`.
-- Source integrity verification passed for the previous 98-file TerraWasm snapshot and 40 retained viewer modules (489,009 bytes), including generated-runtime provenance. All four shipped world/player JS/WASM files match the clean vendored build.
-- Earlier routing-snapshot Flutter aggregate on 2026-10-09: **465 passed, zero failed, zero skipped**, terminal success in 171.558 seconds, with the clean vendored native library and authorized local resources/actual world. This covered that snapshot's full `test/` suite and two actual native integration smoke tests executed through Flutter. Suite-loading records are excluded. The 40 focused actor/UI/navigation cases are included coverage, not an extra 40 tests added to this total. Later implementation changes are not certified by this count.
-- Static analysis and the JavaScript Web release build passed for that earlier routing snapshot. Its formatting check covered 186 files with zero changes before an equivalent test-harness lint correction. The current-snapshot results above supersede only the checks explicitly rerun.
-- [Real-world validation](real-world-validation.md) covers two authorized WLDs: v319 at 4200 × 1200 and v326 at 8400 × 2400. Two Native, two WASM and two Flutter Workspace cases passed. Header/chest candidates saved and reopened with identical Native/WASM/Workspace bytes; unaffected sections and chest slots were retained. Workspace tests also cover exact original undo/redo and all-layer region history. Source saves remain unchanged and are excluded from delivery.
-- Real-resource region previews rendered PNGs using actual imported atlas images. The selected previews still had 48 unknown-frame markers for v319 and 89 for v326. A produced PNG and a source-pixel match are not complete Terraria visual fidelity; see [static preview boundaries](region-texture-preview.md).
-- Real Web WASM contracts cover WLD/PLR read/write/read-back, detached player versions 38/135/218/279/326, region layers/object payloads, RGB filters, safe pixels, whole-world circuit timer/save/reopen, styled frame-specific marker PNGs, whole-world rules and furniture insertion. The real-map run found a Web export offset-validation defect; the fix also passes the public synthetic `test/web/world_export_smoke.cjs` regression.
-- The [authoritative circuit rules host](CIRCUIT_RULES_HOST.md) retains the pinned reference JavaScript rules. Source/Web/native-transport parity passes 1,364 calls across all 15 demos, 1,180 simulation packets and 12 structural changes, with no retained traversal handles or callback buffers. The actual Linux QuickJS/FFI runtime replays all 244 recorded cases in 44 seconds, including route/network preview, commit/cancel, invalidation, failure recovery and 60,001-cell rejection. Demo simulation replay retains the first four commands plus reset; it must not be described as native replay of all 1,180 simulation packets. A separate embedded-native bundle test runs all 15 demos. Ten Web lifecycle cases cover bounds, queue ownership, cancellation, startup failures, timeout, disposal and host reset.
-- [Whole-world circuit fragments](WORLD_CIRCUIT_FRAGMENTS.md) preserve actual command-8 eight-word cell records and the COB1 object companion. Synthetic Native/WASM proof covers exact bytes, pagination, immutable capture, budgets, collision rejection and recovery. Imported geometry expands 4,173 layouts into 18,681 exact cell-frame records; ambiguous geometry and unverified support rules remain guarded.
-- Upstream native CTest: all **25/25** passed after the three originally missing Git LFS binary fixtures were retrieved and hash/size verified. No assertions were changed. ASan/UBSan checks passed locally with leak detection disabled for the ptrace restriction; LeakSanitizer was not verified locally. Private fixture inputs are excluded from delivery.
-- Earlier browser evidence applies only to earlier synthetic-world flows: desktop/mobile layout, import, rename/read-back/download, reload persistence, TCW load/step/save, region copy/write, trash/restore, overlays, terrain-rule confirmation and typed blood-moon/time edits. The current circuit/Fusion/preset/lifecycle, MAP and online UI has **not** received a fresh full end-to-end browser pass. Actual-save command-line/Workspace tests do not establish the real-file browser chooser, browser undo or device behavior.
-- The earlier routing-snapshot **JavaScript Web release build passed** (exit 0, 33.1 seconds). Its optional Flutter Wasm dry run failed with code 247; Flutter Wasm compilation is therefore **not verified**. The successful output is JavaScript Flutter Web plus the separately verified TerraWasm world/player engines. A non-fatal missing Cupertino font-family warning occurred; Material icons were emitted. The later published CI run separately verifies platform compilation for its named head; Android/iOS/macOS runtime, signed distributions, physical devices and in-game read-back remain unverified.
-
-## Performance evidence remains diagnostic
-
-- Current local real-input diagnostics cover two WLDs, a PLR and an imported resource pack: 786 native measurement rows and 360 WASM rows. Rows are measurements, not independent acceptance tests. WASM ran under Node, not the Flutter browser UI. Private names, paths, hashes, source files and raw reports are excluded from publication.
-- The Flutter debug interaction harness has exercised 152 UI macros and 101 controller variants. These runs help identify stalls and unreachable actions; they do not establish profile/release frame budgets. A clean comparable baseline, actual Flutter profile/browser runs and lifecycle/soak acceptance remain pending.
-- The Linux QuickJS register-adapter correction reduced observed local debug median seconds for the large circuit workload: load 7.534→5.359, trigger 7.666→5.167, step-60 5.510→3.075, reset 3.673→2.003, reopen 6.435→3.578 and snapshot 2.701→1.034. All 42 compared outputs were exactly equal by hash; separate 244-case native, 1,364-call facade and 5,466-case Unicode checks passed. The compared output hashes themselves are not published. These multi-second diagnostic results are not a complete clean performance baseline or responsiveness acceptance.
-- The [performance harness documentation](../tool/perf/README.md) describes reproducible workloads and evidence boundaries. MAP fixture provenance, functional read-back, first/repeated-use timings, Flutter frame measurements and owner/process memory must remain separate. A functional `passed` status alone does not mean a performance budget was evaluated.
-
-## Publication and external blockers
-
-1. On 2026-10-09 the user authorized public inclusion of the referenced engine/source, required embedded tables, derived WASM and retained JavaScript rules. The repository now contains the attributed minimal source subsets and verified generated runtimes. This removes the former source-publication authorization blocker; it does not create a new upstream license grant.
-2. [Draft PR #1](https://github.com/Live-yum/abc/pull/1) is published and unmerged. The earlier `19001f3` head passed all five functional jobs. At `6cf31bf6`, [functional run 37877397893](https://github.com/Live-yum/abc/actions/runs/37877397893) passed Native sanitizers, Web, Linux and unsigned macOS/iOS/JSC; Android failed on a stale debug integration-test registrant. [Performance run 37877398035](https://github.com/Live-yum/abc/actions/runs/37877398035) passed the core/MAP/cloud/resource jobs with 24 valid reports; five UI profile reports failed because the short viewport had unmounted the sidebar target. At `801ae8fd`, [functional CI](https://github.com/Live-yum/abc/actions/runs/37893375312) passed all five jobs. [Complete-world CI](https://github.com/Live-yum/abc/actions/runs/37893375454) passed Native/WASM OFF/ON but failed Linux profile in the implicit physical-key lookup; the candidate adds explicit keys and real hit/focus verification. [General performance](https://github.com/Live-yum/abc/actions/runs/37893375338) was automatically cancelled by workflow concurrency when the newer head was published. At `73a2bd11`, [functional CI](https://github.com/Live-yum/abc/actions/runs/37895764401) passed all five jobs; [complete-world CI](https://github.com/Live-yum/abc/actions/runs/37895764420) passed Native and compound WASM but failed the brief-input paddle-motion assertion in all three Linux profile processes. [General performance](https://github.com/Live-yum/abc/actions/runs/37895764400) remains in progress. Each later commit needs its own exact-head results.
-3. [Cloud clients](cloud-provider.md) now implement the inspected reference routes, and the [online resource installer](ONLINE_RESOURCES.md) implements its public manifest/approval contract. The verified backend initial MEMBER login remains WeChat mini-app based; a supported portable initial login, authenticated live sessions and service/content validation are still required. Backend upload eligibility additionally requires a WeChat-linked MEMBER. Client implementation and synthetic mocks do not remove those limits. No credentials are requested or created.
-4. Unsigned Android/iOS/macOS/Linux/Web build jobs are configured separately from runtime verification. Signing, store publication and production deployment are outside this work; a successful unsigned build is not a released app.
-5. Personal saves, private validation artifacts, resource atlases, game binaries and credentials remain excluded. Local resource import does not authorize redistribution of game artwork or personal data.
-
-## Source provenance
-
-Read-only reference viewer commit: `366ebc57751cadfb077f968f4d5069028b3bf9a6`. TerraWasm base: `e2c3c817b2b482a535763695d19945971e19e41c`, with original host wrappers and documented local pointer-safety patches. Resource metadata/profile 326 was checked against the 1.4.5.8 decompiled-source revision `8255d34616c780af12079425ac92a0a7aed87d71`. Exact included closures, patches and artifact hashes are recorded in [third-party notices](../THIRD_PARTY_NOTICES.md) and the integrity manifests. Absence of an upstream license file is not permission to relicense.
-
-See [map overlays and terrain rules](MAP_OVERLAYS_AND_TERRAIN_RULES.md), [typed world properties](WORLD_PROPERTIES.md), [local resources](LOCAL_RESOURCE_PACKS.md) and [platform builds](platform-builds.md) for bounded contracts. Native/WASM read-back, browser interaction, target-device operation and in-game compatibility remain distinct validation layers.
+Read-only reference pins: viewer 366ebc57751cadfb077f968f4d5069028b3bf9a6 and
+TerraWasm e2c3c817b2b482a535763695d19945971e19e41c, plus documented local patches.
+See [third-party notices](../THIRD_PARTY_NOTICES.md), [platform build scope](platform-builds.md)
+and the public contracts linked in the table. Native/WASM read-back, actual
+browser interaction, target-device operation and in-game compatibility are
+separate forms of evidence.

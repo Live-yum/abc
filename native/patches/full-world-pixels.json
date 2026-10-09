@@ -1,24 +1,29 @@
 {
   "schema": 1,
-  "id": "full-world-pixels-v4-wld-host-hashing",
+  "id": "full-world-pixels-v5-sparse-lamp-checkpoints",
   "baseSourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
   "baseDistributedManifestSha256": "9b55c8ad55a4ce8ad848c58e8c9ec80fb78285405f6a7cccc44c8c95b74dbb7a",
   "supersedes": {
-    "id": "full-world-pixels-v3-wld-only",
-    "manifestSha256": "a5bb31a966d8625f16ae095c90d5d1ee0b90da5bc81e34dc481842af0cc76a48",
-    "distributedManifestSha256": "a51b6c058eb3709a5bd958c7fbde79e0d3a239b6b787a74eb4a7fa7e3749e399",
+    "id": "full-world-pixels-v4-wld-host-hashing",
+    "manifestSha256": "a7331e085e0fd5714788974701d853727296ee0cb7e9d64d9a3929efc355aa7e",
+    "distributedManifestSha256": "ff15c09cdcb2cf204a9aa8abcc721d219d5e4639e42837c709b73211c43e5c21",
     "prior": {
-      "id": "full-world-pixels-v2-wld-only",
-      "manifestSha256": "6cffadaaa4efd8bac51b0ba381baef2281e47caf559a7f20ef3425c8be8e05cf",
-      "distributedManifestSha256": "f76b42b4434ca53cda9e489d04dd5ddb34395ff99a8b0bace15f8d809d48153e",
+      "id": "full-world-pixels-v3-wld-only",
+      "manifestSha256": "a5bb31a966d8625f16ae095c90d5d1ee0b90da5bc81e34dc481842af0cc76a48",
+      "distributedManifestSha256": "a51b6c058eb3709a5bd958c7fbde79e0d3a239b6b787a74eb4a7fa7e3749e399",
       "prior": {
-        "id": "full-world-pixels-v1",
-        "manifestSha256": "ee3bb706e7f4cd9437faaa61247182bc5943957b0a93c63dcc21082fb2efa824",
-        "distributedManifestSha256": "539e4369e9517bad5c1d2337241c51d37150eef983376c069b48947783c1cd7c"
+        "id": "full-world-pixels-v2-wld-only",
+        "manifestSha256": "6cffadaaa4efd8bac51b0ba381baef2281e47caf559a7f20ef3425c8be8e05cf",
+        "distributedManifestSha256": "f76b42b4434ca53cda9e489d04dd5ddb34395ff99a8b0bace15f8d809d48153e",
+        "prior": {
+          "id": "full-world-pixels-v1",
+          "manifestSha256": "ee3bb706e7f4cd9437faaa61247182bc5943957b0a93c63dcc21082fb2efa824",
+          "distributedManifestSha256": "539e4369e9517bad5c1d2337241c51d37150eef983376c069b48947783c1cd7c"
+        }
       }
     }
   },
-  "reviewedPurpose": "Cumulative pure-WLD circuit-world ABI 2 with four-argument begin, bounded retained-pixel query and no sidecar parser/session/source/save or custom color mapping. Default OFF retains vanilla per-TripWire type-445 horizontal/vertical crossing XOR. ON combines device generation dedup with WireHead-style per-pixel different-colour connected-group pair parity at each shared physical gate-wave boundary; incompatible same-colour dual-axis topology rejects ON with TCW_UNSUPPORTED without mutation. This is a restricted pixel rule, not a full WireHead topology emulator or its multi-pixel dictionary-overwrite behavior. Idle switching preserves frames, ROM/RAM, input and RNG. Shared physical gate-wave VM execution remains unchanged. Cold-load compilation enumerates wired/gate rows in original order, uses inline paged DSU accessors and bounds-checked tile reads without duplicate checks; every input tile record remains decoded and validated and temporary row indexes are freed after compilation. Export the four existing incremental SHA-256 functions in the WLD Web profile for bounded native hashing by the host; the existing C hash implementation is byte-identical to the frozen v3 source.",
+  "reviewedPurpose": "Cumulative pure-WLD circuit-world ABI 2 with four-argument begin, bounded retained-pixel query and no sidecar parser/session/source/save or custom color mapping. Default OFF retains vanilla per-TripWire type-445 horizontal/vertical crossing XOR. ON combines device generation dedup with WireHead-style per-pixel different-colour connected-group pair parity at each shared physical gate-wave boundary; incompatible same-colour dual-axis topology rejects ON with TCW_UNSUPPORTED without mutation. This is a restricted pixel rule, not a full WireHead topology emulator or its multi-pixel dictionary-overwrite behavior. Idle switching preserves frames, ROM/RAM, input and RNG. Shared physical gate-wave VM execution remains unchanged. Cold-load compilation enumerates wired/gate rows in original order, uses inline paged DSU accessors and bounds-checked tile reads without duplicate checks; every input tile record remains decoded and validated and temporary row indexes are freed after compilation. Export the four existing incremental SHA-256 functions in the WLD Web profile for bounded native hashing by the host; the existing C hash implementation is byte-identical to the frozen v3 source. Sparse READ_LAMPS queries restore existing 64-column checkpoints only at complete-column boundaries when the next requested point has a later checkpoint, preserve original point order/duplicates, and yield immediately after each restore. Compilation, source validation, viewport, write, trigger, simulation and save semantics are unchanged.",
   "runtimeContract": {
     "circuitWorldAbiVersion": 2,
     "circuitWorldWireHeadPixels": 1,
@@ -63,8 +68,8 @@
   ],
   "patch": {
     "path": "native/patches/full-world-pixels.patch",
-    "sha256": "9b698bb969fc2f0e5b40ef0f28c7cec76355bd9b340700c31c8524d132cc5009",
-    "bytes": 81960
+    "sha256": "466734396d82ac88e0dd8b4ef71b8756c414ccb1ab8c1378bd1049f86e59b498",
+    "bytes": 82990
   },
   "files": [
     {
@@ -127,8 +132,8 @@
       "path": "src/terra_circuit_query.c",
       "beforeSha256": "adede2c3dd371f18e5804b0a27b91a7df18f7196ac986873212849659c0afa8c",
       "beforeBytes": 18110,
-      "afterSha256": "206316d613a60d309da1a05a8cfb538f3052a05dafe2e031719536f2fb259a3b",
-      "afterBytes": 19553
+      "afterSha256": "141d6b96c20cfdb96fbe804d29e9007486462acca785c7a0e4aa8bd6269a42df",
+      "afterBytes": 20267
     },
     {
       "path": "src/terra_circuit_rules.c",

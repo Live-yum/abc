@@ -441,7 +441,23 @@
 @@ -52 +57 @@
 -    uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);if(t.type==0xfffeu)flags|=8u;
 +    uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);
-@@ -101,0 +107,17 @@
+@@ -56 +61,14 @@
+-    while(*work&&w->x<w->query_x1){int status=cx_scan_step(w,work);if(status<0||w->event.kind)return status;if(status!=2)return TCW_CONTINUE;
++    while(*work&&w->x<w->query_x1){
++        /* READ_LAMPS needs only requested columns. Resume from the next
++         * checkpoint only at a completed-column boundary, never while a
++         * column or its duplicate points are still being consumed. */
++        if(w->command.kind==TCW_READ_LAMPS&&w->col_stage==0&&w->y==0&&w->point_index<w->point_count){
++            uint32_t next=w->points[w->point_index].x;
++            if(w->checkpoint_index[next/CX_CHECK_COLUMNS].column>w->x){
++                seek_checkpoint(w,next);
++                /* Bound each step to one frontier restore and let hosts
++                 * observe cancellation before reading the new interval. */
++                *work=0;return TCW_CONTINUE;
++            }
++        }
++        int status=cx_scan_step(w,work);if(status<0||w->event.kind)return status;if(status!=2)return TCW_CONTINUE;
+@@ -101,0 +120,17 @@
 +static int query_pixels(CxWorld* w,const TerraCircuitWorldCommand* cmd){
 +    if(!cmd->width||!cmd->height||cmd->x>=w->width||cmd->y>=w->height||cmd->width>w->width-cmd->x||cmd->height>w->height-cmd->y||(uint64_t)cmd->width*cmd->height>65536u||cmd->data_count||cmd->flags)return TCW_INVALID;
 +    uint32_t lo=0,hi=w->pixel_count;
@@ -459,20 +475,20 @@
 +    }
 +    w->command=*cmd;cx_emit(w,TCW_RESULT,0,0,w->result_count*16u,w->result);w->event.result_kind=TCW_PIXELS;w->event.result_count=w->result_count;return TCW_CONTINUE;
 +}
-@@ -104 +126 @@
+@@ -104 +139 @@
 -    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=1||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_EXTRACT||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
 +    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=TERRA_CIRCUIT_WORLD_ABI||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_OPTIMIZATION||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
-@@ -106,0 +129,6 @@
+@@ -106,0 +142,6 @@
 +    if(cmd.kind==TCW_OPTIMIZATION){
 +        if(cmd.mask>1u||cmd.data_count||cmd.flags)return TCW_INVALID;
 +        int status=cx_set_optimization(w,cmd.mask);if(status)return status;
 +        w->command=cmd;return TCW_OK;
 +    }
 +    if(cmd.kind==TCW_PIXELS)return query_pixels(w,&cmd);
-@@ -111 +139 @@
+@@ -111 +152 @@
 -    if(cmd.kind==TCW_SAVE){if(!cmd.source_id||cmd.source_id==w->world_source||cmd.source_id==w->scratch_source||cmd.source_id==w->twld_source)return TCW_INVALID;if(w->twld&&(!cmd.aux_source_id||cmd.aux_source_id==cmd.source_id||cmd.aux_source_id==w->world_source||cmd.aux_source_id==w->scratch_source||cmd.aux_source_id==w->twld_source))return TCW_INVALID;w->command=cmd;w->output_source=cmd.source_id;w->output_offset=0;w->output_length=0;w->save_cursor=0;w->twld_saved_size=0;w->phase=CX_SAVE_PREFIX;w->input_length=0;return TCW_OK;}
 +    if(cmd.kind==TCW_SAVE){if(!cmd.source_id||cmd.source_id==w->world_source||cmd.source_id==w->scratch_source||cmd.aux_source_id)return TCW_INVALID;w->command=cmd;w->output_source=cmd.source_id;w->output_offset=0;w->output_length=0;w->save_cursor=0;w->phase=CX_SAVE_PREFIX;w->input_length=0;return TCW_OK;}
-@@ -141 +169 @@
+@@ -141 +182 @@
 -            while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y;TxTile t=w->column[y];cx_current_tile(w,w->x,y,point_gate(w,y),&t,w->ids+y*4u);if(t.type==0xfffeu&&!cx_mod_vanilla(w,w->x,y,&t))return TCW_FORMAT;t.same=0;
 +            while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y;TxTile t=w->column[y];cx_current_tile(w,w->x,y,point_gate(w,y),&t,w->ids+y*4u);t.same=0;
 --- a/src/terra_circuit_rules.c

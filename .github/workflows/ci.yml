@@ -169,6 +169,13 @@ jobs:
           quickjs="$PUB_CACHE/hosted/pub.dev/flutter_js-0.8.7/linux/shared/libquickjs_c_bridge_plugin.so"
           test -f "$quickjs"
           echo "LIBQUICKJSC_TEST_PATH=$quickjs" >> "$GITHUB_ENV"
+      - name: Native sparse lamp checkpoints, cancellation and source paths
+        run: >-
+          python3 tool/test_sparse_lamp_queries.py
+          --library build/native-release/libabc_engine.so
+          --expect-checkpoint-jump
+          --compare-sequential
+          --output build/sparse-lamp-query-contract.json
       - name: Native application tests with synthetic fixtures
         run: flutter test --no-pub --concurrency=1
       - name: Native circuit and fragment integration

@@ -2,7 +2,7 @@
   "schema": 1,
   "sourceRepository": "Live-yum/TerraWasm",
   "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
-  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v4-wld-host-hashing patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; shared physical gate-wave VM code is unchanged. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches. The WLD Web export list additionally exposes the existing four incremental SHA-256 functions; the C hash implementation is unchanged.",
+  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v5-sparse-lamp-checkpoints patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; shared physical gate-wave VM code is unchanged. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches. The WLD Web export list additionally exposes the existing four incremental SHA-256 functions; the C hash implementation is unchanged. Sparse READ_LAMPS reuses existing checkpoints at complete-column boundaries and yields after every restore; other command scans retain their prior behavior.",
   "license": "No upstream license grant identified; inclusion is user-authorized and does not relicense upstream material.",
   "files": [
     {
@@ -257,8 +257,8 @@
     },
     {
       "path": "src/terra_circuit_query.c",
-      "bytes": 19553,
-      "sha256": "206316d613a60d309da1a05a8cfb538f3052a05dafe2e031719536f2fb259a3b"
+      "bytes": 20267,
+      "sha256": "141d6b96c20cfdb96fbe804d29e9007486462acca785c7a0e4aa8bd6269a42df"
     },
     {
       "path": "src/terra_circuit_rules.c",
@@ -483,9 +483,9 @@
   ],
   "localPatches": [
     {
-      "id": "full-world-pixels-v4-wld-host-hashing",
+      "id": "full-world-pixels-v5-sparse-lamp-checkpoints",
       "manifest": "native/patches/full-world-pixels.json",
-      "sha256": "a7331e085e0fd5714788974701d853727296ee0cb7e9d64d9a3929efc355aa7e"
+      "sha256": "9c42b79a26dae81ecdc245b3c05ac3bad31772b16b573c61b2250cfe735c1f23"
     }
   ]
 }
