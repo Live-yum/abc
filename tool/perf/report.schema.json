@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "abc measured operation performance v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "suite",
+    "runtime",
+    "buildMode",
+    "tier",
+    "fixtures",
+    "operations",
+    "memory",
+    "gaps",
+    "status"
+  ],
+  "properties": {
+    "schema": {
+      "const": "abc.performance.v1"
+    },
+    "suite": {
+      "type": "string"
+    },
+    "runtime": {
+      "type": "string"
+    },
+    "buildMode": {
+      "type": "string"
+    },
+    "tier": {
+      "enum": [
+        "ci",
+        "local",
+        "soak"
+      ]
+    },
+    "status": {
+      "enum": [
+        "running",
+        "passed",
+        "failed"
+      ]
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "provenance",
+          "bytes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "fixture",
+          "phase",
+          "iterations",
+          "warmup",
+          "unit",
+          "samplesMs",
+          "medianMs",
+          "p95Ms",
+          "maxMs",
+          "throughputPerSecond",
+          "bytesPerOperation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fixture": {
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "cold",
+              "warm"
+            ]
+          },
+          "unit": {
+            "const": "ms"
+          },
+          "iterations": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "warmup": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "samplesMs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "medianMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "p95Ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maxMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "throughputPerSecond": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "bytesPerOperation": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "memory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "cycle",
+          "phase",
+          "rssBytes",
+          "ownedHandles"
+        ],
+        "properties": {
+          "cycle": {
+            "type": "integer"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "rssBytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "heapUsedBytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "heapCapacityBytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "wasmCapacityBytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "ownedHandles": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "commit",
+        "worktreeCommit",
+        "dirty",
+        "commitSource"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string"
+        },
+        "worktreeCommit": {
+          "type": "string"
+        },
+        "dirty": {
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
+        "commitSource": {
+          "type": "string"
+        }
+      }
+    },
+    "toolchain": {
+      "type": "object"
+    }
+  }
+}

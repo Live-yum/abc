@@ -10,6 +10,9 @@ import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/services.dart' show rootBundle;
 
 import '../domain/image_import.dart';
+import '../domain/terraria_map.dart';
+import '../engine/world_map_backend.dart';
+import '../engine/map_backend.dart';
 
 import '../domain/canvas_document.dart';
 import '../domain/circuit_document.dart';
@@ -40,6 +43,7 @@ import '../domain/world_map_overlay.dart';
 import '../domain/terrain_rule_plan.dart';
 import '../engine/region_backend.dart';
 import '../cloud/cloud.dart';
+import '../resources/online_resource_service.dart';
 import '../domain/player_conversion.dart';
 import '../domain/player_tools.dart';
 import '../domain/vault_history.dart';
@@ -73,11 +77,17 @@ class Workspace extends TerraController {
   final WorldCircuitBackend? worldCircuitBackend;
   final RegionBackend? regionBackend;
   final CloudBackend? cloud;
+  final OnlineResourceService? onlineResources;
   final PlayerProjectionBackend? playerProjectionBackend;
+  final MapBackend mapBackend;
+  MapSessionInfo? _map;
+  TerrariaMapRaster? _mapRaster;
+  String _mapName = 'exploration.map';
   Uint8List? _conversionBytes;
   String? _conversionSourceHash;
   PlayerConversionPreview? _conversionReview;
   PickedFile? _pendingCloudUpload;
+  CloudSession? _pendingCloudSession;
   AdvancedRegionDocument? _region;
   RegionBrush? _regionBrush;
   FusionPlacementPlan? _placement;
@@ -124,10 +134,17 @@ class Workspace extends TerraController {
     this.worldCircuitBackend,
     this.regionBackend,
     this.cloud,
+    this.onlineResources,
     this.playerProjectionBackend,
-  });
+    MapBackend? mapBackend,
+  }) : mapBackend = mapBackend ?? createMapBackend() {
+    onlineResources?.addListener(_onlineResourcesChanged);
+  }
   Future<void> initialize() async {
+    await onlineResources?.initialize();
+    if (onlineResources?.activeStore != null) _activateOnlineResources();
     if (vault == null) {
+      notifyListeners();
       return;
     }
     _busy = true;
@@ -188,7 +205,7 @@ class Workspace extends TerraController {
       final packs =
           _vaultEntries.values.where((e) => e.kind == 'resources').toList()
             ..sort((a, b) => b.modified.compareTo(a.modified));
-      if (packs.isNotEmpty) {
+      if (packs.isNotEmpty && _resources == null) {
         _resources = await compute(
           ResourceStore.importPack,
           await vault!.read(packs.first.id),
@@ -198,6 +215,7 @@ class Workspace extends TerraController {
     } catch (e) {
       _error = '本地存档不可用：$e';
     } finally {
+      _resourceOperationGuard = null;
       _busy = false;
     }
     notifyListeners();
@@ -219,7 +237,52 @@ class Workspace extends TerraController {
   ).create(name: '我的世界规则');
   final Map<NamedSchemeKind, int> _schemeSequences = {};
   final List<Map<String, Object?>> _catalog = [];
-  ResourceStore? _resources;
+  ResourceStore? _resourceStore;
+  void Function()? _onlineResourceGuard;
+  void Function()? _resourceOperationGuard;
+  ResourceStore? get _resources {
+    _onlineResourceGuard?.call();
+    if (_busy) _resourceOperationGuard ??= _onlineResourceGuard;
+    return _resourceStore;
+  }
+
+  set _resources(ResourceStore? store) {
+    _onlineResourceGuard = null;
+    _resourceStore = store;
+  }
+
+  void _activateOnlineResources() {
+    final service = onlineResources, store = onlineResources?.activeStore;
+    if (service == null || store == null) {
+      throw const FormatException('没有可启用的已验证线上资源。');
+    }
+    service.assertActiveUsable();
+    _resourceStore = store;
+    _onlineResourceGuard = () {
+      service.assertActiveUsable();
+      if (!identical(service.activeStore, store)) {
+        throw const FormatException('线上资源版本已变化，请重新启用。');
+      }
+    };
+  }
+
+  void _onlineResourcesChanged() {
+    if (_onlineResourceGuard != null) {
+      try {
+        _onlineResourceGuard!();
+      } catch (_) {
+        _resources = null;
+        _regionBrush = null;
+        _clearFusionPlacement();
+        _terrainPlan = null;
+        _worldGeometry = null;
+        _worldFragments = null;
+        _status = '线上资源已停用，请检查资源审批状态或重新安装。';
+      }
+    }
+    notifyListeners();
+  }
+
   EngineDocument? _world, _player;
   SaveRecord? _activeWorld, _activePlayer;
   Uint8List? _preview, _basePreview;
@@ -274,6 +337,10 @@ class Workspace extends TerraController {
     resources: _resources,
     region: _region,
     cloud: cloud,
+    onlineResources: onlineResources,
+    map: _map,
+    mapRaster: _mapRaster,
+    canGenerateWorldMap: engine is WorldMapBackend && _world != null,
     files: [
       ..._records.map(
         (r) => TerraFile(
@@ -518,6 +585,7 @@ class Workspace extends TerraController {
       return;
     }
     _error = '';
+    _resourceOperationGuard = _onlineResourceGuard;
     final fast = {'paint', 'strokeStart', 'strokeEnd', 'clear', 'resize'};
     if (!fast.contains(action)) {
       _busy = true;
@@ -525,6 +593,59 @@ class Workspace extends TerraController {
     }
     try {
       switch (action) {
+        case 'importMap':
+          final picked = await files.pick('map');
+          if (picked == null) {
+            _status = '已取消选择 MAP。';
+            break;
+          }
+          await _openMapBytes(picked.name, picked.bytes);
+          await _persistArtifact(picked.name, 'map', picked.bytes);
+        case 'editMapRect':
+          final map = _requireMap();
+          _map = await mapBackend.editRect(
+            _bounded(args, 'x', 0, map.width - 1),
+            _bounded(args, 'y', 0, map.height - 1),
+            _bounded(args, 'width', 1, map.width),
+            _bounded(args, 'height', 1, map.height),
+            light: args['light'] == null
+                ? null
+                : _bounded(args, 'light', 0, 255),
+            color: args['color'] == null
+                ? null
+                : _bounded(args, 'color', 0, 31),
+          );
+          _mapRaster = await mapBackend.render();
+          _status = 'MAP 探索数据已更新，可撤销或导出副本。';
+        case 'undoMap':
+          _requireMap();
+          _map = await mapBackend.undo();
+          _mapRaster = await mapBackend.render();
+          _status = '已撤销 MAP 区域修改。';
+        case 'redoMap':
+          _requireMap();
+          _map = await mapBackend.redo();
+          _mapRaster = await mapBackend.render();
+          _status = '已重做 MAP 区域修改。';
+        case 'closeMap':
+          await mapBackend.close();
+          _map = null;
+          _mapRaster = null;
+          _status = 'MAP 会话已关闭，本地已保存副本保留。';
+        case 'exportMap':
+          _requireMap();
+          final bytes = await mapBackend.exportVerified();
+          final stem = _mapName.replaceFirst(
+            RegExp(r'\.map(\.bak)?$', caseSensitive: false),
+            '',
+          );
+          final name = '${stem}_terraforge.map';
+          await _persistArtifact(name, 'map', bytes);
+          _status = await files.save(name, bytes)
+              ? 'MAP 副本已完整回读验证并交给系统保存。'
+              : '已取消系统保存，MAP 编辑仍保留在当前会话。';
+        case 'generateMapFromWorld':
+          await _generateMapFromWorld();
         case 'terrainPreview':
           _previewTerrainRules();
         case 'terrainApply':
@@ -653,55 +774,88 @@ class Workspace extends TerraController {
           );
         case 'cloudPrepareUpload':
           _pendingCloudUpload = null;
-          if (cloud?.connected != true) {
+          _pendingCloudSession = null;
+          final backend = cloud;
+          if (backend?.connected != true) {
             throw const EngineException('云端尚未连接。');
           }
-          _pendingCloudUpload = await files.pick('save');
+          final owner = backend!.session;
+          final picked = await files.pick('save');
+          if (picked != null) {
+            if (!backend.connected || !identical(owner, backend.session)) {
+              throw const CloudFailure('云端账户已变化，请重新选择文件。');
+            }
+            cloudFileName(picked.name);
+            if (!RegExp(
+              r'\.(wld|plr)(\.bak)?$',
+              caseSensitive: false,
+            ).hasMatch(picked.name)) {
+              throw const CloudFailure('请选择 .wld 或 .plr 存档。');
+            }
+            final remoteName = picked.name.replaceFirst(
+              RegExp(r'\.bak$', caseSensitive: false),
+              '',
+            );
+            if (remoteName.length > 180) {
+              throw const CloudFailure('云端文件名不能超过 180 个字符。');
+            }
+            _pendingCloudUpload = PickedFile(
+              remoteName,
+              Uint8List.fromList(picked.bytes),
+            );
+            _pendingCloudSession = owner;
+          }
         case 'cloudDiscardUpload':
           _pendingCloudUpload = null;
+          _pendingCloudSession = null;
         case 'cloudUploadPrepared':
           final pending = _pendingCloudUpload, backend = cloud;
-          if (pending == null || backend?.connected != true) {
-            throw const EngineException('没有待上传文件或有效云端会话。');
+          if (pending == null ||
+              backend?.connected != true ||
+              !identical(_pendingCloudSession, backend!.session)) {
+            _pendingCloudUpload = null;
+            _pendingCloudSession = null;
+            throw const EngineException('没有待上传文件或原云端会话已变化。');
           }
           try {
-            await backend!.api.upload(
-              backend.session,
+            await backend.uploadFile(
               pending.bytes,
               pending.name,
-              pending.name.toLowerCase().contains('.wld')
+              RegExp(
+                    r'\.wld(\.bak)?$',
+                    caseSensitive: false,
+                  ).hasMatch(pending.name)
                   ? 'world'
-                  : pending.name.toLowerCase().contains('.plr')
-                  ? 'player'
-                  : 'project',
+                  : 'player',
+              prepareWorldPreview: () =>
+                  _renderCloudWorldPreview(pending.bytes),
             );
-            await backend.refreshSaves();
             _status = '云端已接收上传，请在列表核对文件。';
           } finally {
             _pendingCloudUpload = null;
+            _pendingCloudSession = null;
           }
         case 'cloudDownload':
           final backend = cloud, save = args['save'] as CloudSave;
           if (backend?.connected != true) {
             throw const EngineException('云端尚未连接。');
           }
-          final bytes = await backend!.api.download(backend.session, save.id);
-          final name = save.fileName.replaceAll('\\', '/').split('/').last;
-          if (name.isEmpty || name.contains(RegExp(r'[\x00-\x1f]'))) {
-            throw const FormatException('云端返回了无效文件名。');
+          final result = await backend!.downloadSave(save, _persistCloudFile);
+          _status = await files.save(result.save.fileName, result.bytes)
+              ? '文件已保存到本地存档库，导出副本已交给系统。'
+              : '文件已保存到本地存档库；已取消额外导出。';
+        case 'cloudRecommendationDownload':
+          final backend = cloud, item = args['item'] as CloudRecommendation;
+          if (backend?.connected != true) {
+            throw const EngineException('云端尚未连接。');
           }
-          await _persistArtifact(
-            name,
-            save.kind == 'world'
-                ? 'wld'
-                : save.kind == 'player'
-                ? 'plr'
-                : save.kind,
-            bytes,
+          final result = await backend!.downloadRecommendation(
+            item,
+            _persistCloudFile,
           );
-          _status = await files.save(name, bytes)
-              ? '下载文件已交给系统，请确认保存。'
-              : '已取消系统保存。';
+          _status = result.receiptPending
+              ? '推荐已保存到本地存档库，统计回执等待重试。'
+              : '推荐已保存到本地存档库，可在存档中心打开或导出。';
         case 'preparePlayerConversion':
           await _preparePlayerConversion(_bounded(args, 'target', 38, 326));
         case 'applyPlayerConversion':
@@ -714,6 +868,9 @@ class Workspace extends TerraController {
           await _moveVault(args['id'] as String, restore: false);
         case 'restoreFile':
           await _moveVault(args['id'] as String, restore: true);
+        case 'activateOnlineResources':
+          _activateOnlineResources();
+          _status = '已启用经过校验的线上资源。';
         case 'clearResourceMemory':
           _resources = null;
           _status = '资源内存缓存已释放，本地资源包保留，可在存档中心重新打开。';
@@ -941,6 +1098,10 @@ class Workspace extends TerraController {
             }
             final bytes = await vault!.read(id);
             if (!{'wld', 'plr'}.contains(e.kind)) {
+              if (e.kind == 'map') {
+                await _openMapBytes(e.name, bytes);
+                break;
+              }
               if (e.kind == 'resources') {
                 _resources = await compute(ResourceStore.importPack, bytes);
                 _status = '已载入本地资源包。';
@@ -1231,6 +1392,7 @@ class Workspace extends TerraController {
     } catch (e) {
       _error = e.toString().replaceFirst('FormatException: ', '');
     } finally {
+      _resourceOperationGuard = null;
       _busy = false;
       notifyListeners();
     }
@@ -1544,6 +1706,7 @@ class Workspace extends TerraController {
         'version': c['version'],
       });
     }
+    _resourceOperationGuard?.call();
     _mapping
       ..clear()
       ..addAll(rules);
@@ -1680,6 +1843,7 @@ class Workspace extends TerraController {
         objects: fragment.objects,
       );
       await _verify(candidate, 'wld');
+      _resourceOperationGuard?.call();
       record.commit(candidate);
     } finally {
       await _activate(record);
@@ -1946,6 +2110,7 @@ class Workspace extends TerraController {
       }
       await _verify(output, 'wld');
       if (!validateOnly) {
+        _resourceOperationGuard?.call();
         record.commit(output);
       }
     } finally {
@@ -2052,6 +2217,7 @@ class Workspace extends TerraController {
       _status = '校验通过，尚未应用修改。';
       return;
     }
+    _resourceOperationGuard?.call();
     record.commit(output);
     await _activate(record);
     await _persist(record);
@@ -2205,6 +2371,7 @@ class Workspace extends TerraController {
     await _closeWorldCircuit(reopen: false);
     try {
       await _verify(bytes, 'wld');
+      _resourceOperationGuard?.call();
       record.commit(bytes);
     } finally {
       await _activate(record);
@@ -2259,6 +2426,9 @@ class Workspace extends TerraController {
   }
 
   Future<void> close() async {
+    await mapBackend.close();
+    _map = null;
+    _mapRaster = null;
     _stopCircuit();
     await _rules?.close();
     await _closeWorldCircuit(reopen: false);
@@ -2268,6 +2438,10 @@ class Workspace extends TerraController {
 
   @override
   void dispose() {
+    onlineResources?.removeListener(_onlineResourcesChanged);
+    unawaited(mapBackend.dispose());
+    _map = null;
+    _mapRaster = null;
     _stopCircuit();
     _rules?.removeListener(notifyListeners);
     _rules?.dispose();
@@ -2570,6 +2744,7 @@ class Workspace extends TerraController {
     try {
       document = await engine.open(bytes, kind: 'wld');
       document.metadata.addAll(await engine.inspect(document));
+      _resourceOperationGuard?.call();
       record.commit(bytes);
       await _setDocument(document, record);
       document = null;
@@ -2882,6 +3057,63 @@ class Workspace extends TerraController {
     return _canvases[_activeCanvas]!;
   }
 
+  MapSessionInfo _requireMap() {
+    final map = _map;
+    if (map == null || map.isClosed) {
+      throw const EngineException('请先打开 MAP 探索存档。');
+    }
+    return map;
+  }
+
+  Future<void> _openMapBytes(String name, Uint8List bytes) async {
+    if (!RegExp(r'\.map(\.bak)?$', caseSensitive: false).hasMatch(name)) {
+      throw const FormatException('请选择 .map 探索存档。');
+    }
+    final candidate = await mapBackend.open(bytes);
+    await _adoptMap(name, candidate);
+    _status = '已解析真实 MAP：${candidate.width} × ${candidate.height}，原始字节保留。';
+  }
+
+  Future<void> _adoptMap(String name, MapSessionInfo candidate) async {
+    _map = candidate;
+    _mapName = name;
+    _mapRaster = null;
+    _mapRaster = await mapBackend.render();
+  }
+
+  Future<void> _generateMapFromWorld() async {
+    final world = _world, backend = engine;
+    if (world == null || backend is! WorldMapBackend) {
+      throw const EngineException('请先打开支持生成 MAP 的世界。');
+    }
+    final before = sha256.convert(await engine.save(world)).toString();
+    final markers = _markerProfile.isEmpty
+        ? null
+        : (_markerProfile.toEngineRequest()..remove('max_w'));
+    final bytes = await (backend as WorldMapBackend).generateWorldMap(
+      world,
+      markers: markers,
+    );
+    if (before != sha256.convert(await engine.save(world)).toString()) {
+      throw const EngineException('生成 MAP 后世界状态校验失败，未采用输出。');
+    }
+    final name =
+        '${(_activeWorld?.name ?? 'world.wld').replaceFirst(RegExp(r'\.wld(\.bak)?$', caseSensitive: false), '')}_full.map';
+    final metadata = _worldView;
+    final candidate = await mapBackend.open(
+      bytes,
+      expectedWorld: {
+        if (metadata['worldId'] != null) 'worldId': metadata['worldId'],
+        if (metadata['maxTilesX'] != null) 'width': metadata['maxTilesX'],
+        if (metadata['maxTilesY'] != null) 'height': metadata['maxTilesY'],
+        if (metadata['name'] != null) 'worldName': metadata['name'],
+      },
+    );
+    await _adoptMap(name, candidate);
+    await _persistArtifact(name, 'map', bytes);
+    _status = '已从世界生成全亮 MAP，世界字节未改变。这是生成的探索图，不是角色的原始探索进度。';
+  }
+
   Future<void> _import(String kind) async {
     final picked = await files.pick(kind);
     if (picked == null) {
@@ -2889,6 +3121,11 @@ class Workspace extends TerraController {
       return;
     }
     final name = picked.name.toLowerCase();
+    if (kind == 'map' || RegExp(r'\.map(\.bak)?$').hasMatch(name)) {
+      await _openMapBytes(picked.name, picked.bytes);
+      await _persistArtifact(picked.name, 'map', picked.bytes);
+      return;
+    }
     if (kind == 'resources' || name.endsWith('.abcpack')) {
       _resources = await compute(ResourceStore.importPack, picked.bytes);
       await _persistArtifact(picked.name, 'resources', picked.bytes);
@@ -3058,6 +3295,79 @@ class Workspace extends TerraController {
     }).toList();
   }
 
+  /// Generate the required world thumbnail in the real engine. The selected
+  /// upload is an immutable snapshot; the user's active WLD is restored even
+  /// when parsing or preview rendering fails.
+  Future<Uint8List> _renderCloudWorldPreview(Uint8List bytes) async {
+    if (_worldCircuit != null) {
+      throw const EngineException('请先保存或关闭世界电路会话，再上传世界存档。');
+    }
+    final previous = _activeWorld;
+    await _release('wld');
+    EngineDocument? candidate;
+    try {
+      candidate = await engine.open(bytes, kind: 'wld');
+      candidate.metadata.addAll(await engine.inspect(candidate));
+      final preview = await engine.preview(candidate);
+      if (preview == null || preview.isEmpty) {
+        throw const EngineException('世界预览生成失败，未上传存档。');
+      }
+      return Uint8List.fromList(preview);
+    } finally {
+      if (candidate != null) await engine.close(candidate);
+      if (previous != null) await _activate(previous);
+    }
+  }
+
+  /// Cloud adoption succeeds only after both bytes and metadata are durable.
+  /// The regular artifact path permits memory-only work; counted cloud downloads
+  /// deliberately use this strict path so storage failures never send receipts.
+  Future<void> _persistCloudFile(
+    CloudSave save,
+    Uint8List bytes,
+    void Function() assertCurrent,
+  ) async {
+    final local = vault;
+    if (local == null) throw const CloudFailure('本地存档库不可用，未确认下载完成。');
+    assertCurrent();
+    final kind = switch (save.kind) {
+      'world' => 'wld',
+      'player' => 'plr',
+      _ => throw const CloudFailure('不支持的云端存档类型。'),
+    };
+    if (bytes.length != save.fileSize || bytes.isEmpty) {
+      throw const CloudFailure('下载文件大小校验失败。');
+    }
+    final hash = sha256.convert(bytes).toString();
+    final entry = VaultEntry(
+      id: '$kind-$hash',
+      name: cloudFileName(save.fileName),
+      kind: kind,
+      sha256: hash,
+      size: bytes.length,
+      modified: DateTime.now(),
+    );
+    validateVaultBytes(entry, bytes);
+    final existing = (await local.list())
+        .where((v) => v.id == entry.id)
+        .firstOrNull;
+    assertCurrent();
+    if (existing == null) await local.put(entry, bytes);
+    assertCurrent();
+    final committed = (await local.list())
+        .where((v) => v.id == entry.id)
+        .firstOrNull;
+    if (committed == null ||
+        committed.kind != kind ||
+        committed.sha256 != hash ||
+        committed.size != bytes.length) {
+      throw const CloudFailure('本地存档元数据未通过回读验证，未确认下载完成。');
+    }
+    validateVaultBytes(committed, await local.read(entry.id));
+    assertCurrent();
+    _vaultEntries[entry.id] = committed;
+  }
+
   Future<void> _persistArtifact(
     String name,
     String kind,
@@ -3224,6 +3534,7 @@ class Workspace extends TerraController {
       await engine.close(candidate);
       candidate = null;
       await _verify(bytes, record.kind);
+      _resourceOperationGuard?.call();
       record.commit(bytes);
     } finally {
       if (candidate != null) {
@@ -3384,6 +3695,7 @@ class Workspace extends TerraController {
       throw const EngineException('角色已变化，请重新预览转换。');
     }
     await _validateRecord(record, bytes);
+    _resourceOperationGuard?.call();
     record.commit(bytes);
     await _activate(record);
     await _persist(record);

@@ -29,6 +29,8 @@ import 'region_brush_panel.dart';
 import '../domain/region_brush.dart';
 import 'fusion_placement_panel.dart';
 import 'cloud_workspace_panel.dart';
+import 'online_resources_panel.dart';
+import 'terraria_map_panel.dart';
 import 'vault_history_panel.dart';
 import '../platform/vault.dart';
 import 'terra_painters.dart';
@@ -1295,8 +1297,19 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
   Widget _world() => stack([
     if (v.world['readOnly'] == true)
       const TerraNotice('此世界版本仅支持只读查看和原字节导出，编辑已受引擎保护。', warning: true),
-    tabBar('world', ['地图与基本信息', '宝箱编辑', '怪物图鉴', '物品标记', '变更与处理']),
-    if (v.world.isEmpty)
+    tabBar('world', ['地图与基本信息', '宝箱编辑', '怪物图鉴', '物品标记', '变更与处理', 'MAP 探索存档']),
+    if (tabs['world'] == 5)
+      SizedBox(
+        height: 820,
+        child: TerrariaMapPanel(
+          session: v.map,
+          raster: v.mapRaster,
+          busy: v.busy,
+          canGenerateWorldMap: v.canGenerateWorldMap,
+          onAction: (action, args) => act(action, args),
+        ),
+      )
+    else if (v.world.isEmpty)
       TerraPanel(
         child: TerraEmpty(
           '打开你的第一个世界',
@@ -2482,6 +2495,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
           onAction: (action, args) => act(action, args),
         ),
         ExpansionTile(
+          key: const PageStorageKey('bestiary-advanced-records'),
           title: const Text('高级结构化编辑'),
           children: [
             for (final key in ['kills', 'sightings', 'chats'])
@@ -3007,7 +3021,13 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
         ),
       )
     else if (v.cloud != null)
-      _cloudPanel()
+      _cloudPanel(
+        recommendationKind: tabs['saves'] == 2
+            ? 'world'
+            : tabs['saves'] == 3
+            ? 'player'
+            : 'all',
+      )
     else
       TerraPanel(
         child: TerraEmpty(
@@ -3019,6 +3039,10 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
       ),
   ]);
   String _artifactSection(String kind) {
+    if (kind == 'map') {
+      tabs['world'] = 5;
+      return 'world';
+    }
     if (kind == 'rulesCircuit') {
       tabs['circuit'] = 3;
       return 'circuit';
@@ -3052,7 +3076,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
       Icons.archive_outlined,
       () => act('import', {'kind': 'resources'}),
     ),
-    tabBar('codex', ['资料目录', '地图标记', '怪物图鉴', '成就编辑']),
+    tabBar('codex', ['资料目录', '地图标记', '怪物图鉴', '成就编辑', '线上资源']),
     searchBox('搜索名称、Item ID 或 Tile ID'),
     if ((tabs['codex'] ?? 0) == 0 && v.resources != null) ...[
       SizedBox(
@@ -3074,7 +3098,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
           },
         ),
       ),
-      const TerraNotice('物品选择可添加宝箱内容标记；目录与图标来自本机导入资源包。'),
+      const TerraNotice('物品选择可添加宝箱内容标记；目录与图标来自已验证的本地或线上资源包。'),
     ] else if ((tabs['codex'] ?? 0) == 0) ...[
       Wrap(
         spacing: 8,
@@ -3151,7 +3175,17 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
       TerraPanel(child: _markerTools())
     else if (tabs['codex'] == 2)
       _bestiaryPanel()
-    else
+    else if (tabs['codex'] == 4)
+      SizedBox(
+        height: 560,
+        child: OnlineResourcesPanel(
+          service: v.onlineResources,
+          onActivate: (_, _) {
+            act('activateOnlineResources');
+          },
+        ),
+      ),
+    if (tabs['codex'] == 3)
       TerraPanel(
         child: stack([
           Wrap(
@@ -3416,7 +3450,10 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
     ]);
   }
 
-  Widget _cloudPanel() => CloudWorkspacePanel(
+  Widget _cloudPanel({
+    String recommendationKind = 'all',
+  }) => CloudWorkspacePanel(
+    recommendationKind: recommendationKind,
     backend: v.cloud,
     onUpload: () async {
       await act('cloudPrepareUpload');
@@ -3426,12 +3463,14 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
       final upload = v.result['pendingCloudUpload'] as Map;
       await _confirm(
         '上传所选文件？',
-        '将 ${upload['name']}（${upload['bytes']} 字节）发送到 ${v.result['cloudDestination']}，用于该账户的云端存档。',
+        '将 ${upload['name']}（${upload['bytes']} 字节）发送到 ${v.result['cloudDestination']}，用于该账户的云端存档；世界存档会附带引擎生成的地图预览。',
         () => act('cloudUploadPrepared'),
       );
       await act('cloudDiscardUpload');
     },
     onDownload: (save) => act('cloudDownload', {'save': save}),
+    onRecommendationDownload: (item) =>
+        act('cloudRecommendationDownload', {'item': item}),
   );
   Widget _settings() => tiles([
     TerraPanel(child: _cloudPanel()),
@@ -3478,7 +3517,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
         ),
         gap(),
         const Text(
-          '无需账户即可使用本地创作。当前没有连接云端存档服务。',
+          '无需账户即可使用本地创作。账户面板显示当前云端连接状态。',
           style: TextStyle(color: TerraColors.muted, fontSize: 12, height: 1.7),
         ),
         const Divider(),
@@ -3504,11 +3543,18 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
         info('界面', '原生 Flutter · 多端适配'),
         info('工作模式', '本地优先'),
         info('资源索引', '${v.catalog.length} 项已载入'),
-        info('云端服务', '未连接'),
+        info(
+          '云端服务',
+          v.cloud?.connected == true
+              ? '已连接'
+              : v.cloud == null
+              ? '未配置'
+              : '待登录',
+        ),
         const Divider(),
         _settingLink(
           '文件格式与支持范围',
-          'WLD / PLR / 工程 JSON / PNG',
+          'WLD / PLR / MAP / 工程 JSON / PNG',
           Icons.description_outlined,
           () => _explain(
             '文件格式与支持范围',
@@ -3566,6 +3612,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
   Future<void> _importDialog() => _showDialog(
     builder: (ctx) => AlertDialog(
       title: const Text('导入到工作空间'),
+      scrollable: true,
       content: SizedBox(
         width: 420,
         child: Column(
@@ -3579,6 +3626,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
             for (final item in [
               ('world', '世界存档', 'WLD', Icons.public),
               ('player', '角色存档', 'PLR', Icons.person_outline),
+              ('map', '探索存档', 'MAP', Icons.map_outlined),
               ('image', '图片素材', 'PNG / JPEG', Icons.image_outlined),
               ('project', '创作工程', 'JSON', Icons.layers_outlined),
               ('resources', '本地资源包', 'ABCPACK', Icons.archive_outlined),

@@ -34,6 +34,8 @@ already containing that exact CMake version.
 The release build has no signing configuration and produces an unsigned APK; no
 production signing or Play Store publishing is configured. A local debug build
 uses Android's normal development tooling.
+The release manifest includes the approved INTERNET permission for explicitly
+configured cloud/resource clients. It does not supply a service or account.
 
 ## Linux
 
@@ -51,7 +53,9 @@ Frameworks folder. The Dart adapter loads that explicit bundle path.
 CI uses `flutter build macos --release --config-only`, followed by `xcodebuild`
 with `CODE_SIGNING_ALLOWED=NO`. It does not produce a signed distribution.
 Sandbox access is limited to files selected by the user. The standard debug
-Flutter JIT and debugger entitlements remain; release adds no network access.
+Flutter JIT and debugger entitlements remain. Release includes the approved
+`com.apple.security.network.client` entitlement for explicitly configured
+outgoing cloud/resource requests; no service/account connection is implied.
 
 ## iOS
 
@@ -64,6 +68,14 @@ cannot be installed as App Store or signed device distributions without a
 separately authorized signing workflow.
 
 ## Verification status
+
+All five functional jobs in [run 37869339708](https://github.com/Live-yum/abc/actions/runs/37869339708)
+passed for public PR head `19001f3ac2507c905ece043926b98df42810ddad`, including the
+configured platform builds. That run supersedes the initial-head build failures.
+Later local MAP, cloud/resource, worker and performance changes are not covered by
+that run and require their own exact-head CI. Their separate local functional and
+build status is recorded in [the evidence matrix](feature-matrix.md). None of
+these build results certifies physical-device operation.
 
 The CI workflow checks source/runtime integrity, formatting, static analysis,
 Flutter tests, actual Web WLD/PLR, region and circuit contracts, and synthetic

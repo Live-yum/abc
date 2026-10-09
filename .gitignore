@@ -47,6 +47,7 @@ web/engine/*
 !web/engine/player.js
 !web/engine/player.wasm
 !web/engine/circuit_rules_web.js
+!web/engine/map_worker.js
 !web/engine/manifest.json
 !web/engine/circuit_rules.engine-provenance.json
 assets/private/*

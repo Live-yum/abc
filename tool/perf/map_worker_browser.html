@@ -1,0 +1,88 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Binary MAP worker responsiveness benchmark</title>
+<style>body{font:16px system-ui;background:#101827;color:#fff;margin:24px}canvas{max-width:100%;image-rendering:pixelated;border:1px solid #587}#pulse{width:20px;height:20px;background:#7ee787;border-radius:50%;position:fixed;bottom:20px}</style>
+<p id="status">Binary MAP worker benchmark. Local inputs stay on this computer.</p>
+<p><label>MAP source <input type="file" id="source" accept=".map,.bak"></label> Leave empty for the repository-authored synthetic MAP.</p>
+<p><label>Cycles <input id="cycles" type="number" min="2" max="10" value="3"></label>
+<button id="run">Run MAP benchmark</button> <button id="download" disabled>Export timing report</button></p>
+<pre id="result"></pre><canvas id="map"></canvas><div id="pulse"></div>
+<script src="terra_map.js"></script>
+<script>
+window.runMapWorkerBenchmark=async function(input,iterations=3,provenance='repository-authored-synthetic'){
+  if(!(input instanceof Uint8Array)||iterations<2||iterations>10)throw new Error('Choose 2–10 cycles and a MAP input');
+  const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(n=>n.toString(16).padStart(2,'0')).join('');
+  const sourceHash=await digest(input),client=createTerraMapClient(),samples=new Map(),frames=[],memory=[];
+  let running=true,last=performance.now(),token=0,openedBytes=0;
+  const longTasks=[];const observer=typeof PerformanceObserver==='function'?new PerformanceObserver(list=>{for(const e of list.getEntries())longTasks.push({startTimeMs:e.startTime,durationMs:e.duration});}):null;
+  if(observer&&PerformanceObserver.supportedEntryTypes.includes('longtask'))observer.observe({entryTypes:['longtask']});
+  const pulse=document.querySelector('#pulse'),status=document.querySelector('#status');
+  function frame(now){if(!running)return;frames.push(now-last);last=now;pulse.style.transform=`translateX(${(now/5)%500}px)`;requestAnimationFrame(frame);}
+  requestAnimationFrame(frame);
+  const recordMemory=(cycle,phase)=>memory.push({cycle,phase,rssBytes:null,heapUsedBytes:performance.memory?.usedJSHeapSize??null,
+    heapCapacityBytes:performance.memory?.totalJSHeapSize??null,wasmCapacityBytes:null,ownedHandles:phase==='loaded'?1:0,
+    memoryScope:'browser-main-thread; worker heap is not exposed by performance.memory'});
+  const call=async(method,args={},bytes=null)=>client.invoke(method,JSON.stringify({token,...args}),bytes);
+  const measure=async(id,fn)=>{const start=performance.now(),value=await fn(),elapsed=performance.now()-start;
+    if(!samples.has(id))samples.set(id,[]);samples.get(id).push(elapsed);return value;};
+  try {
+    await new Promise(resolve=>setTimeout(resolve,250));
+    for(let cycle=0;cycle<iterations;cycle++){
+      status.textContent=`Binary MAP worker cycle ${cycle+1} / ${iterations}`;
+      recordMemory(cycle,'baseline');
+      const response=await measure('map.worker_open_decode',()=>call('open',{},input));
+      const info=JSON.parse(response.json);token=info.token;openedBytes=info.ownedBytes;
+      if(response.bytes!=null||response.json.length>4096)throw new Error('Open leaked grid data onto UI');
+      const raster=await measure('map.worker_render',()=>call('render',{maxWidth:960})),size=JSON.parse(raster.json);
+      const canvas=document.querySelector('#map');canvas.width=size.width;canvas.height=size.height;
+      canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(raster.bytes.buffer),size.width,size.height),0,0);
+      const unchanged=await measure('map.worker_export_verified_unchanged',()=>call('export'));
+      if(await digest(unchanged.bytes)!==sourceHash)throw new Error('Source preservation failed');
+      await measure('map.worker_edit',()=>call('edit',{x:0,y:0,width:64,height:64,light:177,color:12}));
+      await measure('map.worker_undo',()=>call('undo'));
+      await measure('map.worker_redo',()=>call('redo'));
+      const edited=await measure('map.worker_export_verified_changed',()=>call('export'));
+      const reopened=await measure('map.worker_reopen',()=>call('open',{},edited.bytes));token=JSON.parse(reopened.json).token;
+      await measure('map.worker_close',()=>{client.dispose();return Promise.resolve();});
+      recordMemory(cycle,'after-close');
+    }
+    if(await digest(input)!==sourceHash)throw new Error('Caller MAP buffer was changed');
+    const operations=[];
+    for(const [id,all] of samples)for(const phase of ['cold','warm']){
+      const values=phase==='cold'?all.slice(0,1):all.slice(1),sorted=values.slice().sort((a,b)=>a-b),n=values.length;
+      if(!n)continue;const median=n%2?sorted[n>>1]:(sorted[n/2-1]+sorted[n/2])/2;
+      operations.push({id,fixture:'local-map-1',phase,iterations:n,warmup:0,unit:'ms',samplesMs:values,medianMs:median,p95Ms:sorted[Math.ceil(n*.95)-1],maxMs:sorted.at(-1),throughputPerSecond:median?1000/median:null,bytesPerOperation:input.length});
+    }
+    const sorted=frames.slice(2).sort((a,b)=>a-b);
+    return {schema:'abc.performance.v1',suite:'browser-map-worker',runtime:navigator.userAgent,buildMode:'dart2js-O2',tier:'local',executionBoundary:'actual-webworker',source:{commit:'unknown',worktreeCommit:'unknown',dirty:'unknown',commitSource:'interactive-page'},status:'passed',performanceBudgetsEvaluated:false,
+      fixtures:[{id:'local-map-1',kind:'map',provenance,bytes:input.length,sha256:sourceHash}],
+      operations,memory,sourcePreserved:true,metadataOnlyOnOpen:true,decodedOwnedBytes:openedBytes,
+      mainThreadLongTasks:longTasks,
+      animationFrames:{count:sorted.length,p95GapMs:sorted[Math.ceil(sorted.length*.95)-1],maxGapMs:sorted.at(-1),over33Ms:sorted.filter(n=>n>33).length,over100Ms:sorted.filter(n=>n>100).length},
+      gaps:['Interactive browser worker/canvas harness, not a Flutter release UI/device benchmark.','Browser performance.memory covers the main thread only, not worker heap or process RSS.','Cold means first call; worker restarts on each explicit close. OS caches are not flushed.']};
+  }finally{running=false;observer?.disconnect();client.dispose();}
+};
+function syntheticMap(){
+  const width=512,height=256,parts=[],u32=n=>{const b=new Uint8Array(4);new DataView(b.buffer).setUint32(0,n,true);parts.push(b);};
+  u32(33083);parts.push(new TextEncoder().encode('relogic'),new Uint8Array([1]));u32(0);u32(0);u32(0);
+  const name=new TextEncoder().encode('Repository synthetic MAP');parts.push(new Uint8Array([name.length]),name);u32(17);u32(height);u32(width);
+  for(const n of [2,2,4,256,256,256]){const b=new Uint8Array(2);new DataView(b.buffer).setUint16(0,n,true);parts.push(b);}parts.push(new Uint8Array([0,0]));
+  for(let cy=0;cy<height;cy+=64)for(let cx=0;cx<width;cx+=64){
+    const raw=new Uint8Array(16384),view=new DataView(raw.buffer);let a=1,b=0;
+    for(let y=0;y<64;y++)for(let x=0;x<64;x++)view.setUint32((y*64+x)*4,1+((cx+x)%4)|(((cy+y)%256)<<16),true);
+    for(const v of raw){a=(a+v)%65521;b=(b+a)%65521;}
+    const zlib=new Uint8Array(16395);zlib.set([0x78,0x01,0x01,0x00,0x40,0xff,0xbf]);zlib.set(raw,7);new DataView(zlib.buffer).setUint32(zlib.length-4,(b<<16)|a);
+    u32(zlib.length);parts.push(zlib);
+  }
+  const result=new Uint8Array(parts.reduce((n,p)=>n+p.length,0));let offset=0;for(const p of parts){result.set(p,offset);offset+=p.length;}return result;
+}
+let report=null;
+document.querySelector('#run').onclick=async()=>{
+  const button=document.querySelector('#run'),download=document.querySelector('#download');button.disabled=true;download.disabled=true;
+  try{const file=document.querySelector('#source').files[0],input=file?new Uint8Array(await file.arrayBuffer()):syntheticMap();
+    report=await window.runMapWorkerBenchmark(input,Number(document.querySelector('#cycles').value),file?'user-selected-local-map':'repository-authored-synthetic');
+    document.querySelector('#result').textContent=JSON.stringify({status:report.status,animationFrames:report.animationFrames,mainThreadLongTasks:report.mainThreadLongTasks,sourcePreserved:report.sourcePreserved},null,2);download.disabled=false;
+  }catch(error){document.querySelector('#result').textContent=String(error);}finally{button.disabled=false;}
+};
+document.querySelector('#download').onclick=()=>{if(!report)return;const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='map-worker-performance.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+</script>

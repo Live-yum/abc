@@ -2,11 +2,14 @@ import 'package:flutter/foundation.dart';
 
 import '../platform/resource_store.dart';
 import '../domain/region_document.dart';
+import '../domain/terraria_map.dart';
+import '../engine/map_backend.dart';
 import '../domain/world_map_overlay.dart';
 import '../domain/map_markers.dart';
 import '../domain/world_rules.dart';
 import '../domain/named_scheme_library.dart';
 import '../cloud/cloud.dart';
+import '../resources/online_resource_service.dart';
 
 /// Engine boundary. The UI never interprets a picked filename as parsed data.
 abstract class TerraController extends ChangeNotifier {
@@ -39,7 +42,11 @@ class TerraViewState {
   final Uint8List? worldRulePreviewPng;
   final ResourceStore? resources;
   final AdvancedRegionDocument? region;
+  final MapSessionInfo? map;
+  final TerrariaMapRaster? mapRaster;
+  final bool canGenerateWorldMap;
   final CloudBackend? cloud;
+  final OnlineResourceService? onlineResources;
   final Map<String, TerraCanvas> canvases;
   final List<Map<String, Object?>> catalog, mapping, changes;
   final int stagedCount, circuitTick;
@@ -63,7 +70,11 @@ class TerraViewState {
     this.worldRulePreviewPng,
     this.resources,
     this.region,
+    this.map,
+    this.mapRaster,
+    this.canGenerateWorldMap = false,
     this.cloud,
+    this.onlineResources,
     this.canvases = const {},
     this.catalog = const [],
     this.mapping = const [],

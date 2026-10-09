@@ -959,6 +959,7 @@ class _PlayerToolsPanelState extends State<PlayerToolsPanel> {
   Widget _advanced() => _card('高级 · 原始结构只读', [
     const Text('未知字段保留原样。版本转换需要真实转换引擎、损失预览与确认；不能仅修改 version 字段。'),
     ExpansionTile(
+      key: const PageStorageKey('player-advanced-fields'),
       title: const Text('查看解码后的 JSON'),
       children: [
         SelectableText(

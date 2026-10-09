@@ -10,6 +10,8 @@ import 'package:terraforge/cloud/cloud.dart';
 import 'package:terraforge/ui/cloud_workspace_panel.dart';
 import 'package:terraforge/ui/generation_options_form.dart';
 
+import 'support/cloud_preview.dart';
+
 CloudSession session() => CloudSession(
   accessToken: 'test-session',
   expiresAt: DateTime.now().add(const Duration(hours: 1)),
@@ -42,7 +44,7 @@ final schemaJson = <String, dynamic>{
   },
 };
 Map<String, dynamic> save([String status = 'gen_queued']) => {
-  'id': 'sample-job',
+  'id': '11111111-1111-4111-8111-111111111111',
   'fileName': 'sample.wld',
   'fileSize': 4,
   'kind': 'world',
@@ -55,7 +57,7 @@ CloudServiceConfig config({int cap = 4096}) => CloudServiceConfig(
   routes: {
     'listSaves': 'list',
     'upload': 'upload',
-    'download': 'ticket',
+    'download': 'download',
     'options': 'options',
     'submit': 'submit',
     'refresh': 'job',
@@ -66,7 +68,6 @@ CloudServiceConfig config({int cap = 4096}) => CloudServiceConfig(
     'recommendations': 'recommended',
   },
   capabilities: CloudCapability.values.toSet(),
-  downloadOrigins: {'https://files.example'},
   maxJsonBytes: cap,
 );
 GenerationRequest request({Map<String, dynamic> values = const {}}) =>
@@ -166,32 +167,32 @@ void main() {
     },
   );
   test(
-    'signed download uses allowlist and never forwards credentials',
+    'private download is authenticated binary data without redirects',
     () async {
+      var calls = 0;
       final api = HttpCloudApi(
         config: config(),
         client: MockClient((req) async {
-          if (req.url.path == '/ticket') {
-            return envelope({
-              'downloadUrl': 'https://files.example/file?signature=test',
-            });
-          }
-          expect(req.headers.containsKey('Authorization'), isFalse);
+          calls++;
+          expect(req.url.path, '/download');
+          expect(
+            req.url.queryParameters['id'],
+            '11111111-1111-4111-8111-111111111111',
+          );
+          expect(req.headers['Authorization'], 'Bearer test-session');
           expect(req.followRedirects, isFalse);
           return http.Response.bytes([1, 2, 3], 200);
         }),
       );
-      expect(await api.download(session(), 'sample'), [1, 2, 3]);
-      final blocked = HttpCloudApi(
-        config: config(),
-        client: MockClient(
-          (req) async => envelope({'downloadUrl': 'https://evil.example/file'}),
+      expect(
+        await api.download(
+          session(),
+          '11111111-1111-4111-8111-111111111111',
+          expectedBytes: 3,
         ),
+        [1, 2, 3],
       );
-      await expectLater(
-        blocked.download(session(), 'sample'),
-        throwsA(isA<CloudFailure>()),
-      );
+      expect(calls, 1);
     },
   );
   test('response cap and safe errors hide remote error details', () async {
@@ -241,7 +242,13 @@ void main() {
           return envelope(save());
         }),
       );
-      await api.upload(session(), Uint8List.fromList([1]), 'test.wld', 'world');
+      await api.upload(
+        session(),
+        Uint8List.fromList([1]),
+        'test.wld',
+        'world',
+        preview: syntheticCloudPreview(),
+      );
       final cancel = CloudCancellation()..cancel();
       await expectLater(
         api.upload(
@@ -249,6 +256,7 @@ void main() {
           Uint8List.fromList([1]),
           'test.wld',
           'world',
+          preview: syntheticCloudPreview(),
           cancellation: cancel,
         ),
         throwsA(isA<CloudFailure>()),
@@ -414,7 +422,7 @@ void main() {
       expect(calls, 0);
     },
   );
-  test('malformed signed URI fails safely', () async {
+  test('invalid save identifier fails before a download request', () async {
     final api = HttpCloudApi(
       config: config(),
       client: MockClient(

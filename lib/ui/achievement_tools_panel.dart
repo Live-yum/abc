@@ -362,8 +362,9 @@ class _AchievementToolsPanelState extends State<AchievementToolsPanel> {
     final definition = _definition(id);
     final conditions = _conditions(record);
     return Card(
+      key: Key('achievement-$id'),
       child: ExpansionTile(
-        key: Key('achievement-$id'),
+        key: PageStorageKey('achievement-expansion-$id'),
         tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         title: Text(definition?.name ?? id),

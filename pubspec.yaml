@@ -16,9 +16,15 @@ dependencies:
   image: ^4.5.4
   shared_preferences: ^2.5.3
   crypto: ^3.0.6
+  archive: 4.3.0
   pointycastle: ^4.0.0
   share_plus: ^13.3.1
 dev_dependencies:
+  integration_test:
+    sdk: flutter
+  flutter_driver:
+    sdk: flutter
+  vm_service: 15.3.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

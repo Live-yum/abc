@@ -741,6 +741,7 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
           ),
           if (_snapshot['packet'] is Map)
             ExpansionTile(
+              key: const PageStorageKey('authoritative-circuit-signal-details'),
               title: const Text('信号与事件'),
               subtitle: Text(
                 '运算 ${(_snapshot['packet'] as Map)['operations'] ?? 0}',
@@ -754,6 +755,9 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
                     SizedBox(
                       height: 140,
                       child: ListView.builder(
+                        key: PageStorageKey(
+                          'authoritative-circuit-events-$key',
+                        ),
                         itemCount: math.min(
                           200,
                           ((_snapshot['packet'] as Map)[key] as List).length,
@@ -1090,6 +1094,7 @@ class _AuthoritativeCircuitPanelState extends State<AuthoritativeCircuitPanel> {
           ],
           if (_snapshot['packet'] != null)
             ExpansionTile(
+              key: const PageStorageKey('authoritative-circuit-feedback'),
               title: const Text('实际模拟反馈'),
               children: [
                 SelectableText(

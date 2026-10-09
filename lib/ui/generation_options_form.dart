@@ -27,6 +27,7 @@ class _GenerationOptionsFormState extends State<GenerationOptionsForm> {
   late Map<String, dynamic> _value;
   final Map<String, String> _parseErrors = {};
   final Set<String> _expanded = {};
+  PageStorageBucket _expansionStorage = PageStorageBucket();
   final Map<String, Map<String, dynamic>> _objectDrafts = {};
   @override
   void initState() {
@@ -42,6 +43,7 @@ class _GenerationOptionsFormState extends State<GenerationOptionsForm> {
       _value = {};
       _parseErrors.clear();
       _expanded.clear();
+      _expansionStorage = PageStorageBucket();
       _objectDrafts.clear();
     }
   }
@@ -101,6 +103,7 @@ class _GenerationOptionsFormState extends State<GenerationOptionsForm> {
                 : <String, dynamic>{},
           );
           return ExpansionTile(
+            tilePadding: EdgeInsets.zero,
             onExpansionChanged: (open) => setState(() {
               if (open) {
                 _expanded.add(key);
@@ -108,12 +111,16 @@ class _GenerationOptionsFormState extends State<GenerationOptionsForm> {
                 _expanded.remove(key);
               }
             }),
-            key: ValueKey(key),
+            key: PageStorageKey(key),
             title: Text(label),
             children: [
               if (_expanded.contains(key))
                 Padding(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.only(
+                    left: depth < 2 ? 8 : 0,
+                    top: 4,
+                    bottom: 4,
+                  ),
                   child: _fields(nested, draft, depth + 1, key, () {
                     values[entry.key] = draft;
                     commit?.call();
@@ -135,13 +142,20 @@ class _GenerationOptionsFormState extends State<GenerationOptionsForm> {
         }
         if (field['choices'] is List) {
           return DropdownButtonFormField<String>(
+            isExpanded: true,
             key: ValueKey(key),
             initialValue: values[entry.key] as String?,
             decoration: InputDecoration(labelText: label),
             items: [
-              const DropdownMenuItem(value: '', child: Text('Service default')),
+              const DropdownMenuItem(
+                value: '',
+                child: Text('Service default', overflow: TextOverflow.ellipsis),
+              ),
               ...(field['choices'] as List).whereType<String>().map(
-                (c) => DropdownMenuItem(value: c, child: Text(c)),
+                (c) => DropdownMenuItem(
+                  value: c,
+                  child: Text(c, overflow: TextOverflow.ellipsis),
+                ),
               ),
             ],
             onChanged: enabled ? (v) => update(v == '' ? null : v) : null,
@@ -172,6 +186,8 @@ class _GenerationOptionsFormState extends State<GenerationOptionsForm> {
               helperText: complex
                   ? 'JSON; at most 256 items, nesting at most 12'
                   : field['help']?.toString(),
+              helperMaxLines: 3,
+              errorMaxLines: 3,
               errorText: _parseErrors[key],
             ),
             onChanged: (text) {
@@ -200,6 +216,8 @@ class _GenerationOptionsFormState extends State<GenerationOptionsForm> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      _fields(widget.schema.root, _value, 0, 'config');
+  Widget build(BuildContext context) => PageStorage(
+    bucket: _expansionStorage,
+    child: _fields(widget.schema.root, _value, 0, 'config'),
+  );
 }

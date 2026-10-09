@@ -4,17 +4,19 @@
 
 ## 结论与判定口径
 
-旧报告列出的 P1–P5 已补上大部分可达 UI、领域逻辑、Workspace 操作和真实核心路径，不能继续写成“只有入口/JSON/简单 ID 替换”。按下表原有的 **38 行动作**重新核对：**已实现 32，部分实现 2，缺失 0，外部阻塞 1，未验证 3**。这是操作覆盖数，不是按功能复杂度加权的完成百分比。
+旧报告列出的 P1–P5 已补上大部分可达 UI、领域逻辑、Workspace 操作和真实核心路径，不能继续写成“只有入口/JSON/简单 ID 替换”。下表仍保留原有的 **38 行动作**：**已实现 32，部分实现 2，缺失 0，外部阻塞 1，未验证 3**。两行在线功能的客户端已接通；“部分实现”现在指表内列出的能力边界与未具备的完整在线体验，不能再解读成推荐、资源、头像或帮助客户端缺失。这个保守分类不是按功能复杂度加权的完成百分比，也不是全 viewer-app 操作清单。
 
 - **已实现**：该行狭义动作有可达 UI、应用操作和实际数据路径。已知版本、资源校验及安全预算仍适用，不表示所有历史版本或所有平台均等价。
-- **部分实现**：已有可用动作，但该行列出的参考语义仍有明确本地差距；表内写明差距。
+- **部分实现**：已有可达客户端，但该组合行仍有明确能力边界或未具备完整在线体验；表内分别列出本地边界与实际服务条件。
 - **缺失**：未发现可达实现；不能因此推断底层核心缺能力。
 - **外部阻塞**：本地对应传输/操作已有，实际结果还依赖受支持账户、实时服务数据或可用执行环境；该标签不覆盖未完成的客户端移植。
 - **未验证**：现有证据不能支持该范围的完成结论；不是自动新增开发需求。
 
-本次按当前源码、可达 UI、测试文件和主任务已执行的证明重新核对。2026-10-09 布线/网络预览快照的本地串行全套为 **465 项通过、0 失败、0 跳过、terminal success**，171.558 秒，使用从随附来源构建的原生库及已授权的本地资源/真实地图。包含完整 `test/` 和两项通过 Flutter 执行的真实 Native 集成 smoke；已排除 suite-loading 记录。40 项 actor/UI/导航专项属于该覆盖，不重复累加到总数。完整 244 案例真实 QuickJS/FFI 回放已通过；最终静态分析无问题，格式检查 186 个文件、零变更，随后仅对 Native 测试 harness 作了等价的 null-aware-element lint 修正。该快照 JavaScript Web 发布构建成功（退出 0，33.1 秒）；Flutter Wasm dry run 返回 247，不能声称 Flutter Wasm 编译通过。Cupertino 字体缺失仍有非致命告警，Material 图标已生成；Web 应用使用另行验证的 TerraWasm 引擎。
+本次按当前源码、可达 UI、测试文件和主任务已执行的证明重新核对。较早布线/网络预览快照曾有 **465 项通过、0 失败、0 跳过**、171.558 秒的本地全套，以及干净静态分析和 JavaScript Web 发布构建；这些历史结果不能代表随后加入的 MAP、云端/资源、Worker 和性能改动。最新聚合与补充夹具的唯一计数以[能力证据矩阵](feature-matrix.md)为准，专项覆盖不能重复相加。较早 Flutter Wasm dry run 返回 247，Flutter Wasm 编译仍未验证；JavaScript Flutter Web 与独立 TerraWasm 引擎需分开记录。
 
 已确认的独立证据包括：两个真实地图在 Native、WASM、Flutter Workspace 共六个案例通过；全规则电路的 1364 次调用、15 示例、1180 响应包和 12 次结构变化与固定参考一致；真实 Linux QuickJS/FFI 的有界 244 案例回放与独立的 15 示例运行；10 项 Web 生命周期测试；Fusion 32 个真实目录放置案例经 WASM 精确回读。最新 UI 尚未重跑完整浏览器交互验收，Android/iOS/macOS 的嵌入式运行时和真机操作未验证。详见[真实地图报告](real-world-validation.md)与[能力证据矩阵](feature-matrix.md)。
+
+本地还已实现[二进制 MAP](MAP_FORMAT.md) legacy 135–319 / chunked 315 的完整解码、有界编辑、撤销/重做、校验导出及 Native isolate / Web Worker；由两个真实 WLD 生成的 MAP 是独立的生成证据，没有验证用户原始探索进度。没有取得实际探索 MAP 夹具。新增 Web document/TCW/traversal Worker 的真实 WASM 合约在 Node 中执行；它们不能代替实际浏览器帧测量、文件选择器或真机验收。上述补充不改写原 38 行的分母。
 
 `R:` 为只读参考仓库相对路径，`F:` 为 Flutter 仓库相对路径。参考行号沿用该固定快照；Flutter 优先用文件和符号定位，避免并行编辑后行号失真。没有向本报告复制私有实现、资源表或个人样本。
 
@@ -86,7 +88,7 @@
 - 证据：`tool/test_circuit_rules.mjs` 比较固定原模块、Web bundle 与 Native 传输 shim，1364 次调用、15 示例/1180 模拟包/12 次结构变化一致，结束时无残留 traversal handles 或 callback buffers。`native/circuit_rules_corpus_test.dart` 用真实 Linux QuickJS/FFI 在 44 秒内重放全部 244 个记录案例，包含新增预览/提交/取消/失效/预算/失败恢复；示例模拟只保留各示例前四命令及 reset，不能写成 Native 重放全部 1180 包。`native/circuit_rules_bundle_test.dart` 另运行全部 15 示例。10 项 `test/web/circuit_rules_lifecycle.cjs` 验证队列、限额、启动失败、取消、超时、释放和重置；40 项 actor/UI/导航专项覆盖可达交互。
 - **完整编辑器预览已实现并验证**：面板通过 `rulesPreviewRoute/rulesPreviewNetwork/rulesCommitPreview/rulesCancelPreview` 调用 facade 的原 `CircuitEditor.route`/`traceNetwork`，不修改参考寻路/拓扑算法。预览显示逐色覆盖和数量，确认绑定文档 ID/代次/revision/token，一次提交形成一条 undo；取消、后续编辑、模拟、重置、导入、关闭使旧计划失效。最多 60000 格，60001 格拒绝。证明覆盖三种 junction 样式、pixel 方向、多格占用与支撑、未选择线色保留、防意外短接、不可达路径、重复/伪造/过期确认和精确 undo/redo。独立单格沙盒不作为此完整规则路径的替代证据；目标平台和实际浏览器交互仍分开验收。
 - 整图 WLD/TWLD 的 TCW 会话是第三条独立路径，保留触发/60 Hz 调度/保存/回读；它不是 `viewer-terralogic` 文件编辑器，也不由完整器件库测试自动获得所有游戏机制的验证。
-- 最终全套已覆盖“恢复后未保存标记直到导出成功才清除”和“导航离开时幂等暂停”的生命周期回归；取消导出与忙碌中的暂停均有专门测试。Android/iOS/macOS 嵌入式 JS 运行与真机交互尚未验证。
+- 较早布线快照全套已覆盖“恢复后未保存标记直到导出成功才清除”和“导航离开时幂等暂停”的生命周期回归；取消导出与忙碌中的暂停均有专门测试。Android/iOS/macOS 嵌入式 JS 运行与真机交互尚未验证。
 
 ## 用户动作矩阵
 
@@ -126,27 +128,30 @@
 | 电路完整物品库、示例、属性与元件样式 | 已实现 | R:features/circuit/components/CircuitFiles.vue:26；CircuitSandbox.vue:117,176 | F:AuthoritativeCircuitPanel、CircuitRulesWorkspace、circuit_rules_backend.dart；固定参考规则的 2776 palette/15 示例、实际属性/样式与多格放置；Linux 嵌入式运行及 Web 合约有证据，目标平台未验证 |
 | 电路自动寻路/删除网络预览、选区旋转/镜像 | 已实现 | R:features/circuit/components/CircuitSandbox.vue:40,47,61,176 | F:AuthoritativeCircuitPanel/CircuitRulesWorkspace/rules-facade；原规则寻路/逐色网络预览、覆盖层、token 确认/取消/原子 undo 与剪贴板变换可达；40 项 actor/UI/导航、完整 Node 与真实 QuickJS 的 244 案例证明通过；预览上限 60000 格 |
 | 本地文件打开、导出、历史/回收站恢复 | 已实现 | R:pages/saves/saves.vue:57,67,291 | F:lib/domain/vault_history.dart、ui/vault_history_panel.dart；test/vault_history_test.dart；不新增不可恢复删除要求 |
-| 云端上传/下载、推荐点赞/转存、账户资料 | 部分实现 | R:pages/saves/saves.vue:62–65,216–244；pages/user/user.vue:191 | F:CloudApi/HttpCloudApi/CloudBackend/CloudWorkspacePanel 有通用传输及 mock 覆盖；缺推荐 like/计数下载/转存、预览和参考私有存档直接下载适配。R API 已定义这些客户端契约；跨平台身份适配与真实账户/服务验证另待完成 |
+| 云端上传/下载、推荐点赞/转存、账户资料 | 部分实现 | R:pages/saves/saves.vue:62–65,216–244；pages/user/user.vue:191 | F:CloudApi/HttpCloudApi/CloudBackend/CloudWorkspacePanel 已接参考私有二进制下载、multipart 上传及真实 WLD 预览、推荐点赞/ticket/complete/transfer/operation、资料编辑、durable vault 采纳及账户/服务隔离日志；mock/恢复/UI 合约覆盖。本地尚无可用初次登录；实际账户/传输未验，后端新上传要求微信关联 MEMBER，角色装备预览生成未提供 |
 | 定制世界配置、提交、取消、重试及真实结果 | 外部阻塞 | R:features/world-generation/pages/generate.vue；pages/saves/saves.vue:65,99–108 | F:GenerationOptionsForm/HttpCloudApi/CloudBackend 已实现 schema 表单、提交/轮询/取消/重试；R:infrastructure/api/world-generation.ts 已定义契约。受支持的跨平台真实会话、实时 options/schema 和任务/下载结果验证未取得；不是缺少全部协议 |
-| 资源在线更新、账户头像与完整帮助 | 部分实现 | R:pages/user/user.vue:135,191,270；pages/user/help.vue:47–65；infrastructure/api/helper-info.ts | F:本地资源导入/指南、profile 通用接口和昵称 UI 已有；在线资源安装、头像控件与远程帮助客户端未接。R:resource-manager.mjs、auth.ts、helper-info.ts 已有契约/实现；实时批准资源/内容及账户验证是另一个外部条件 |
+| 资源在线更新、账户头像与完整帮助 | 部分实现 | R:pages/user/user.vue:135,191,270；pages/user/help.vue:47–65；infrastructure/api/helper-info.ts | F:OnlineResourceService/OnlineResourcesPanel 已接批准清单、校验下载、原子安装、持久缓存/恢复/撤销；CloudProfileDialog/CloudHelpSection 已接昵称/头像 URL 与清空、显式头像加载、帮助加载/重试。帮助为清洗后纯文本；资源不补造缺失 atlas、成就、转换档案、实体标记或规则方案。真实内容、账户和在线结果仍未验证 |
 | iOS/Android/macOS 真机操作与游戏回读 | 未验证 | 必须实际执行，平台模板不是结果 | F:docs/platform-builds.md；本地 Linux 核心/Web 合约不能代表平台安装、文件选择、生命周期或游戏内回读 |
 
 ## 有限的原范围剩余工作
 
-完整电路自动寻路与网络删除预览已通过可达 UI、控制器、原规则对照和真实 Linux QuickJS/FFI 证明，原五行“部分/缺失”的本地编辑功能均已覆盖。当前表内仍有 **2 行部分实现**，都是在线功能的本地接线缺口；不能用电路完善或本地测试通过代替这些客户端移植。
-在线功能重新按源码核对后，不再把尚未移植的客户端操作统称为“外部阻塞”：推荐点赞/计数下载/转存、参考私有存档下载适配、在线资源安装、头像控件和远程帮助接线仍是本地工程工作。它们已有参考客户端契约；真实身份提供方、会话、服务内容及实际调用结果是独立的外部/验证条件。此处纠正的是状态分类，没有将这些功能记作已完成。
+完整电路自动寻路与网络删除预览已有可达 UI、控制器、原规则对照和真实 Linux QuickJS/FFI 证明。两行在线功能中，之前列出的推荐点赞/计数下载/转存、私有存档直接下载适配、在线资源安装、头像控件和远程帮助接线也已实现，不能继续列为缺失。
 
-**3 组广泛验证缺口**仍保留：历史角色转换/外观、写入页逐开关与组合对照、目标平台及游戏回读。前两组先核对已有能力和测试夹具，只把实际发现的差距转为开发任务；不声称参考也未保证的任意旧版本安全转换。合计为矩阵中的 3 行“未验证”。最新完整浏览器验收与目标平台实际构建/运行也是交付证据缺口，不自动转为新的功能行。
+这两行仍保守记为 **部分实现**，但必须拆开说明：本地客户端的实际边界包括无初次跨平台登录实现、未生成角色装备预览、帮助仅纯文本、在线归一化未包含无来源的补充资源族；服务侧条件包括受支持身份交换、真实会话/内容和实际调用结果。不能用合约测试证明完整在线体验，也不能把已有客户端重新归为未实现。
 
-**帮助归类**：参考 `pages/user/help.vue` 在加载时调用 `helperInfoApi.list()`，渲染服务返回的标题和富文本；只读源码没有一份静态“完整帮助”待迁移。现有本地指南已存在；远程帮助的客户端请求与内容呈现仍需本地接线，真实文章内容由服务提供。不应把客户端缺口说成协议不存在，也不新增静态帮助写作任务。
+**3 组广泛验证缺口**仍保留：历史角色转换/外观、写入页逐开关与组合对照、目标平台及游戏回读。前两组先核对已有能力和测试夹具，只把实际发现的差距转为开发任务；不声称参考也未保证的任意旧版本安全转换。合计为矩阵中的 3 行“未验证”。最新完整浏览器交互、当前改动的 exact-head 构建与目标平台运行仍是证据缺口；此前公开提交的五项功能 CI 已通过。
+
+**帮助归类**：参考 `pages/user/help.vue` 在加载时调用 `helperInfoApi.list()`，渲染服务返回的标题和富文本。现有本地指南与远程文章请求/加载/展开/错误重试均已接通；`CloudHelpSection` 清除脚本、样式和嵌入元素，按有界纯文本呈现，不执行 HTML 或抓取文章图片。真实文章由服务提供，尚未验证；没有一份静态“完整帮助”需凭空补写。
 
 ## 真正的外部条件与验证层级
 
-- **已有参考契约与本地缺口**：`R:infrastructure/api/cloud-saves.ts`、`recommendations.ts`、`world-generation.ts`、`auth.ts`、`helper-info.ts` 以及 `infrastructure/assets/resource-manager.mjs` 已定义客户端操作。Flutter 通用 adapter 的列表/上传/票据下载/资料/任务传输和 mock 测试已存在，但不能直接等同于参考服务兼容。参考私有存档走授权二进制下载，推荐另走 ticket/complete/transfer；当前 Flutter 只有通用票据下载，推荐仅展示列表。点赞、计数下载、转存、资源在线安装、头像和帮助客户端仍需工程接线。
-- **实际外部条件**：已读 `R:infrastructure/api/auth.ts` 提供微信小程序 loginCode/state 登录及 refresh；未有可验证的非微信跨平台身份交换方案。受支持会话、部署配置、实时生成 options/schema、批准的在线资源及帮助内容、真实任务/传输结果仍待确认。普通客户端移植不因这些条件而自动变成外部阻塞，也不需要向用户索取长期凭据。
+- **已接客户端与具体边界**：参考私有存档使用授权原始二进制下载；推荐使用 ticket/complete/transfer/operation，当前 Flutter 已分别实现。下载先 durable vault 写入并回读验证，随后才发计数回执；失败回执和不确定转存由稳定账户/服务/tenant/terminal 隔离日志恢复。资源安装使用 manifest/approval/hash、native/IndexedDB 原子持久化、缓存与撤销校验。详见 [cloud-provider.md](cloud-provider.md) 与 [ONLINE_RESOURCES.md](ONLINE_RESOURCES.md)，包括上表未覆盖的预览、帮助和补充资源边界。
+- **实际外部条件**：只读核验 viewer-boot `1f8347c69f370b24463ae35f253d855dfef19423` 仍只有已验证微信小程序初始 MEMBER 登录/刷新，未取得可用的非微信初始身份交换；不能用管理员登录替代。受支持会话、部署配置、实时生成 options/schema、批准资源/帮助内容和真实任务/传输结果仍待确认，后端新上传另要求微信 openid。不需要向用户索取长期凭据。
 - **环境条件**：Android/iOS/macOS 对应构建和真机/游戏环境。平台源码模板、Linux 动态库、Web 构建均不能替代实际结果；本报告不把签名/商店发布列入已授权本地迁移范围。
-- **授权与分发状态**：2026-10-09 已获引擎源码、所需内嵌表、衍生 WASM 和保留 JavaScript 规则公开纳入 `Live-yum/abc` 的授权；该源代码授权阻塞已解除，保留来源/完整性记录且不重新许可。远端 main 的 bootstrap 已确认为 `3def6fa2544d4b7e51579d7091f014277f33bf85`；[Draft PR #1](https://github.com/Live-yum/abc/pull/1) 已创建且未合并。首个提交 `f966c574` 的 [CI](https://github.com/Live-yum/abc/actions/runs/37865496547) 已结束：Web/Linux jobs 与 macOS 应用构建通过，Android 工具链、Native runner 和 iOS archive graph 出现失败。修正及后续本地布线/预览变更还需发布并核对自身提交的 CI，不能沿用旧提交结果。个人存档、私人验证产物、游戏图片/程序及凭据继续排除，未签名构建不等于已发布应用。
+- **授权与分发状态**：2026-10-09 已获引擎源码、所需内嵌表、衍生 WASM 和保留 JavaScript 规则公开纳入 `Live-yum/abc` 的授权；该阻塞已解除，保留来源/完整性记录且不重新许可。远端 main 的 bootstrap 为 `3def6fa2544d4b7e51579d7091f014277f33bf85`；[Draft PR #1](https://github.com/Live-yum/abc/pull/1) 已创建且未合并。公开 head `19001f3ac2507c905ece043926b98df42810ddad` 的 [CI 37869339708](https://github.com/Live-yum/abc/actions/runs/37869339708) 五项功能 jobs 全部通过，已取代首个提交的失败状态。后续本地 MAP、云端/资源、Worker 和性能变更仍需发布并验证自身提交的 CI。个人存档、私人验证产物、游戏图片/程序及凭据继续排除，未签名构建不等于已发布应用。
 
 验收须分层记录：领域单测 → 可达 UI 的取消/重复/忙碌/切换/恢复 → Workspace 历史和原件保持 → 真实 Native/WASM 候选/保存/重开 → 实际浏览器和目标平台/游戏。尤其需要显式启用 Native 与外部目录夹具，区分通过、跳过、未运行；WASM 的 Node 合约不等于 Flutter 浏览器端到端交互。最终回归应覆盖最后一次修改，而不是沿用修改前的通过计数。
 
 当前结论是“38 行狭义动作中 32 行本地已实现、2 行部分实现；另有 1 行真实服务阻塞与 3 行广泛未验证”。这一覆盖数不代表 viewer-app 全操作、全版本、全平台等价，也不把有界合约通过当作最终浏览器或游戏验收。
+
+性能证据也需单独验收：真实文件 Native/WASM 测量和 Flutter debug UI 宏用于定位问题；Node 不是浏览器，debug 不是 profile，生成 MAP 不是原始探索 MAP。当前仍缺干净对照基线、实际 Flutter profile/browser 帧与长期生命周期/soak 结果。QuickJS adapter 改善后，大电路操作的本地 debug 中位耗时仍为秒级，不能据此宣称全操作无卡顿；具体诊断范围见[能力证据矩阵](feature-matrix.md)。

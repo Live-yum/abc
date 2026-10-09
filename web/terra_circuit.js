@@ -41,12 +41,10 @@
     }
     return {propagate:async(w,h,json,x,y,c)=>JSON.stringify(await propagate(w,h,JSON.parse(json),x,y,c)),propagateRaw:propagate};
   }
-  async function load() {
-    const base=new URL('engine/',root.document.baseURI);
-    await new Promise((resolve,reject)=>{const s=root.document.createElement('script');s.src=new URL('world.js',base).href;s.onload=resolve;s.onerror=()=>reject(new Error('Missing verified circuit WASM artifact'));root.document.head.appendChild(s);});
-    if(typeof root.TerraWorldWasmWeb!=='function')throw new Error('Circuit WASM factory unavailable');
-    return root.TerraWorldWasmWeb({locateFile:f=>new URL(f.endsWith('.wasm')?'world.wasm':f,base).href});
+  root.createTerraCircuitBridge = createCircuitBridge;
+  if (root.document) {
+    root.terraCircuit = root.TerraWorkerRPC.createClient('circuit');
+    root.addEventListener?.('pagehide', () => root.terraCircuit.dispose());
   }
-  root.terraCircuit=createCircuitBridge(load);
   if(typeof module==='object'&&module.exports)module.exports={createCircuitBridge};
 })(globalThis);

@@ -35,8 +35,14 @@ jobs:
       - name: Check reproducible rules artifacts
         run: git diff --exit-code -- assets/private/circuit_rules_native.js assets/private/circuit_rules.provenance.json web/engine/circuit_rules_web.js
       - run: flutter pub get --enforce-lockfile
-      - run: dart format --output=none --set-exit-if-changed lib test native
+      - name: Rebuild and verify the binary MAP owner
+        run: |
+          bash tool/build_map_worker.sh
+          git diff --exit-code -- web/engine/map_worker.js
+      - run: dart format --output=none --set-exit-if-changed lib test native integration_test test_driver tool/perf tool/map_worker.dart
       - run: flutter analyze --no-pub
+      - name: Performance report validation and false-pass protections
+        run: python3 -m unittest discover -s tool/perf -p '*test*.py'
       - run: flutter test --no-pub --concurrency=1 --coverage
       - name: Install pinned official Emscripten
         run: |
@@ -62,12 +68,19 @@ jobs:
           node tool/test_web_engine.mjs
           TERRA_WLD_FIXTURE="$PWD/build/circuit.wld" node tool/test_web_engine.mjs
           node test/web/world_export_smoke.cjs
+          node test/web/engine_worker_lifecycle.cjs
+          node test/web/engine_worker_smoke.cjs
           node tool/test_web_region.mjs
           node tool/test_web_markers.mjs
           node tool/test_web_world_rules.mjs
           node tool/test_web_circuit.mjs
+          node tool/test_web_binary_map.mjs
           node test/web/world_circuit_smoke.cjs web/engine/world.js web/engine/world.wasm build/circuit.wld
           node test/web/world_circuit_fragments_smoke.cjs web/engine/world.js web/engine/world.wasm build/fragments.wld
+      - name: Actual binary MAP worker lifecycle contracts
+        run: |
+          dart run tool/perf/write_map_fixture.dart build/synthetic.map
+          TERRA_MAP_FIXTURE="$PWD/build/synthetic.map" node tool/test_map_worker.cjs
       - name: Authoritative source and actual Web-worker parity
         run: |
           export TERRA_CIRCUIT_SOURCE="$PWD/vendor/viewer-circuit"
@@ -75,7 +88,12 @@ jobs:
           node tool/test_circuit_rules.mjs
           node --test test/web/circuit_rules_lifecycle.cjs
           node test/web/circuit_rules_worker_smoke.cjs
-      - run: flutter build web --release --no-pub --no-web-resources-cdn
+      - name: Offline online-resource storage and public transport contracts
+        run: |
+          node test/web/online_resource_storage_smoke.cjs
+          dart compile js -o build/public_resource_client_contract.js test/web/public_resource_client_contract.dart
+          node test/web/public_resource_client_contract.cjs build/public_resource_client_contract.js
+      - run: flutter build web --release --no-pub --no-web-resources-cdn --no-wasm-dry-run
       - run: tar -czf build/terraforge-web.tar.gz -C build/web .
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

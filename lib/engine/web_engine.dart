@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'engine.dart';
 import 'circuit_rules_backend.dart';
+import 'world_map_backend.dart';
 
 @JS('terraCircuitRules')
 external _CircuitRulesBridge get _circuitRulesBridge;
@@ -25,6 +26,10 @@ extension type _Bridge(JSObject _) implements JSObject {
     JSString args,
   );
   external JSPromise<JSUint8Array> save(JSNumber handle);
+  external JSPromise<JSUint8Array> generateMap(
+    JSNumber handle,
+    JSString markers,
+  );
   external JSPromise<JSUint8Array?> preview(JSNumber handle);
   external JSPromise<JSAny?> close(JSNumber handle);
 }
@@ -33,7 +38,23 @@ TerraEngine createTerraEngine() => WebTerraEngine();
 TerraEngine createWebEngine() => createTerraEngine();
 
 class WebTerraEngine
-    implements TerraEngine, CreatablePlayerEngine, CircuitRulesBackend {
+    implements
+        TerraEngine,
+        CreatablePlayerEngine,
+        CircuitRulesBackend,
+        WorldMapBackend {
+  @override
+  Future<Uint8List> generateWorldMap(
+    EngineDocument world, {
+    Map<String, Object?>? markers,
+  }) => _guard(() async {
+    if (world.kind != 'wld') throw const EngineException('只有世界可以生成 MAP');
+    final request = markers == null ? null : validatedMapMarkers(markers);
+    final bytes = await _bridge
+        .generateMap(world.handle.toJS, jsonEncode(request).toJS)
+        .toDart;
+    return Uint8List.fromList(bytes.toDart);
+  });
   @override
   Future<Object?> invokeCircuitRules(String method, List<Object?> args) =>
       _guard(() async {

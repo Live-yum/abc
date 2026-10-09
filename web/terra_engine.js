@@ -240,22 +240,30 @@
         exec(d,'render_thumbnail_png',{max_w:960});
         return d.a.read((o,n,s,w,h)=>d.a.M._terra_op_get_thumbnail_png(d.native,o,n,s,w,h),true,16*1024*1024,true,2);
       }),
+      generateMap:(id,json)=>serial(()=>{
+        const d=get(id); if(d.kind!=='wld') throw new Error('MAP generation requires a world');
+        const markers=JSON.parse(json);
+        if(markers!==null && (typeof markers!=='object' || Array.isArray(markers) ||
+            Object.keys(markers).some(key=>!['chest_markers','tile_markers'].includes(key)))) {
+          throw new Error('MAP accepts only chest and tile markers');
+        }
+        try {
+          exec(d,markers===null ? 'render_lit_map' : 'mark_tiles_and_chests_map',markers ?? {});
+          return d.a.read((o,n,s,w,h)=>d.a.M._terra_op_get_map(d.native,o,n,s,w,h),true,128*1024*1024,true,2);
+        } finally {
+          // The successful get releases media; reclaim also covers a failed
+          // allocation/copy, keeping the next queued operation usable.
+          d.a.M._tx_reclaim_transients?.();
+        }
+      }),
       close:id=>serial(()=>{ const d=get(id); release(d); docs.delete(id); }),
     };
     return Object.freeze(bridge);
   }
-  async function browserModule(kind) {
-    if (!root.document) throw new Error('Browser runtime loader unavailable');
-    const name=kind==='wld' ? 'world' : 'player', base=new URL('engine/',root.document.baseURI);
-    await new Promise((resolve,reject)=>{
-      const script=root.document.createElement('script'); script.src=new URL(name+'.js',base).href;
-      script.onload=resolve; script.onerror=()=>reject(new Error('Missing engine/'+name+'.js. Install verified engine artifacts.'));
-      root.document.head.appendChild(script);
-    });
-    const factory=root.TerraWorldWasmWeb;
-    if(typeof factory!=='function') throw new Error('Engine factory is missing');
-    return factory({locateFile:file=>file.endsWith('.wasm') ? new URL(name+'.wasm',base).href : new URL(file,base).href});
+  root.createTerraDocumentBridge = createBridge;
+  if (root.document) {
+    root.terraForge = root.TerraWorkerRPC.createClient('document');
+    root.addEventListener?.('pagehide', () => root.terraForge.dispose());
   }
-  root.terraForge=createBridge(browserModule);
   if(typeof module==='object' && module.exports) module.exports={createBridge,parse,encode};
 })(globalThis);

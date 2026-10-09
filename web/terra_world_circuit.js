@@ -96,7 +96,10 @@ function createWorldCircuitBridge(loadModule){
  function close(id){return serial(async()=>{if(!session||id!==session.handle)return;const{M,handle,world}=session;check(M._terra_circuit_world_close(handle));worldCheck(M._terra_world_close(world));session=null;});}
  return {open,command,close};
 }
-async function load(){const base=new URL('engine/',root.document.baseURI);await new Promise((resolve,reject)=>{const s=root.document.createElement('script');s.src=new URL('world.js',base).href;s.onload=resolve;s.onerror=()=>reject(new Error('Missing verified whole-world circuit WASM'));root.document.head.appendChild(s);});return root.TerraWorldWasmWeb({locateFile:f=>new URL(f.endsWith('.wasm')?'world.wasm':f,base).href});}
-root.terraWorldCircuit=createWorldCircuitBridge(load);
+root.createTerraWorldCircuitBridge=createWorldCircuitBridge;
+if(root.document){
+ root.terraWorldCircuit=root.TerraWorkerRPC.createClient('worldCircuit');
+ root.addEventListener?.('pagehide',()=>root.terraWorldCircuit.dispose());
+}
 if(typeof module==='object'&&module.exports)module.exports={createWorldCircuitBridge};
 })(globalThis);

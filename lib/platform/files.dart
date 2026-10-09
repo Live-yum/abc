@@ -27,6 +27,7 @@ class PlatformFiles implements FileGateway {
     final extensions = switch (kind) {
       'world' => ['wld', 'bak'],
       'player' => ['plr', 'bak'],
+      'map' => ['map', 'bak'],
       'image' => ['png', 'jpg', 'jpeg', 'webp'],
       'achievements' => ['dat', 'bak'],
       'project' => ['json'],
@@ -53,7 +54,7 @@ class PlatformFiles implements FileGateway {
     }
     final limit = kind == 'resources'
         ? 256 * 1024 * 1024
-        : kind == 'world' || kind == 'save'
+        : kind == 'world' || kind == 'save' || kind == 'map'
         ? 128 * 1024 * 1024
         : 32 * 1024 * 1024;
     if (await file.length() > limit) {

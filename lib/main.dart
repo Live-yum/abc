@@ -1,6 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+import 'cloud/cloud.dart';
+import 'resources/online_resource_service.dart';
+import 'resources/online_resource_transport.dart';
 
 import 'application/workspace.dart';
 import 'engine/native_engine.dart'
@@ -25,8 +30,31 @@ import 'ui/terra_app.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final core = engine.createTerraEngine();
+  const cloudOrigin = String.fromEnvironment('TERRAFORGE_CLOUD_ORIGIN');
+  const cloudTenant = String.fromEnvironment('TERRAFORGE_CLOUD_TENANT_ID');
+  const cloudTerminal = String.fromEnvironment('TERRAFORGE_CLOUD_TERMINAL');
+  final cloud = cloudOrigin.isEmpty
+      ? null
+      : CloudBackend(
+          api: HttpCloudApi(
+            config: CloudServiceConfig.viewer(
+              baseUri: Uri.parse(cloudOrigin),
+              tenantId: cloudTenant.isEmpty ? null : cloudTenant,
+              terminal: cloudTerminal.isEmpty ? null : cloudTerminal,
+            ),
+            client: http.Client(),
+          ),
+        );
+  const resourceOrigin = String.fromEnvironment('TERRAFORGE_RESOURCE_ORIGIN');
+  final onlineResources = resourceOrigin.isEmpty
+      ? null
+      : OnlineResourceService(
+          transport: HttpOnlineResourceTransport(resourceOrigin),
+        );
   final workspace = Workspace(
     engine: core,
+    cloud: cloud,
+    onlineResources: onlineResources,
     files: PlatformFiles(),
     vault: createLocalVault(),
     circuitBackend: circuits.createCircuitBackend(core),

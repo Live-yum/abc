@@ -19,6 +19,7 @@ import 'world_circuit_backend.dart';
 import 'native_world_circuit_bindings.dart';
 import 'circuit_rules_backend.dart';
 import 'native_circuit_rules_runtime.dart';
+import 'world_map_backend.dart';
 
 final TerraEngine _sharedEngine = _NativeEngine();
 TerraEngine createTerraEngine() => _sharedEngine;
@@ -33,8 +34,19 @@ class _NativeEngine
         CircuitBackend,
         RegionBackend,
         WorldCircuitBackend,
+        WorldMapBackend,
         CircuitRulesBackend {
   Future<void>? _circuitRulesReady;
+
+  @override
+  Future<Uint8List> generateWorldMap(
+    EngineDocument world, {
+    Map<String, Object?>? markers,
+  }) async => (await _call('generateMap', [
+    world.handle,
+    world.kind,
+    markers == null ? null : validatedMapMarkers(markers),
+  ])) as Uint8List;
 
   @override
   Future<Object?> invokeCircuitRules(String method, List<Object?> args) async {
@@ -413,7 +425,7 @@ class _Bindings {
   final _Set playerSet;
   final _Patch playerPatch, playerSetMany;
   final _OpenJson playerOpenJson;
-  final _Image worldThumbnail;
+  final _Image worldThumbnail, worldMap;
   final _Error lastError;
   final Set<String> _handles = {};
 
@@ -443,6 +455,7 @@ class _Bindings {
       worldThumbnail = lib.lookupFunction<_ImageC, _Image>(
         'abc_world_thumbnail',
       ),
+      worldMap = lib.lookupFunction<_ImageC, _Image>('abc_world_map'),
       lastError = lib.lookupFunction<_ErrorC, _Error>('abc_error') {
     final abi = lib.lookupFunction<Uint32 Function(), int Function()>(
       'abc_engine_abi_version',
@@ -714,6 +727,30 @@ class _Bindings {
       throw const EngineException('存档会话已关闭或失效');
     }
     switch (method) {
+      case 'generateMap':
+        if (kind != 'wld') throw const EngineException('只有世界可以生成 MAP');
+        final markers = args[2] as Map?;
+        final request = markers == null
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(
+                validatedMapMarkers(Map<String, Object?>.from(markers)),
+              );
+        _operation(
+          handle,
+          markers == null ? 'render_lit_map' : 'mark_tiles_and_chests_map',
+          request,
+        );
+        final width = calloc<Uint32>(), height = calloc<Uint32>();
+        try {
+          // Successful copy releases the core's owned MAP media buffer.
+          return _read(
+            (p, n, r) => worldMap(handle, p, n, r, width, height),
+            maximum: 128 * 1024 * 1024,
+          );
+        } finally {
+          calloc.free(width);
+          calloc.free(height);
+        }
       case 'inspect':
         return _inspect(handle, kind);
       case 'save':

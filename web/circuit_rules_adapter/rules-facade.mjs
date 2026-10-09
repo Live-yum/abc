@@ -20,6 +20,9 @@ const arity = (args, min, max = min) => {
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 function boundedString(value, maximum, label) {
   if (typeof value !== 'string' || value.length > maximum) throw fail('CIRCUIT_LIMIT', `${label} exceeds its limit`);
+  // Every UTF-16 code unit needs at most three UTF-8 bytes (a valid surrogate
+  // pair needs four across two units). Keep the exact scan for larger strings.
+  if (value.length <= Math.floor(maximum / 3)) return value;
   // Count UTF-8 without requiring TextEncoder in embedded JS runtimes.
   let bytes = 0;
   for (let i = 0; i < value.length; i++) {
@@ -54,8 +57,11 @@ export function createRulesFacade(tx) {
   }
   function snapshot(id = activeId) {
     const s = sessionFor(id), editor = s.editor;
-    return { id, generation: s.generation, document: documentText(serializeDocument(editor.document)),
-      dirty: editor.dirty, revision: editor.revision, canUndo: editor.undoStack.length > 0,
+    const document = documentText(serializeDocument(editor.document));
+    // The pinned dirty getter compares this exact serialization with saved.
+    // Reuse the validated snapshot rather than validating the whole graph twice.
+    return { id, generation: s.generation, document,
+      dirty: document !== editor.saved, revision: editor.revision, canUndo: editor.undoStack.length > 0,
       canRedo: editor.redoStack.length > 0, selection: editor.selection,
       clipboardAvailable: editor.clipboard !== null, canReset: s.baseline !== null,
       preview: s.preview ? { kind: s.preview.kind, token: s.preview.token, editorId: id,

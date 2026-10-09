@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../cloud/cloud.dart';
 import 'generation_options_form.dart';
+import 'cloud_profile_dialog.dart';
+import 'cloud_help_section.dart';
 
 /// Network operations occur only after explicit user actions. File selection and
 /// local download saving are delegated to the embedding workspace.
@@ -11,10 +13,15 @@ class CloudWorkspacePanel extends StatefulWidget {
     this.backend,
     this.onUpload,
     this.onDownload,
+    this.onRecommendationDownload,
+    this.recommendationKind = 'all',
   });
   final CloudBackend? backend;
+  final String recommendationKind;
   final Future<void> Function()? onUpload;
   final Future<void> Function(CloudSave save)? onDownload;
+  final Future<void> Function(CloudRecommendation item)?
+  onRecommendationDownload;
   @override
   State<CloudWorkspacePanel> createState() => _CloudWorkspacePanelState();
 }
@@ -47,20 +54,37 @@ class _CloudWorkspacePanelState extends State<CloudWorkspacePanel> {
       listenable: backend,
       builder: (context, _) {
         if (!backend.connected) {
-          return Padding(
+          return ListView(
+            shrinkWrap: true,
+            primary: false,
             padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('云端未连接。需要受支持的登录方式；会话仅保留在内存中。'),
+            children: [
+              const Text('云端未连接。需要受支持的登录方式；会话仅保留在内存中。'),
+              OutlinedButton(
+                onPressed: backend.busy ? null : backend.signIn,
+                child: const Text('连接云端'),
+              ),
+              if (backend.error != null) Text(backend.error!),
+              if (backend.supports(CloudCapability.recommendations))
                 OutlinedButton(
-                  onPressed: backend.busy ? null : backend.signIn,
-                  child: const Text('连接云端'),
+                  onPressed: backend.busy
+                      ? null
+                      : () => backend.loadRecommendations(
+                          kind: widget.recommendationKind,
+                        ),
+                  child: const Text('加载推荐'),
                 ),
-                if (backend.error != null) Text(backend.error!),
-              ],
-            ),
+              ..._recommendationTiles(backend),
+              if (backend.hasMoreRecommendations &&
+                  widget.recommendationKind == backend.recommendationKind)
+                OutlinedButton(
+                  onPressed: backend.busy
+                      ? null
+                      : backend.loadMoreRecommendations,
+                  child: const Text('加载更多推荐'),
+                ),
+              if (backend.supports(CloudCapability.help)) _help(backend),
+            ],
           );
         }
         final options = backend.generationOptions;
@@ -71,6 +95,8 @@ class _CloudWorkspacePanelState extends State<CloudWorkspacePanel> {
           if (!options.versions.contains(_version)) _version = null;
         }
         return ListView(
+          shrinkWrap: true,
+          primary: false,
           padding: const EdgeInsets.all(16),
           children: [
             Row(
@@ -83,6 +109,12 @@ class _CloudWorkspacePanelState extends State<CloudWorkspacePanel> {
               ],
             ),
             if (backend.busy) const LinearProgressIndicator(),
+            if (backend.transferring)
+              TextButton(
+                onPressed: backend.cancelTransfer,
+                child: const Text('取消传输'),
+              ),
+            if (backend.notice != null) Text(backend.notice!),
             if (backend.error != null)
               Text(
                 backend.error!,
@@ -107,7 +139,9 @@ class _CloudWorkspacePanelState extends State<CloudWorkspacePanel> {
                   OutlinedButton(
                     onPressed: backend.busy
                         ? null
-                        : backend.loadRecommendations,
+                        : () => backend.loadRecommendations(
+                            kind: widget.recommendationKind,
+                          ),
                     child: const Text('加载推荐'),
                   ),
                 if (backend.supports(CloudCapability.profile))
@@ -124,6 +158,12 @@ class _CloudWorkspacePanelState extends State<CloudWorkspacePanel> {
             ),
             if (backend.account != null)
               ListTile(
+                leading: CloudAccountAvatar(
+                  avatarUrl: backend.normalizeAvatar(
+                    backend.account!['avatar']?.toString() ?? '',
+                  ),
+                  nickname: backend.account!['nickname']?.toString() ?? '',
+                ),
                 title: Text(
                   backend.account!['nickname']?.toString() ?? 'Cloud account',
                 ),
@@ -133,74 +173,55 @@ class _CloudWorkspacePanelState extends State<CloudWorkspacePanel> {
                         onPressed: backend.busy
                             ? null
                             : () => _editProfile(backend),
-                        child: const Text('编辑昵称'),
+                        child: const Text('编辑资料'),
                       )
                     : null,
               ),
-            ...backend.saves.map(
-              (save) => ListTile(
-                title: Text(save.fileName),
-                subtitle: Text(
-                  '${save.kind} · ${save.status.name} · ${save.fileSize} bytes',
-                ),
-                trailing: Wrap(
-                  children: [
-                    if (save.kind == 'world' &&
-                        backend.supports(CloudCapability.generation))
-                      TextButton(
-                        onPressed: backend.busy
-                            ? null
-                            : () => backend.observeJob(save),
-                        child: const Text('查看进度'),
-                      ),
-                    if (save.status == CloudJobStatus.ready &&
-                        backend.supports(CloudCapability.download) &&
-                        widget.onDownload != null)
-                      TextButton(
-                        onPressed: backend.busy
-                            ? null
-                            : () => widget.onDownload!(save),
-                        child: const Text('下载'),
-                      ),
-                  ],
-                ),
+            ...backend.saves.map((save) => _saveCard(backend, save)),
+            if (backend.hasMoreSaves)
+              OutlinedButton(
+                onPressed: backend.busy ? null : backend.loadMoreSaves,
+                child: const Text('加载更多存档'),
               ),
-            ),
-            ...backend.recommended.map(
-              (item) => ListTile(
-                title: Text(item['title']?.toString() ?? 'Recommendation'),
-                subtitle: Text(item['description']?.toString() ?? ''),
+            ..._recommendationTiles(backend),
+            if (backend.hasMoreRecommendations &&
+                widget.recommendationKind == backend.recommendationKind)
+              OutlinedButton(
+                onPressed: backend.busy
+                    ? null
+                    : backend.loadMoreRecommendations,
+                child: const Text('加载更多推荐'),
               ),
-            ),
+            if (backend.supports(CloudCapability.recommendations) &&
+                backend.hasAccountIdentity)
+              OutlinedButton(
+                onPressed: backend.busy
+                    ? null
+                    : backend.retryRecommendationReceipts,
+                child: Text('同步下载回执（${backend.pendingReceiptCount}）'),
+              ),
+            if (backend.supports(CloudCapability.help)) _help(backend),
             if (backend.submissionUncertain)
               const Text(
                 'Submission response was lost. 刷新存档 and select the created job before doing anything else; automatic resubmission is blocked.',
               ),
             if (backend.job case final job?)
-              Card(
-                child: ListTile(
-                  title: Text(job.fileName),
-                  subtitle: Text('Generation: ${job.status.name}'),
-                  trailing: Wrap(
-                    children: [
-                      TextButton(
-                        onPressed: backend.busy ? null : backend.refreshJob,
-                        child: const Text('刷新任务'),
-                      ),
-                      if (!job.status.terminal)
-                        TextButton(
-                          onPressed: backend.busy ? null : backend.cancelJob,
-                          child: const Text('取消任务'),
-                        ),
-                      if (job.status.retryable)
-                        TextButton(
-                          onPressed: backend.busy ? null : backend.retryJob,
-                          child: const Text('重试任务'),
-                        ),
-                    ],
-                  ),
+              _recordCard(job.fileName, 'Generation: ${job.status.name}', [
+                TextButton(
+                  onPressed: backend.busy ? null : backend.refreshJob,
+                  child: const Text('刷新任务'),
                 ),
-              ),
+                if (!job.status.terminal)
+                  TextButton(
+                    onPressed: backend.busy ? null : backend.cancelJob,
+                    child: const Text('取消任务'),
+                  ),
+                if (job.status.retryable)
+                  TextButton(
+                    onPressed: backend.busy ? null : backend.retryJob,
+                    child: const Text('重试任务'),
+                  ),
+              ]),
             if (options != null && !options.enabled) const Text('服务端暂未启用世界生成。'),
             if (options != null && options.enabled) ...[
               TextField(
@@ -214,6 +235,7 @@ class _CloudWorkspacePanelState extends State<CloudWorkspacePanel> {
                 decoration: const InputDecoration(labelText: 'Seed'),
               ),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: options.versions.contains(_version)
                     ? _version
                     : null,
@@ -278,46 +300,154 @@ class _CloudWorkspacePanelState extends State<CloudWorkspacePanel> {
     );
   }
 
+  Widget _recordCard(String title, String subtitle, List<Widget> actions) =>
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              Text(subtitle),
+              Wrap(spacing: 8, runSpacing: 4, children: actions),
+            ],
+          ),
+        ),
+      );
+
+  Widget _saveCard(CloudBackend backend, CloudSave save) => _recordCard(
+    save.fileName,
+    '${save.kind} · ${save.status.name} · ${save.fileSize} bytes',
+    [
+      TextButton(
+        onPressed: backend.busy ? null : () => _deleteSave(backend, save),
+        child: const Text('删除云端'),
+      ),
+      if (save.kind == 'world' && backend.supports(CloudCapability.generation))
+        TextButton(
+          onPressed: backend.busy ? null : () => backend.observeJob(save),
+          child: const Text('查看进度'),
+        ),
+      if (save.status == CloudJobStatus.ready &&
+          backend.supports(CloudCapability.download) &&
+          widget.onDownload != null)
+        TextButton(
+          onPressed: backend.busy ? null : () => widget.onDownload!(save),
+          child: const Text('下载'),
+        ),
+    ],
+  );
+
   Future<void> _editProfile(CloudBackend backend) async {
     final account = backend.account;
     final originalSession = backend.session;
     if (account == null) return;
-    final controller = TextEditingController(
-      text: account['nickname']?.toString() ?? '',
+    final value = await showCloudProfileDialog(
+      context,
+      account: account,
+      normalizeAvatar: backend.normalizeAvatar,
     );
-    final nickname = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('编辑云端昵称'),
-        content: TextField(
-          controller: controller,
-          maxLength: 80,
-          decoration: const InputDecoration(labelText: 'Nickname'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('保存到云端'),
-          ),
-        ],
-      ),
-    );
-    // Let the dialog route release its text field before disposing its controller.
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    controller.dispose();
     if (!mounted ||
-        nickname == null ||
-        nickname.isEmpty ||
+        value == null ||
         !backend.connected ||
         !identical(originalSession, backend.session)) {
       return;
     }
-    await backend.saveProfile({'id': account['id'], 'nickname': nickname});
+    await backend.saveProfile(value);
   }
+
+  Future<void> _deleteSave(CloudBackend backend, CloudSave save) async {
+    final originalSession = backend.session;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除云端存档？'),
+        content: Text('将删除此账户的 ${save.fileName} 云端副本。本地文件会保留。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除云端'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted ||
+        approved != true ||
+        !backend.connected ||
+        !identical(originalSession, backend.session)) {
+      return;
+    }
+    await backend.deleteSave(save);
+  }
+
+  Widget _help(CloudBackend backend) => CloudHelpSection(
+    articles: backend.helpArticles,
+    loading: backend.helpLoading,
+    loaded: backend.helpLoaded,
+    error: backend.helpError,
+    onLoad: backend.busy ? null : backend.loadHelp,
+  );
+
+  List<Widget> _recommendationTiles(CloudBackend backend) => backend.recommended
+      .where(
+        (item) =>
+            widget.recommendationKind == 'all' ||
+            item.kind == widget.recommendationKind,
+      )
+      .map(
+        (item) => Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Text(item.description),
+                Text(
+                  '${item.kind} · ${item.fileSize} bytes · ${item.likeCount} 赞 · ${item.downloadCount} 下载',
+                ),
+                if (backend.recommendationTransfers[item.id]
+                    case final transfer?)
+                  Text('转存：${transfer.status}'),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    TextButton(
+                      onPressed: backend.busy || !backend.connected
+                          ? null
+                          : () => backend.likeRecommendation(item),
+                      child: Text(item.liked ? '取消点赞' : '点赞'),
+                    ),
+                    TextButton(
+                      onPressed:
+                          backend.busy ||
+                              !backend.hasAccountIdentity ||
+                              widget.onRecommendationDownload == null
+                          ? null
+                          : () => widget.onRecommendationDownload!(item),
+                      child: const Text('下载推荐'),
+                    ),
+                    TextButton(
+                      onPressed: backend.busy || !backend.hasAccountIdentity
+                          ? null
+                          : () => backend.transferRecommendation(item),
+                      child: const Text('转存云端 / 查询进度'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      )
+      .toList();
 
   Widget _choice(
     String label,
@@ -325,6 +455,7 @@ class _CloudWorkspacePanelState extends State<CloudWorkspacePanel> {
     List<String> choices,
     void Function(String) onChanged,
   ) => DropdownButtonFormField<String>(
+    isExpanded: true,
     initialValue: value,
     decoration: InputDecoration(labelText: label),
     items: choices
