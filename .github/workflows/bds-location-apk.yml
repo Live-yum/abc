@@ -1,0 +1,84 @@
+name: BDS location APK
+on:
+  push:
+    branches: [codex/bds-location-apk]
+    paths:
+      - 'examples/bds_location/**'
+      - '.github/workflows/bds-location-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bds-location-apk-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  CI: 'true'
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install pinned official Flutter
+        run: |
+          set -euo pipefail
+          sdk="$RUNNER_TEMP/flutter"
+          git clone --depth 1 --branch 3.47.6 https://github.com/flutter/flutter.git "$sdk"
+          test "$(git -C "$sdk" rev-parse HEAD)" = 5fc346839b5d0eef006ed8404392afb4dfae428d
+          echo "$sdk/bin" >> "$GITHUB_PATH"
+          echo "PUB_CACHE=$RUNNER_TEMP/pub-cache" >> "$GITHUB_ENV"
+          "$sdk/bin/flutter" --version
+      - name: Prepare independent Android project
+        run: |
+          set -euo pipefail
+          flutter create --platforms=android --org=app.local --project-name=bds_location "$RUNNER_TEMP/bds-build"
+          cp examples/bds_location/pubspec.yaml examples/bds_location/analysis_options.yaml examples/bds_location/README.md "$RUNNER_TEMP/bds-build/"
+          rm "$RUNNER_TEMP/bds-build/test/widget_test.dart"
+          cp -R examples/bds_location/lib examples/bds_location/test examples/bds_location/ci "$RUNNER_TEMP/bds-build/"
+          cd "$RUNNER_TEMP/bds-build"
+          python3 ci/prepare_android.py
+          flutter pub get
+          dart format lib test
+          flutter analyze --no-pub
+          flutter test --no-pub --reporter expanded
+      - name: Build split release APKs with ephemeral test signing
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/bds-build"
+          flutter build apk --release --split-per-abi --no-pub
+      - name: Verify permissions, identities, and signatures; package source
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/bds-build"
+          mkdir -p "$GITHUB_WORKSPACE/bds-output"
+          buildtools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          for apk in build/app/outputs/flutter-apk/*-release.apk; do
+            name="BDS-location-1.0.0-$(basename "$apk" | sed 's/app-//')"
+            "$buildtools/apksigner" verify --verbose --print-certs "$apk" > "$GITHUB_WORKSPACE/bds-output/$name.signature.txt"
+            "$buildtools/aapt" dump badging "$apk" > "$GITHUB_WORKSPACE/bds-output/$name.manifest.txt"
+            "$buildtools/aapt" dump permissions "$apk" > "$GITHUB_WORKSPACE/bds-output/$name.permissions.txt"
+            grep -q 'android.permission.ACCESS_FINE_LOCATION' "$GITHUB_WORKSPACE/bds-output/$name.permissions.txt"
+            grep -q 'android.permission.ACCESS_COARSE_LOCATION' "$GITHUB_WORKSPACE/bds-output/$name.permissions.txt"
+            if grep -E 'android.permission.(INTERNET|ACCESS_BACKGROUND_LOCATION|FOREGROUND_SERVICE)' "$GITHUB_WORKSPACE/bds-output/$name.permissions.txt"; then exit 1; fi
+            grep -q "package: name='app.local.bds_location'" "$GITHUB_WORKSPACE/bds-output/$name.manifest.txt"
+            cp "$apk" "$GITHUB_WORKSPACE/bds-output/$name"
+          done
+          zip -q -r "$GITHUB_WORKSPACE/bds-output/BDS-location-1.0.0-source.zip" lib test android ci pubspec.yaml pubspec.lock analysis_options.yaml README.md -x '*/.gradle/*' '*/local.properties' '*.keystore' '*.jks' '*/key.properties' '*/__pycache__/*'
+          cp README.md "$GITHUB_WORKSPACE/bds-output/README.md"
+          cd "$GITHUB_WORKSPACE/bds-output"
+          sha256sum *.apk *.zip > SHA256SUMS.txt
+          ls -lh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bds-location-apk-and-source
+          path: bds-output/
+          retention-days: 30
+          if-no-files-found: error
