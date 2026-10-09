@@ -1,0 +1,29 @@
+{
+  "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
+  "emscripten": "5.0.7",
+  "localPatches": [
+    "64-bit-pointer-safety",
+    "persistent-allocation-lifetime",
+    "native-zlib-bridge",
+    "abc-host-integration"
+  ],
+  "artifacts": {
+    "world.js": {
+      "bytes": 21330,
+      "sha256": "1ef8e6507abe27dc16daf72fb64de0aa4eb71d66a52a3e487b863618064c5a1d"
+    },
+    "world.wasm": {
+      "bytes": 438514,
+      "sha256": "ca0cc3569976d359d66ab5f19d8e0a34d819009d8d058e8d09d4947c6968147c"
+    },
+    "player.js": {
+      "bytes": 64516,
+      "sha256": "95bfdcea6dfbbc98a6b069ea13c360bfd8a762cfa71b153a2adf523faef599be"
+    },
+    "player.wasm": {
+      "bytes": 66245,
+      "sha256": "597206bffbdfe7caa781bacaff6cab124844f0062b1955b0a2aabbcbbd4303b0"
+    }
+  },
+  "sourceManifestSha256": "9b55c8ad55a4ce8ad848c58e8c9ec80fb78285405f6a7cccc44c8c95b74dbb7a"
+}

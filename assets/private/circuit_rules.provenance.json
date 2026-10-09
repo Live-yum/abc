@@ -1,0 +1,279 @@
+{
+  "schema": 1,
+  "sourceCommit": "366ebc57751cadfb077f968f4d5069028b3bf9a6",
+  "sourceRepository": "Live-yan/viewer-app",
+  "sourceUrl": "https://github.com/Live-yan/viewer-app/tree/366ebc57751cadfb077f968f4d5069028b3bf9a6/features/circuit",
+  "source": "Authoritative viewer circuit domain, editor, computation session and traversal; included under the user's explicit publication authorization",
+  "distribution": "User-authorized inclusion in abc source and builds. Preserve source attribution and this provenance. Game artwork, executables and personal saves remain excluded.",
+  "bundler": {
+    "name": "esbuild",
+    "version": "0.20.1"
+  },
+  "sourceVerification": {
+    "method": "retrieved-git-blob-manifest",
+    "sha256": "45f2e305f7fdfe80b05940f02c18629bf0eab9a9ac628a505d7669193faec05a"
+  },
+  "helper": {
+    "path": "tool/build_circuit_rules.mjs",
+    "bytes": 6801,
+    "sha256": "d4a687fafe9145a0cce8cb819dd1c24ea421ea078e18e83d0632b3e72f853482"
+  },
+  "modules": [
+    {
+      "path": "features/circuit/domain/actuation-data.mjs",
+      "bytes": 3920,
+      "sha256": "4715dc69bf7e0b7fbc4684d07df63e25192c4d69c0e4bd1182c2fbb6aef8f5fb"
+    },
+    {
+      "path": "features/circuit/domain/actuation.mjs",
+      "bytes": 6062,
+      "sha256": "d3789df0806d1af3b41667fc22a69ee4395e3070d6db0d8a9ce695dddb449854"
+    },
+    {
+      "path": "features/circuit/domain/catalog.mjs",
+      "bytes": 9868,
+      "sha256": "c87adfc2f32519d7bbfb0ff678006782d7e0d135144e374865d96f2e782c3d83"
+    },
+    {
+      "path": "features/circuit/domain/compat.mjs",
+      "bytes": 573,
+      "sha256": "d84ac4845dded541024a59d757023f01d37b6d0c292c7e24ae999125331be9d7"
+    },
+    {
+      "path": "features/circuit/domain/device-state.mjs",
+      "bytes": 6618,
+      "sha256": "30f5b53d866a92dff374754a5ad36f26acc6a71a3d786b948aa7303892eb22d7"
+    },
+    {
+      "path": "features/circuit/domain/devices-catalog.mjs",
+      "bytes": 9695,
+      "sha256": "bff150682b66921f53c66d9a6b55d4fe4dccb75fc0c975f5f1d78c68889a711c"
+    },
+    {
+      "path": "features/circuit/domain/editor.mjs",
+      "bytes": 30098,
+      "sha256": "1215c9abccf29b351d7624d35bf9e567b87241490f79d798dc7d76669630feb4"
+    },
+    {
+      "path": "features/circuit/domain/effect-state.mjs",
+      "bytes": 4874,
+      "sha256": "8809d71d23928de65577f4942d4431c05e7f9e3723b771cbe0b2fa129bf5422d"
+    },
+    {
+      "path": "features/circuit/domain/effects-catalog.mjs",
+      "bytes": 7090,
+      "sha256": "21deced1c62667189a1f6747cbd76c419f47670c1b061247a537f7bf035e1ca5"
+    },
+    {
+      "path": "features/circuit/domain/engine.mjs",
+      "bytes": 23499,
+      "sha256": "9acf91d3b6f5e953c094102e83c9d09625213af6febe07880e2f568564511264"
+    },
+    {
+      "path": "features/circuit/domain/hello-example.mjs",
+      "bytes": 4297,
+      "sha256": "c0b733c6f7b3000cc6e7de685f0bee24cac1a44db0652e011d06b388de6dffbc"
+    },
+    {
+      "path": "features/circuit/domain/lighting-batch1-catalog.mjs",
+      "bytes": 16032,
+      "sha256": "340947b2df8bb971286228130c2b15e5378e55d77cf90196999fd1cb4f6934fc"
+    },
+    {
+      "path": "features/circuit/domain/lighting-catalog.mjs",
+      "bytes": 796,
+      "sha256": "22a479d73d11b50818c0b5dc0f3c59fd1c9753401c98b9147cea8082aa65dd98"
+    },
+    {
+      "path": "features/circuit/domain/lighting-extra-catalog.mjs",
+      "bytes": 10917,
+      "sha256": "9acee0da203d4872d020a71f573978c98bba84839e8a9167224243b6770add98"
+    },
+    {
+      "path": "features/circuit/domain/mechanical-state.mjs",
+      "bytes": 3162,
+      "sha256": "452a5433501000ecb7407f05c6dba9ea6b70c71d86b23ac3ddab4a4e38d4e958"
+    },
+    {
+      "path": "features/circuit/domain/mechanism-state.mjs",
+      "bytes": 5540,
+      "sha256": "ce3de380f61856779af77a53375e699601d513c53b6171ff7243a5a5d40c2c1a"
+    },
+    {
+      "path": "features/circuit/domain/mechanisms-catalog.mjs",
+      "bytes": 12212,
+      "sha256": "6a5e48b2c55f7db9406928be969bdcb692a7a56d7b198f225ab31292b997b9f3"
+    },
+    {
+      "path": "features/circuit/domain/model.mjs",
+      "bytes": 13881,
+      "sha256": "862cb2010e16dc6013d8fd82dbd46eb3ab1ff5b437e77a8d3e13b1031a66f84e"
+    },
+    {
+      "path": "features/circuit/domain/native-tile-data.mjs",
+      "bytes": 114027,
+      "sha256": "23a3806c39ca3161b99f1ef1aff3bed9e87d7c57050b863c1a01ea05be61e03f"
+    },
+    {
+      "path": "features/circuit/domain/native-tiles.mjs",
+      "bytes": 1718,
+      "sha256": "8ae841fce7a66f785e96e9279b848f462d28a9292f81baaecff2fcc82b14b22f"
+    },
+    {
+      "path": "features/circuit/domain/object-records.mjs",
+      "bytes": 5368,
+      "sha256": "46d7b6ae8e50507c7369b9792681b32f2660059d9df71f5de6096a81f17f7f8b"
+    },
+    {
+      "path": "features/circuit/domain/object-text.mjs",
+      "bytes": 5154,
+      "sha256": "1fe3340838cd4850b8814c7e2851b7d6ad0022b5b6dd699e46616e7ca730fc1b"
+    },
+    {
+      "path": "features/circuit/domain/one-shot-state.mjs",
+      "bytes": 3132,
+      "sha256": "5fdd12dad0be6df39a0cc1e96c4bd6c7f2cba0ab33c7153577e18fa7c1dc8766"
+    },
+    {
+      "path": "features/circuit/domain/one-shot.mjs",
+      "bytes": 4354,
+      "sha256": "1717b7f3dcd14c7281521fbcdb201d6054685a26ee887dc3ee957f4556fc0713"
+    },
+    {
+      "path": "features/circuit/domain/placement-support-data.mjs",
+      "bytes": 23215,
+      "sha256": "06fed9e7a78022668ff88c84fa6a351812baad0f41e132f4188566961a9b8c55"
+    },
+    {
+      "path": "features/circuit/domain/placement-supports.mjs",
+      "bytes": 24233,
+      "sha256": "512abe9944db4088e4d4a57d75771cb05b51c857f5bccf6a1111cd69ea270489"
+    },
+    {
+      "path": "features/circuit/domain/pulse-catalog.mjs",
+      "bytes": 3085,
+      "sha256": "20158581567727dcb7150bc6113e8fe4fd64b6d87803fe1ec39ec0ff1721f0b2"
+    },
+    {
+      "path": "features/circuit/domain/pulse-state.mjs",
+      "bytes": 4285,
+      "sha256": "e14fc41d67f9a117a41be1a9683a3e132f3013866b53aac7ed56b0e9aa289b0b"
+    },
+    {
+      "path": "features/circuit/domain/register-example.mjs",
+      "bytes": 2915,
+      "sha256": "555d83b9858828c710f3b1a1b420a43bb85266ae09d5d7774bdceb966b40a69e"
+    },
+    {
+      "path": "features/circuit/domain/remaining-catalog.mjs",
+      "bytes": 48962,
+      "sha256": "5ecbed2c08b84e33d71c008126c8d88ea7dfe23d1df71da647b038ac53ec663b"
+    },
+    {
+      "path": "features/circuit/domain/remaining-state.mjs",
+      "bytes": 9082,
+      "sha256": "541d0c962b3787bdee287f951dbaa2d94eddd3650b119140d35f5ce34f585dbc"
+    },
+    {
+      "path": "features/circuit/domain/routing.mjs",
+      "bytes": 6600,
+      "sha256": "6496c158b9a30abab2a13c9eab71def9aed3734b7a6998b19419a29593c795cd"
+    },
+    {
+      "path": "features/circuit/domain/storage-catalog.mjs",
+      "bytes": 30033,
+      "sha256": "0eb10dbc774fe542e82c07113386cf0d1996c883322a09aa8d5fe08b2d0fe23e"
+    },
+    {
+      "path": "features/circuit/domain/storage-state.mjs",
+      "bytes": 4103,
+      "sha256": "24bd8787b1f1d17c667859c5116663d1a32e0c7a0e4a9a5101ddd75c90e5b095"
+    },
+    {
+      "path": "features/circuit/domain/support-state.mjs",
+      "bytes": 3852,
+      "sha256": "ddd98610ceb00b42f0e91e49ab1d05cf50b29f3e4c1150834bcf989a9ccbca75"
+    },
+    {
+      "path": "features/circuit/domain/world-tile.mjs",
+      "bytes": 4142,
+      "sha256": "a404df631013e05939b033ed31f96c03cd591f20ade4bb595c4543781bf0ffe3"
+    },
+    {
+      "path": "features/circuit/runtime/native-traversal.mjs",
+      "bytes": 7262,
+      "sha256": "3c3e14c846b9c1ca4d68cc924c4613f2f7a91d9a56099653c85dab31525617cd"
+    },
+    {
+      "path": "features/circuit/services/computation-session.mjs",
+      "bytes": 8981,
+      "sha256": "75e06f8e45bf98f84b4e3d723d3a185bc9bde9ae34cd7d8bdb2d87a41bad044a"
+    },
+    {
+      "path": "features/circuit/services/memory.mjs",
+      "bytes": 1720,
+      "sha256": "650e7ce8d491326146439be1b12c2033eb4fb8e2be10b1f104e4fcf9353cc6fd"
+    },
+    {
+      "path": "shared/circuit-object-protocol.mjs",
+      "bytes": 3652,
+      "sha256": "e5cc1ae5222346bfa2873e4031e6f714c9b71c8a838e32879a738593f4fda5a0"
+    }
+  ],
+  "adapters": [
+    {
+      "path": "web/circuit_rules_adapter/native-entry.mjs",
+      "bytes": 764,
+      "sha256": "a9bd380cd04d493f54aead11ee348125c98dde47e4c8a75d9bf2aba510f4f9da"
+    },
+    {
+      "path": "web/circuit_rules_adapter/native-traversal.mjs",
+      "bytes": 3734,
+      "sha256": "71f903723fdb7ef11b1bdfcc5302cb5c2f6fd4dc8f74c4c99b1cddfdfc99f0b3"
+    },
+    {
+      "path": "web/circuit_rules_adapter/rules-facade.mjs",
+      "bytes": 13709,
+      "sha256": "a8760838e7322ccaf354ac0bd32831c44b7e9750d7d3d6c90a869c9aa72900bc"
+    },
+    {
+      "path": "web/circuit_rules_adapter/web-entry.mjs",
+      "bytes": 328,
+      "sha256": "b4211860f009fb608d9235d2c2cf20c7adad30c7642636a0b02dc3870a89330b"
+    }
+  ],
+  "hosts": [
+    {
+      "path": "web/terra_circuit_rules.js",
+      "bytes": 4736,
+      "sha256": "754c4e0f44e71a73e4c0dec04a997f22d281bf8d8940cd95510204013e5c47bf"
+    },
+    {
+      "path": "web/terra_circuit_rules_worker.js",
+      "bytes": 4797,
+      "sha256": "ffd6bac40a930fdc35ce04ee4cd80c84203f0e4e82bfdf52a7430f45b61b4457"
+    },
+    {
+      "path": "lib/engine/web_engine.dart",
+      "bytes": 3413,
+      "sha256": "e2123c1bbf76720712446facbf7b8b85ce786ad736cad32cb083ea187908a645"
+    },
+    {
+      "path": "lib/engine/circuit_rules_backend.dart",
+      "bytes": 276,
+      "sha256": "e27880638273c868606ff7bbb8cf3edf0a4cb9bcdff162bc51ded27b6ed65d3d"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "assets/private/circuit_rules_native.js",
+      "bytes": 376956,
+      "sha256": "6601e4c4a6320d42578e6662f50e9880d7df5c0e7ddf8d3beaecfc204aaf4958"
+    },
+    {
+      "path": "web/engine/circuit_rules_web.js",
+      "bytes": 374952,
+      "sha256": "2ae54b9d8e0f29ed31008aa341bb61e478ac737dd101c51041894bcbdaab610f"
+    }
+  ]
+}

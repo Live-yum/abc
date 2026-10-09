@@ -1,0 +1,499 @@
+{
+  "schema": 1,
+  "sourceRepository": "Live-yum/TerraWasm",
+  "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
+  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs.",
+  "license": "No upstream license grant identified; inclusion is user-authorized and does not relicense upstream material.",
+  "files": [
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 25671,
+      "sha256": "bc180b08dd16d190e17d2d149e3fddbb8216be6d642c6d8969ceeaeb53d8a53c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 21780,
+      "sha256": "606997a6056d091a62f86cd084dfdc7c030a9a5571596c5e73d928ff663722c8"
+    },
+    {
+      "path": "exports.plr.txt",
+      "bytes": 1052,
+      "sha256": "85eade9370f871e2506c4ef13e52347a81fdf4de5acc9a6cc883f04acfe74b80"
+    },
+    {
+      "path": "exports.txt",
+      "bytes": 4031,
+      "sha256": "2fb901864740bef3b13d0c7cf38a80599cc9d13a3feb0f481f1d95109df2ead0"
+    },
+    {
+      "path": "exports.web.txt",
+      "bytes": 3975,
+      "sha256": "5e57ff4f62926651454fb7d0f9f4f345a919284b88a27cf82866c6643df3a3b6"
+    },
+    {
+      "path": "exports.wld.txt",
+      "bytes": 3236,
+      "sha256": "9d0dec77e282ee6ac9427e3ad9778e468a561dfda5f547dfe73d640bdbd6d367"
+    },
+    {
+      "path": "exports.wld.web.txt",
+      "bytes": 2625,
+      "sha256": "89dd71783a62d2306d2e9465dd8f64ac7c1021ed03310f0c05a485f63c9b2d0f"
+    },
+    {
+      "path": "include/terra_abi.h",
+      "bytes": 643,
+      "sha256": "9080459a63f5a564d8852958ef6b87a147c05cc27387ef698b0a9707e8f41aea"
+    },
+    {
+      "path": "include/terra_checkpoint.h",
+      "bytes": 482,
+      "sha256": "ab0eb3a2c248a9d01333ef5b252943d4bf7df27b0dc55fe291ac835d2c370e29"
+    },
+    {
+      "path": "include/terra_circuit.h",
+      "bytes": 3646,
+      "sha256": "1b66da0fa3603a8bc797ba3e4b8af00e8c4ede5487457d8ff981371e1d6b3b15"
+    },
+    {
+      "path": "include/terra_circuit_actuation.h",
+      "bytes": 1359,
+      "sha256": "e3c852404f86c059655d83f905d73af32c653bf51dfced8d0596993395f189b1"
+    },
+    {
+      "path": "include/terra_circuit_anchor_permissions.h",
+      "bytes": 3124,
+      "sha256": "666e0fbde504a0af9e0b3d36f55f76fee076ae922da86409512a4a7a458ab06c"
+    },
+    {
+      "path": "include/terra_circuit_materials.h",
+      "bytes": 2596,
+      "sha256": "3eaad5ddd07dfab57d3437009e4dfea7268477dcb94a2b05f30cb513dfe27d96"
+    },
+    {
+      "path": "include/terra_circuit_mechanism_tiles.h",
+      "bytes": 779,
+      "sha256": "a7566697b367725ec23bfd73ee81013c37ed3bfffcbd2e72db20bb83287f6224"
+    },
+    {
+      "path": "include/terra_circuit_support_materials.h",
+      "bytes": 2424,
+      "sha256": "c2c2ef196a45487b0450aacbca9ec92417af4e689fd540c3ba7e0ec729b78456"
+    },
+    {
+      "path": "include/terra_circuit_twld.h",
+      "bytes": 3167,
+      "sha256": "3bdbbdb72fc4061b42381f014c43ad49e22f4ef86d879f2a015658dcc05b3843"
+    },
+    {
+      "path": "include/terra_circuit_vm.h",
+      "bytes": 5528,
+      "sha256": "ab5a6b9de349d7ddf5b206034cafb364acdac3568f5c7eac90b00054659de2ea"
+    },
+    {
+      "path": "include/terra_circuit_world.h",
+      "bytes": 6543,
+      "sha256": "6728a2c78cc025aa40e34660217d7b5323485898dac8b780ffb3bfecb9712f8f"
+    },
+    {
+      "path": "include/terra_color_data.h",
+      "bytes": 407753,
+      "sha256": "e3015d4944b17132dc38ab354b98cd9afd13331eb82305beabebc595505d4c87"
+    },
+    {
+      "path": "include/terra_commands.h",
+      "bytes": 648,
+      "sha256": "7787386480fa898db8a78e47ff68effe0817fcc01cd2f5c13d1a2733c60bc049"
+    },
+    {
+      "path": "include/terra_hash.h",
+      "bytes": 594,
+      "sha256": "e07f75ff0bf32bad55ac673cd0edf9999ee74f90c87b19d8d0c56a85ed01ec71"
+    },
+    {
+      "path": "include/terra_icon.h",
+      "bytes": 708,
+      "sha256": "e80f62ba59ce77beeeb35617f64f56195dc23903fa6225395c6bcba931ca7b31"
+    },
+    {
+      "path": "include/terra_legacy.h",
+      "bytes": 203,
+      "sha256": "82aa6129a12aea1f2d571b27bc456e39aaa5dd6495c3dfe28af449052e0797bb"
+    },
+    {
+      "path": "include/terra_map.h",
+      "bytes": 1386,
+      "sha256": "fbff98c8a26530418ebeb26bd661fdd84b1b8409dacfddee389366968854a2fb"
+    },
+    {
+      "path": "include/terra_map_runtime.h",
+      "bytes": 1451,
+      "sha256": "cd058170763dc87d24f49506f50d20bcb461305b6ccd0e46fbca724f0f694b93"
+    },
+    {
+      "path": "include/terra_output.h",
+      "bytes": 1904,
+      "sha256": "5ff838003f4553c8b71ca1d51d66dd9aa282a3f18c16b741f0189f5e10c45aff"
+    },
+    {
+      "path": "include/terra_pixel_workspace.h",
+      "bytes": 7261,
+      "sha256": "c1f1eb923d8bd7a4117e6753519392e681fd9fc1a12ca5ec9282e5b981cc725b"
+    },
+    {
+      "path": "include/terra_plr.h",
+      "bytes": 4847,
+      "sha256": "3a11a8d3f7b0cc10361cf3830298b2362141b7a6c2c3ab238c5f05d445a77134"
+    },
+    {
+      "path": "include/terra_reader.h",
+      "bytes": 404,
+      "sha256": "b9a967a6aef5e3772183b08d35f70e810d750866561f3d451ae3363bcd5684cd"
+    },
+    {
+      "path": "include/terra_regions.h",
+      "bytes": 372,
+      "sha256": "2bd6c5b596dc0b952e1a1039dab5c7f169e8628f3a65d03bb5665f21045788ca"
+    },
+    {
+      "path": "include/terra_render_task.h",
+      "bytes": 828,
+      "sha256": "077fad3fde3fdaa219b31327e2d76f49c52c881ef7dedaccc718764b2b1042d6"
+    },
+    {
+      "path": "include/terra_status.h",
+      "bytes": 778,
+      "sha256": "0d12cea620b684f56eab8415c56074f50314afdbc426c2c150b44f741ec279c3"
+    },
+    {
+      "path": "include/terra_stream.h",
+      "bytes": 3322,
+      "sha256": "e821f1d139d8b7ba5c8c80a294b41d9894965573d561312d4745d4c4448bb77d"
+    },
+    {
+      "path": "include/terra_stream_map.h",
+      "bytes": 606,
+      "sha256": "4367b3e6f428f7599eff3721561312964f7288289568273993fe97e3ae827e49"
+    },
+    {
+      "path": "include/terra_stream_metadata.h",
+      "bytes": 737,
+      "sha256": "847cba0156afd0174157d29da77d305ddb5dd38efc2299565a2dd33affd42057"
+    },
+    {
+      "path": "include/terra_stream_png.h",
+      "bytes": 1010,
+      "sha256": "9de4221c8861842f5d6e99ee0f29afb6c27d25b25d7598cf69266474b89ed986"
+    },
+    {
+      "path": "include/terra_task.h",
+      "bytes": 936,
+      "sha256": "ae6e6811c81bd2abf1cb65d31d482b1625051425298df0b27666edc0de9e12f2"
+    },
+    {
+      "path": "include/terra_theme.h",
+      "bytes": 183,
+      "sha256": "2d027f7b16e8b8982375345ab37c6cf8e208fcae314af6b4b3bec21cfdc21ac8"
+    },
+    {
+      "path": "include/terra_txci.h",
+      "bytes": 3082,
+      "sha256": "6f2324285de2fef89a851886a0c4b214584784eb7cfe8e6eb86e69ff1b844862"
+    },
+    {
+      "path": "include/terra_types.h",
+      "bytes": 20790,
+      "sha256": "e3365263e47f86240a68f2c7ce01d534627bf14d39a5d981a47bb1ff13efe7b7"
+    },
+    {
+      "path": "include/terra_wld_guard_task.h",
+      "bytes": 618,
+      "sha256": "69af108da6093f44d58891a1779c5cf6a7bbdeafb50b75a1f7dbd5797943c732"
+    },
+    {
+      "path": "include/terra_world.h",
+      "bytes": 3412,
+      "sha256": "793a851bee2828a8c5b3f9ba31b0a8f537ee0add75b835a7df2c781a44ace3f0"
+    },
+    {
+      "path": "scripts/memory-growth-limit.js",
+      "bytes": 657,
+      "sha256": "e7159079f2e27ad218c551cb2a7d0bae0df9d5c3f231d9d0e93c3f3165137b32"
+    },
+    {
+      "path": "src/terra_abi.c",
+      "bytes": 4304,
+      "sha256": "fbf85a40d92725a4ec4961947d7043dd0f102189e176a52c3d86406dd0753bdc"
+    },
+    {
+      "path": "src/terra_api.c",
+      "bytes": 52396,
+      "sha256": "88f868eb30f105c50e951c5b88835c81d081d6865a223a3581fdba4b9da31b08"
+    },
+    {
+      "path": "src/terra_circuit.c",
+      "bytes": 15669,
+      "sha256": "ea4db01eb573d2d80748a8ea47bee5b416952e2ef5fc18b47d7c2f30b7345030"
+    },
+    {
+      "path": "src/terra_circuit_actuation.c",
+      "bytes": 5020,
+      "sha256": "21604a6d3424770dfd1058a7c592e1c32f37216e01054fd34c419aebd3c0cfab"
+    },
+    {
+      "path": "src/terra_circuit_compile.c",
+      "bytes": 22785,
+      "sha256": "898ac2650b453e830011debf95dd35d463a4e296fc076e4e12400cc5da2e14cb"
+    },
+    {
+      "path": "src/terra_circuit_devices.c",
+      "bytes": 15719,
+      "sha256": "4b584e668f1c20492974d84d2e523de82c5875482fec77f005d377f550e66174"
+    },
+    {
+      "path": "src/terra_circuit_fragments.inc",
+      "bytes": 21162,
+      "sha256": "3b41226db51e75819e3f03cc84d23ac7788ced0316690700c5f95fc329bd99ba"
+    },
+    {
+      "path": "src/terra_circuit_objects.h",
+      "bytes": 9047,
+      "sha256": "7519f4048f045043fd6ad46ae318e02222c8ed32eab6b6da719da4b68d0bf13b"
+    },
+    {
+      "path": "src/terra_circuit_query.c",
+      "bytes": 18110,
+      "sha256": "adede2c3dd371f18e5804b0a27b91a7df18f7196ac986873212849659c0afa8c"
+    },
+    {
+      "path": "src/terra_circuit_rules.c",
+      "bytes": 13513,
+      "sha256": "00d0232156f2a24c5b1e7033433ce0edccceaf813bf98aa12cb44f39c4847e56"
+    },
+    {
+      "path": "src/terra_circuit_supports.inc",
+      "bytes": 17032,
+      "sha256": "af85808cd12c7994ff7efab98bb6d4254b4b9309ea45cd94ed1bc512ce2a9b13"
+    },
+    {
+      "path": "src/terra_circuit_twld.c",
+      "bytes": 27757,
+      "sha256": "ceb78d7d05e8e299e20cbac897c850d17ca9f08337adbedec28a596f23657d89"
+    },
+    {
+      "path": "src/terra_circuit_twld_session.c",
+      "bytes": 5190,
+      "sha256": "dcfdd538e09f4625519fe0e0d4d0371fd9900965b039e14579124aa9263427a4"
+    },
+    {
+      "path": "src/terra_circuit_vm.c",
+      "bytes": 18646,
+      "sha256": "0e7f3b171115b8fb684a3bbe2eeaf7bedba5b57a17d20be442b1e951b0290716"
+    },
+    {
+      "path": "src/terra_circuit_world.c",
+      "bytes": 19491,
+      "sha256": "af78e5cf1e7884d97a16a516390d7ffbf1786a66a928509ab0402bdbbc112cfd"
+    },
+    {
+      "path": "src/terra_circuit_world_internal.h",
+      "bytes": 9555,
+      "sha256": "2d982d3f755a6100515322fd8a26cf9acb1fe20a1c86f459abdc2a9b6265d452"
+    },
+    {
+      "path": "src/terra_commands.c",
+      "bytes": 5579,
+      "sha256": "ee013dc5b399c887ceccfce8ae2f591838401ee99bb5d82d32110267877b3b44"
+    },
+    {
+      "path": "src/terra_commit.c",
+      "bytes": 3979,
+      "sha256": "a443977c1ba5b144eb7f111e1656baa6c87959e4ae2fc00dc4f5f4381ba16034"
+    },
+    {
+      "path": "src/terra_defaults.inc",
+      "bytes": 14478,
+      "sha256": "f36fb0250094d0a7583c872b76f9b85972b13fb127cfa2062874005daa094b22"
+    },
+    {
+      "path": "src/terra_future.c",
+      "bytes": 6919,
+      "sha256": "175911734da419d342e5c35f114beb0b7e1f3c65a047e3bdc84a57a7753168ff"
+    },
+    {
+      "path": "src/terra_hash.c",
+      "bytes": 9716,
+      "sha256": "acf3d1964e43d12a725d8d1b58874916976ef55b83c54d10eb3ae788a58a960d"
+    },
+    {
+      "path": "src/terra_icon.c",
+      "bytes": 5655,
+      "sha256": "4d9284598cf949865f3f898961bfc404aa67b0aeb42c6953469a44415f288ed6"
+    },
+    {
+      "path": "src/terra_json.c",
+      "bytes": 20145,
+      "sha256": "df1e8e69c4af44db084043f9c44877266794cc52737cbfe646ad29bc6edbee1b"
+    },
+    {
+      "path": "src/terra_legacy_npc.c",
+      "bytes": 13054,
+      "sha256": "f10faeecaeaf29a5fd1fd96fa9dd758bd2d411600ab59b44380db95b816d189f"
+    },
+    {
+      "path": "src/terra_map.c",
+      "bytes": 85224,
+      "sha256": "65ce45072b283f5755a9adc83ef1255ec4f0fe22495a5c49729f1ea7a4658844"
+    },
+    {
+      "path": "src/terra_map_runtime.c",
+      "bytes": 8974,
+      "sha256": "17f669fd51f7018dfa435063014cd13d535384e4dc14c8bd0aa88b842f1521a4"
+    },
+    {
+      "path": "src/terra_markers.c",
+      "bytes": 16011,
+      "sha256": "52566c7689bc1554ea81ec4b5d63bfc0f3e5a42c24315cf4a56a63102e88e47e"
+    },
+    {
+      "path": "src/terra_mem.c",
+      "bytes": 24099,
+      "sha256": "0bd457d06c896e4641e934329edcbf2e0dd30ceafdca57ae418a8811187957b5"
+    },
+    {
+      "path": "src/terra_mutators.c",
+      "bytes": 73462,
+      "sha256": "7be340e4f3ef0bb1e0924b5b5800eff73d96a3941f39c82ee5ec28a41d298bdb"
+    },
+    {
+      "path": "src/terra_ops.c",
+      "bytes": 30676,
+      "sha256": "b94441647cfea04945b9a1cc8c1eb2311b0311bed158dbe794c360fe5abc3081"
+    },
+    {
+      "path": "src/terra_pixel_art.c",
+      "bytes": 36318,
+      "sha256": "4d6f3ecd00ab7ee54a370a3c559801cd92dd629afae26af57d393f9688569650"
+    },
+    {
+      "path": "src/terra_pixel_art_bulk_fast.c",
+      "bytes": 7567,
+      "sha256": "5c2e4ca0dfbc52554c280be339fe91015fc0801eec40f9e1375c9e20552abbf8"
+    },
+    {
+      "path": "src/terra_pixel_art_metadata.c",
+      "bytes": 14018,
+      "sha256": "2e32afa85cbe43763ef3450b8af0ee8119c59ad718becede5f9f82182c07f259"
+    },
+    {
+      "path": "src/terra_pixel_workspace.c",
+      "bytes": 45109,
+      "sha256": "b3d9c62406f3c50aac0321a686170beaff034a9759dcb79144611d06b9bbd3de"
+    },
+    {
+      "path": "src/terra_plr.c",
+      "bytes": 193992,
+      "sha256": "0f656113342921ec91e2ddd0cd3a4c1ace83ef22c7042d083ec321b5cf533962"
+    },
+    {
+      "path": "src/terra_reader.c",
+      "bytes": 758,
+      "sha256": "70848ab5708b8c5685fb9774fc89fbe72602bd984e276eb3c0fc25dc2fb124a6"
+    },
+    {
+      "path": "src/terra_region_cells.inc",
+      "bytes": 4145,
+      "sha256": "1972f597c7bcc87c74be7f4f8b80e240d133344d6187adb857891dcd436e3592"
+    },
+    {
+      "path": "src/terra_regions.c",
+      "bytes": 15466,
+      "sha256": "73703b056ad5f2cef16a43700f97f4d0053e518e3839ad6d293221f9354541c2"
+    },
+    {
+      "path": "src/terra_render.c",
+      "bytes": 25857,
+      "sha256": "c5b83e40b36c5e19746a81956e5047ec476db11cf7cc23e282f7bf8854223d79"
+    },
+    {
+      "path": "src/terra_render_core.inc",
+      "bytes": 80022,
+      "sha256": "cf2272a9698885a0efda7f0e22c55ca921354ac3aaae08075c3ca07c7dbadba6"
+    },
+    {
+      "path": "src/terra_render_png_lowmem.c",
+      "bytes": 1538,
+      "sha256": "f175b6e09f715ee494a9a546af24837249c2e43b0e882dd234df84362319a133"
+    },
+    {
+      "path": "src/terra_stream.c",
+      "bytes": 66799,
+      "sha256": "887e0a1759db5d3b96189e72327c653ee85ab50f18c3ed374f5ca46fbd17bf1d"
+    },
+    {
+      "path": "src/terra_stream_png.c",
+      "bytes": 8148,
+      "sha256": "95ab3ceeefe65baef8dba143569e0a434b6508d15933cf4213ab90d029f25718"
+    },
+    {
+      "path": "src/terra_stream_stamp.inc",
+      "bytes": 15184,
+      "sha256": "cb0e08be232a0ca47f63f10dd242a5e1693d29d8f60e3207df8d174c8f4afe12"
+    },
+    {
+      "path": "src/terra_task.c",
+      "bytes": 15440,
+      "sha256": "ed582bc4f77533736c147e36715e43520d64f1ad0386529d9af782ad60874b51"
+    },
+    {
+      "path": "src/terra_theme.c",
+      "bytes": 2925,
+      "sha256": "566172246c8b7f1d624c0a3e21f56b2efee1346c892e94483cc1934e14d98d27"
+    },
+    {
+      "path": "src/terra_theme_data.inc",
+      "bytes": 5083,
+      "sha256": "b70d765d6955acc9565ce80722d15dbacea52d3e45b30e1b08a22120a27d4ba8"
+    },
+    {
+      "path": "src/terra_tile_record.h",
+      "bytes": 2633,
+      "sha256": "de89a164aad62401ff0193130bc56234c9abf2aafc142d45b0ec7619542138cc"
+    },
+    {
+      "path": "src/terra_txci.c",
+      "bytes": 17945,
+      "sha256": "4d9652fe9606b01aab6cde945fbe04cc593192f247f27735852bf7c6b7e87116"
+    },
+    {
+      "path": "src/terra_update.c",
+      "bytes": 52497,
+      "sha256": "f53d579869734c84a71f10b6f9ef8bc65e121fd5efda7863e6e58db4992e2791"
+    },
+    {
+      "path": "src/terra_wld.c",
+      "bytes": 105256,
+      "sha256": "587e2b89e36770fb8849fcd19a7cb7e799a13b9e1b6b71cb13b69880e6b2383e"
+    },
+    {
+      "path": "src/terra_wld_guard.c",
+      "bytes": 15536,
+      "sha256": "addf1d327183d02e605aa2aa90b62a69531bc2c8aa9b3cc0b9641656a822ec74"
+    },
+    {
+      "path": "src/terra_wld_guard_task.c",
+      "bytes": 23151,
+      "sha256": "7d487ee532443652d6c02b74c2c900ba2bffe19c3fb324d83f0b01e81100c9cf"
+    },
+    {
+      "path": "src/terra_wld_legacy.c",
+      "bytes": 6406,
+      "sha256": "cbd806adab9ce1c65106e1ee3eda53bdbee38c3567912c1617e5a389880caf95"
+    },
+    {
+      "path": "src/terra_zlib_bridge.c",
+      "bytes": 2953,
+      "sha256": "90d525c13fd448abcd473ed53912e9a59af4849d6faa75d2948d8dbbfdbc4bc7"
+    }
+  ]
+}

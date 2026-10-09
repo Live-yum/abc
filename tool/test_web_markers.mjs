@@ -1,0 +1,28 @@
+// Original synthetic-fixture marker integration; no personal saves or game assets.
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+const {createRegionBridge}=require('../web/terra_region.js');
+const runtime=process.env.TERRA_WORLD_RUNTIME;
+if(!runtime)throw new Error('Set TERRA_WORLD_RUNTIME');
+const factory=require(runtime), bridge=createRegionBridge(()=>factory({wasmBinary:fs.readFileSync(runtime.replace(/\.js$/,'.wasm'))}));
+const source=new Uint8Array(fs.readFileSync(new URL('../assets/qa/synthetic-objects.wld',import.meta.url))), before=source.slice();
+const blank=new Uint8Array();
+const request={max_w:1920,chest_markers:[{item_id:8,color:'#FF00FF',radius:2,line_width:1}],tile_markers:[{tile_type:55,color:'#00FFFF',radius:2,line_width:1}]};
+const normal=await bridge.operation(source,'render_thumbnail_png','{}',blank,blank);
+const marked=await bridge.operation(source,'mark_tiles_and_chests_preview',JSON.stringify(request),blank,blank);
+assert.deepEqual([...marked.slice(0,8)],[137,80,78,71,13,10,26,10]);
+assert.notDeepEqual(marked,normal);
+assert.deepEqual(source,before);
+await assert.rejects(()=>bridge.operation(source,'mark_tiles_and_chests_preview',JSON.stringify({chest_markers:[{item_id:'invalid'}]}),blank,blank));
+assert.deepEqual(await bridge.operation(source,'mark_tiles_and_chests_preview',JSON.stringify(request),blank,blank),marked);
+assert.deepEqual(await bridge.operation(source,'render_thumbnail_png','{}',blank,blank),normal);
+const variant=(frame_x,color='#FF00FF')=>({tile_type:55,locate:1,frame_x,frame_y:0,color,radius:1,line_width:1});
+const renderVariants=markers=>bridge.operation(source,'mark_tiles_and_chests_preview',JSON.stringify({max_w:1920,tile_markers:markers}),blank,blank);
+const anchor0=await renderVariants([variant(0)]), anchor18=await renderVariants([variant(18)]);
+assert.notDeepEqual(anchor0,anchor18,'same tile ID must honor distinct frame anchors');
+const variants=await renderVariants([variant(0),variant(18,'#00FFFF')]);
+assert.notDeepEqual(variants,anchor0);
+assert.deepEqual(source,before);
+console.log('PASS: real WASM chest/tile marker PNG, immutable WLD, rejected request and clean recovery');

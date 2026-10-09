@@ -1,0 +1,4 @@
+#include "Generated.xcconfig"
+
+// Retain FFI entry points for DynamicLibrary.process().
+OTHER_LDFLAGS = $(inherited) -Wl,-force_load,"$(BUILT_PRODUCTS_DIR)/libabc_engine.a" -lz
