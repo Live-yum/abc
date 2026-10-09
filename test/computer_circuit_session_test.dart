@@ -15,6 +15,31 @@ const source = WorldCircuitSource.file(
 );
 
 void main() {
+  test(
+    'timing observes commands without changing physical and full-display order',
+    () async {
+      final backend = ComputerCircuitBackend();
+      final session = WorldCircuitSession.fromSource(backend, source);
+      await session.open();
+      await session.verifyComputer();
+      await session.loadProgram('p.bin', Uint8List.fromList([1, 0, 0, 0]));
+      backend.commands.clear();
+      session.hostStages.reset();
+      await session.stepComputer(128);
+      expect(backend.commands.map((c) => c.words[1]), [2, 9, 9]);
+      expect(backend.commands.first.words[8], 128);
+      expect(session.displayFrames.length, 2);
+      final stages = session.hostStages.snapshot()['stages'] as Map;
+      for (final key in ['physical.command', 'mono.query', 'color.query']) {
+        expect((stages[key] as Map)['count'], 1);
+      }
+      expect((stages['display.rgbaDecode'] as Map)['count'], 2);
+      expect((stages['display.listEquals'] as Map)['count'], 2);
+      await session.close();
+      session.dispose();
+    },
+  );
+
   test('registered derived pair restores ROM metadata without reset and clears a longer tail later', () async {
     final backend = ComputerCircuitBackend()
       ..digest = ComputerCircuitBackend.savedWldSha

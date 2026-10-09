@@ -5,48 +5,112 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terraforge/ui/world_circuit_panel.dart';
 
+import '../integration_test/support/computer_profile_interaction.dart';
+
 void main() {
-  testWidgets('focused monitor forwards key edges; focus loss releases keys', (
-    tester,
-  ) async {
-    final calls = <(String, Map<String, Object?>)>[];
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: WorldCircuitPanel(
-              state: {
-                'open': true,
-                'computerVerified': true,
-                'canRunComputer': true,
-                'keyboardVerified': true,
-                'programName': 'p.bin',
-                'width': 15200,
-                'height': 7200,
-              },
-              dispatch: (action, args) async {
-                calls.add((action, args));
-              },
+  for (final size in [
+    const Size(1440, 1000),
+    const Size(1280, 508),
+    const Size(800, 508),
+  ]) {
+    testWidgets(
+      'real monitor tap routes explicit physical key edges at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final previousFatal = WidgetController.hitTestWarningShouldBeFatal;
+        WidgetController.hitTestWarningShouldBeFatal = true;
+        addTearDown(() {
+          WidgetController.hitTestWarningShouldBeFatal = previousFatal;
+        });
+        final calls = <(String, Map<String, Object?>)>[];
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    SizedBox(height: size.height),
+                    WorldCircuitPanel(
+                      state: {
+                        'open': true,
+                        'computerVerified': true,
+                        'canRunComputer': true,
+                        'keyboardVerified': true,
+                        'programName': 'p.bin',
+                        'width': 15200,
+                        'height': 7200,
+                      },
+                      dispatch: (action, args) async {
+                        calls.add((action, args));
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+        final screen = findComputerProfileMonitor('黑白显示器，显示实际物理像素状态');
+        expect(screen.hitTestable(), findsNothing);
+        expect(Focus.of(tester.element(screen)).hasFocus, isFalse);
+        await focusComputerProfileMonitor(tester, screen);
+        const keys = [
+          ('up', LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp),
+          ('down', LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown),
+          ('left', LogicalKeyboardKey.arrowLeft, PhysicalKeyboardKey.arrowLeft),
+          (
+            'right',
+            LogicalKeyboardKey.arrowRight,
+            PhysicalKeyboardKey.arrowRight,
+          ),
+        ];
+        for (final key in keys) {
+          await tester.sendKeyDownEvent(key.$2, physicalKey: key.$3);
+          await tester.sendKeyUpEvent(key.$2, physicalKey: key.$3);
+        }
+        expect(
+          calls.where((e) => e.$1 == 'worldCircuitInput').map((e) => e.$2),
+          [
+            for (final key in keys) ...[
+              {'direction': key.$1, 'pressed': true},
+              {'direction': key.$1, 'pressed': false},
+            ],
+          ],
+        );
+        await tester.sendKeyDownEvent(
+          LogicalKeyboardKey.arrowUp,
+          physicalKey: PhysicalKeyboardKey.arrowUp,
+        );
+        final coordinate = find.byType(TextField).first;
+        await revealComputerProfileTarget(tester, coordinate);
+        await tester.tap(coordinate);
+        await tester.pump();
+        expect(Focus.of(tester.element(screen)).hasFocus, isFalse);
+        expect(calls.any((e) => e.$1 == 'worldCircuitReleaseKeys'), isTrue);
+        await tester.sendKeyUpEvent(
+          LogicalKeyboardKey.arrowUp,
+          physicalKey: PhysicalKeyboardKey.arrowUp,
+        );
+        calls.clear();
+        await tester.sendKeyDownEvent(
+          LogicalKeyboardKey.arrowDown,
+          physicalKey: PhysicalKeyboardKey.arrowDown,
+        );
+        await tester.sendKeyUpEvent(
+          LogicalKeyboardKey.arrowDown,
+          physicalKey: PhysicalKeyboardKey.arrowDown,
+        );
+        expect(calls.where((e) => e.$1 == 'worldCircuitInput'), isEmpty);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump();
+        expect(calls.any((e) => e.$1 == 'worldCircuitReleaseKeys'), isTrue);
+        expect(tester.takeException(), isNull);
+      },
     );
-    final screen = find.bySemanticsLabel('黑白显示器，显示实际物理像素状态');
-    await tester.ensureVisible(screen);
-    await tester.tap(screen);
-    await tester.pump();
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowUp);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowUp);
-    expect(calls.where((e) => e.$1 == 'worldCircuitInput').map((e) => e.$2), [
-      {'direction': 'up', 'pressed': true},
-      {'direction': 'up', 'pressed': false},
-    ]);
-    await tester.pumpWidget(const SizedBox());
-    await tester.pump();
-    expect(calls.any((e) => e.$1 == 'worldCircuitReleaseKeys'), isTrue);
-    expect(tester.takeException(), isNull);
-  });
+  }
 
   testWidgets(
     'physical computer controls show actual frames and allow pause while engine busy',

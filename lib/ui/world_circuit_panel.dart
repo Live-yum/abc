@@ -8,15 +8,18 @@ import 'package:flutter/services.dart';
 import '../domain/computerraria_computer.dart';
 import '../engine/world_circuit_backend.dart';
 import 'computer_display.dart';
+import '../diagnostics/host_stage_timings.dart';
 
 /// Schematic view of actual VM records, not a rendered game-world preview.
 class WorldCircuitPanel extends StatefulWidget {
   final Map<String, Object?> state;
+  final HostStageTimings? hostStages;
   final Future<void> Function(String, Map<String, Object?>) dispatch;
   const WorldCircuitPanel({
     super.key,
     required this.state,
     required this.dispatch,
+    this.hostStages,
   });
   @override
   State<WorldCircuitPanel> createState() => _WorldCircuitPanelState();
@@ -29,7 +32,26 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
   final _height = TextEditingController(text: '32');
   final _computerFocus = FocusNode(debugLabel: 'physical computer input');
   int _mask = 15;
-  bool _colorDisplay = false;
+  bool get _colorDisplay => widget.state['selectedDisplay'] == 'color';
+  bool _performanceExpanded = false;
+  Map<String, Object?>? _performanceSnapshot;
+  List<Widget> _performanceDetails(Map<String, Object?> snapshot) {
+    final stages = snapshot['stages'] as Map;
+    return [
+      const Text(
+        '每行：调用总数 · 最近均值 / P95 / 最大值（毫秒）。各阶段相互包含，不能相加；不代表 Flutter 帧或实际呈现延迟。运行开始时清零。',
+      ),
+      Text('主机：${snapshot['host']}'),
+      for (final entry in stages.entries)
+        Text(
+          '${entry.key}: n=${(entry.value as Map)['count']} · '
+          '${((entry.value as Map)['recentMeanUs'] as num).toDouble() / 1000 < .01 ? '<0.01' : (((entry.value as Map)['recentMeanUs'] as num) / 1000).toStringAsFixed(2)} / '
+          '${(((entry.value as Map)['recentP95Us'] as num) / 1000).toStringAsFixed(2)} / '
+          '${(((entry.value as Map)['recentMaxUs'] as num) / 1000).toStringAsFixed(2)} ms',
+        ),
+    ];
+  }
+
   int? _selectedX, _selectedY;
   String? _localError;
   bool get _busy => widget.state['busy'] == true;
@@ -480,12 +502,14 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               ChoiceChip(
                 label: const Text('黑白 64 × 48'),
                 selected: !_colorDisplay,
-                onSelected: (_) => setState(() => _colorDisplay = false),
+                onSelected: (_) =>
+                    _send('worldCircuitSelectDisplay', {'color': false}),
               ),
               ChoiceChip(
                 label: const Text('彩色 176 × 96'),
                 selected: _colorDisplay,
-                onSelected: (_) => setState(() => _colorDisplay = true),
+                onSelected: (_) =>
+                    _send('worldCircuitSelectDisplay', {'color': true}),
               ),
             ],
           ),
@@ -518,6 +542,10 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                         ),
                       ),
                       child: ComputerDisplay(
+                        key: s['displayIdentity'] == null
+                            ? null
+                            : ObjectKey(s['displayIdentity']),
+                        hostStages: widget.hostStages,
                         rgba: rgba is Uint8List ? rgba : Uint8List(0),
                         width: region.width,
                         height: region.height,
@@ -533,6 +561,25 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             '已执行 ${s['physicalPulses'] ?? 0} 个物理时钟脉冲 · 当前模式实测 ${((s['clockHz'] as num?) ?? 0).toStringAsFixed(1)} Hz · 显示读取 ${((s['displayHz'] as num?) ?? 0).toStringAsFixed(1)} 次/秒',
           ),
           const Text('时钟脉冲不等于 CPU 指令。运行速度取决于设备；彩色视图用实际帧状态对应的平面平均色。'),
+          if (widget.hostStages != null)
+            ExpansionTile(
+              title: const Text('性能明细 / Performance'),
+              subtitle: const Text('主机耗时，非 FPS；暂停后展开读取最近 128 次'),
+              onExpansionChanged: (expanded) => setState(() {
+                _performanceExpanded = expanded;
+                _performanceSnapshot = expanded
+                    ? widget.hostStages!.snapshot()
+                    : null;
+              }),
+              children: [
+                if (_performanceExpanded && running)
+                  const Text('请暂停后重新展开，以免额外布局影响运行测量。'),
+                if (_performanceExpanded &&
+                    !running &&
+                    _performanceSnapshot != null)
+                  ..._performanceDetails(_performanceSnapshot!),
+              ],
+            ),
           if (s['keyboardVerified'] == true) ...[
             const Text('点显示器后使用方向键或 WASD；屏幕方向键也可长按。失去焦点或暂停会释放输入。'),
             Wrap(

@@ -19,6 +19,11 @@ extension type _Bridge(JSObject _) implements JSObject {
     JSString words,
     JSString records,
   );
+  external JSPromise<_ComputerFrame> computerFrame(
+    JSNumber session,
+    JSString clockWords,
+    JSString pixelWords,
+  );
   external JSPromise<JSAny?> close(JSNumber session);
 }
 
@@ -72,6 +77,7 @@ extension type _Result(JSObject _) implements JSObject {
   external JSNumber get resultKind;
   external JSNumber get resultCount;
   external JSNumber get reserved;
+  external JSObject? get hostStagesUs;
   WorldCircuitResult convert() => WorldCircuitResult(
     session.toDartInt,
     stats.toDart.map((v) => v.toDartInt).toList(),
@@ -86,10 +92,44 @@ extension type _Result(JSObject _) implements JSObject {
     resultKind: resultKind.toDartInt,
     resultCount: resultCount.toDartInt,
     reserved: reserved.toDartInt,
+    hostStagesUs: Map<String, num>.from(
+      hostStagesUs?.dartify() as Map? ?? const {},
+    ),
   );
 }
 
-class WebWorldCircuitBackend implements WorldCircuitSourceBackend {
+extension type _ComputerFrame(JSObject _) implements JSObject {
+  external _Result get clock;
+  external _Result? get display;
+  external JSString? get displayError;
+  external JSObject? get hostStagesUs;
+  WorldCircuitComputerFrame convert() => WorldCircuitComputerFrame(
+    clock: clock.convert(),
+    display: display?.convert(),
+    displayError: displayError?.toDart,
+    hostStagesUs: Map<String, num>.from(
+      hostStagesUs?.dartify() as Map? ?? const {},
+    ),
+  );
+}
+
+class WebWorldCircuitBackend
+    implements WorldCircuitSourceBackend, WorldCircuitComputerBackend {
+  @override
+  Future<WorldCircuitComputerFrame> clockAndReadDisplay(
+    int session,
+    WorldCircuitCommand clock,
+    WorldCircuitCommand pixels,
+  ) async =>
+      (await _bridge
+              .computerFrame(
+                session.toJS,
+                jsonEncode(clock.words).toJS,
+                jsonEncode(pixels.words).toJS,
+              )
+              .toDart)
+          .convert();
+
   @override
   Future<WorldCircuitResult> openWorldCircuit(
     Uint8List world, {

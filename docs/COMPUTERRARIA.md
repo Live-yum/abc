@@ -175,3 +175,35 @@ only this pinned public upstream pair and verify its exact hashes; personal
 world/player inputs remain excluded from public CI. Serialize full-world runs with other large compiles/tests to keep
 memory results interpretable. Merely adding this target is not a completed
 profile run or a claim of smooth performance on mobile devices.
+
+### Host display cadence and bounded diagnostics
+
+The browser runtime batches the existing physical clock command (128 pulses by
+default) and the selected monitor's pixel query into one serialized worker RPC.
+The worker still invokes the retained wiring engine twice, in that order; no
+instruction execution moves to the host. Input sensor commands complete before
+this batch. Worker cooperation remains at 128 core steps or 16 ms, and the UI's
+1 ms reschedule and 16.667 ms publication gate remain. Each runtime batch reads
+the selected monitor; manual stepping, verification, explicit refresh, mode
+changes, UI pause after drain, and export retain fresh reads of both monitors.
+A monitor selection is published after its fresh serialized read completes.
+
+The response retains the successfully committed clock result if its subsequent
+pixel read fails. The session then preserves the accepted pulse count and dirty
+state, pauses with the error, and never retries that clock. Returned pixel
+chunks still copy borrowed WASM memory before acknowledgement. A single owned
+chunk can be transferred directly; only multi-chunk results need concatenation.
+
+Image presentation permits one decode in flight. A completed image for the same
+monitor is published even when a newer frame is pending, then only the newest
+pending frame is decoded. Monitor/dimension changes and session/reset identity
+changes reject obsolete callbacks; disposal never resurrects an image.
+
+Performance details are collapsed by default. Pause and expand them to inspect
+bounded recent-128-call host duration samples in milliseconds. Machine profile
+observations store microseconds, counts, host identity, and overlapping-stage
+metadata. Existing per-command worker core/yield/copy/wall stages remain directly
+comparable. The combined request has separate `runtime.batch` and RPC stages;
+its wall time must not be interpreted as the former clock-only RPC. Runtime loop
+wall and actual timer wait are also measured. Stopwatch/callback timings are
+not Flutter FrameTiming, display FPS, or presentation/input latency.

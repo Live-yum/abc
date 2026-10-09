@@ -12,6 +12,9 @@ import statistics
 from computerraria_provenance import digest
 
 HEAP_MEASUREMENT_METHOD = 'vm-service-isolate-groups-v1'
+WEB_AWAITED_CLOCK_MEASUREMENT = 'Only the awaited128-clock command, including bounded owner dispatch; excludes ROM loading, state reads and rendering'
+WEB_COMPOUND_CLOCK_MEASUREMENT = 'Only the worker bridge clock command hostStagesUs.commandWallUs; excludes compound display read and loopback round trip, and is not the legacy externally-awaited timing'
+WEB_COMPOUND_TRANSPORT = 'Actual RPC client/host and structuredClone ArrayBuffer transfers in a Node loopback, both endpoints on one thread; immutable fs.openAsBlob handles preserved by identity because Node24 forbids cloning them; not browser File transfer, threading or timing proof'
 
 REVISION = '0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8'
 WLD_SHA = '55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33'
@@ -123,7 +126,50 @@ def program_projection(value):
     return {'signature': value['signature'], 'clocks': value['clocks']}
 
 
-def validate_backend(report, backend, mode, build, expected_signatures):
+def validate_compound_frames(report, optimized, required=False):
+    timing = report['clock128Timing']
+    compound = report.get('compoundFrame')
+    if compound is None:
+        require(not required, 'CI Web evidence must exercise compound RPC')
+        require(timing.get('measurement') == WEB_AWAITED_CLOCK_MEASUREMENT,
+                'Unknown legacy Web clock measurement scope')
+        return 'node-awaited-clock-command-v1', None
+    require(compound.get('status') == 'passed'
+            and compound.get('transport') == WEB_COMPOUND_TRANSPORT,
+            'Compound evidence must label Node loopback and file-Blob identity limits')
+    require(timing.get('measurement') == WEB_COMPOUND_CLOCK_MEASUREMENT,
+            'Compound clock-only scope must exclude display and roundtrip time')
+    frames, clocks = compound['samples'], timing['samples']
+    require(isinstance(frames, list) and len(frames) == len(clocks) and len(frames) >= 2,
+            'Every clock batch must have compound selected-monitor evidence')
+    for index, (frame, clock) in enumerate(zip(frames, clocks)):
+        monitor = 'mono' if index % 2 == 0 else 'color'
+        require(frame['monitor'] == monitor
+                and frame['recordsBytes'] == (3072 if monitor == 'mono' else 16896) * 16,
+                'Compound monitor alternation or record length is wrong')
+        require(frame['phase'] == clock['phase']
+                and type(frame['optimized']) is bool
+                and frame['optimized'] is clock['optimized'],
+                'Compound and clock samples describe different batches')
+        sha(frame['recordsSha256'])
+        clock_ms = number(frame['clockCommandMilliseconds'], 'compound clock-only time', .000001)
+        roundtrip_ms = number(frame['roundTripMilliseconds'], 'compound loopback roundtrip', .000001)
+        require(clock_ms == clock['milliseconds'] and roundtrip_ms + .000001 >= clock_ms,
+                'Clock-only and compound roundtrip timings were mixed')
+    pong = [row for row in frames if row['phase'] == 'pong']
+    require({row['monitor'] for row in pong} == {'mono', 'color'},
+            'Actual Pong must exercise both compound monitor selections')
+    values = [row['roundTripMilliseconds'] for row in pong if row['optimized'] is optimized]
+    require(values, 'Missing requested-mode compound Pong roundtrips')
+    return 'node-bridge-clock-stage-v1', {
+        'scope': 'node-loopback-clock-and-selected-display-v1',
+        'samples': len(values), 'medianMs': statistics.median(values),
+        'p95Ms': sorted(values)[math.ceil(len(values) * .95) - 1],
+        'maxMs': max(values),
+    }
+
+
+def validate_backend(report, backend, mode, build, expected_signatures, *, require_compound=False):
     require(report['status'] == 'passed', 'Physical acceptance did not pass')
     optimized = mode == 'optimized'
     require(report['defaultOptimization'] is False
@@ -227,7 +273,9 @@ def validate_backend(report, backend, mode, build, expected_signatures):
     if backend == 'native':
         samples = pong['clockSamples']
         pulses = sum(number(row['pulses'], 'clock sample pulses', 1) for row in samples)
+        clock_scope, compound_metrics = 'native-awaited-clock-command-v1', None
     else:
+        clock_scope, compound_metrics = validate_compound_frames(report, optimized, require_compound)
         samples = [row for row in report['clock128Timing']['samples']
                    if row['phase'] == 'pong' and row['optimized'] is optimized]
         pulses = len(samples) * 128
@@ -235,6 +283,8 @@ def validate_backend(report, backend, mode, build, expected_signatures):
     milliseconds = sum(number(row['milliseconds'], 'clock sample time', .000001)
                        for row in samples)
     return projection, {'backend': backend, 'mode': mode,
+                        'clockMeasurementScope': clock_scope,
+                        'compoundRoundTrip': compound_metrics,
                         'measuredClockSamples': len(samples),
                         'clockPulsesPerSecond': pulses * 1000 / milliseconds,
                         'importMs': number(opened['milliseconds'], 'import time'),
@@ -425,7 +475,8 @@ def compare(reports, commit, require_jobs=False):
                         build_trees.add(ui_build['sourceTreeSha256'])
                         state, metrics = validate_profile(report, commit)
                     else:
-                        state, metrics = validate_backend(report, lane, suite.rsplit('-', 1)[1], build, expected)
+                        state, metrics = validate_backend(report, lane, suite.rsplit('-', 1)[1], build, expected,
+                                                          require_compound=lane == 'web')
                     states[path.name] = state
                     measurements[path.name] = metrics
                 except (ValueError, OSError, KeyError, TypeError, IndexError, StopIteration) as error:
@@ -460,6 +511,8 @@ def compare(reports, commit, require_jobs=False):
                                    .encode()).hexdigest() for name, state in states.items()},
             'limits': ['Physical clock throughput is not screen FPS.',
                        'Node WASM timings are not browser UI timings.',
+                       'Web compound RPC runs in a same-thread Node loopback; file-backed Blob handles use identity because Node cannot clone them. Browser File transfer and threading are not established.',
+                       'Web clock-stage throughput excludes selected-display reads and loopback roundtrips; those durations are reported separately and cannot be pooled with legacy externally-awaited clock timings.',
                        'Linux Xvfb software rendering is not target-device fluidity.',
                        'Input latency ends at native sensor acknowledgement, not OS input or pixel presentation.',
                        'Shared existing group cache/lazy parity operates in both modes; ON adds generation deduplication.',
@@ -476,14 +529,24 @@ def markdown(result):
     if result['errors']:
         lines += ['## Blockers', ''] + [f'- {error}' for error in result['errors']] + ['']
     data = result['measurements']
-    lines += ['## Physical clock commands', '', '| Runtime | Mode | Processes | Median pulses/s |',
-              '|---|---|---:|---:|']
+    lines += ['## Physical clock commands', '', '| Runtime | Mode | Measurement scope | Processes | Median pulses/s |',
+              '|---|---|---|---:|---:|']
     for lane in ('native', 'web'):
         for mode in MODES:
-            values = [v['clockPulsesPerSecond'] for v in data.values()
-                      if v.get('backend') == lane and v.get('mode') == mode]
-            if values:
-                lines.append(f'| {lane} | {mode} | {len(values)} | {statistics.median(values):.1f} |')
+            rows = [v for v in data.values() if v.get('backend') == lane and v.get('mode') == mode]
+            for scope in sorted({row['clockMeasurementScope'] for row in rows}):
+                values = [row['clockPulsesPerSecond'] for row in rows if row['clockMeasurementScope'] == scope]
+                lines.append(f'| {lane} | {mode} | {scope} | {len(values)} | {statistics.median(values):.1f} |')
+    lines += ['', '## Node loopback clock plus selected-display roundtrip', '',
+              'Protocol/transfer correctness timing only: same-thread Node with file-backed Blob identity adaptation. This is not browser threading, rendering or FPS.', '',
+              '| Mode | Processes | Median batch ms (median/process) | p95 batch ms (median/process) |',
+              '|---|---:|---:|---:|']
+    for mode in MODES:
+        rows = [value['compoundRoundTrip'] for value in data.values()
+                if value.get('mode') == mode and value.get('compoundRoundTrip')]
+        if rows:
+            lines.append(f'| {mode} | {len(rows)} | {statistics.median(row["medianMs"] for row in rows):.2f} | '
+                         f'{statistics.median(row["p95Ms"] for row in rows):.2f} |')
     frames = [row for value in data.values() for row in value.get('frames', [])]
     lines += ['', '## Actual Flutter profile frame windows', '',
               '| Mode | Windows | Raw frames | UI p95 µs (median/window) | Raster p95 µs (median/window) | Frames over observed refresh budget |',

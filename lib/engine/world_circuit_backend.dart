@@ -92,6 +92,30 @@ abstract interface class WorldCircuitBackend {
   Future<void> closeWorldCircuit(int session);
 }
 
+/// Optional transport coalescing. Both commands still execute in order in the
+/// retained circuit engine; this does not implement any CPU instruction.
+abstract interface class WorldCircuitComputerBackend
+    implements WorldCircuitBackend {
+  Future<WorldCircuitComputerFrame> clockAndReadDisplay(
+    int session,
+    WorldCircuitCommand clock,
+    WorldCircuitCommand pixels,
+  );
+}
+
+class WorldCircuitComputerFrame {
+  final WorldCircuitResult clock;
+  final WorldCircuitResult? display;
+  final String? displayError;
+  final Map<String, num> hostStagesUs;
+  const WorldCircuitComputerFrame({
+    required this.clock,
+    this.display,
+    this.displayError,
+    this.hostStagesUs = const {},
+  });
+}
+
 class WorldCircuitCommand {
   final List<int> words;
   final List<int> records;
@@ -288,6 +312,8 @@ class WorldCircuitCommand {
 }
 
 class WorldCircuitResult {
+  /// Optional host diagnostics; no circuit state or command semantics.
+  final Map<String, num> hostStagesUs;
   final int session;
   final List<int> stats;
   final Uint8List records;
@@ -313,6 +339,7 @@ class WorldCircuitResult {
     this.resultCount = 0,
     this.reserved = 0,
     this.objects,
+    this.hostStagesUs = const {},
   });
   factory WorldCircuitResult.fromMap(Map<dynamic, dynamic> map) =>
       WorldCircuitResult(
@@ -333,6 +360,9 @@ class WorldCircuitResult {
         resultCount: map['resultCount'] as int? ?? 0,
         reserved: map['reserved'] as int? ?? 0,
         objects: map['objects'] as Uint8List?,
+        hostStagesUs: Map<String, num>.from(
+          map['hostStagesUs'] as Map? ?? const {},
+        ),
       );
   int get width => stats[2];
   int get height => stats[3];

@@ -95,15 +95,15 @@ jobs:
           ABC_WEB_OUTPUT="$PWD/build/computerraria/engine-web" bash tool/build_web_engine.sh
           cp build/computerraria/engine-web/manifest.json build/computerraria/raw/web/engine-manifest.json
           python3 tool/perf/computerraria_provenance.py --artifact build/computerraria/engine-web/world.js --artifact build/computerraria/engine-web/world.wasm --cmake-cache build/wasm-wld/CMakeCache.txt --output build/computerraria/raw/web/build.json
-      - name: Three default OFF file-owner lifecycles and paired save/reopen
+      - name: Three default OFF compound RPC lifecycles and paired save/reopen
         run: >-
           python3 tool/perf/run_ci_suite.py --suite computerraria-web-standard --runs 3
           --timeout-seconds 1200 --output-dir build/computerraria/raw/web --
           node test/web/computerraria_file_acceptance.cjs
           build/computerraria/engine-web/world.js build/computerraria/engine-web/world.wasm
           build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
-          {report} --pong assets/computer/pong.bin --input - --save
-      - name: Three ON file-owner lifecycles with identical physical inputs
+          {report} --pong assets/computer/pong.bin --input - --save --compound-frame
+      - name: Three ON compound RPC lifecycles with identical physical inputs
         if: ${{ !cancelled() }}
         run: >-
           python3 tool/perf/run_ci_suite.py --suite computerraria-web-optimized --runs 3
@@ -111,7 +111,7 @@ jobs:
           node test/web/computerraria_file_acceptance.cjs
           build/computerraria/engine-web/world.js build/computerraria/engine-web/world.wasm
           build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
-          {report} --pong assets/computer/pong.bin --input - --save --optimized
+          {report} --pong assets/computer/pong.bin --input - --save --optimized --compound-frame
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

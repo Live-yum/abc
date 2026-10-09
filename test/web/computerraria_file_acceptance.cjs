@@ -1,9 +1,10 @@
 // Opt-in acceptance of ABC's exact Web WASM artifact and original complete WLD.
 // Only physical wire pulses, ROM/RAM lamps, and native pixel queries are used.
-// Usage: node test/web/computerraria_file_acceptance.cjs world.js world.wasm world.wld world.twld report.json [--pong Pong.bin] [--input input-once.bin] [--save] [--optimized]
+// Usage: node test/web/computerraria_file_acceptance.cjs world.js world.wasm world.wld world.twld report.json [--pong Pong.bin] [--input input-once.bin] [--save] [--optimized] [--compound-frame]
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {createFileWorldOwner}=require('./helpers/world_file_host.cjs');
+const {createClient,installHost}=require('../../web/terra_worker_rpc.js');
 const SOURCE_SHA='55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33';
 const TWLD_SHA='c6de694b3d034701513dc1ba17311213561ec359d3ecddde7bc35ea3c9611ed8';
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
@@ -23,28 +24,66 @@ function summarizeClockSamples(samples){
  const median=n?(n%2?sorted[n>>1]:(sorted[(n>>1)-1]+sorted[n>>1])/2):null,p95=n?sorted[Math.ceil(n*.95)-1]:null;
  return {batches:n,pulses:n*128,milliseconds:total,medianMs:median,p95Ms:p95,pulsesPerSecond:total>0?n*128000/total:null,medianPulsesPerSecond:median>0?128000/median:null};
 }
+// Real RPC validation/remapping and transferable-buffer ownership, with the
+// actual WASM/file bridge below. Both endpoints run in this Node process:
+// this proves protocol/transfer correctness, not browser scheduling/threading.
+function rpcLoopback(bridge){
+ // Node24 deliberately rejects cloning fs.openAsBlob(). Keep those immutable
+ // handles by identity in this same-process adapter; clone all other packet
+ // structure and genuinely transfer ArrayBuffers. No file bytes are copied.
+ function clonePacket(value,transfer){
+  const blobs=[],tag='__abcLoopbackBlobIndex';
+  function scrub(v){if(v instanceof Blob){blobs.push(v);return {[tag]:blobs.length-1};}if(v instanceof Uint8Array||v===null||typeof v!=='object')return v;if(Array.isArray(v))return v.map(scrub);assert.ok(!Object.hasOwn(v,tag));return Object.fromEntries(Object.entries(v).map(([k,child])=>[k,scrub(child)]));}
+  function restore(v){if(v instanceof Uint8Array||v===null||typeof v!=='object')return v;if(Object.hasOwn(v,tag))return blobs[v[tag]];for(const k of Object.keys(v))v[k]=restore(v[k]);return v;}
+  return restore(structuredClone(scrub(value),{transfer}));
+ }
+ return createClient('worldCircuit',{createWorker(){
+  let terminated=false;
+  const scope={postMessage(value,transfer=[]){const data=clonePacket(value,transfer);queueMicrotask(()=>{if(!terminated)worker.onmessage?.({data});});}};
+  const worker={onmessage:null,onerror:null,onmessageerror:null,postMessage(value,transfer=[]){const data=clonePacket(value,transfer);queueMicrotask(()=>{if(!terminated)scope.onmessage({data});});},terminate(){terminated=true;}};
+  installHost('worldCircuit',bridge,scope);return worker;
+ }});
+}
 async function main(args){
- if(args.length<5)throw new Error('Expected world.js world.wasm WLD TWLD report.json [--pong path] [--input path] [--save] [--optimized]');
- const [loader,wasm,wld,twld,reportPath]=args.slice(0,5);let pongPath,inputPath,save=false,optimized=false;
- for(let n=5;n<args.length;n++){if(args[n]==='--save')save=true;else if(args[n]==='--optimized')optimized=true;else if(args[n]==='--pong'&&args[n+1])pongPath=args[++n];else if(args[n]==='--input'&&args[n+1])inputPath=args[++n];else throw new Error('Unknown or incomplete acceptance option: '+args[n]);}
+ if(args.length<5)throw new Error('Expected world.js world.wasm WLD TWLD report.json [--pong path] [--input path] [--save] [--optimized] [--compound-frame]');
+ const [loader,wasm,wld,twld,reportPath]=args.slice(0,5);let pongPath,inputPath,save=false,optimized=false,compound=false;
+ for(let n=5;n<args.length;n++){if(args[n]==='--save')save=true;else if(args[n]==='--optimized')optimized=true;else if(args[n]==='--compound-frame')compound=true;else if(args[n]==='--pong'&&args[n+1])pongPath=args[++n];else if(args[n]==='--input'&&args[n+1])inputPath=args[++n];else throw new Error('Unknown or incomplete acceptance option: '+args[n]);}
  const fixtures=JSON.parse(fs.readFileSync(path.resolve(__dirname,'../../native/fixtures/computerraria/programs.json'),'utf8'));
  const image=name=>new Uint8Array(Buffer.from(fixtures[name].hex,'hex'));
  const report={schema:'abc.computerraria.web-file-acceptance.v1',host:'Node File/Blob and random-access temporary files with ABC Web WASM',measurement:'Physical simulation acceptance; Node scheduling and query timing are not browser UI FPS',loaderSha256:await hashFile(loader),wasmSha256:await hashFile(wasm),twldSha256:await hashFile(twld),runtime:process.version,requestedOptimization:optimized,defaultOptimization:false};
  assert.equal(report.twldSha256,TWLD_SHA,'Original compressed TWLD identity');
- const owner=createFileWorldOwner(loader,wasm),bridge=owner.bridge,start=performance.now();let id=0,previousProgram=new Uint8Array(),staged=null,peakRss=0,lastSample=performance.now(),maxOwnerGapMs=0;
+ const owner=createFileWorldOwner(loader,wasm),bridge=compound?rpcLoopback(owner.bridge):owner.bridge,start=performance.now();let id=0,previousProgram=new Uint8Array(),staged=null,peakRss=0,lastSample=performance.now(),maxOwnerGapMs=0;
+ const compoundSamples=[];let lastCompoundDisplay=null;
+ if(compound)report.compoundFrame={transport:'Actual RPC client/host and structuredClone ArrayBuffer transfers in a Node loopback, both endpoints on one thread; immutable fs.openAsBlob handles preserved by identity because Node24 forbids cloning them; not browser File transfer, threading or timing proof',monitorSelection:'Alternating mono/color after each unchanged128-pulse batch; compare returned selected pixels byte-for-byte with an ordinary read at the same electrical state',samples:compoundSamples};
  const samples=setInterval(()=>{const now=performance.now();maxOwnerGapMs=Math.max(maxOwnerGapMs,now-lastSample);lastSample=now;peakRss=Math.max(peakRss,process.memoryUsage().rss);},16);
  const progress=setInterval(async()=>{console.log(JSON.stringify({elapsedMs:performance.now()-start,progress:await bridge.progress()}));},10000);
  const command=c=>bridge.command(id,JSON.stringify(c.words),JSON.stringify(c.records));
  let activeOptimization=false;const clockSamples=[];
  async function setOptimization(enabled){const result=await command(packet(10,{mask:enabled?1:0}));assert.equal(result.session,id,'Mode toggle retains native session');assert.equal(result.reserved&2,enabled?2:0,'Native confirms requested optimization');assert.equal(result.reserved&1,1,'Optimization preserves TWLD compatibility');activeOptimization=enabled;return result;}
- async function clock128(phase){const begin=performance.now(),mode=activeOptimization;const result=await command(clock(128));assert.equal(result.reserved&2,mode?2:0,'Clock batch retains selected mode');clockSamples.push({phase,optimized:mode,milliseconds:performance.now()-begin});return result;}
+ async function clock128(phase){
+  const begin=performance.now(),mode=activeOptimization;let result,milliseconds;
+  if(compound){
+   const color=compoundSamples.length%2===1,pixels=displayPacket(color);
+   const frame=await bridge.computerFrame(id,JSON.stringify(clock(128).words),JSON.stringify(pixels.words)),roundTripMilliseconds=performance.now()-begin;
+   assert.equal(frame.displayError,null,'Compound display must succeed after accepted physical clocks');assert.ok(frame.display,'Compound returns selected actual pixels');
+   result=frame.clock;assert.equal(result.session,id,'Compound clock remaps public session');assert.equal(frame.display.session,id,'Compound display remaps same session');
+   assert.equal(frame.display.resultKind,9);assert.equal(frame.display.records.length,(color?16896:3072)*16,'Only selected monitor records are returned');
+   assert.deepEqual(frame.display.stats.slice(18,24),result.stats.slice(18,24),'Compound display read adds no electrical work');
+   milliseconds=result.hostStagesUs?.commandWallUs/1000;assert.ok(Number.isFinite(milliseconds)&&milliseconds>=0,'Separate clock-only host timing is available');
+   const ordinary=await display(color);assert.deepEqual(frame.display.records,ordinary.records,'Compound selected pixels exactly equal separate read');
+   lastCompoundDisplay={color,result:frame.display};
+   compoundSamples.push({phase,optimized:mode,monitor:color?'color':'mono',recordsBytes:frame.display.records.length,recordsSha256:hash(frame.display.records),clockCommandMilliseconds:milliseconds,roundTripMilliseconds,hostStagesUs:frame.hostStagesUs});
+  }else{result=await command(clock(128));milliseconds=performance.now()-begin;}
+  assert.equal(result.reserved&2,mode?2:0,'Clock batch retains selected mode');clockSamples.push({phase,optimized:mode,milliseconds});return result;
+ }
  const lamps=(records,write=false)=>command(packet(write?5:4,{},records));
  const ready=async()=>{const values=rows(await lamps([3199,156,0,0]));assert.equal(values.length,1);assert.equal(values[0][3],419);return values[0][2]===1;};
  async function reset(){for(let n=0;!await ready()&&n<3;n++)await command(clock());if(!await ready())await command(trigger(3198,156,4));for(const c of resetBus())await command(c);}
  async function load(bytes){await reset();for(const records of programWrites(previousProgram,bytes))await lamps(records,true);previousProgram=bytes;await reset();}
  async function signature(addresses){for(const c of resetBus().slice(0,2))await command(c);const values=rows(await lamps(ramRecords(addresses)));return addresses.map((_,index)=>{let value=0;for(let bit=0;bit<32;bit++)value|=values[index*32+bit][2]<<bit;return value>>>0;});}
  async function execute(bytes,addresses,input,phase='program'){const begin=performance.now();await load(bytes);await lamps(ramRecords(addresses,true),true);await reset();if(input){for(const c of (Array.isArray(input)?input:[input]))await command(c);}let values=[],clocks=0;while(clocks<4096){await clock128(phase);clocks+=128;for(let n=0;!await ready()&&n<3;n++){await command(clock());clocks++;}assert.ok(await ready(),'Physical CPU reaches an instruction boundary');values=await signature(addresses);if(values.at(-1)===0x600dc0de)break;}assert.equal(values.at(-1),0x600dc0de,'Physical program completion marker');return {signature:values,clocks,milliseconds:performance.now()-begin};}
- const display=(color=false,old=false)=>command(packet(old?1:9,{x:color?7371:6485,y:color?1002:800,width:color?176:64,height:color?96:48}));
+ const displayPacket=(color=false,old=false)=>packet(old?1:9,{x:color?7371:6485,y:color?1002:800,width:color?176:64,height:color?96:48});
+ const display=(color=false,old=false)=>command(displayPacket(color,old));
  try {
   const opened=await bridge.openSource(await fs.openAsBlob(wld),await fs.openAsBlob(twld));id=opened.session;
   report.import={milliseconds:performance.now()-start,sourceSha256:opened.sourceSha256,stats:opened.stats,diagnostics:opened.diagnostics,processMemory:process.memoryUsage()};
@@ -83,7 +122,7 @@ async function main(args){
    }
    for(let n=0;n<400;n++){
     await clock128('pong');clocks+=128;
-    const frame=await display(),lit=rows(frame).filter(v=>v[3]===18).map(v=>[v[0]-6485,v[1]-800]),digest=hash(frame.records);
+    const frame=compound&&lastCompoundDisplay?.color===false?lastCompoundDisplay.result:await display(),lit=rows(frame).filter(v=>v[3]===18).map(v=>[v[0]-6485,v[1]-800]),digest=hash(frame.records);
     if(!hashes.has(digest)){hashes.add(digest);frames.push({clocks,sha256:digest,lit});}
     if(n===3)await flipPreservingState(!optimized);
     if(n===4)await flipPreservingState(optimized);
@@ -112,13 +151,14 @@ async function main(args){
    assert.ok(rows(clearedColor).filter(r=>r[1]===1002&&r[0]<7379).every(r=>r[3]===0));
    report.save.postProgramDisplaySha256={mono:hash(clearedMono.records),color:hash(clearedColor.records)};report.save.status='passed';
   }
+  if(compound){assert.ok(compoundSamples.some(v=>v.monitor==='mono')&&compoundSamples.some(v=>v.monitor==='color'),'Both selected monitors exercise compound RPC');if(pongPath)assert.ok(['mono','color'].every(m=>compoundSamples.some(v=>v.phase==='pong'&&v.monitor===m)),'Actual Pong exercises both monitor selections');report.compoundFrame.status='passed';}
   report.finalStats=(await display()).stats;report.activeOptimizationAtEnd=activeOptimization;report.hostProgress=await bridge.progress();report.status='passed';
  }catch(error){report.status='failed';report.error=String(error.stack||error);throw error;}
  finally {
   clearInterval(progress);clearInterval(samples);
-  report.clock128Timing={measurement:'Only the awaited128-clock command, including bounded owner dispatch; excludes ROM loading, state reads and rendering',all:summarizeClockSamples(clockSamples),byMode:[false,true].map(mode=>({optimized:mode,...summarizeClockSamples(clockSamples.filter(v=>v.optimized===mode))})),pongByMode:[false,true].map(mode=>({optimized:mode,...summarizeClockSamples(clockSamples.filter(v=>v.phase==='pong'&&v.optimized===mode))})),samples:clockSamples};
+  report.clock128Timing={measurement:compound?'Only the worker bridge clock command hostStagesUs.commandWallUs; excludes compound display read and loopback round trip, and is not the legacy externally-awaited timing':'Only the awaited128-clock command, including bounded owner dispatch; excludes ROM loading, state reads and rendering',all:summarizeClockSamples(clockSamples),byMode:[false,true].map(mode=>({optimized:mode,...summarizeClockSamples(clockSamples.filter(v=>v.optimized===mode))})),pongByMode:[false,true].map(mode=>({optimized:mode,...summarizeClockSamples(clockSamples.filter(v=>v.phase==='pong'&&v.optimized===mode))})),samples:clockSamples};
   try{if(id)await bridge.close(id);if(staged){await bridge.releaseSource(staged.worldSource.token);await bridge.releaseSource(staged.twldSource.token);}}
-  finally{report.peakRssBytes=Math.max(peakRss,process.memoryUsage().rss);report.maxOwnerTimerGapMs=maxOwnerGapMs;report.elapsedMilliseconds=performance.now()-start;report.nativeBytesAfterClose=owner.module?._tx_native_heap_used?.()??null;report.bridgeBytesAfterClose=owner.module?._tx_bridge_heap_used?.()??null;report.openFilesAfterClose=owner.openFiles;report.peakOpenFiles=owner.peakOpenFiles;if(report.nativeBytesAfterClose!==0||report.bridgeBytesAfterClose!==0||report.openFilesAfterClose!==0){report.status='failed';report.error=report.error||'Circuit owners remain after close';}fs.mkdirSync(path.dirname(reportPath),{recursive:true});fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');owner.cleanup();}
+  finally{if(compound)await bridge.dispose();report.peakRssBytes=Math.max(peakRss,process.memoryUsage().rss);report.maxOwnerTimerGapMs=maxOwnerGapMs;report.elapsedMilliseconds=performance.now()-start;report.nativeBytesAfterClose=owner.module?._tx_native_heap_used?.()??null;report.bridgeBytesAfterClose=owner.module?._tx_bridge_heap_used?.()??null;report.openFilesAfterClose=owner.openFiles;report.peakOpenFiles=owner.peakOpenFiles;if(report.nativeBytesAfterClose!==0||report.bridgeBytesAfterClose!==0||report.openFilesAfterClose!==0){report.status='failed';report.error=report.error||'Circuit owners remain after close';}fs.mkdirSync(path.dirname(reportPath),{recursive:true});fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');owner.cleanup();}
  }
  assert.equal(report.nativeBytesAfterClose,0,'No native allocations remain');assert.equal(report.bridgeBytesAfterClose,0,'No bridge allocations remain');assert.equal(report.openFilesAfterClose,0,'No temporary file owners remain');
  console.log('PASS: Web artifact acceptance complete; report '+reportPath);

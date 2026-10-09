@@ -39,10 +39,16 @@ authorized assets, not the full input world.
    to zero after close.
 2. Web engine: three fresh processes per mode use the Emscripten 5.0.7 Release
    WASM artifact, built from the same recorded sources. The actual Web file-owner
-   bridge runs the complete pair and physical program. This lane measures Node
-   file/worker/WASM execution; it does not measure browser rendering. It verifies
-   paired save/reopen, full record hashes and zero native/bridge/file owners after
-   close.
+   bridge runs the complete pair and physical program with `--compound-frame`.
+   Each unchanged 128-pulse batch uses the production compound RPC and alternates
+   monochrome/color selection. Every returned selected frame is checked byte for
+   byte against an ordinary read at the same electrical state. The real RPC
+   client/host, remapping and ArrayBuffer transfers run in a same-thread Node
+   loopback. Node cannot clone `fs.openAsBlob` handles, so this adapter preserves
+   immutable file-backed Blob identity without copying the world. This is not
+   browser File-transfer, worker-threading or rendering evidence. The same six
+   processes also verify paired save/reopen, full record hashes and zero
+   native/bridge/file owners after close; no additional heavy jobs are added.
 3. Flutter UI: three independent Linux `flutter drive --profile` processes run
    under Xvfb. Each process retains two complete import/run/reset/close cycles in
    each mode, including the first cycle. Import cancellation is also exercised.
@@ -80,6 +86,19 @@ mono/color records before save, after reopen, and after post-reopen set/clear.
 Resetting/replacing a paused Pong ROM can change other buffered display words;
 the gate compares the observed full records instead of assuming that all other
 pixels are unchanged.
+
+The CI Web lane requires compound coverage for every measured batch, correct
+alternating monitor sizes and both selections during Pong. Missing compound
+evidence, a browser/FPS transport label, or mixed clock/roundtrip measurements
+fail the gate. Historical standalone reports can still be validated explicitly
+as separate-command evidence; they do not satisfy this compound CI requirement.
+
+Web `node-bridge-clock-stage-v1` throughput uses only the bridge's physical clock
+command duration. It excludes the subsequent pixel read and RPC roundtrip. The
+compound clock-plus-selected-display roundtrip has a separate millisecond table.
+Legacy `node-awaited-clock-command-v1` measurements include the externally
+awaited dispatch; the summary keeps these scopes in separate rows instead of
+pooling their rates. Neither measure is browser threading, rendering or FPS.
 
 The Flutter fixed trace is compared across modes and processes separately from
 the wall-timed run. Faster modes can execute different pulse counts in the same

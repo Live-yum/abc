@@ -110,6 +110,7 @@ function harness(owner, bridge, timeoutMs = 1000) {
     progress:async () => ({stage:'compile',phase:1,completed:2,total:3}),
     cancelOperation:async () => { streamCancelled=true; finishCommand?.(); },
     command:async (_,words) => { if (words==='wait') await new Promise(resolve => { finishCommand=resolve; }); return {...streamResult(),worldSource:{blob:sourceBlob,size:3,name:'staged.wld',token:11}}; },
+    computerFrame:async () => ({clock:{...streamResult(),resultKind:2},display:{...streamResult(),resultKind:9},displayError:null,hostStagesUs:{commandWallUs:1}}),
     releaseSource:async token => { releasedSource=token; },
     close:async()=>{},
   });
@@ -121,7 +122,16 @@ function harness(owner, bridge, timeoutMs = 1000) {
   const afterRunning=streamed.client.command(streamedId,'next','[]');
   await sleep(0);await streamed.client.cancelOperation();assert.equal(streamCancelled,true);
   const firstOutput=await running,secondOutput=await afterRunning;
+  for(const output of [firstOutput,secondOutput]) {
+    assert.ok(Number.isFinite(output.hostStagesUs.rpcWallUs) && output.hostStagesUs.rpcWallUs >= 0);
+    assert.ok(Number.isFinite(output.hostStagesUs.rpcQueueUs) && output.hostStagesUs.rpcQueueUs >= 0);
+    assert.ok(output.hostStagesUs.rpcWallUs >= output.hostStagesUs.rpcQueueUs);
+  }
   assert.notEqual(firstOutput.worldSource.token,secondOutput.worldSource.token,'Public output identity cannot alias a native token');
+  const combined=await streamed.client.computerFrame(streamedId,'clock','pixels');
+  assert.equal(combined.clock.session,streamedId);assert.equal(combined.display.session,streamedId);
+  assert.equal(combined.hostStagesUs.commandWallUs,1);assert.ok(combined.hostStagesUs.rpcWallUs>=0);
+  assert.equal(streamed.workers[0].sent.at(-1).method,'computerFrame');
   await streamed.client.close(streamedId);await streamed.client.releaseSource(firstOutput.worldSource.token);assert.equal(releasedSource,11);
   await streamed.client.dispose();await streamed.client.releaseSource(secondOutput.worldSource.token);
 

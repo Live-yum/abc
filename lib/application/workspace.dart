@@ -336,265 +336,273 @@ class Workspace extends TerraController {
   String _status = '选择存档，或从空白画布开始。', _error = '', _activeCanvas = 'pixel';
   Map<String, Object?> _result = {};
   @override
-  TerraViewState get view => TerraViewState(
-    busy: _busy || (_rules?.state['busy'] == true),
-    circuitRunning: _circuitTimer != null,
-    circuitTick: _simulation?.tick ?? 0,
-    status: _status,
-    error: _error,
-    world: _worldView,
-    player: _playerView,
-    worldPreview: _preview,
-    worldOverlay: _worldOverlay,
-    markerProfile: _markerProfile,
-    worldRuleScheme: _worldRuleScheme,
-    mappingSchemes: _mappingSchemes,
-    worldRuleSchemes: _worldRuleSchemes,
-    worldRulePreviewPng: _worldRulePreviewPng,
-    resources: _resources,
-    region: _region,
-    cloud: cloud,
-    onlineResources: onlineResources,
-    map: _map,
-    mapRaster: _mapRaster,
-    canGenerateWorldMap: engine is WorldMapBackend && _world != null,
-    files: [
-      ..._records.map(
-        (r) => TerraFile(
-          id: r.id,
-          name: r.name,
-          kind: r.kind,
-          detail: r.modified ? '有已验证的修改' : '原件已保留',
-        ),
-      ),
-      ..._vaultEntries.values
-          .where(
-            (e) =>
-                !VaultHistory.isTrashed(e) &&
-                !_isInternalPreference(e) &&
-                !_records.any((r) => r.id == e.id),
-          )
-          .map(
-            (e) => TerraFile(
-              id: e.id,
-              name: e.name,
-              kind: e.kind,
-              detail: '本地持久存档 · ${e.size} 字节',
-            ),
+  TerraViewState get view => hostStages.measure(
+    'workspace.view',
+    () => TerraViewState(
+      busy: _busy || (_rules?.state['busy'] == true),
+      circuitRunning: _circuitTimer != null,
+      circuitTick: _simulation?.tick ?? 0,
+      status: _status,
+      error: _error,
+      world: _worldView,
+      player: _playerView,
+      worldPreview: _preview,
+      worldOverlay: _worldOverlay,
+      markerProfile: _markerProfile,
+      worldRuleScheme: _worldRuleScheme,
+      mappingSchemes: _mappingSchemes,
+      worldRuleSchemes: _worldRuleSchemes,
+      worldRulePreviewPng: _worldRulePreviewPng,
+      resources: _resources,
+      region: _region,
+      cloud: cloud,
+      onlineResources: onlineResources,
+      map: _map,
+      mapRaster: _mapRaster,
+      canGenerateWorldMap: engine is WorldMapBackend && _world != null,
+      files: [
+        ..._records.map(
+          (r) => TerraFile(
+            id: r.id,
+            name: r.name,
+            kind: r.kind,
+            detail: r.modified ? '有已验证的修改' : '原件已保留',
           ),
-    ],
-    canvases: {
-      ..._canvases.map(
-        (k, v) => MapEntry(
-          k,
-          TerraCanvas(width: v.width, height: v.height, colors: v.pixels),
         ),
-      ),
-      'circuit': _circuitCanvas,
-      'fusion': _fusionCanvas,
-    },
-    canUndo:
-        (_region?.canUndo ?? false) ||
-        _fusion.canUndo ||
-        _circuit.canUndo ||
-        (_canvases[_activeCanvas]?.canUndo ?? false) ||
-        (_activeWorld?.canUndo ?? false) ||
-        (_activePlayer?.canUndo ?? false),
-    canRedo:
-        (_region?.canRedo ?? false) ||
-        _fusion.canRedo ||
-        _circuit.canRedo ||
-        (_canvases[_activeCanvas]?.canRedo ?? false) ||
-        (_activeWorld?.canRedo ?? false) ||
-        (_activePlayer?.canRedo ?? false),
-    stagedCount: _changes.length,
-    changes: List.unmodifiable(_changes),
-    mapping: List.unmodifiable(_mapping),
-    catalog: List.unmodifiable(_catalog),
-    result: {
-      'rulesCircuit':
-          _rules?.state ?? const {'ready': false, 'busy': false, 'error': ''},
-      ..._result,
-      'terrainPlan': _terrainPlan == null
-          ? null
-          : {
-              'changedCells': _terrainPlan!.changedCells,
-              'blockChanges': _terrainPlan!.blockChanges,
-              'wallChanges': _terrainPlan!.wallChanges,
-              'matchedCounts': _terrainPlan!.matchedCounts,
-              'stale':
-                  !identical(_region, _terrainPlanRegion) ||
-                  _region?.revision != _terrainPlan!.sourceRevision,
-            },
-      'worldRulesPreview': _worldRuleCandidate == null
-          ? null
-          : {
-              'bytes': _worldRuleCandidate!.length,
-              'sourceName': _worldRuleSourceName,
-              'fingerprint': _worldRuleFingerprint,
-              'stale':
-                  _activeWorld?.id != _worldRuleSourceId ||
-                  _activeWorld?.currentHash != _worldRuleSourceHash,
-            },
-      'markersVisible': _markersVisible,
-      'markers': [
-        for (final marker in _markerProfile.markers)
-          if (marker.kind == 'item') marker.id,
+        ..._vaultEntries.values
+            .where(
+              (e) =>
+                  !VaultHistory.isTrashed(e) &&
+                  !_isInternalPreference(e) &&
+                  !_records.any((r) => r.id == e.id),
+            )
+            .map(
+              (e) => TerraFile(
+                id: e.id,
+                name: e.name,
+                kind: e.kind,
+                detail: '本地持久存档 · ${e.size} 字节',
+              ),
+            ),
       ],
-      'chestRulesVerified': _verifiedChestCatalog != null,
-      'bestiaryRulesVerified': _verifiedBestiaryCatalog != null,
-      'modifiedChests': _modifiedChests.toList(growable: false),
-      'worldCanUndo': _activeWorld?.canUndo ?? false,
-      'worldCanRedo': _activeWorld?.canRedo ?? false,
-      'worldModified': _activeWorld?.modified ?? false,
-      'vaultEntries': _vaultEntries.values
-          .where((e) => !_isInternalPreference(e))
-          .toList(),
-      'conversion': _conversionReview == null
-          ? null
-          : {
-              'target': _conversionReview!.projected['version'],
-              'blocked': _conversionReview!.gameplayCompatibilityBlocked,
-              'blockers': _conversionReview!.blockers,
-              'changes': _conversionReview!.changes
-                  .map(
-                    (c) => {
-                      'path': c.path,
-                      'before': c.before,
-                      'after': c.after,
-                      'removed': c.removed,
-                    },
-                  )
-                  .toList(),
-            },
-      'pendingCloudUpload': _pendingCloudUpload == null
-          ? null
-          : {
-              'name': _pendingCloudUpload!.name,
-              'bytes': _pendingCloudUpload!.bytes.length,
-            },
-      'cloudDestination': cloud?.api is HttpCloudApi
-          ? (cloud!.api as HttpCloudApi).config.baseUri.origin
-          : '已配置云端服务',
-      'regionTile': _region?.cellAt(_regionX, _regionY),
-      'regionCompanionWarning': _regionCompanionWarning,
-      'regionBrush': _regionBrush?.intent,
-      if (_placement != null)
-        'fusionPlacement': {
-          'width': _placement!.width,
-          'height': _placement!.height,
-          'x': _placementWorldX,
-          'y': _placementWorldY,
-          'stale': !_placementIsCurrent,
-        },
-      'worldCircuit': {
-        'open': _worldCircuit?.result != null,
-        'streamingAvailable': worldCircuitBackend is WorldCircuitSourceBackend,
-        'sourceName': _circuitSource?.name,
-        'sourceBytes': _circuitSource?.length,
-        'companionName': _circuitCompanion?.name,
-        'importing': _circuitImporting,
-        'cancelling': _circuitCancelling,
-        'streamed': _worldCircuit?.streamed ?? false,
-        'profile': _worldCircuit?.compatibilityProfile ?? false,
-        'computerVerified': _worldCircuit?.computerVerified ?? false,
-        'canRunComputer': _worldCircuit?.canRunComputer ?? false,
-        'programName': _worldCircuit?.programName,
-        'programIncomplete': _worldCircuit?.programIncomplete ?? false,
-        'programBaselineKnown': _worldCircuit?.programBaselineKnown ?? true,
-        'restoredFromExport': _worldCircuit?.restoredFromExport ?? false,
-        'provenanceWarning':
-            _computerProvenanceLoaded && !_computerProvenance.available
-            ? '本地计算机续跑记录无法核验；派生文件暂按通用世界载入。'
-            : null,
-        'physicalPulses': _worldCircuit?.physicalPulses ?? 0,
-        'clockHz': _worldCircuit?.physicalClockHz ?? 0,
-        'displayHz': _worldCircuit?.displayPollHz ?? 0,
-        'displayedFrames': _worldCircuit?.displayedFrames ?? 0,
-        'displayFrames': _worldCircuit?.displayFrames ?? const {},
-        'progress': _worldCircuit?.progress,
-        'keyboardVerified': _worldCircuit?.computerVerified ?? false,
-        'heldKeys': _worldCircuit?.heldKeys.toList() ?? const <String>[],
-        'busy': _busy || (_worldCircuit?.busy ?? false),
-        'running': _worldCircuit?.running ?? false,
-        'optimizationEnabled': _worldCircuit?.optimizationEnabled ?? false,
-        'dirty': _worldCircuit?.dirty ?? false,
-        'error': _worldCircuit?.error?.toString(),
-        'width': _worldCircuit?.result?.width,
-        'height': _worldCircuit?.result?.height,
-        'ticks': _worldCircuit?.result?.ticks ?? 0,
-        'devices': _worldCircuit?.result?.devices ?? 0,
-        'networks': _worldCircuit?.result?.networks ?? 0,
-        'records': _worldCircuitRecords,
-        'viewport': _circuitViewport,
-        if (_worldFragments != null)
-          'fragments': {
-            'offset': _worldFragments!.offset,
-            'total': _worldFragments!.total,
-            'hasMore': _worldFragments!.hasMore,
-            'items': [
-              for (final f in _worldFragments!.fragments)
-                {
-                  'id': f.id,
-                  'x': f.x,
-                  'y': f.y,
-                  'width': f.width,
-                  'height': f.height,
-                  'cells': f.cells,
-                  'wireCells': f.wireCells,
-                  'canStamp': f.canStamp,
-                  'complete': f.completeFootprint,
-                  'modded': f.isModded,
-                  'missingSupport': f.missingSupport,
-                },
-            ],
-          },
+      canvases: {
+        ..._canvases.map(
+          (k, v) => MapEntry(
+            k,
+            TerraCanvas(width: v.width, height: v.height, colors: v.pixels),
+          ),
+        ),
+        'circuit': _circuitCanvas,
+        'fusion': _fusionCanvas,
       },
-      'history': _vaultEntries.values
-          .where((e) => !_isInternalPreference(e))
-          .map(
-            (e) => {
-              'name': e.name,
-              'type': e.kind,
-              'modified': e.modified.toLocal().toIso8601String(),
-              'bytes': e.size,
+      canUndo:
+          (_region?.canUndo ?? false) ||
+          _fusion.canUndo ||
+          _circuit.canUndo ||
+          (_canvases[_activeCanvas]?.canUndo ?? false) ||
+          (_activeWorld?.canUndo ?? false) ||
+          (_activePlayer?.canUndo ?? false),
+      canRedo:
+          (_region?.canRedo ?? false) ||
+          _fusion.canRedo ||
+          _circuit.canRedo ||
+          (_canvases[_activeCanvas]?.canRedo ?? false) ||
+          (_activeWorld?.canRedo ?? false) ||
+          (_activePlayer?.canRedo ?? false),
+      stagedCount: _changes.length,
+      changes: List.unmodifiable(_changes),
+      mapping: List.unmodifiable(_mapping),
+      catalog: List.unmodifiable(_catalog),
+      result: {
+        'rulesCircuit':
+            _rules?.state ?? const {'ready': false, 'busy': false, 'error': ''},
+        ..._result,
+        'terrainPlan': _terrainPlan == null
+            ? null
+            : {
+                'changedCells': _terrainPlan!.changedCells,
+                'blockChanges': _terrainPlan!.blockChanges,
+                'wallChanges': _terrainPlan!.wallChanges,
+                'matchedCounts': _terrainPlan!.matchedCounts,
+                'stale':
+                    !identical(_region, _terrainPlanRegion) ||
+                    _region?.revision != _terrainPlan!.sourceRevision,
+              },
+        'worldRulesPreview': _worldRuleCandidate == null
+            ? null
+            : {
+                'bytes': _worldRuleCandidate!.length,
+                'sourceName': _worldRuleSourceName,
+                'fingerprint': _worldRuleFingerprint,
+                'stale':
+                    _activeWorld?.id != _worldRuleSourceId ||
+                    _activeWorld?.currentHash != _worldRuleSourceHash,
+              },
+        'markersVisible': _markersVisible,
+        'markers': [
+          for (final marker in _markerProfile.markers)
+            if (marker.kind == 'item') marker.id,
+        ],
+        'chestRulesVerified': _verifiedChestCatalog != null,
+        'bestiaryRulesVerified': _verifiedBestiaryCatalog != null,
+        'modifiedChests': _modifiedChests.toList(growable: false),
+        'worldCanUndo': _activeWorld?.canUndo ?? false,
+        'worldCanRedo': _activeWorld?.canRedo ?? false,
+        'worldModified': _activeWorld?.modified ?? false,
+        'vaultEntries': _vaultEntries.values
+            .where((e) => !_isInternalPreference(e))
+            .toList(),
+        'conversion': _conversionReview == null
+            ? null
+            : {
+                'target': _conversionReview!.projected['version'],
+                'blocked': _conversionReview!.gameplayCompatibilityBlocked,
+                'blockers': _conversionReview!.blockers,
+                'changes': _conversionReview!.changes
+                    .map(
+                      (c) => {
+                        'path': c.path,
+                        'before': c.before,
+                        'after': c.after,
+                        'removed': c.removed,
+                      },
+                    )
+                    .toList(),
+              },
+        'pendingCloudUpload': _pendingCloudUpload == null
+            ? null
+            : {
+                'name': _pendingCloudUpload!.name,
+                'bytes': _pendingCloudUpload!.bytes.length,
+              },
+        'cloudDestination': cloud?.api is HttpCloudApi
+            ? (cloud!.api as HttpCloudApi).config.baseUri.origin
+            : '已配置云端服务',
+        'regionTile': _region?.cellAt(_regionX, _regionY),
+        'regionCompanionWarning': _regionCompanionWarning,
+        'regionBrush': _regionBrush?.intent,
+        if (_placement != null)
+          'fusionPlacement': {
+            'width': _placement!.width,
+            'height': _placement!.height,
+            'x': _placementWorldX,
+            'y': _placementWorldY,
+            'stale': !_placementIsCurrent,
+          },
+        'worldCircuit': {
+          'open': _worldCircuit?.result != null,
+          'streamingAvailable':
+              worldCircuitBackend is WorldCircuitSourceBackend,
+          'sourceName': _circuitSource?.name,
+          'sourceBytes': _circuitSource?.length,
+          'companionName': _circuitCompanion?.name,
+          'importing': _circuitImporting,
+          'cancelling': _circuitCancelling,
+          'streamed': _worldCircuit?.streamed ?? false,
+          'profile': _worldCircuit?.compatibilityProfile ?? false,
+          'computerVerified': _worldCircuit?.computerVerified ?? false,
+          'canRunComputer': _worldCircuit?.canRunComputer ?? false,
+          'programName': _worldCircuit?.programName,
+          'programIncomplete': _worldCircuit?.programIncomplete ?? false,
+          'programBaselineKnown': _worldCircuit?.programBaselineKnown ?? true,
+          'restoredFromExport': _worldCircuit?.restoredFromExport ?? false,
+          'provenanceWarning':
+              _computerProvenanceLoaded && !_computerProvenance.available
+              ? '本地计算机续跑记录无法核验；派生文件暂按通用世界载入。'
+              : null,
+          'physicalPulses': _worldCircuit?.physicalPulses ?? 0,
+          'clockHz': _worldCircuit?.physicalClockHz ?? 0,
+          'displayHz': _worldCircuit?.displayPollHz ?? 0,
+          'displayedFrames': _worldCircuit?.displayedFrames ?? 0,
+          'displayFrames': _worldCircuit?.displayFrames ?? const {},
+          'displayIdentity': _worldCircuit?.displayIdentity,
+          'selectedDisplay': _worldCircuit?.selectedDisplay.colored == true
+              ? 'color'
+              : 'mono',
+          'progress': _worldCircuit?.progress,
+          'keyboardVerified': _worldCircuit?.computerVerified ?? false,
+          'heldKeys': _worldCircuit?.heldKeys.toList() ?? const <String>[],
+          'busy': _busy || (_worldCircuit?.busy ?? false),
+          'running': _worldCircuit?.running ?? false,
+          'optimizationEnabled': _worldCircuit?.optimizationEnabled ?? false,
+          'dirty': _worldCircuit?.dirty ?? false,
+          'error': _worldCircuit?.error?.toString(),
+          'width': _worldCircuit?.result?.width,
+          'height': _worldCircuit?.result?.height,
+          'ticks': _worldCircuit?.result?.ticks ?? 0,
+          'devices': _worldCircuit?.result?.devices ?? 0,
+          'networks': _worldCircuit?.result?.networks ?? 0,
+          'records': _worldCircuitRecords,
+          'viewport': _circuitViewport,
+          if (_worldFragments != null)
+            'fragments': {
+              'offset': _worldFragments!.offset,
+              'total': _worldFragments!.total,
+              'hasMore': _worldFragments!.hasMore,
+              'items': [
+                for (final f in _worldFragments!.fragments)
+                  {
+                    'id': f.id,
+                    'x': f.x,
+                    'y': f.y,
+                    'width': f.width,
+                    'height': f.height,
+                    'cells': f.cells,
+                    'wireCells': f.wireCells,
+                    'canStamp': f.canStamp,
+                    'complete': f.completeFootprint,
+                    'modded': f.isModded,
+                    'missingSupport': f.missingSupport,
+                  },
+              ],
             },
-          )
-          .toList(),
-      'circuitCells': _circuit.cells.entries
-          .map(
-            (e) => {
-              ...e.value.toJson(e.key),
-              'on': _simulation?.states[e.key] ?? e.value.initialOn,
-            },
-          )
-          .toList(),
-      'circuitTrace': _simulation?.trace.toList() ?? [],
-      if (circuitBackend != null) 'circuitEditor': _circuitEditor.snapshot(),
-      'circuitStates': _simulation?.states ?? {},
-      'achievements':
-          _achievements?.records
-              .map(
-                (r) => {
-                  'id': r.id,
-                  'completed': r.completed,
-                  'editable': r.editable,
-                  'conditions': r.conditions
-                      .map(
-                        (c) => {
-                          'id': c.id,
-                          'kind': c.kind,
-                          'value': c.value,
-                          'completed': c.completed,
-                          'editable': c.editable,
-                        },
-                      )
-                      .toList(),
-                },
-              )
-              .toList() ??
-          [],
-    },
+        },
+        'history': _vaultEntries.values
+            .where((e) => !_isInternalPreference(e))
+            .map(
+              (e) => {
+                'name': e.name,
+                'type': e.kind,
+                'modified': e.modified.toLocal().toIso8601String(),
+                'bytes': e.size,
+              },
+            )
+            .toList(),
+        'circuitCells': _circuit.cells.entries
+            .map(
+              (e) => {
+                ...e.value.toJson(e.key),
+                'on': _simulation?.states[e.key] ?? e.value.initialOn,
+              },
+            )
+            .toList(),
+        'circuitTrace': _simulation?.trace.toList() ?? [],
+        if (circuitBackend != null) 'circuitEditor': _circuitEditor.snapshot(),
+        'circuitStates': _simulation?.states ?? {},
+        'achievements':
+            _achievements?.records
+                .map(
+                  (r) => {
+                    'id': r.id,
+                    'completed': r.completed,
+                    'editable': r.editable,
+                    'conditions': r.conditions
+                        .map(
+                          (c) => {
+                            'id': c.id,
+                            'kind': c.kind,
+                            'value': c.value,
+                            'completed': c.completed,
+                            'editable': c.editable,
+                          },
+                        )
+                        .toList(),
+                  },
+                )
+                .toList() ??
+            [],
+      },
+    ),
   );
   @override
   Future<void> dispatch(
@@ -627,7 +635,7 @@ class Workspace extends TerraController {
       return;
     }
     if (action == 'worldCircuitPause') {
-      _worldCircuit?.pause();
+      await _worldCircuit?.pauseAndRefreshDisplays();
       return;
     }
     if (action.startsWith('rules')) {
@@ -793,6 +801,8 @@ class Workspace extends TerraController {
             await session.loadProgram(program.name, program.bytes);
             _status = '已将 ${program.name} 写入实际 ROM 灯位，并通过物理控制复位到地址 0。';
           }
+        case 'worldCircuitSelectDisplay':
+          await _worldCircuit?.selectComputerDisplay(args['color'] == true);
         case 'worldCircuitRefreshDisplay':
           await _worldCircuit?.refreshComputerDisplays();
         case 'worldCircuitOpen':
@@ -813,7 +823,11 @@ class Workspace extends TerraController {
           if (session == null) {
             throw const EngineException('请先载入世界电路。');
           }
-          session.running ? session.pause() : session.run();
+          if (session.running) {
+            await session.pauseAndRefreshDisplays();
+          } else {
+            session.run();
+          }
         case 'worldCircuitOptimization':
           final session = _worldCircuit;
           if (session == null) throw const EngineException('请先载入世界电路。');
@@ -2415,6 +2429,7 @@ class Workspace extends TerraController {
       backend,
       source,
       companion: _circuitCompanion,
+      hostStages: hostStages,
     );
     _worldCircuit = session;
     session.addListener(_worldCircuitChanged);
@@ -2477,7 +2492,11 @@ class Workspace extends TerraController {
         ? WorldCircuitGeometry.fromCatalog(catalog!, worldVersion: 326)
         : null;
     await _release('wld');
-    final session = WorldCircuitSession(backend, record.current);
+    final session = WorldCircuitSession(
+      backend,
+      record.current,
+      hostStages: hostStages,
+    );
     _worldCircuit = session;
     session.addListener(_worldCircuitChanged);
     try {
@@ -2742,7 +2761,9 @@ class Workspace extends TerraController {
 
   @override
   void notifyListeners() {
-    if (!_disposed) super.notifyListeners();
+    if (!_disposed) {
+      hostStages.measure('workspace.publishListeners', super.notifyListeners);
+    }
   }
 
   @override

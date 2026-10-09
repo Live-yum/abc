@@ -449,82 +449,84 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
     child: Focus(
       autofocus: true,
       child: LayoutBuilder(
-        builder: (context, c) {
-          final desktop = c.maxWidth >= 1000;
-          return Scaffold(
-            key: _scaffold,
-            drawer: desktop ? null : Drawer(width: 280, child: _sidebar()),
-            body: SafeArea(
-              child: Row(
-                children: [
-                  if (desktop) SizedBox(width: 238, child: _sidebar()),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _topbar(desktop),
-                        if (v.busy) const LinearProgressIndicator(minHeight: 2),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            key: PageStorageKey(section),
-                            padding: EdgeInsets.fromLTRB(
-                              desktop ? 30 : 18,
-                              desktop ? 28 : 22,
-                              desktop ? 30 : 18,
-                              36,
-                            ),
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 1390,
+        builder: (context, c) =>
+            widget.controller.hostStages.measure('workspace.layoutBuilder', () {
+              final desktop = c.maxWidth >= 1000;
+              return Scaffold(
+                key: _scaffold,
+                drawer: desktop ? null : Drawer(width: 280, child: _sidebar()),
+                body: SafeArea(
+                  child: Row(
+                    children: [
+                      if (desktop) SizedBox(width: 238, child: _sidebar()),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            _topbar(desktop),
+                            if (v.busy)
+                              const LinearProgressIndicator(minHeight: 2),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                key: PageStorageKey(section),
+                                padding: EdgeInsets.fromLTRB(
+                                  desktop ? 30 : 18,
+                                  desktop ? 28 : 22,
+                                  desktop ? 30 : 18,
+                                  36,
                                 ),
-                                child: stack([
-                                  _pageHeading(),
-                                  if (v.error.isNotEmpty)
-                                    TerraNotice(
-                                      v.error,
-                                      warning: true,
-                                      icon: Icons.error_outline,
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 1390,
                                     ),
-                                  if (v.status.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 14,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.info_outline,
-                                            size: 15,
-                                            color: TerraColors.muted,
+                                    child: stack([
+                                      _pageHeading(),
+                                      if (v.error.isNotEmpty)
+                                        TerraNotice(
+                                          v.error,
+                                          warning: true,
+                                          icon: Icons.error_outline,
+                                        ),
+                                      if (v.status.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 14,
                                           ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              v.status,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall,
-                                            ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.info_outline,
+                                                size: 15,
+                                                color: TerraColors.muted,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  v.status,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                  _page(),
-                                ]),
+                                        ),
+                                      _page(),
+                                    ]),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            bottomNavigationBar: desktop ? null : _bottomNav(),
-          );
-        },
+                ),
+                bottomNavigationBar: desktop ? null : _bottomNav(),
+              );
+            }),
       ),
     ),
   );
@@ -1573,6 +1575,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
       return stack([
         tabBar('circuit', ['电路沙盒', '信号观察', '世界电路', '完整电路工坊']),
         WorldCircuitPanel(
+          hostStages: widget.controller.hostStages,
           state: Map<String, Object?>.from(
             v.result['worldCircuit'] as Map? ?? const {},
           ),

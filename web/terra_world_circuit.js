@@ -219,10 +219,11 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   const recordSize = fragments ? 32 : 16, recordLimit = fragments ? command[8] : kindExpected === 9 ? 65536 : 8 * MiB / 16;
   const {M,handle,files,storage,streaming} = session, event = M._tx_malloc(48), stats = M._tx_malloc(96);
   const chunks = []; let resultBytes = 0, batches = 0, yieldedAt = now(), resultKind = 0, resultCount = 0, reserved = 0, objectBytes = 0;
+  const hostStagesUs = {coreStepUs:0, yieldWaitUs:0, resultCopyUs:0};
   try {
    if (!event || !stats) throw new Error('Circuit allocation failed');
    for (;;) {
-    cancelled(); check(M._terra_circuit_world_step(handle, 4096, event)); const e = Array.from(M.HEAPU32.subarray(event >>> 2, (event >>> 2) + 12));
+    cancelled(); const stepAt = now(); check(M._terra_circuit_world_step(handle, 4096, event)); hostStagesUs.coreStepUs += (now() - stepAt) * 1000; const e = Array.from(M.HEAPU32.subarray(event >>> 2, (event >>> 2) + 12));
     const [abi,kind,id,offset,length,pointer] = e; if (abi !== 1) throw new Error('Unsupported circuit ABI');
     progressState.phase = e[6]; progressState.completed = e[7]; progressState.total = e[8];
     if (kind === 4) { resultKind = e[9]; resultCount = e[10]; reserved = e[11];
@@ -242,13 +243,14 @@ function createWorldCircuitBridge(loadModule, options = {}) {
       const priorSize = target.size; await target.write(offset, M.HEAPU8.subarray(pointer, pointer + length)); cancelled();
       progressState.storageBytes += target.size - priorSize; progressState.scratchWriteBytes += length; progressState.maxWriteBytes = Math.max(progressState.maxWriteBytes, length);
      } else {
-      if (e[9] !== kindExpected || length !== e[10] * recordSize || resultBytes + length > recordLimit * recordSize) throw new Error('Circuit query exceeds host budget'); chunks.push(M.HEAPU8.slice(pointer, pointer + length)); resultBytes += length;
+      if (e[9] !== kindExpected || length !== e[10] * recordSize || resultBytes + length > recordLimit * recordSize) throw new Error('Circuit query exceeds host budget'); const copyAt = now(); chunks.push(M.HEAPU8.slice(pointer, pointer + length)); hostStagesUs.resultCopyUs += (now() - copyAt) * 1000; resultBytes += length;
      }
      check(M._terra_circuit_world_ack(handle));
     } else if (kind !== 0) throw new Error('Unknown circuit event');
-    if (++batches % 128 === 0 || now() - yieldedAt >= 16) { check(M._terra_circuit_world_stats(handle, stats)); refreshMemory(M, storage, Array.from(M.HEAPU32.subarray(stats >>> 2, (stats >>> 2) + 24))); await cooperate(); yieldedAt = now(); }
+    if (++batches % 128 === 0 || now() - yieldedAt >= 16) { check(M._terra_circuit_world_stats(handle, stats)); refreshMemory(M, storage, Array.from(M.HEAPU32.subarray(stats >>> 2, (stats >>> 2) + 24))); const yieldAt = now(); await cooperate(); hostStagesUs.yieldWaitUs += (now() - yieldAt) * 1000; yieldedAt = now(); }
    }
-   const records = new Uint8Array(resultBytes); let at = 0; for (const chunk of chunks) { records.set(chunk, at); at += chunk.length; }
+   const copyAt = now(); // Each chunk already owns the required borrowed-WASM copy made before ack.
+   const records = chunks.length === 1 ? chunks[0] : new Uint8Array(resultBytes); let at = 0; if (chunks.length !== 1) for (const chunk of chunks) { records.set(chunk, at); at += chunk.length; } hostStagesUs.resultCopyUs += (now() - copyAt) * 1000;
    const objects = withObjects ? await materialize(files.get(6), command[4]) : null; if (objects) validateObjects(objects, command[4], command[5]);
    check(M._terra_circuit_world_stats(handle, stats)); const statWords = Array.from(M.HEAPU32.subarray(stats >>> 2, (stats >>> 2) + 24)); refreshMemory(M, storage, statWords);
    let world = null, twld = null, worldSource = null, twldSource = null;
@@ -264,10 +266,12 @@ function createWorldCircuitBridge(loadModule, options = {}) {
      files.delete(3); files.delete(5);
     } else { world = await materialize(files.get(3), SMALL_WORLD); if (session.hasTwld) twld = await materialize(files.get(5), SMALL_TWLD); }
    }
-   progressState.stage = 'ready'; return {session:handle, resultKind, resultCount, reserved, objects, stats:statWords, records, world, twld, worldSource, twldSource, sourceSha256:session.sourceSha256, twldSourceSha256:session.twldSourceSha256, diagnostics:{...progressState}};
+   progressState.stage = 'ready'; return {hostStagesUs, session:handle, resultKind, resultCount, reserved, objects, stats:statWords, records, world, twld, worldSource, twldSource, sourceSha256:session.sourceSha256, twldSourceSha256:session.twldSourceSha256, diagnostics:{...progressState}};
   } finally { if (event) M._tx_free(event); if (stats) M._tx_free(stats); }
  }
- function command(id, json, recordsJson) { return serial(async () => {
+ function command(id, json, recordsJson) { return serial(() => commandImpl(id, json, recordsJson)); }
+ async function commandImpl(id, json, recordsJson, preserveOperation = false) {
+  const commandAt = now();
   if (!session || id !== session.handle) throw new Error('Circuit session is closed');
   const words = JSON.parse(json), records = JSON.parse(recordsJson), {M,handle,files,storage} = session;
   if (!Array.isArray(words) || !Array.isArray(records) || words.length !== 16 || words[0] !== 1 || words[1] < 1 || words[1] > 10 || words[9] !== 0 || words[14] !== 0 || words[15] !== 0 || records.length !== words[10] * 4 || records.length > 65536 * 4 || [...words,...records].some(v => !Number.isInteger(v) || v < 0 || v > 0xffffffff)) throw new Error('Invalid circuit command');
@@ -281,12 +285,12 @@ function createWorldCircuitBridge(loadModule, options = {}) {
     if (records[i+3] !== 0 && info.circuitWorldFragmentSupports !== 1) throw new Error('Circuit placement supports are unavailable'); }
    } else { if (records.length || words[12] > 1 || (words[12] === 1 && (words[13] !== 6 || words[4] < 32 || words[4] > 4 * MiB || words[5] < 1 || words[5] > 32768)) || (words[12] === 0 && words[13] !== 0)) throw new Error('Invalid circuit companion extraction'); if (words[12] === 1 && info.circuitWorldFragmentObjects !== 1) throw new Error('Circuit object companions are unavailable'); }
   }
-  const p = M._tx_malloc(64), r = M._tx_malloc(Math.max(4, records.length * 4)); operation = {cancelled:false}; progressState.stage = words[1] === 6 ? 'save' : 'command';
+  const p = M._tx_malloc(64), r = M._tx_malloc(Math.max(4, records.length * 4)); if (!preserveOperation) operation = {cancelled:false}; progressState.stage = words[1] === 6 ? 'save' : 'command';
   const replace = async id => { const old = files.get(id); if (old) { progressState.storageBytes -= old.size; await old.close(); } files.set(id, await storage.create()); };
   try {
    if (!p || !r) throw new Error('Circuit allocation failed'); M.HEAPU32.set(records, r >>> 2); words[9] = r; M.HEAPU32.set(words, p >>> 2);
    if (words[1] === 6) { await replace(3); if (session.hasTwld) await replace(5); } if (words[1] === 8) await replace(6);
-   cancelled(); check(M._terra_circuit_world_command(handle, p)); return await pump(words);
+   cancelled(); check(M._terra_circuit_world_command(handle, p)); const result = await pump(words); result.hostStagesUs.commandWallUs = (now() - commandAt) * 1000; return result;
   } catch (error) {
    M._terra_circuit_world_cancel(handle);
    if (words[1] === 6) for (const outputId of [3,5]) {
@@ -296,7 +300,25 @@ function createWorldCircuitBridge(loadModule, options = {}) {
    }
    progressState.stage = error.code === 'CIRCUIT_CANCELLED' ? 'cancelled' : 'error'; throw error;
   }
-  finally { if (p) M._tx_free(p); if (r) M._tx_free(r); operation = null; refreshMemory(M, storage); }
+  finally { if (p) M._tx_free(p); if (r) M._tx_free(r); if (!preserveOperation) operation = null; refreshMemory(M, storage); }
+ }
+ function computerFrame(id, clockJson, pixelsJson) { return serial(async () => {
+  const clockWords = JSON.parse(clockJson), pixels = JSON.parse(pixelsJson);
+  const expectedClock = [1,2,3194,153,1,1,1,8,128,0,0,0,0,0,0,0];
+  const monitor = pixels?.[2] === 6485 ? [6485,800,64,48] : [7371,1002,176,96];
+  const expectedPixels = [1,9,...monitor,1,0,0,0,0,0,0,0,0,0];
+  if (!Array.isArray(clockWords) || clockWords.length !== 16 || !Number.isInteger(clockWords[8]) || clockWords[8] < 32 || clockWords[8] > 128 || clockWords.some((v,i) => i !== 8 && v !== expectedClock[i]) || !Array.isArray(pixels) || pixels.length !== 16 || pixels.some((v,i) => v !== expectedPixels[i])) throw new Error('Invalid physical computer frame');
+  operation = {cancelled:false}; const started = now();
+  try {
+   const clock = await commandImpl(id, clockJson, '[]', true);
+   try {
+    cancelled(); const display = await commandImpl(id, pixelsJson, '[]', true);
+    return {clock, display, displayError:null, hostStagesUs:{commandWallUs:(now()-started)*1000}};
+   } catch (error) {
+    // The accepted physical clock cannot be replayed if the read fails.
+    return {clock, display:null, displayError:String(error.message || error).slice(0,2048), hostStagesUs:{commandWallUs:(now()-started)*1000}};
+   }
+  } finally { operation = null; }
  }); }
  function close(id) { return serial(async () => {
   if (!session || id !== session.handle) return; const current = session; session = null;
@@ -305,7 +327,7 @@ function createWorldCircuitBridge(loadModule, options = {}) {
  }); }
  function releaseSource(token) { return serial(async () => { const file = exported.get(token); if (!file) return; const size = file.size; await file.close(); exported.delete(token); progressState.storageBytes = Math.max(0, progressState.storageBytes - size); }); }
  const open = (world,twld,streaming) => serial(async () => { operation={cancelled:false}; try { return await openImpl(world,twld,streaming); } finally { operation=null; } });
- return {open:(world,twld) => open(world,twld,false), openSource:(world,twld) => open(world,twld,true), command, close, releaseSource,
+ return {open:(world,twld) => open(world,twld,false), openSource:(world,twld) => open(world,twld,true), command, computerFrame, close, releaseSource,
   progress:async () => ({...progressState, diagnostics:{...progressState}}), cancelOperation:async () => { if (operation) operation.cancelled = true; },
  };
 }

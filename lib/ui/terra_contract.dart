@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../platform/resource_store.dart';
+import '../diagnostics/host_stage_timings.dart';
 import '../domain/region_document.dart';
 import '../domain/terraria_map.dart';
 import '../engine/map_backend.dart';
@@ -13,6 +14,7 @@ import '../resources/online_resource_service.dart';
 
 /// Engine boundary. The UI never interprets a picked filename as parsed data.
 abstract class TerraController extends ChangeNotifier {
+  final HostStageTimings hostStages = HostStageTimings();
   TerraViewState get view;
   Future<void> dispatch(String action, [Map<String, Object?> args = const {}]);
 }

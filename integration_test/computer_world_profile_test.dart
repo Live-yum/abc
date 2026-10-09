@@ -30,6 +30,7 @@ import 'support/profile_memory_native.dart'
     as memory;
 import 'support/profile_recorder.dart';
 import 'support/computer_profile_storage.dart';
+import 'support/computer_profile_interaction.dart';
 
 class _SourceFiles implements WorldCircuitFileGateway {
   final WorldCircuitSource world, twld;
@@ -71,7 +72,8 @@ class _NoSmallFiles implements FileGateway {
       throw UnsupportedError('No export requested');
 }
 
-class _ObservedBackend implements WorldCircuitSourceBackend {
+class _ObservedBackend
+    implements WorldCircuitSourceBackend, WorldCircuitComputerBackend {
   final WorldCircuitSourceBackend inner;
   int? id;
   WorldCircuitResult? latest;
@@ -79,6 +81,34 @@ class _ObservedBackend implements WorldCircuitSourceBackend {
   final inputEvents = <Map<String, Object?>>[];
   final inputCompletedUs = <int>[];
   _ObservedBackend(this.inner);
+  @override
+  Future<WorldCircuitComputerFrame> clockAndReadDisplay(
+    int session,
+    WorldCircuitCommand clock,
+    WorldCircuitCommand pixels,
+  ) async {
+    final backend = inner;
+    if (backend is WorldCircuitComputerBackend) {
+      final frame = await (backend as WorldCircuitComputerBackend)
+          .clockAndReadDisplay(session, clock, pixels);
+      clocks += clock.words[8];
+      latest = frame.clock;
+      return frame;
+    }
+    final clockResult = await commandWorldCircuit(session, clock);
+    try {
+      return WorldCircuitComputerFrame(
+        clock: clockResult,
+        display: await commandWorldCircuit(session, pixels),
+      );
+    } catch (error) {
+      return WorldCircuitComputerFrame(
+        clock: clockResult,
+        displayError: error.toString(),
+      );
+    }
+  }
+
   @override
   Future<WorldCircuitResult> openWorldCircuitSource(
     WorldCircuitSource source, {
@@ -232,7 +262,7 @@ void main() {
 
           Future<void> tap(String label, {bool wait = true}) async {
             final button = find.text(label);
-            await tester.ensureVisible(button);
+            await revealComputerProfileTarget(tester, button);
             await tester.tap(button);
             await tester.pump();
             if (wait) {
@@ -273,6 +303,7 @@ void main() {
                       child: WorldCircuitPanel(
                         state: Map<String, Object?>.from(state()),
                         dispatch: workspace.dispatch,
+                        hostStages: workspace.hostStages,
                       ),
                     ),
                   ),
@@ -406,10 +437,8 @@ void main() {
               expect(state()['programName'], isNotNull);
             });
             await tap('运行物理时钟', wait: false);
-            final screen = find.bySemanticsLabel('黑白显示器，显示实际物理像素状态');
-            await tester.ensureVisible(screen);
-            await tester.tap(screen);
-            await tester.pump();
+            final screen = findComputerProfileMonitor('黑白显示器，显示实际物理像素状态');
+            await focusComputerProfileMonitor(tester, screen);
             Future<void> inputWait(bool Function() condition) async {
               final watch = Stopwatch()..start();
               while (!condition()) {
@@ -449,31 +478,51 @@ void main() {
             }
 
             for (final key in [
-              ('up', LogicalKeyboardKey.arrowUp, 6516),
-              ('down', LogicalKeyboardKey.arrowDown, 6517),
-              ('left', LogicalKeyboardKey.arrowLeft, 6519),
-              ('right', LogicalKeyboardKey.arrowRight, 6520),
+              (
+                'up',
+                LogicalKeyboardKey.arrowUp,
+                PhysicalKeyboardKey.arrowUp,
+                6516,
+              ),
+              (
+                'down',
+                LogicalKeyboardKey.arrowDown,
+                PhysicalKeyboardKey.arrowDown,
+                6517,
+              ),
+              (
+                'left',
+                LogicalKeyboardKey.arrowLeft,
+                PhysicalKeyboardKey.arrowLeft,
+                6519,
+              ),
+              (
+                'right',
+                LogicalKeyboardKey.arrowRight,
+                PhysicalKeyboardKey.arrowRight,
+                6520,
+              ),
             ]) {
               await measure('computer.keyboard-${key.$1}', () async {
                 final eventStart = backend.inputEvents.length,
                     centerBefore = paddleCenter();
                 final startUs = Timeline.now;
-                await tester.sendKeyDownEvent(key.$2);
+                await tester.sendKeyDownEvent(key.$2, physicalKey: key.$3);
                 int eventIndex() => backend.inputEvents.indexWhere(
-                  (event) => event['x'] == key.$3,
+                  (event) => event['x'] == key.$4,
                   eventStart,
                 );
                 await inputWait(() => eventIndex() >= 0);
                 final event = eventIndex(),
                     acknowledgedUs = backend.inputCompletedUs[event];
                 final releaseUs = Timeline.now;
-                await tester.sendKeyUpEvent(key.$2);
+                await tester.sendKeyUpEvent(key.$2, physicalKey: key.$3);
                 await tester.pump();
                 expect(
                   (state()['heldKeys'] as Iterable).contains(key.$1),
                   isFalse,
                 );
-                await releaseProof(key.$3, releaseUs);
+                await releaseProof(key.$4, releaseUs);
                 if (key.$1 == 'up' || key.$1 == 'down') {
                   await inputWait(() => paddleCenter() != centerBefore);
                 }
@@ -495,7 +544,7 @@ void main() {
             }
             await measure('computer.touch-hold-down', () async {
               final button = find.bySemanticsLabel('计算机向下');
-              await tester.ensureVisible(button);
+              await revealComputerProfileTarget(tester, button);
               final start = backend.inputEvents.length, startUs = Timeline.now;
               final gesture = await tester.startGesture(
                 tester.getCenter(button),
@@ -531,8 +580,9 @@ void main() {
             );
             await measure('computer.run-displayed-pong', () async {
               await tap('运行物理时钟', wait: false);
-              await tester.ensureVisible(
-                find.bySemanticsLabel('黑白显示器，显示实际物理像素状态'),
+              await revealComputerProfileTarget(
+                tester,
+                findComputerProfileMonitor('黑白显示器，显示实际物理像素状态'),
               );
               final watch = Stopwatch()..start();
               final clocksBefore = backend.clocks,
@@ -570,6 +620,7 @@ void main() {
                 'physicalPulses': stopped,
                 'nativeActiveBytes': backend.latest?.activeBytes,
                 'nativePeakBytes': backend.latest?.peakBytes,
+                'hostStages': workspace.hostStages.snapshot(),
                 'steadyWindowMs': watch.elapsedMicroseconds / 1000,
                 'steadyPhysicalPulses': backend.clocks - clocksBefore,
                 'clockHz':

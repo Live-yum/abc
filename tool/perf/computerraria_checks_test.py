@@ -190,7 +190,81 @@ def backend_report():
     return report, {'artifacts': {'libabc_engine.so': {'sha256': HASH}}}, signatures
 
 
+def web_backend_report(optimized=False, compound=True):
+    report, _, signatures = backend_report()
+    report.update(schema='abc.computerraria.web-file-acceptance.v1',
+                  requestedOptimization=optimized, defaultOptimization=False,
+                  activeOptimizationAtStart=optimized, activeOptimizationAtEnd=optimized,
+                  twldSha256=checks.TWLD_SHA, loaderSha256=HASH, wasmSha256=HASH,
+                  bridgeBytesAfterClose=0, openFilesAfterClose=0,
+                  clock128Timing={'measurement': checks.WEB_COMPOUND_CLOCK_MEASUREMENT if compound
+                                  else checks.WEB_AWAITED_CLOCK_MEASUREMENT,
+                                  'samples': [{'phase': 'pong', 'optimized': optimized,
+                                               'milliseconds': 10} for _ in range(2)]})
+    report['pong']['modeFlips'] = [
+        {'clocks': clock, 'optimized': enabled, 'session': 1,
+         'monoSha256': HASH, 'colorSha256': HASH, 'lampSha256': HASH}
+        for clock, enabled in [(512, not optimized), (640, optimized)]]
+    if compound:
+        report['compoundFrame'] = {
+            'status': 'passed', 'transport': checks.WEB_COMPOUND_TRANSPORT,
+            'samples': [{'phase': 'pong', 'optimized': optimized,
+                         'monitor': monitor, 'recordsBytes': count * 16,
+                         'recordsSha256': HASH, 'clockCommandMilliseconds': 10,
+                         'roundTripMilliseconds': 12}
+                        for monitor, count in [('mono', 3072), ('color', 16896)]]}
+    return report, {'artifacts': {name: {'sha256': HASH} for name in ('world.js', 'world.wasm')}}, signatures
+
+
 class BackendEvidenceTests(unittest.TestCase):
+    def test_compound_scope_and_roundtrip_are_separate_from_clock_time(self):
+        report, build, signatures = web_backend_report()
+        _, metrics = checks.validate_backend(report, 'web', 'standard', build, signatures,
+                                             require_compound=True)
+        self.assertEqual(metrics['clockMeasurementScope'], 'node-bridge-clock-stage-v1')
+        self.assertEqual(metrics['clockPulsesPerSecond'], 12800)
+        self.assertEqual(metrics['compoundRoundTrip']['medianMs'], 12)
+
+    def test_ci_requires_compound_but_historical_scope_stays_explicit(self):
+        report, build, signatures = web_backend_report(compound=False)
+        _, metrics = checks.validate_backend(report, 'web', 'standard', build, signatures)
+        self.assertEqual(metrics['clockMeasurementScope'], 'node-awaited-clock-command-v1')
+        with self.assertRaises(ValueError):
+            checks.validate_backend(report, 'web', 'standard', build, signatures, require_compound=True)
+
+    def test_compound_missing_selection_or_misleading_measurement_is_rejected(self):
+        for failure in ('transport', 'scope', 'count', 'monitor', 'bytes', 'mixed-time', 'short-roundtrip'):
+            report, build, signatures = web_backend_report()
+            compound = report['compoundFrame']
+            if failure == 'transport':
+                compound['transport'] = 'Actual browser worker FPS'
+            elif failure == 'scope':
+                report['clock128Timing']['measurement'] = checks.WEB_AWAITED_CLOCK_MEASUREMENT
+            elif failure == 'count':
+                compound['samples'].pop()
+            elif failure == 'monitor':
+                compound['samples'][1]['monitor'] = 'mono'
+            elif failure == 'bytes':
+                compound['samples'][1]['recordsBytes'] = 3072 * 16
+            elif failure == 'mixed-time':
+                report['clock128Timing']['samples'][0]['milliseconds'] = 12
+            else:
+                compound['samples'][0]['roundTripMilliseconds'] = 9
+            with self.subTest(failure=failure), self.assertRaises(ValueError):
+                checks.validate_backend(report, 'web', 'standard', build, signatures, require_compound=True)
+
+    def test_summary_does_not_pool_different_clock_measurement_scopes(self):
+        values = {}
+        for compound in (False, True):
+            report, build, signatures = web_backend_report(compound=compound)
+            _, values[str(compound)] = checks.validate_backend(report, 'web', 'standard', build, signatures)
+        text = checks.markdown({'status': 'passed', 'acceptedReports': 2, 'commit': COMMIT,
+                                'errors': [], 'limits': [], 'measurements': values})
+        self.assertIn('| web | standard | node-awaited-clock-command-v1 | 1 |', text)
+        self.assertIn('| web | standard | node-bridge-clock-stage-v1 | 1 |', text)
+        self.assertIn('same-thread Node', text)
+        self.assertIn('not browser threading, rendering or FPS', text)
+
     def test_reported_actual_mode_and_companion_digest_are_required(self):
         for mutate in ('default', 'start', 'end', 'twld'):
             report, build, signatures = backend_report()
@@ -291,17 +365,7 @@ class ManifestTests(unittest.TestCase):
                             report['activeOptimizationAtStart'] = optimized
                             report['activeOptimizationAtEnd'] = optimized
                             if lane == 'web':
-                                report.update(schema='abc.computerraria.web-file-acceptance.v1',
-                                              requestedOptimization=optimized, defaultOptimization=False,
-                                              activeOptimizationAtStart=optimized, activeOptimizationAtEnd=optimized,
-                                              twldSha256=checks.TWLD_SHA, loaderSha256=HASH, wasmSha256=HASH,
-                                              bridgeBytesAfterClose=0, openFilesAfterClose=0,
-                                              clock128Timing={'samples': [{'phase': 'pong', 'optimized': optimized,
-                                                                           'milliseconds': 10}]})
-                                report['pong']['modeFlips'] = [
-                                    {'clocks': clock, 'optimized': enabled, 'session': run,
-                                     'monoSha256': HASH, 'colorSha256': HASH, 'lampSha256': HASH}
-                                    for clock, enabled in [(512, not optimized), (640, optimized)]]
+                                report, _, _ = web_backend_report(optimized)
                         write(path, report)
                         path.with_suffix('.log').write_text('Synthetic helper fixture only\n')
                         write(path.with_suffix('.execution.json'), {

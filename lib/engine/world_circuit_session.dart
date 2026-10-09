@@ -5,11 +5,13 @@ import 'package:flutter/foundation.dart';
 import '../domain/computerraria_computer.dart';
 import '../domain/computer_provenance.dart';
 import 'world_circuit_backend.dart';
+import '../diagnostics/host_stage_timings.dart';
 
 /// UI lifecycle for the circuit scheduler and verified physical computer.
 /// Device ticks and hardware clock pulses remain distinct engine commands.
 class WorldCircuitSession extends ChangeNotifier {
   final WorldCircuitBackend backend;
+  final HostStageTimings hostStages;
   final Uint8List? _original;
   final WorldCircuitSource? source, companion;
   final Uint8List? _originalTwld;
@@ -32,10 +34,12 @@ class WorldCircuitSession extends ChangeNotifier {
   Uint8List _program = Uint8List(0);
   Uint8List get programImage => Uint8List.fromList(_program);
   final Map<String, Uint8List> displayFrames = {};
+  Object displayIdentity = Object();
   final Stopwatch _runWatch = Stopwatch();
   int physicalPulses = 0, displayedFrames = 0, _lastDisplayMicros = 0;
   int _measuredPulses = 0, _measuredFrames = 0;
   int clockBatch = 128;
+  ComputerDisplayRegion selectedDisplay = ComputerrariaComputer.mono;
   bool optimizationEnabled = false;
   int _programGeneration = 0;
   final Set<String> _heldKeys = {}, _pendingKeys = {};
@@ -65,15 +69,25 @@ class WorldCircuitSession extends ChangeNotifier {
   final Map<int, WorldCircuitFragment> _fragments = {};
   List<int>? _indexedGeometry;
   Future<void> _queue = Future.value();
-  WorldCircuitSession(this.backend, Uint8List original, {Uint8List? twld})
-    : _original = Uint8List.fromList(original),
-      _originalTwld = twld == null ? null : Uint8List.fromList(twld),
-      source = null,
-      companion = null;
+  WorldCircuitSession(
+    this.backend,
+    Uint8List original, {
+    Uint8List? twld,
+    HostStageTimings? hostStages,
+  }) : hostStages = hostStages ?? HostStageTimings(),
+       _original = Uint8List.fromList(original),
+       _originalTwld = twld == null ? null : Uint8List.fromList(twld),
+       source = null,
+       companion = null;
 
-  WorldCircuitSession.fromSource(this.backend, this.source, {this.companion})
-    : _original = null,
-      _originalTwld = null {
+  WorldCircuitSession.fromSource(
+    this.backend,
+    this.source, {
+    this.companion,
+    HostStageTimings? hostStages,
+  }) : hostStages = hostStages ?? HostStageTimings(),
+       _original = null,
+       _originalTwld = null {
     if (source == null || backend is! WorldCircuitSourceBackend) {
       throw ArgumentError('Streaming world backend and source are required');
     }
@@ -100,7 +114,9 @@ class WorldCircuitSession extends ChangeNotifier {
   }
 
   Future<T> _serial<T>(Future<T> Function() task, {bool notifyState = true}) {
+    final queued = Stopwatch()..start();
     final work = _queue.then((_) async {
+      hostStages.record('session.queueWait', queued.elapsedMicroseconds);
       if (_closed || _closing) throw StateError('Circuit session is closed');
       busy = true;
       if (backend is WorldCircuitSourceBackend) {
@@ -220,27 +236,130 @@ class WorldCircuitSession extends ChangeNotifier {
         return true;
       });
 
+  Future<WorldCircuitResult> _observedCommand(
+    int id,
+    WorldCircuitCommand command,
+    String stage,
+  ) async {
+    final watch = Stopwatch()..start();
+    try {
+      final response = await backend.commandWorldCircuit(id, command);
+      hostStages.recordBridge(stage, response.hostStagesUs);
+      return response;
+    } finally {
+      hostStages.record(stage, watch.elapsedMicroseconds);
+    }
+  }
+
+  @override
+  void notifyListeners() =>
+      hostStages.measure('session.publishListeners', super.notifyListeners);
+
+  WorldCircuitCommand _displayQuery(ComputerDisplayRegion region) =>
+      WorldCircuitCommand.pixels(
+        region.x,
+        region.y,
+        region.width,
+        region.height,
+      );
+
+  String _displayStage(ComputerDisplayRegion region) =>
+      region == ComputerrariaComputer.mono ? 'mono.query' : 'color.query';
+
+  void _acceptDisplay(
+    ComputerDisplayRegion region,
+    WorldCircuitResult response,
+  ) {
+    final rgba = hostStages.measure(
+      'display.rgbaDecode',
+      () => region.decode(response),
+    );
+    final unchanged = hostStages.measure(
+      'display.listEquals',
+      () => listEquals(displayFrames[region.name], rgba),
+    );
+    if (!unchanged) displayFrames[region.name] = rgba;
+  }
+
+  Future<void> _refreshDisplay(int id, ComputerDisplayRegion region) async {
+    _acceptDisplay(
+      region,
+      await _observedCommand(id, _displayQuery(region), _displayStage(region)),
+    );
+  }
+
+  void _countDisplayRead() {
+    displayedFrames++;
+    if (_runWatch.isRunning) _measuredFrames++;
+  }
+
   Future<void> _refreshComputerDisplays(int id) async {
     for (final region in [
       ComputerrariaComputer.mono,
       ComputerrariaComputer.color,
     ]) {
-      final response = await backend.commandWorldCircuit(
-        id,
-        WorldCircuitCommand.pixels(
-          region.x,
-          region.y,
-          region.width,
-          region.height,
-        ),
-      );
-      final rgba = region.decode(response);
-      if (!listEquals(displayFrames[region.name], rgba)) {
-        displayFrames[region.name] = rgba;
-      }
+      await _refreshDisplay(id, region);
     }
-    displayedFrames++;
-    if (_runWatch.isRunning) _measuredFrames++;
+    _countDisplayRead();
+  }
+
+  /// Selection is published only after a fresh read accepted behind any clock.
+  Future<void> selectComputerDisplay(bool color) => _serial(() async {
+    if (!computerVerified || result == null) throw StateError('计算机布局尚未核验。');
+    final region = color
+        ? ComputerrariaComputer.color
+        : ComputerrariaComputer.mono;
+    await _refreshDisplay(result!.session, region);
+    selectedDisplay = region;
+    _countDisplayRead();
+  });
+
+  /// Explicit UI pause retains a full, fresh validation snapshot after drain.
+  Future<void> pauseAndRefreshDisplays() async {
+    pause();
+    if (computerVerified && result != null && !_closed && !_closing) {
+      await refreshComputerDisplays();
+    }
+  }
+
+  Future<void> _runtimeComputerBatch() async {
+    final id = result!.session, pulses = clockBatch.clamp(32, 128);
+    final region = selectedDisplay, computerBackend = backend;
+    final watch = Stopwatch()..start();
+    try {
+      if (computerBackend is WorldCircuitComputerBackend) {
+        final frame = await computerBackend.clockAndReadDisplay(
+          id,
+          ComputerrariaComputer.clock(pulses),
+          _displayQuery(region),
+        );
+        result = frame.clock;
+        physicalPulses += pulses;
+        _measuredPulses += pulses;
+        dirty = true;
+        hostStages.recordBridge('runtime.batch', frame.hostStagesUs);
+        hostStages.recordBridge('physical.command', frame.clock.hostStagesUs);
+        final display = frame.display;
+        if (display == null) {
+          throw StateError(frame.displayError ?? '计算机显示读取未完成。');
+        }
+        hostStages.recordBridge(_displayStage(region), display.hostStagesUs);
+        _acceptDisplay(region, display);
+      } else {
+        result = await _observedCommand(
+          id,
+          ComputerrariaComputer.clock(pulses),
+          'physical.command',
+        );
+        physicalPulses += pulses;
+        _measuredPulses += pulses;
+        dirty = true;
+        await _refreshDisplay(id, region);
+      }
+      _countDisplayRead();
+    } finally {
+      hostStages.record('runtime.batch', watch.elapsedMicroseconds);
+    }
   }
 
   Future<void> refreshComputerDisplays() => _serial(() async {
@@ -359,9 +478,10 @@ class WorldCircuitSession extends ChangeNotifier {
         throw StateError('请先完整加载 RV32I 程序。');
       }
       await _applyComputerKeys(result!.session);
-      result = await backend.commandWorldCircuit(
+      result = await _observedCommand(
         result!.session,
         ComputerrariaComputer.clock(pulses),
+        'physical.command',
       );
       physicalPulses += pulses;
       dirty = true;
@@ -401,7 +521,10 @@ class WorldCircuitSession extends ChangeNotifier {
 
   void _scheduleComputer() {
     if (!running || _closing || _closed) return;
+    final scheduled = Stopwatch()..start();
     _timer = Timer(const Duration(milliseconds: 1), () async {
+      hostStages.record('runtime.timerWait', scheduled.elapsedMicroseconds);
+      final loop = Stopwatch()..start();
       if (!running || _closing || _closed) return;
       if (busy) {
         _scheduleComputer();
@@ -412,16 +535,9 @@ class WorldCircuitSession extends ChangeNotifier {
         await _serial(() async {
           if (!running || result == null) return;
           await _applyComputerKeys(result!.session);
-          result = await backend.commandWorldCircuit(
-            result!.session,
-            ComputerrariaComputer.clock(clockBatch.clamp(32, 128)),
-          );
-          physicalPulses += clockBatch.clamp(32, 128);
-          _measuredPulses += clockBatch.clamp(32, 128);
-          dirty = true;
+          await _runtimeComputerBatch();
           final now = _runWatch.elapsedMicroseconds;
           if (!running || now - _lastDisplayMicros >= 16667) {
-            await _refreshComputerDisplays(result!.session);
             _lastDisplayMicros = _runWatch.elapsedMicroseconds;
             publishFrame = true;
           }
@@ -430,6 +546,7 @@ class WorldCircuitSession extends ChangeNotifier {
       } catch (_) {
         pause();
       }
+      hostStages.record('runtime.loop', loop.elapsedMicroseconds);
       if (running) _scheduleComputer();
     });
   }
@@ -440,6 +557,9 @@ class WorldCircuitSession extends ChangeNotifier {
   }) => _serial(() async {
     final active = result;
     if (active == null) throw StateError('Open the circuit first');
+    if (command.words[1] == 6 && computerVerified) {
+      await _refreshComputerDisplays(active.session);
+    }
     final next = await backend.commandWorldCircuit(active.session, command);
     // Fragment queries return eight-word records, unlike the viewport. Keep
     // those out of the live four-word display and retain its current state.
@@ -540,6 +660,7 @@ class WorldCircuitSession extends ChangeNotifier {
     if (_closed || _closing || running || result == null) return;
     if (computerVerified) {
       if (!canRunComputer) throw StateError('请先完整加载 RV32I 程序。');
+      hostStages.reset();
       running = true;
       _runWatch.start();
       _scheduleComputer();
@@ -589,6 +710,8 @@ class WorldCircuitSession extends ChangeNotifier {
       programName = null;
       _program = Uint8List(0);
       displayFrames.clear();
+      displayIdentity = Object();
+      selectedDisplay = ComputerrariaComputer.mono;
       physicalPulses = 0;
       displayedFrames = 0;
       _measuredPulses = 0;
