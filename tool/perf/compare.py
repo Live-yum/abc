@@ -23,6 +23,9 @@ def median(xs):
 def validate(report):
     assert report['schema'] == 'abc.performance.v1', 'Unexpected report schema'
     assert report['status'] == 'passed', 'The measured workload failed correctness checks'
+    if report.get('suite') == 'public-dispatch-actions':
+        from public_dispatch_validate import validate_workload
+        validate_workload(report)
     assert report['operations'], 'No measured operations'
     for row in report['operations']:
         samples = row['samplesMs']

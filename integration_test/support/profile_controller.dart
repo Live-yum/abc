@@ -11,14 +11,16 @@ class ProfiledTerraController extends TerraController {
     this.delegate,
     this.recorder,
     this.cycle,
-    this.warmup,
-  ) {
+    this.warmup, {
+    this.profileMode,
+  }) {
     delegate.addListener(notifyListeners);
   }
   final TerraController delegate;
   final ProfileRecorder recorder;
   final int cycle;
   final bool warmup;
+  final String? profileMode;
 
   @override
   TerraViewState get view => delegate.view;
@@ -29,7 +31,10 @@ class ProfiledTerraController extends TerraController {
     Map<String, Object?> args = const {},
   ]) async {
     final scope = recorder.activeScope;
-    final variants = <String, String>{};
+    final variants = <String, String>{
+      if (profileMode == 'standard' || profileMode == 'optimized')
+        'profileMode': profileMode!,
+    };
     const safe = {
       'kind': {
         'world',

@@ -304,42 +304,53 @@
     {
       "controller": "Workspace",
       "action": "cloudDiscardUpload",
-      "operationIds": [],
-      "status": "gap",
+      "operationIds": [
+        "workspace.cloud.discard"
+      ],
+      "status": "declared",
       "availability": "available",
-      "reason": "Cloud local protocol/storage suite owned separately; no real network measurement or direct dispatcher coverage claimed here."
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
     },
     {
       "controller": "Workspace",
       "action": "cloudDownload",
-      "operationIds": [],
-      "status": "gap",
+      "operationIds": [
+        "workspace.cloud.download"
+      ],
+      "status": "declared",
       "availability": "available",
-      "reason": "Cloud local protocol/storage suite owned separately; no real network measurement or direct dispatcher coverage claimed here."
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
     },
     {
       "controller": "Workspace",
       "action": "cloudPrepareUpload",
-      "operationIds": [],
-      "status": "gap",
+      "operationIds": [
+        "workspace.cloud.prepare",
+        "workspace.cloud.reprepare"
+      ],
+      "status": "declared",
       "availability": "available",
-      "reason": "Cloud local protocol/storage suite owned separately; no real network measurement or direct dispatcher coverage claimed here."
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
     },
     {
       "controller": "Workspace",
       "action": "cloudRecommendationDownload",
-      "operationIds": [],
-      "status": "gap",
+      "operationIds": [
+        "workspace.cloud.recommendation-download"
+      ],
+      "status": "declared",
       "availability": "available",
-      "reason": "Cloud local protocol/storage suite owned separately; no real network measurement or direct dispatcher coverage claimed here."
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
     },
     {
       "controller": "Workspace",
       "action": "cloudUploadPrepared",
-      "operationIds": [],
-      "status": "gap",
+      "operationIds": [
+        "workspace.cloud.upload"
+      ],
+      "status": "declared",
       "availability": "available",
-      "reason": "Cloud local protocol/storage suite owned separately; no real network measurement or direct dispatcher coverage claimed here."
+      "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
     },
     {
       "controller": "Workspace",
@@ -378,7 +389,9 @@
         "workspace.rules.export",
         "workspace.vault.export",
         "workspace.wld.export",
-        "workspace.world.map-png-export"
+        "workspace.world.map-png-export",
+        "workspace.public.world-export",
+        "workspace.public.conversion-export"
       ],
       "status": "declared",
       "availability": "available",
@@ -429,7 +442,8 @@
       "operationIds": [
         "workspace.placement.region-load",
         "workspace.region.load",
-        "workspace.region.object-load"
+        "workspace.region.object-load",
+        "workspace.public.placement-readback"
       ],
       "status": "declared",
       "availability": "available",
@@ -960,6 +974,22 @@
     },
     {
       "controller": "Workspace",
+      "action": "worldCircuitCancel",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitChooseWorld",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
       "action": "worldCircuitClose",
       "operationIds": [
         "workspace.fragments.close",
@@ -991,6 +1021,38 @@
     },
     {
       "controller": "Workspace",
+      "action": "worldCircuitImport",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitInput",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitLoadPong",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitLoadProgram",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
       "action": "worldCircuitOpen",
       "operationIds": [
         "workspace.fragments.open",
@@ -1000,6 +1062,38 @@
       "status": "declared",
       "availability": "available",
       "reason": "Declared measured workload; requires a matching operation row in a passed report. Only listed parameter variants count."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitOptimization",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitPause",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitRefreshDisplay",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+    },
+    {
+      "controller": "Workspace",
+      "action": "worldCircuitReleaseKeys",
+      "operationIds": [],
+      "status": "gap",
+      "availability": "available",
+      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
     },
     {
       "controller": "Workspace",

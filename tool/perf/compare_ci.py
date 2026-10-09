@@ -12,9 +12,14 @@ from compare import identity, validate as validate_core
 from ui_compare import signature as ui_signature
 from ui_validate import validate as validate_ui
 
-SUITES = {'native': 3, 'wasm': 3, 'cloud': 3, 'resources': 3,
+SUITES = {'native': 3, 'public-dispatch': 3, 'wasm': 3, 'cloud': 3, 'resources': 3,
           'map-aot': 3, 'map-dart2js': 3, 'map-owner': 3, 'map-generation': 3,
           'ui-profile': 5}
+
+# This verified historical calibration predates the new public dispatcher suite.
+# Only that known absence is calibration-only; missing/partial later artifacts
+# remain failures and cannot silently bypass the required three processes.
+PRE_DISPATCH_BASELINE = 'a5612b474fc8dc50d41b3bc6b87234d30ba97e02'
 
 
 def load_group(root, suite, required):
@@ -79,6 +84,17 @@ def main():
                 result['reason'] = 'First calibration: no baseline run selected. Workloads passed; regression acceptance remains unestablished.'
             else:
                 assert args.baseline is not None, 'Requested baseline was not downloaded'
+                if (suite == 'public-dispatch' and args.baseline_run_metadata is not None
+                        and not list(args.baseline.rglob(f'{suite}.run-*'))):
+                    selected = json.loads(args.baseline_run_metadata.read_text())
+                    if (selected.get('head_sha') == PRE_DISPATCH_BASELINE
+                            and selected.get('status') == 'completed'
+                            and selected.get('conclusion') == 'success'):
+                        result.update(status='new-workload-uncompared',
+                            baselineRunId=selected['id'], baselineCommit=selected['head_sha'],
+                            reason='Three candidate processes validated. The verified selected historical baseline predates this suite; no paired latency or memory regression conclusion is available.')
+                        rows.append(result)
+                        continue
                 baseline = load_group(args.baseline, suite, required)
                 result['baselineRuns'] = [str(row[0]) for row in baseline]
                 if args.baseline_run_metadata is not None:
@@ -115,6 +131,7 @@ def main():
             failed = True
         rows.append(result)
     status = ('failed' if failed else 'inconclusive' if not args.baseline_requested
+              or any(row['status'] in ('inconclusive', 'new-workload-uncompared') for row in rows)
               else 'no-detected-regression')
     summary = {'schema': 'abc.performance-ci-comparison.v1', 'status': status,
                'baselineRequested': args.baseline_requested, 'suites': rows,

@@ -121,9 +121,10 @@ jobs:
           retention-days: 30
 
   ui-profile:
-    name: Actual Linux profile, 3 processes × 2 cycles × 2 modes
+    name: Linux profile and bounded memory attribution
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # Three 20-minute process bounds, one 45-minute diagnostic, plus builds.
+    timeout-minutes: 150
     env:
       LIBGL_ALWAYS_SOFTWARE: '1'
       TERRA_PERF_RUNNER: ubuntu-24.04-xvfb
@@ -172,6 +173,34 @@ jobs:
         with:
           name: computerraria-linux-profile-bundle
           path: build/computerraria/linux-profile-bundle.tar.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: One bounded eight-cycle memory attribution process
+        run: >-
+          xvfb-run -a -s "-screen 0 1440x1000x24"
+          bash tool/perf/computer_memory_diagnostic.sh
+          build/computerraria/memory-diagnostic/memory.json
+      - name: Preserve only an identified diagnostic application bundle
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          import pathlib
+          import tarfile
+          root = pathlib.Path('build/computerraria/memory-diagnostic')
+          execution = root / 'memory.execution.json'
+          build = root / 'memory.build.json'
+          if execution.exists() and build.exists():
+              evidence = json.loads(execution.read_text())
+              if evidence.get('diagnosticTargetReported') is True:
+                  with tarfile.open(root / 'diagnostic-profile-bundle.tar.gz', 'w:gz') as archive:
+                      archive.add('build/linux/x64/profile/bundle', arcname='bundle')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: computerraria-memory-diagnostic
+          path: build/computerraria/memory-diagnostic/
           if-no-files-found: warn
           retention-days: 30
 

@@ -11,7 +11,9 @@ import re
 root = pathlib.Path(__file__).resolve().parents[2]
 catalog_path = root / 'tool/perf/action_catalog.json'
 catalog = json.loads(catalog_path.read_text())
-native = (root / 'test/performance/native_actions_test.dart').read_text()
+native = '\n'.join((root / file).read_text() for file in (
+    'test/performance/native_actions_test.dart',
+    'test/performance/public_dispatch_actions_test.dart'))
 declared = {row['id']: row for row in catalog['workspaceActions']}
 for operation, action in re.findall(r"await action\(\s*'([^']+)'\s*,\s*'([^']+)'", native):
     variants = [operation.replace('$kind', kind) for kind in ('pixel', 'fusion', 'circuit')] if '$kind' in operation else [operation]

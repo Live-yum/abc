@@ -14,7 +14,7 @@ COMMIT = 'a' * 40
 HASH = 'b' * 64
 
 
-def loading_memory_report(cycles=2):
+def loading_memory_report(cycles=2, *, include_resets=False):
     mib = 1024 * 1024
     def sample(time, rss):
         return {'timeUs': time, 'rssBytes': rss * mib,
@@ -28,8 +28,10 @@ def loading_memory_report(cycles=2):
                 'max': gap if count else None, 'mean': gap if count else None,
                 'nonOverlappingBuckets': {bucket: count} if count else {}}
     identities = [('cancelled-import', 0, 'standard')]
+    kinds = ('initial-import', 'exported-reimport', 'reset-original') if include_resets else (
+             'initial-import', 'exported-reimport')
     identities += [(kind, cycle, mode) for cycle in range(cycles) for mode in checks.MODES
-                   for kind in ('initial-import', 'exported-reimport')]
+                   for kind in kinds]
     windows, closes = [], []
     for attempt, (kind, cycle, mode) in enumerate(identities):
         cancelled = attempt == 0
@@ -39,13 +41,16 @@ def loading_memory_report(cycles=2):
         count = 2 if cancelled else 3
         windows.append({
             'kind': kind, 'cycle': cycle, 'mode': mode, 'hostLoadAttempt': attempt,
+            'sessionSource': 'exported-reimport-session-source' if kind in
+                             ('exported-reimport', 'reset-original') else 'pinned-public-original-source',
             'priorCancelledLoad': not cancelled,
             'hostLoadContext': 'cancelled-load-attempt' if cancelled else
                                'fresh-host-first-complete-load' if attempt == 1 else 'repeat-in-same-host',
             'cacheState': 'uncontrolled', 'outcome': 'cancelled' if cancelled else 'ready',
             'baseline': baseline, 'terminal': terminal, 'ready': None if cancelled else terminal,
             'readyEvidence': {} if cancelled else {'completeWldVerified': True,
-                              'monoDisplayInitialized': True, 'monoRgbaBytes': 12288},
+                              'monoDisplayInitialized': True, 'monoRgbaBytes': 12288,
+                              'restoredFromExport': kind in ('exported-reimport', 'reset-original')},
             'durationUs': duration,
             'sampleMax': {key: peak[key] for key in checks.OS_MEMORY_FIELDS},
             'sampleMaxAtUs': {key: peak['timeUs'] for key in checks.OS_MEMORY_FIELDS},
@@ -55,7 +60,8 @@ def loading_memory_report(cycles=2):
             'smapsSampleCount': count, 'statusIntervalUs': intervals(count - 1, duration // (count - 1)),
             'smapsIntervalUs': intervals(count - 1, duration // (count - 1)),
         })
-        if not cancelled:
+        if not cancelled and (kind == 'initial-import' or
+                              kind == ('reset-original' if include_resets else 'exported-reimport')):
             closes.append({'phase': 'after-export-close' if kind == 'initial-import' else 'after-cycle-close',
                            'cycle': cycle, 'mode': mode, 'sample': sample(start + duration + 1000, 120)})
     return {'schema': checks.LOADING_MEMORY_SCHEMA, 'status': 'observed', 'hostPid': 1234,
@@ -141,6 +147,27 @@ def profile_report():
 
 
 class ProfileEvidenceTests(unittest.TestCase):
+    def test_extended_loading_memory_requires_every_reset_window(self):
+        report = loading_memory_report(include_resets=True)
+        self.assertEqual(len(report['windows']), 13)
+        self.assertEqual(len(report['closeSamples']), 8)
+        checks.validate_loading_os_memory(report, 2, include_resets=True)
+        for failure in ('missing-reset', 'wrong-source', 'reset-not-restored', 'wrong-close'):
+            broken = copy.deepcopy(report)
+            reset = next(row for row in broken['windows'] if row['kind'] == 'reset-original')
+            if failure == 'missing-reset':
+                broken['windows'].remove(reset)
+            elif failure == 'wrong-source':
+                reset['sessionSource'] = 'pinned-public-original-source'
+            elif failure == 'reset-not-restored':
+                reset['readyEvidence']['restoredFromExport'] = False
+            else:
+                broken['closeSamples'][1]['sample']['timeUs'] = reset['baseline']['timeUs'] - 1
+            with self.assertRaises(ValueError, msg=failure):
+                checks.validate_loading_os_memory(broken, 2, include_resets=True)
+        with self.assertRaises(ValueError):
+            checks.validate_loading_os_memory(loading_memory_report(), 2, include_resets=True)
+
     def test_mode_rule_and_not_applicable_paddle_evidence_are_required(self):
         for failure in ('rule', 'ready', 'compatibility', 'halted', 'false-paddle', 'missing-reason'):
             report = profile_report()

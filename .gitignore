@@ -26,6 +26,7 @@ node_modules/
 *.wld
 !assets/qa/synthetic-objects.wld
 !assets/qa/synthetic-circuit.wld
+!assets/qa/synthetic-modern.wld
 *.plr
 *.twld
 *.tplr

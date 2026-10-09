@@ -31,7 +31,7 @@ jobs:
   native:
     name: Native core and controller actions (3 processes)
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 105
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -53,6 +53,16 @@ jobs:
           --timeout-seconds 1500 --output-dir build/perf/raw/native
           --report-env ABC_PERF_REPORT -- flutter test --no-pub --concurrency=1
           test/performance/native_actions_test.dart
+      - name: Verify public modern fixture and three sequential dispatcher workloads
+        if: ${{ !cancelled() }}
+        run: |
+          python3 tool/perf/generate_synthetic_modern_world.py build/perf/fixtures/synthetic-modern.wld
+          cmp assets/qa/synthetic-modern.wld build/perf/fixtures/synthetic-modern.wld
+          python3 tool/perf/verify_synthetic_modern_world.py "$TERRAFORGE_ENGINE_LIBRARY"
+          python3 tool/perf/run_ci_suite.py --suite public-dispatch --runs 3 \
+            --timeout-seconds 300 --output-dir build/perf/raw/native \
+            --report-env ABC_DISPATCH_PERF_REPORT -- flutter test --no-pub --concurrency=1 \
+            test/performance/public_dispatch_actions_test.dart
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

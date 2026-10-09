@@ -78,8 +78,105 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(report['reportCount'], 0)
         self.assertEqual(len(report['rejectedReports']), 1)
 
+    def test_explicit_dispatch_keeps_frame_and_parameter_gaps(self):
+        source = core_report()
+        source['suite'] = 'public-dispatch-actions'
+        source['operations'][0].update(id='workspace.edit-a',
+            controller='Workspace', action='edit',
+            dispatchEvidence='awaited-production-dispatch',
+            completion='returned-and-state-asserted')
+        report = build_coverage(self.inventory, [('direct.json', source)], [])
+        action = report['actions'][1]
+        self.assertTrue(action['directDispatchMeasured'])
+        self.assertFalse(action['profileDispatchMeasured'])
+        self.assertEqual(action['missingCoreOperations'], ['workspace.edit-b'])
+        row = next(row for row in report['rows'] if row['category'] == 'controller-direct')
+        self.assertIsNone(row['frames'])
+
+    def test_cloud_service_id_only_maps_audited_local_dispatch(self):
+        self.inventory['actions'].append({'controller': 'Workspace',
+            'action': 'cloudPrepareUpload', 'operationIds': [],
+            'availability': 'available', 'reason': 'not measured'})
+        source = core_report()
+        source['operations'][0]['id'] = 'cloud.upload.prepare_snapshot'
+        report = build_coverage(self.inventory, [('untrusted-suite.json', source)], [])
+        self.assertEqual(report['actions'][-1]['status'], 'gap')
+        source['suite'] = 'cloud-client-local'
+        report = build_coverage(self.inventory, [('local-cloud.json', source)], [])
+        self.assertTrue(report['actions'][-1]['directDispatchMeasured'])
+        self.assertFalse(report['actions'][-1]['profileDispatchMeasured'])
+        self.assertEqual(report['rows'][0]['category'], 'controller-local')
+
+    def test_disabled_qa_entry_is_not_production_success(self):
+        self.inventory['actions'].append({'controller': 'Workspace',
+            'action': 'openSynthetic', 'operationIds': [],
+            'availability': 'qa-only', 'reason': 'disabled in production'})
+        report = build_coverage(self.inventory, [], [])
+        self.assertEqual(report['actions'][-1]['status'], 'not-applicable')
+        self.assertFalse(report['actions'][-1]['directDispatchMeasured'])
+
+    def test_full_world_macro_never_becomes_direct_dispatch_latency(self):
+        self.inventory['actions'].append({'controller': 'Workspace',
+            'action': 'worldCircuitCancel', 'operationIds': [],
+            'availability': 'available', 'reason': 'not measured'})
+        source = core_report()
+        source.update(suite='computerraria-ui', runtime={
+            'platform': 'linux', 'workingTreeDirty': False})
+        source['operations'][0]['id'] = 'computer.cancel-import.standard'
+        report = build_coverage(self.inventory, [('whole-world.json', source)], [])
+        action = report['actions'][-1]
+        self.assertTrue(action['profileWorkflowMeasured'])
+        self.assertFalse(action['directDispatchMeasured'])
+        self.assertFalse(action['profileDispatchMeasured'])
+        row = next(row for row in report['rows']
+                   if row['category'] == 'controller-profile-workflow')
+        self.assertEqual(row['medianMs'], source['operations'][0]['medianMs'])
+        self.assertIn('whole macro', row['measurementScope'])
+
+    def test_current_inventory_contains_early_computer_dispatches(self):
+        inventory = json.loads(Path(__file__).with_name('action_gaps.json').read_text())
+        names = {row['action'] for row in inventory['actions']}
+        self.assertTrue({'worldCircuitCancel', 'worldCircuitChooseWorld',
+            'worldCircuitImport', 'worldCircuitInput', 'worldCircuitLoadPong',
+            'worldCircuitLoadProgram', 'worldCircuitOptimization',
+            'worldCircuitPause', 'worldCircuitRefreshDisplay',
+            'worldCircuitReleaseKeys'} <= names)
+
 
 class ExecutionTests(unittest.TestCase):
+    def test_new_dispatch_suite_has_three_required_ci_processes(self):
+        self.assertEqual(compare_ci.SUITES['public-dispatch'], 3)
+
+    def test_only_verified_pre_dispatch_baseline_is_uncompared(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline = root / 'baseline'
+            baseline.mkdir()
+            selected = root / 'selected.json'
+            selected.write_text(json.dumps({'id': 37909644872,
+                'head_sha': compare_ci.PRE_DISPATCH_BASELINE,
+                'status': 'completed', 'conclusion': 'success'}))
+            candidate = [(root / 'candidate.json', core_report(),
+                          {'source': {'commit': 'c' * 40}, 'runId': 'candidate'})]
+            argv = ['compare_ci.py', '--candidate', str(root), '--baseline', str(baseline),
+                    '--baseline-requested', '--baseline-run-metadata', str(selected),
+                    '--output', str(root / 'summary')]
+            with mock.patch.object(compare_ci, 'SUITES', {'public-dispatch': 3}), \
+                 mock.patch.object(compare_ci, 'load_group', return_value=candidate) as load, \
+                 mock.patch.object(sys, 'argv', argv):
+                self.assertEqual(compare_ci.main(), 0)
+                self.assertEqual(load.call_count, 1)
+            summary = json.loads((root / 'summary/comparison.json').read_text())
+            self.assertEqual(summary['status'], 'inconclusive')
+            self.assertEqual(summary['suites'][0]['status'], 'new-workload-uncompared')
+            # A partial attempted baseline is never treated as the historical absence.
+            (baseline / 'public-dispatch.run-1.execution.json').write_text('{}')
+            with mock.patch.object(compare_ci, 'SUITES', {'public-dispatch': 3}), \
+                 mock.patch.object(compare_ci, 'load_group', side_effect=[candidate,
+                    AssertionError('incomplete attempted baseline')]), \
+                 mock.patch.object(sys, 'argv', argv):
+                self.assertEqual(compare_ci.main(), 1)
+
     def test_three_distinct_processes_are_required(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

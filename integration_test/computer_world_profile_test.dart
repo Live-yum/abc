@@ -29,6 +29,7 @@ import 'support/profile_memory_native.dart'
     if (dart.library.js_interop) 'support/profile_memory_web.dart'
     as memory;
 import 'support/profile_recorder.dart';
+import 'support/profile_controller.dart';
 import 'support/profile_os_memory_native.dart'
     if (dart.library.js_interop) 'support/profile_os_memory_web.dart'
     as os_memory;
@@ -58,8 +59,17 @@ class _SourceFiles implements WorldCircuitFileGateway {
 
 class _NoSmallFiles implements FileGateway {
   @override
-  Future<PickedFile?> pick(String kind) =>
-      throw StateError('Full worlds must never enter byte picker');
+  Future<PickedFile?> pick(String kind) async {
+    if (kind == 'computerProgram') {
+      // Four-byte RV32I JAL x0, 0, authored here. Full WLD remains handle-only.
+      return PickedFile(
+        'synthetic-loop.bin',
+        Uint8List.fromList([0x6f, 0, 0, 0]),
+      );
+    }
+    throw StateError('Full worlds must never enter byte picker');
+  }
+
   @override
   Future<bool> save(String name, Uint8List bytes) =>
       throw UnsupportedError('No export requested');
@@ -290,6 +300,13 @@ void main() {
             worldCircuitFiles: sourceFiles,
           );
           var workspace = createWorkspace();
+          var controller = ProfiledTerraController(
+            workspace,
+            recorder,
+            cycle,
+            false,
+            profileMode: mode,
+          );
           Map state() => workspace.view.result['worldCircuit'] as Map;
           int litPixels(Uint8List rgba) {
             expect(rgba.length, 64 * 48 * 4);
@@ -384,6 +401,9 @@ void main() {
               'cycle': cycle,
               'mode': mode,
               'hostLoadAttempt': loadAttempts++,
+              'sessionSource': sourceFiles.useSavedWorld
+                  ? 'exported-reimport-session-source'
+                  : 'pinned-public-original-source',
               'priorCancelledLoad': priorCancelledLoad,
               'hostLoadContext': cancelled
                   ? 'cancelled-load-attempt'
@@ -414,6 +434,7 @@ void main() {
                   'completeWldVerified': true,
                   'monoRgbaBytes': mono.length,
                   'monoDisplayInitialized': true,
+                  'restoredFromExport': state()['restoredFromExport'] == true,
                 });
                 outcome = 'ready';
                 completeLoads++;
@@ -434,7 +455,7 @@ void main() {
                       padding: const EdgeInsets.all(16),
                       child: WorldCircuitPanel(
                         state: Map<String, Object?>.from(state()),
-                        dispatch: workspace.dispatch,
+                        dispatch: controller.dispatch,
                         hostStages: workspace.hostStages,
                       ),
                     ),
@@ -473,8 +494,61 @@ void main() {
               expect(state()['optimizationEnabled'], isTrue);
             }
             await measure('computer.load-pong', () => tap('载入 Pong 程序'));
+            final baselineRam = await backend.memorySignature();
+            final baselineCpu = await backend.cpuSignature();
+            final baselineFrames = Map.of(state()['displayFrames'] as Map);
+            await measure('computer.load-program', () => tap('加载 RV32I 程序'));
+            expect(state()['programName'], 'synthetic-loop.bin');
+            expect(state()['programIncomplete'], isFalse);
+            expect(state()['canRunComputer'], isTrue);
+            final romPoints = <int>[];
+            for (var bit = 0; bit < 32; bit++) {
+              final (x, y) = ComputerrariaComputer.romLamp(0, bit);
+              romPoints.addAll([x, y, 0, 0]);
+            }
+            final rom = await backend.commandWorldCircuit(
+              backend.id!,
+              WorldCircuitCommand.lamps(romPoints),
+            );
+            expect(rom.records.length, 32 * 16);
+            final romData = ByteData.sublistView(rom.records);
+            for (var bit = 0; bit < 32; bit++) {
+              expect(
+                romData.getUint32(bit * 16 + 8, Endian.little),
+                (0x6f >> bit) & 1,
+                reason: 'Picked synthetic program must reach actual ROM lamps.',
+              );
+            }
+            await measure(
+              'computer.restore-pong-after-program',
+              () => tap('载入 Pong 程序'),
+            );
             expect(state()['canRunComputer'], isTrue);
             expect(state()['running'], isFalse);
+            expect(state()['physicalPulses'], 0);
+            expect(
+              await backend.memorySignature(),
+              baselineRam,
+              reason: 'Extra program test must not alter the existing Pong RAM baseline.',
+            );
+            expect(
+              await backend.cpuSignature(),
+              baselineCpu,
+              reason: 'Production loadProgram resets must restore the original Pong CPU baseline.',
+            );
+            expect(state()['displayFrames'], baselineFrames);
+            final framesBeforeRefresh = Map.of(state()['displayFrames'] as Map);
+            final pulsesBeforeRefresh = state()['physicalPulses'];
+            final pollsBeforeRefresh = state()['displayedFrames'] as int;
+            await measure('computer.refresh-display', () => tap('读取显示器'));
+            expect(state()['displayFrames'], framesBeforeRefresh);
+            expect(
+              (state()['displayFrames']
+                  as Map)[ComputerrariaComputer.mono.name],
+              hasLength(64 * 48 * 4),
+            );
+            expect(state()['physicalPulses'], pulsesBeforeRefresh);
+            expect(state()['displayedFrames'], greaterThan(pollsBeforeRefresh));
             final selectedReadyMetadata = readyMetadata();
             backend.clocks = 0;
             backend.inputEvents.clear();
@@ -483,18 +557,18 @@ void main() {
             await measure('computer.same-program-input-trace', () async {
               for (var batch = 0; batch < 40; batch++) {
                 if (batch == 8 || batch == 20) {
-                  await workspace.dispatch('worldCircuitInput', {
+                  await controller.dispatch('worldCircuitInput', {
                     'direction': batch == 8 ? 'up' : 'down',
                     'pressed': true,
                   });
                 }
                 if (batch == 12 || batch == 26) {
-                  await workspace.dispatch('worldCircuitInput', {
+                  await controller.dispatch('worldCircuitInput', {
                     'direction': batch == 12 ? 'up' : 'down',
                     'pressed': false,
                   });
                 }
-                await workspace.dispatch('worldCircuitStep', {'pulses': 128});
+                await controller.dispatch('worldCircuitStep', {'pulses': 128});
                 await tester.pump();
                 if (workspace.view.error.isNotEmpty) fail(workspace.view.error);
                 if (batch % 4 == 3) {
@@ -573,6 +647,7 @@ void main() {
             await measure('computer.close-exported', () => tap('关闭'));
             await workspace.close();
             await tester.pumpWidget(const SizedBox());
+            controller.dispose();
             workspace.dispose();
             await osProbe.closePoint({
               'phase': 'after-export-close',
@@ -581,6 +656,13 @@ void main() {
             });
             sourceFiles.useSavedWorld = true;
             workspace = createWorkspace();
+            controller = ProfiledTerraController(
+              workspace,
+              recorder,
+              cycle,
+              false,
+              profileMode: mode,
+            );
             await mount();
             await measure('computer.reselect-exported-world', () async {
               await tap('选择完整 WLD');
@@ -873,11 +955,14 @@ void main() {
               'computer.single-physical-clock',
               () => tap('单个时钟脉冲'),
             );
-            await measure('computer.reset-original', () async {
-              await tap('重置', wait: false);
-              await tester.pump(const Duration(milliseconds: 250));
-              await tap('继续');
-            });
+            await observeLoad(
+              'reset-original',
+              () => measure('computer.reset-original', () async {
+                await tap('重置', wait: false);
+                await tester.pump(const Duration(milliseconds: 250));
+                await tap('继续');
+              }),
+            );
             expect(state()['programName'], savedProgram);
             expect(state()['canRunComputer'], isTrue);
             expect(state()['physicalPulses'], savedPulses);
@@ -886,6 +971,7 @@ void main() {
           } finally {
             await workspace.close();
             await tester.pumpWidget(const SizedBox());
+            controller.dispose();
             workspace.dispose();
             await storage.close();
             await osProbe.closePoint({
@@ -898,6 +984,9 @@ void main() {
             'phase': 'after-close',
             'cycle': cycle,
             'mode': mode,
+            'harnessRetainedControllerSamples': recorder.dispatches.length,
+            'harnessRetainedFrameCount': recorder.frames.length,
+            'harnessRetainedOperationWindows': recorder.windows.length,
             ...await memory.memorySnapshot(),
           });
         }
@@ -930,7 +1019,7 @@ void main() {
           'observed',
           reason: 'Loading OS samples must be present and complete.',
         );
-        expect((loadingMemory['windows'] as List).length, cycles * 4 + 1);
+        expect((loadingMemory['windows'] as List).length, cycles * 6 + 1);
         expect((loadingMemory['closeSamples'] as List).length, cycles * 4);
       }
       status = 'passed';
@@ -968,6 +1057,8 @@ void main() {
         'circuitAbi': observedCircuitAbi,
         'status': status,
         'buildMode': 'profile',
+        'dispatcherCoverageSchema': 1,
+        'loadingOperationCoverage': 'initial-reimport-reset-v1',
         'cycles': cycles,
         'steadySecondsPerMode': seconds,
         'modes': const ['standard', 'optimized'],
@@ -1026,11 +1117,13 @@ void main() {
         },
         'methodology': 'Every lifecycle is retained with no excluded warmup. First and repeat cycles are identified; filesystem/cache state is uncontrolled. Each cycle runs standard game TripWire rules then optimized WireHead pixel pairing. Fixed pulse/input checkpoints compare passive CPU/RAM across modes, while display expectations are mode-specific. Steady throughput uses equal wall-time windows.',
         'operations': rows,
+        'controllerOperations': recorder.controllerResults(),
         'observations': observations,
         'inputLatencies': inputLatencies,
         'memory': snapshots,
         'loadingOsMemory': loadingMemory,
         'limits': [
+          'Controller samples and additional program/read-display workflows are retained in process memory; older reports without this instrumentation are not same-workload latency or memory baselines. New operation IDs are unpaired until independently measured baseline runs exist.',
           'System file chooser latency excluded; picker returns explicit source handles.',
           'No target-device claim follows from Linux or browser profiling.',
           'Input uses independently calibrated physical sensors and sticky read-clear semantics.',

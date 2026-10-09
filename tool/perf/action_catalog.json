@@ -389,6 +389,36 @@
       "variant": "chests.undo"
     },
     {
+      "id": "workspace.cloud.discard",
+      "action": "cloudDiscardUpload",
+      "variant": "cloud.discard"
+    },
+    {
+      "id": "workspace.cloud.download",
+      "action": "cloudDownload",
+      "variant": "cloud.download"
+    },
+    {
+      "id": "workspace.cloud.prepare",
+      "action": "cloudPrepareUpload",
+      "variant": "cloud.prepare"
+    },
+    {
+      "id": "workspace.cloud.recommendation-download",
+      "action": "cloudRecommendationDownload",
+      "variant": "cloud.recommendation-download"
+    },
+    {
+      "id": "workspace.cloud.reprepare",
+      "action": "cloudPrepareUpload",
+      "variant": "cloud.reprepare"
+    },
+    {
+      "id": "workspace.cloud.upload",
+      "action": "cloudUploadPrepared",
+      "variant": "cloud.upload"
+    },
+    {
       "id": "workspace.conversion.apply",
       "action": "applyPlayerConversion",
       "variant": "conversion.apply"
@@ -713,6 +743,21 @@
       "args": {
         "canvas": "player"
       }
+    },
+    {
+      "id": "workspace.public.conversion-export",
+      "action": "export",
+      "variant": "public.conversion-export"
+    },
+    {
+      "id": "workspace.public.placement-readback",
+      "action": "fusionRegion",
+      "variant": "public.placement-readback"
+    },
+    {
+      "id": "workspace.public.world-export",
+      "action": "export",
+      "variant": "public.world-export"
     },
     {
       "id": "workspace.region.brush",

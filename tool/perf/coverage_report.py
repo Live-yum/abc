@@ -8,6 +8,46 @@ from pathlib import Path
 
 from compare import validate as validate_core
 from ui_validate import validate as validate_ui
+from computerraria_compare import validate_profile as validate_computer_profile
+from computerraria_compare import validate_execution as validate_computer_execution
+
+# Audited exact awaited Workspace.dispatch calls in cloud_actions_test.dart.
+# These are local injected HTTP/auth measurements, never live service or frames.
+LOCAL_CLOUD_DISPATCHES = {
+    'cloud.upload.prepare_snapshot': 'cloudPrepareUpload',
+    'cloud.upload.hash_duplicate_multipart_commit': 'cloudUploadPrepared',
+    'cloud.download.binary_native_vault_commit': 'cloudRecommendationDownload',
+    'cloud.receipt.pending_after_cached_adoption': 'cloudRecommendationDownload',
+}
+
+# Exact actions occurring inside these audited production pointer/key workflows.
+# The recorded duration remains the ENTIRE macro; it is never divided among
+# its actions or relabelled as direct dispatcher duration.
+COMPUTER_WORKFLOW_ACTIONS = {
+    'computer.choose-world': ('worldCircuitChooseWorld',),
+    'computer.reselect-exported-world': ('worldCircuitChooseWorld',),
+    'computer.cancel-import': ('worldCircuitImport', 'worldCircuitCancel'),
+    'computer.import': ('worldCircuitImport',),
+    'computer.reimport-resume': ('worldCircuitImport',),
+    'computer.load-pong': ('worldCircuitLoadPong',),
+    'computer.load-program': ('worldCircuitLoadProgram',),
+    'computer.restore-pong-after-program': ('worldCircuitLoadPong',),
+    'computer.refresh-display': ('worldCircuitRefreshDisplay',),
+    'computer.enable-optimization': ('worldCircuitOptimization',),
+    'computer.idle-mode-roundtrip': ('worldCircuitOptimization',),
+    'computer.same-program-input-trace': ('worldCircuitInput', 'worldCircuitStep'),
+    'computer.run-physical-program': ('worldCircuitToggle', 'worldCircuitPause'),
+    'computer.keyboard-up': ('worldCircuitInput',),
+    'computer.keyboard-down': ('worldCircuitInput',),
+    'computer.keyboard-left': ('worldCircuitInput',),
+    'computer.keyboard-right': ('worldCircuitInput',),
+    'computer.touch-hold-down': ('worldCircuitInput',),
+    'computer.single-physical-clock': ('worldCircuitStep',),
+    'computer.export-world': ('worldCircuitSave',),
+    'computer.close-exported': ('worldCircuitClose',),
+    'computer.close': ('worldCircuitClose',),
+    'computer.reset-original': ('worldCircuitReset',),
+}
 
 
 def read_reports(root):
@@ -16,6 +56,22 @@ def read_reports(root):
         try:
             report = json.loads(path.read_text())
             if not isinstance(report, dict):
+                continue
+            if (report.get('schema') == 2 and report.get('inputFormat') == 'wld-only'
+                    and report.get('buildMode') == 'profile'):
+                execution_path = path.with_suffix('.execution.json')
+                if not execution_path.is_file():
+                    # A standalone mirror is not another independent run.
+                    continue
+                commit = report['runtime']['commit']
+                validate_computer_profile(report, commit, report['cycles'])
+                execution = validate_computer_execution(
+                    execution_path, path, 'computerraria-ui', commit)
+                report = {**report, 'suite': 'computerraria-ui',
+                    'schema': 'abc.performance.v1', 'runId': execution['runId'],
+                    'tier': 'public-complete-computerraria',
+                    'fixtures': [report['fixture']]}
+                reports.append((str(path), report))
                 continue
             if report.get('schema') != 'abc.performance.v1':
                 continue
@@ -26,7 +82,7 @@ def read_reports(root):
             else:
                 validate_core(report)
             reports.append((str(path), report))
-        except (ValueError, AssertionError, KeyError, TypeError) as error:
+        except (ValueError, AssertionError, KeyError, TypeError, OSError) as error:
             failures.append({'report': str(path), 'reason': str(error)})
     return reports, failures
 
@@ -71,15 +127,47 @@ def evidence_row(path, report, operation, kind, **extra):
 
 
 def build_coverage(inventory, reports, rejected):
-    rows, matched, direct_profile = [], set(), set()
+    rows, matched, direct_profile, direct_dispatch, profile_workflow = [], set(), set(), set(), set()
     declarations = {}
     actions = {(row['controller'], row['action']): row for row in inventory['actions']}
     for action in inventory['actions']:
         for operation in action['operationIds']:
             declarations.setdefault(operation, []).append(action)
     for path, report in reports:
-        is_ui = report['suite'] == 'flutter-ui'
+        is_ui = report['suite'] in ('flutter-ui', 'computerraria-ui')
         for operation in report['operations']:
+            if report['suite'] == 'computerraria-ui':
+                macro = operation['id'].rsplit('.', 1)[0]
+                for name in COMPUTER_WORKFLOW_ACTIONS.get(macro, ()):
+                    key = ('Workspace', name)
+                    if key not in actions:
+                        continue
+                    profile_workflow.add(key)
+                    rows.append(evidence_row(path, report, operation, 'controller-profile-workflow',
+                        controller=key[0], action=key[1],
+                        measurementScope='Contains this exact action in a verified full-world UI workflow; duration is the whole macro, not isolated dispatch latency'))
+            explicit = (operation.get('controller'), operation.get('action'))
+            direct = (report['suite'] == 'public-dispatch-actions'
+                      and explicit in actions
+                      and operation.get('dispatchEvidence') == 'awaited-production-dispatch'
+                      and operation.get('completion') == 'returned-and-state-asserted')
+            local_action = (LOCAL_CLOUD_DISPATCHES.get(operation['id'])
+                            if report['suite'] == 'cloud-client-local' else None)
+            local_key = ('Workspace', local_action)
+            if local_key in actions:
+                direct_dispatch.add(local_key)
+                rows.append(evidence_row(path, report, operation, 'controller-local',
+                    controller=local_key[0], action=local_key[1],
+                    measurementScope='Production Workspace dispatcher with synthetic HTTP/auth; no live service or frames'))
+                continue
+            if direct:
+                direct_dispatch.add(explicit)
+                if operation['id'] in actions[explicit]['operationIds']:
+                    matched.add((*explicit, operation['id']))
+                rows.append(evidence_row(path, report, operation, 'controller-direct',
+                    controller=explicit[0], action=explicit[1],
+                    measurementScope='Exact awaited production dispatch; real native codecs, synthetic catalog; cloud uses local injected HTTP/auth; no frames'))
+                continue
             declared = declarations.get(operation['id'], []) if not is_ui else []
             if declared:
                 for action in declared:
@@ -113,19 +201,25 @@ def build_coverage(inventory, reports, rejected):
         measured = [operation for operation in action['operationIds'] if (*key, operation) in matched]
         missing = [operation for operation in action['operationIds'] if (*key, operation) not in matched]
         has_profile = key in direct_profile
+        has_direct = key in direct_dispatch
+        has_workflow = key in profile_workflow
+        unavailable = action['availability'] in ('qa-only', 'unsupported-service')
         summary.append({'controller': key[0], 'action': key[1],
                         'availability': action['availability'],
                         'declaredCoreOperations': action['operationIds'],
                         'measuredCoreOperations': measured, 'missingCoreOperations': missing,
                         'profileDispatchMeasured': has_profile,
+                        'directDispatchMeasured': has_direct,
+                        'profileWorkflowMeasured': has_workflow,
                         'scope': 'Only the recorded fixtures, runtimes and parameter variants count.',
-                        'status': 'measured' if measured or has_profile else 'gap',
-                        'gap': action['reason'] if not measured and not has_profile else None})
+                        'status': ('measured' if measured or has_profile or has_direct or has_workflow else
+                                   'not-applicable' if unavailable else 'gap'),
+                        'gap': action['reason'] if not measured and not has_profile and not has_direct and not has_workflow else None})
         # Keep missing declared variants even if another variant/action was measured.
-        for operation in missing or ([None] if not measured and not has_profile else []):
+        for operation in missing or ([None] if not measured and not has_profile and not has_direct and not has_workflow else []):
             rows.append({'category': 'declared-gap', 'controller': key[0], 'action': key[1],
                          'operation': operation, 'variant': {}, 'measured': False,
-                         'status': 'declared' if operation else 'gap',
+                         'status': 'not-applicable' if unavailable else 'declared' if operation else 'gap',
                          'gap': action['reason'], 'report': None})
     return {'schema': 'abc.performance-coverage.v1',
             'status': 'partial' if rejected else 'assembled',
@@ -142,7 +236,7 @@ def write_reports(result, output):
     (output / 'coverage.json').write_text(json.dumps(result, indent=2) + '\n')
     fields = ['category', 'controller', 'action', 'operation', 'variant', 'suite',
               'runtime', 'buildMode', 'tier', 'fixture', 'phase', 'iterations', 'warmup',
-              'medianMs', 'p95Ms', 'maxMs', 'frames', 'frameScopes', 'memory', 'provenance',
+              'medianMs', 'p95Ms', 'maxMs', 'frames', 'frameScopes', 'measurementScope', 'memory', 'provenance',
               'source', 'runId', 'report', 'measured', 'status', 'evidenceTier', 'gap']
     with (output / 'coverage.csv').open('w', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, extrasaction='ignore')
@@ -153,12 +247,14 @@ def write_reports(result, output):
                              for key, value in row.items()})
     lines = ['# Actual performance coverage', '', result['note'], '',
              f"Validated reports: {result['reportCount']}; rejected/incomplete: {len(result['rejectedReports'])}.", '',
-             '| Controller | Action | Core variants measured/declared | Profile dispatch | Gap |',
-             '|---|---|---:|---|---|']
+             '| Controller | Action | Declared operation variants measured/declared | Profile dispatch | Direct/local dispatch | Contains action in profile workflow | Gap |',
+             '|---|---|---:|---|---|---|---|']
     for row in result['actions']:
         lines.append(f"| {row['controller']} | {row['action']} | "
                      f"{len(row['measuredCoreOperations'])}/{len(row['declaredCoreOperations'])} | "
-                     f"{'measured' if row['profileDispatchMeasured'] else 'unmeasured'} | {row['gap'] or ', '.join(row['missingCoreOperations'])} |")
+                     f"{'measured' if row['profileDispatchMeasured'] else 'unmeasured'} | "
+                     f"{'measured' if row['directDispatchMeasured'] else 'unmeasured'} | "
+                     f"{'measured macro only' if row['profileWorkflowMeasured'] else 'unmeasured'} | {row['gap'] or ', '.join(row['missingCoreOperations'])} |")
     lines += ['', '## Per-process operation evidence', '',
               'Full memory, frame, source and fixture provenance is in coverage.json/coverage.csv and the linked raw reports.', '',
               '| Kind | Action / operation | Run / runtime | Fixture / phase | N / warmup | Median / p95 / max (ms) | Frames |',

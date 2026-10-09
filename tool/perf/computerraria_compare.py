@@ -388,7 +388,7 @@ def validate_os_intervals(intervals, sample_count, duration=None):
                     'Status intervals do not span the declared loading window')
 
 
-def validate_loading_os_memory(data, cycles):
+def validate_loading_os_memory(data, cycles, *, include_resets=False):
     require(isinstance(data, dict) and data.get('schema') == LOADING_MEMORY_SCHEMA
             and data.get('status') == 'observed', 'Complete observed Flutter loading OS memory is required')
     integer(data.get('hostPid'), 'Flutter application PID', 1)
@@ -402,15 +402,22 @@ def validate_loading_os_memory(data, cycles):
     require(data.get('errors') == [], 'OS loading sampler reported errors')
     windows, closes = data.get('windows'), data.get('closeSamples')
     expected = [('cancelled-import', 0, 'standard')]
+    kinds = ('initial-import', 'exported-reimport', 'reset-original') if include_resets else (
+             'initial-import', 'exported-reimport')
     expected += [(kind, cycle, mode) for cycle in range(cycles) for mode in MODES
-                 for kind in ('initial-import', 'exported-reimport')]
+                 for kind in kinds]
     require(isinstance(windows, list) and len(windows) == len(expected),
-            'Incomplete cancelled/initial/reimport loading windows')
+            'Incomplete required cancelled/initial/reimport/reset loading windows')
     previous_end, smaps_total = -1, 0
     for attempt, (window, identity) in enumerate(zip(windows, expected)):
         require((window.get('kind'), window.get('cycle'), window.get('mode')) == identity
                 and integer(window.get('hostLoadAttempt'), 'host load attempt') == attempt,
                 'Loading windows are missing, duplicated or reordered')
+        if include_resets:
+            source = ('exported-reimport-session-source' if identity[0] in
+                      ('exported-reimport', 'reset-original') else 'pinned-public-original-source')
+            require(window.get('sessionSource') == source,
+                    'Loading window does not identify the actual original/exported session source')
         cancelled = attempt == 0
         context = ('cancelled-load-attempt' if cancelled else
                    'fresh-host-first-complete-load' if attempt == 1 else 'repeat-in-same-host')
@@ -436,6 +443,9 @@ def validate_loading_os_memory(data, cycles):
                     and evidence.get('monoDisplayInitialized') is True
                     and evidence.get('monoRgbaBytes') == 12288,
                     'Load readiness requires the verified complete WLD and actual monochrome RGBA plane')
+            if include_resets and identity[0] in ('exported-reimport', 'reset-original'):
+                require(evidence.get('restoredFromExport') is True,
+                        'Reimport/reset must restore the actual saved session source')
         status_count = integer(window.get('statusSampleCount'), 'status sample count', 2)
         periodic = integer(window.get('periodicStatusSampleCount'), 'periodic status sample count')
         require(periodic == status_count - 2 and (cancelled or periodic > 0),
@@ -478,11 +488,16 @@ def validate_loading_os_memory(data, cycles):
         require((close.get('phase'), close.get('cycle'), close.get('mode')) == identity,
                 'Post-close OS memory samples are missing, duplicated or reordered')
         sample = validate_os_memory_sample(close.get('sample'))
-        preceding = windows[index + 1]
+        preceding_kind = ('initial-import' if close['phase'] == 'after-export-close' else
+                          'reset-original' if include_resets else 'exported-reimport')
+        preceding_index = next(i for i, window in enumerate(windows)
+            if (window['kind'], window['cycle'], window['mode']) ==
+               (preceding_kind, close['cycle'], close['mode']))
+        preceding = windows[preceding_index]
         require(sample['timeUs'] >= preceding['terminal']['timeUs'],
                 'Post-close sample precedes the corresponding load')
-        if index + 2 < len(windows):
-            require(sample['timeUs'] <= windows[index + 2]['baseline']['timeUs'],
+        if preceding_index + 1 < len(windows):
+            require(sample['timeUs'] <= windows[preceding_index + 1]['baseline']['timeUs'],
                     'Post-close sample overlaps the next load')
     available = data.get('pssUssAvailability')
     expected_availability = ('available' if data.get('smapsUnavailable') is None else 'partial') if smaps_total else 'unavailable'
@@ -548,6 +563,28 @@ def validate_profile(report, commit, cycles=2):
     budget = calibration['observedFrameBudgetUs']
     operations = {row['id']: row for row in report['operations']}
     require(len(operations) == len(report['operations']), 'Duplicate operation summaries')
+    if report.get('dispatcherCoverageSchema') == 1:
+        require(report.get('loadingOperationCoverage') == 'initial-reimport-reset-v1',
+                'Extended operation profile requires reset loading OS memory coverage')
+        controllers = report.get('controllerOperations', [])
+        expected = {'worldCircuitChooseWorld', 'worldCircuitImport', 'worldCircuitCancel',
+                    'worldCircuitLoadPong', 'worldCircuitLoadProgram',
+                    'worldCircuitRefreshDisplay', 'worldCircuitOptimization',
+                    'worldCircuitInput', 'worldCircuitPause', 'worldCircuitReleaseKeys'}
+        require(expected <= {row.get('action') for row in controllers},
+                'Extended dispatcher profile is missing an actual action')
+        for row in controllers:
+            require(row.get('sampleCount') == len(row.get('samples', []))
+                    and row['sampleCount'] > 0, 'Missing exact dispatcher samples')
+            require(row.get('variant', {}).get('profileMode') in MODES,
+                    'Dispatcher profile must retain separate execution modes')
+            for sample in row['samples']:
+                number(sample['durationMs'], 'dispatcher duration')
+                require(sample.get('completion') == 'returned', 'Dispatcher threw')
+        for mode in MODES:
+            require(all(f'computer.{operation}.{mode}' in operations for operation in
+                        ('load-program', 'restore-pong-after-program', 'refresh-display')),
+                    'Extended profile is missing a program/display workflow')
     for row in operations.values():
         require(row['samples'] and all(sample['success'] is True for sample in row['samples']),
                 'Failed or missing raw operation samples')
@@ -690,7 +727,8 @@ def validate_profile(report, commit, cycles=2):
         require(row.get('heapMeasurementMethod') == HEAP_MEASUREMENT_METHOD and
                 row['gc'] == 'requested-all-isolate-groups',
                 'Heap sample must use unique isolate groups after GC')
-    loading_memory = validate_loading_os_memory(report.get('loadingOsMemory'), cycles)
+    loading_memory = validate_loading_os_memory(report.get('loadingOsMemory'), cycles,
+        include_resets=report.get('loadingOperationCoverage') == 'initial-reimport-reset-v1')
     return projections, {'displayCalibration': calibration,
                          'frames': metrics, 'inputLatencies': inputs, 'memory': memory,
                          'loadingOsMemory': loading_memory,
