@@ -112,6 +112,8 @@ class Workspace extends TerraController {
   int _circuitImportGeneration = 0;
   bool _circuitImporting = false;
   bool _circuitCancelling = false;
+  WorldCircuitProgress? _circuitLoadProgress;
+  String? _circuitLoadError;
   WorldCircuitFragmentPage? _worldFragments;
   WorldCircuitGeometry? _worldGeometry;
   Map<String, Object?> _circuitWorldMetadata = {};
@@ -520,6 +522,8 @@ class Workspace extends TerraController {
           'displayFrames': _worldCircuit?.displayFrames ?? const {},
           'displayIdentity': _worldCircuit?.displayIdentity,
           'progress': _worldCircuit?.progress,
+          'loadProgress': _circuitLoadProgress,
+          'loadError': _circuitLoadError,
           'keyboardVerified': _worldCircuit?.computerVerified ?? false,
           'heldKeys': _worldCircuit?.heldKeys.toList() ?? const <String>[],
           'busy': _busy || (_worldCircuit?.busy ?? false),
@@ -530,7 +534,7 @@ class Workspace extends TerraController {
           'wireHeadPixelRulesEnabled':
               _worldCircuit?.wireHeadPixelRulesEnabled ?? false,
           'dirty': _worldCircuit?.dirty ?? false,
-          'error': _worldCircuit?.error?.toString(),
+          'error': _worldCircuit?.error?.toString() ?? _circuitLoadError,
           'width': _worldCircuit?.result?.width,
           'height': _worldCircuit?.result?.height,
           'ticks': _worldCircuit?.result?.ticks ?? 0,
@@ -2397,6 +2401,27 @@ class Workspace extends TerraController {
   }
 
   void _worldCircuitChanged() {
+    final progress = _worldCircuit?.progress;
+    if (_circuitImporting &&
+        !_circuitCancelling &&
+        progress != null &&
+        const {
+          'hash',
+          'open',
+          'decode',
+          'compile',
+          'ready',
+          'command',
+          'run',
+        }.contains(progress.stage) &&
+        progress.phase >= 0 &&
+        progress.completed >= 0 &&
+        progress.total >= 0 &&
+        (progress.total == 0 || progress.completed <= progress.total)) {
+      // Retain one reported sample, not the session or a history. Cleanup may
+      // publish closed/error with zero active allocation before the open fails.
+      _circuitLoadProgress = progress;
+    }
     final records = _worldCircuit?.result?.records;
     if (records != null &&
         records.isNotEmpty &&
@@ -2406,8 +2431,14 @@ class Workspace extends TerraController {
     notifyListeners();
   }
 
+  void _clearCircuitLoadDiagnostics() {
+    _circuitLoadProgress = null;
+    _circuitLoadError = null;
+  }
+
   Future<void> _chooseCircuitSource() async {
     if (_worldCircuit != null) throw const EngineException('请先关闭当前电路会话。');
+    _clearCircuitLoadDiagnostics();
     final generation = ++_circuitImportGeneration;
     final source = await worldCircuitFiles.pick();
     if (generation != _circuitImportGeneration || source == null) return;
@@ -2427,6 +2458,7 @@ class Workspace extends TerraController {
 
   Future<void> _importCircuitSource() async {
     if (_worldCircuit != null) throw const EngineException('请先关闭当前电路会话。');
+    _clearCircuitLoadDiagnostics();
     final backend = worldCircuitBackend, source = _circuitSource;
     if (backend is! WorldCircuitSourceBackend || source == null) {
       throw const EngineException('请先选择 WLD；当前平台须支持分段读取。');
@@ -2467,10 +2499,17 @@ class Workspace extends TerraController {
         });
         _status = '已载入完整 WLD 原版电路；该文件不匹配已核验的计算机布局，可查看实际电路。';
       }
-    } catch (_) {
-      if (generation == _circuitImportGeneration) rethrow;
+    } catch (error) {
+      if (generation == _circuitImportGeneration) {
+        _circuitLoadError = error.toString().replaceFirst(
+          'FormatException: ',
+          '',
+        );
+        rethrow;
+      }
     } finally {
       final cancelled = generation != _circuitImportGeneration;
+      if (cancelled) _clearCircuitLoadDiagnostics();
       _circuitImporting = false;
       _circuitCancelling = false;
       if (cancelled || session.result == null || session.error != null) {
@@ -2484,6 +2523,7 @@ class Workspace extends TerraController {
     if (_worldCircuit != null) {
       return;
     }
+    _clearCircuitLoadDiagnostics();
     final backend = worldCircuitBackend, record = _activeWorld;
     if (backend == null) {
       throw const EngineException('当前平台未加载世界电路引擎。');

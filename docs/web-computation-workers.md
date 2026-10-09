@@ -71,7 +71,9 @@ session, source, ROM/RAM and existing pixels. See [the two rule paths](COMPUTERR
 
 The client allocates monotonically increasing public handles and maps them to
 the current worker's native handles. Close immediately rejects new operations
-on that handle, then releases it in queue order. Repeated/stale close is a harmless cleanup
+on that handle, then releases it in queue order. Concurrent close callers share
+the same acknowledged completion; a failed close remains blocked for other
+commands and can be retried. A completed/stale close is a harmless cleanup
 no-op and never targets a new owner. `reset()`, `cancel()`, and
 `dispose()` terminate that owner and reject all active/queued calls. Timeout,
 worker error, or malformed output also invalidate the entire owner. A later
@@ -81,11 +83,38 @@ after owner loss: the caller must explicitly reopen a retained source, and an
 unreturned mutation result is uncertain. These controls do not cancel other
 owners. Page exit disposes each browser owner.
 
+The shared document worker retains its WLD/PLR modules while another document
+or queued request still needs them. After the last successful close ACK, with
+no documents, requests, controls, or output leases remaining, the client
+checks for retirement once in the next event-loop turn. A new request cancels
+that check, so an immediate close-then-open handoff reuses the worker. The
+callback also verifies the same worker and generation before terminating it;
+owner-wide cancellation or disposal clears the pending check. A completed
+handle-free player projection also retires an otherwise idle document worker;
+its transferred output bytes remain owned by the caller, and a rejected
+projection preserves its original error. The next document
+request lazily creates a fresh worker. This releases retained Wasm high-water
+capacity; it is not evidence of an unbounded native allocation leak. Whole-world
+circuit retirement still uses its separate cleanup/control acknowledgement rules.
+Failed document opens or player creation also schedule this check when no
+document or queued request remains, including a failed immediate handoff that
+canceled the preceding close's check. Their original errors remain visible.
+
 Verification commands:
 
 - `node test/web/engine_worker_lifecycle.cjs`: lightweight bounds, snapshot,
   serialization, timeout, cancellation, no replay, stale-handle, recovery, and
   absent-worker contracts.
+- `node test/web/document_worker_retirement_contract.cjs`: shared WLD/PLR
+  ownership, last-close acknowledgement, concurrent close/retry, queued reopen
+  and projection, transferred output, lazy recreation, and stale generations.
+- `node test/web/document_worker_retirement_smoke.cjs`: eight actual packaged
+  WASM cycles in Node workers using synthetic WLD and schema-created PLR data.
+  Edits and saved bytes survive fresh-owner reopens; shared documents keep the
+  owner alive, and the test explicitly waits for worker thread exit after close
+  acknowledgement. The product close promise does not wait for that OS exit.
+  `TERRA_DOCUMENT_RETIRE_REPORT` optionally records owner counts and contextual
+  Node process memory. This does not measure browser RSS or prove a leak.
 - `node test/web/world_circuit_optimization_contract.cjs`: default OFF,
   independent mode/profile metadata, queued idle toggles, display preservation,
   capability checks and invalid-command rejection.

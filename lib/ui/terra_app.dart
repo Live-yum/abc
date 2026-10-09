@@ -184,7 +184,39 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
   bool grid = true;
   double zoom = 1;
   final _scaffold = GlobalKey<ScaffoldState>();
-  TerraViewState get v => widget.controller.view;
+  TerraViewState? _buildingView;
+  bool _readingBuildView = false;
+  TerraViewState get v => _readingBuildView
+      ? (_buildingView ??= widget.controller.view)
+      : widget.controller.view;
+
+  Widget _withViewSnapshot(
+    TerraViewState? snapshot,
+    Widget Function() builder,
+  ) {
+    final previous = _buildingView;
+    final wasReadingBuildView = _readingBuildView;
+    _buildingView = snapshot;
+    _readingBuildView = true;
+    try {
+      return builder();
+    } finally {
+      // Events, dialog builders and code resuming after await need live state.
+      _buildingView = previous;
+      _readingBuildView = wasReadingBuildView;
+    }
+  }
+
+  Widget _viewLayoutBuilder({required LayoutWidgetBuilder builder}) {
+    // Deferred child layouts belong to the same snapshot as their parent.
+    // The root reads lazily, inside its existing layout timing measurement.
+    final snapshot = _readingBuildView ? v : null;
+    return LayoutBuilder(
+      builder: (context, constraints) =>
+          _withViewSnapshot(snapshot, () => builder(context, constraints)),
+    );
+  }
+
   _Section get selected => _sections.firstWhere((s) => s.id == section);
   @override
   void initState() {
@@ -448,7 +480,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
     },
     child: Focus(
       autofocus: true,
-      child: LayoutBuilder(
+      child: _viewLayoutBuilder(
         builder: (context, c) =>
             widget.controller.hostStages.measure('workspace.layoutBuilder', () {
               final desktop = c.maxWidth >= 1000;
@@ -809,7 +841,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
 
   Widget _pageHeading() => Padding(
     padding: const EdgeInsets.only(bottom: 23),
-    child: LayoutBuilder(
+    child: _viewLayoutBuilder(
       builder: (context, c) {
         final copy = stack([
           Text(
@@ -980,7 +1012,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
           border: Border.all(color: const Color(0xff46645b)),
           borderRadius: BorderRadius.circular(17),
         ),
-        child: LayoutBuilder(
+        child: _viewLayoutBuilder(
           builder: (context, c) {
             final text = Padding(
               padding: const EdgeInsets.all(28),
@@ -3224,15 +3256,15 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
     onAction: (action, args) => act(action, args),
   );
 
-  Widget _mappingTile(int i) => ListTile(
+  Widget _mappingTile(int i, Map<String, Object?> rule) => ListTile(
     contentPadding: EdgeInsets.zero,
     leading: const Icon(Icons.compare_arrows, color: TerraColors.mint),
     title: Text(
-      '${v.mapping[i]['source'] ?? v.mapping[i]['color']} → ${v.mapping[i]['target'] ?? v.mapping[i]['tileId']}',
+      '${rule['source'] ?? rule['color']} → ${rule['target'] ?? rule['tileId']}',
     ),
     subtitle: Text(
-      v.mapping[i]['type'] == 'terrain'
-          ? '环境转换 · ${v.mapping[i]['layer'] == 'wall' ? '墙体' : '前景物块'}'
+      rule['type'] == 'terrain'
+          ? '环境转换 · ${rule['layer'] == 'wall' ? '墙体' : '前景物块'}'
           : '像素颜色映射',
       style: Theme.of(context).textTheme.bodySmall,
     ),
@@ -3343,9 +3375,10 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
     }
 
     final terrain = (tabs['mapping'] ?? 0) == 1;
+    final rules = v.mapping;
     final indices = [
-      for (var i = 0; i < v.mapping.length; i++)
-        if ((v.mapping[i]['type'] == 'terrain') == terrain) i,
+      for (var i = 0; i < rules.length; i++)
+        if ((rules[i]['type'] == 'terrain') == terrain) i,
     ];
     final plan = v.result['terrainPlan'] as Map?;
     return stack([
@@ -3382,7 +3415,8 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
                 height: 420,
                 child: ListView.builder(
                   itemCount: indices.length,
-                  itemBuilder: (context, i) => _mappingTile(indices[i]),
+                  itemBuilder: (context, i) =>
+                      _mappingTile(indices[i], rules[indices[i]]),
                 ),
               ),
           ]),

@@ -93,7 +93,7 @@ async function close(h, id) { const pending = h.client.close(id), worker = h.wor
  }
  const independent=harness(), independentId=await independent.open();
  const other=harness(), otherId=await other.open(); await close(independent,independentId); assert.equal(other.workers[0].terminated,0); await close(other,otherId);
- const document=harness('document'), documentId=await document.open(); await close(document,documentId); assert.equal(document.workers[0].terminated,0,'Document owner lifecycle is unchanged'); await document.client.dispose();
+ const document=harness('document'), documentId=await document.open(); await close(document,documentId); assert.equal(document.workers[0].terminated,0,'Document handoff remains available until the next event-loop turn'); await document.client.dispose();
  const traversal=harness('circuit'), traversalWork=traversal.client.propagate(1,1,'[]',0,0,0), tw=traversal.workers[0]; traversal.reply(tw,tw.sent.at(-1),'[]'); await traversalWork; assert.equal(tw.terminated,0); await traversal.client.dispose();
  await tick();
  console.log('PASS: exclusive world retirement, monotonic generations/IDs, stale events, leases, close retry, control acknowledgement/veto, queued reopen and other owners');

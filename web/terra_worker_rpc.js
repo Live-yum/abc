@@ -122,8 +122,14 @@
     if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600000) invalid('Invalid worker timeout');
     let worker = null, generation = 1, sequence = 0, nextHandle = 1, nextSource = 1, queuedBytes = 0, active = null;
     let retirementArmed = false, controlRetirementVeto = false, retirementEpoch = 0;
+    let documentRetirementTimer = null, documentRetirementEpoch = 0;
     const pending = new Map(), controls = new Map(), handles = new Map(), sources = new Map();
+    function cancelDocumentRetirement() {
+      if (documentRetirementTimer !== null) clearTimeout(documentRetirementTimer);
+      documentRetirementTimer = null; documentRetirementEpoch++;
+    }
     function shutdown(error) {
+      cancelDocumentRetirement();
       generation++;
       retirementArmed = false; controlRetirementVeto = false;
       const old = worker; worker = null; active = null; handles.clear(); sources.clear();
@@ -138,6 +144,23 @@
       if (owner !== 'worldCircuit' || !worker || !retirementArmed || controlRetirementVeto ||
           handles.size || sources.size || pending.size || active || queuedBytes || controls.size) return;
       shutdown(ownerLost('Idle world computation owner was retired'));
+    }
+    function retireDocumentIfIdle(method) {
+      // The document owner can contain both WLD and PLR modules. Only the last
+      // acknowledged close, or a settled operation with no public handle, may release
+      // their retained Wasm capacity. Allow the awaiting caller's immediate
+      // document handoff to reuse this owner before the next event-loop turn.
+      // Returned buffers are transferred; document methods retain no leases.
+      if (owner !== 'document' || !['close','open','createPlayer','projectPlayer'].includes(method) || !worker ||
+          handles.size || sources.size || pending.size || active || queuedBytes || controls.size) return;
+      cancelDocumentRetirement();
+      const retiringWorker = worker, retiringGeneration = generation, retiringEpoch = documentRetirementEpoch;
+      documentRetirementTimer = setTimeout(() => {
+        if (retiringEpoch !== documentRetirementEpoch || worker !== retiringWorker || generation !== retiringGeneration) return;
+        documentRetirementTimer = null;
+        if (handles.size || sources.size || pending.size || active || queuedBytes || controls.size) return;
+        shutdown(ownerLost('Idle document computation owner was retired'));
+      }, 0);
     }
     function ensureWorker() {
       if (worker) return worker;
@@ -162,8 +185,12 @@
         if (data.ok === false) {
           // Keep commands blocked after partial teardown, but permit an
           // explicit close retry to finish the retained cleanup descriptor.
-          if (owner === 'worldCircuit' && request.method === 'close') { const entry = handles.get(request.publicHandle); if (entry) entry.closePromise = null; }
+          if (request.method === 'close') { const entry = handles.get(request.publicHandle); if (entry) entry.closePromise = null; }
           request.reject(fail(typeof data.code === 'string' ? data.code.slice(0,80) : 'WORKER_ENGINE', typeof data.error === 'string' ? data.error.slice(0,2048) : 'Worker operation failed'));
+          // Failed opens/creation/projection return no new public handle or
+          // output lease. Recheck a now-empty owner after a failed handoff,
+          // without hiding that error or retiring other live/queued documents.
+          if (['open','createPlayer','projectPlayer'].includes(request.method)) retireDocumentIfIdle(request.method);
         }
         else {
           try {
@@ -201,6 +228,7 @@
               // after a safe retirement, so immediate reopen gets a new heap.
               retireIfIdle();
             }
+            retireDocumentIfIdle(request.method);
           } catch (error) { request.reject(error); shutdown(ownerLost('Invalid worker result')); return; }
         }
         dispatch();
@@ -250,19 +278,20 @@
         }
         if ((owner === 'document' && !['open','createPlayer','projectPlayer'].includes(method)) || (owner === 'worldCircuit' && ['command','computerFrame','close'].includes(method))) {
           publicHandle = args[0]; const entry = handles.get(publicHandle);
-          if (!entry || entry.generation !== generation || (entry.closing && (method !== 'close' || owner !== 'worldCircuit'))) {
+          if (!entry || entry.generation !== generation || (entry.closing && method !== 'close')) {
             // Cleanup after a lost owner must not prevent an explicit reopen.
             // Never forward a stale close to a new owner's reused native handle.
             if (method === 'close') return Promise.resolve();
             throw fail('STALE_HANDLE', 'Computation handle is closed or belongs to a lost owner; reopen the source');
           }
-          if (owner === 'worldCircuit' && method === 'close' && entry.closePromise) return entry.closePromise;
+          if (method === 'close' && entry.closePromise) return entry.closePromise;
           args[0] = entry.native;
         }
         // Snapshot now, before queueing; never transfer an application-owned buffer.
         for (let i=0;i<args.length;i++) if (args[i] instanceof Uint8Array) args[i] = Uint8Array.from(args[i]);
         const id = ++sequence;
         if (!Number.isSafeInteger(id)) throw fail('WORKER_LIMIT', 'Computation request identity space exhausted');
+        cancelDocumentRetirement();
         retirementArmed = false; retirementEpoch++;
         if (method === 'close') handles.get(publicHandle).closing = true;
         const completion = new Promise((resolve,reject) => {
@@ -270,7 +299,7 @@
           request.timer = setTimeout(() => { if (pending.has(id)) shutdown(ownerLost('Computation worker timed out')); }, timeoutMs);
           pending.set(id, request); queuedBytes += size; dispatch();
         });
-        if (owner === 'worldCircuit' && method === 'close') { const entry = handles.get(publicHandle); if (entry) entry.closePromise = completion; }
+        if (method === 'close') { const entry = handles.get(publicHandle); if (entry) entry.closePromise = completion; }
         return completion;
       } catch (error) { return Promise.reject(error); }
     }

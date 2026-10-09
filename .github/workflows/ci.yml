@@ -75,6 +75,7 @@ jobs:
           TERRA_WLD_FIXTURE="$PWD/build/circuit.wld" node tool/test_web_engine.mjs
           node test/web/world_export_smoke.cjs
           node test/web/engine_worker_lifecycle.cjs
+          node test/web/document_worker_retirement_contract.cjs
           node test/web/world_worker_retirement_contract.cjs
           node test/web/world_circuit_cleanup_contract.cjs
           node test/web/world_circuit_hash_contract.cjs
@@ -83,6 +84,7 @@ jobs:
           node test/web/world_circuit_optimization_contract.cjs
           node test/web/world_circuit_fragments_contract.cjs
           node test/web/engine_worker_smoke.cjs
+          node test/web/document_worker_retirement_smoke.cjs
           node tool/test_web_region.mjs
           node tool/test_web_markers.mjs
           node tool/test_web_world_rules.mjs

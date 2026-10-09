@@ -147,6 +147,18 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
     'ready' => '电路已就绪',
     _ => stage,
   };
+
+  String _memorySize(Object? bytes) {
+    if (bytes is! num ||
+        !bytes.isFinite ||
+        bytes < 0 ||
+        bytes > 9007199254740991 ||
+        bytes % 1 != 0) {
+      return '不可得';
+    }
+    return '${(bytes / 1048576).toStringAsFixed(1)} MiB';
+  }
+
   Future<void> _send(
     String action, [
     Map<String, Object?> args = const {},
@@ -240,8 +252,14 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         running = s['running'] == true;
     final computer = s['computerVerified'] == true;
     final canRunComputer = s['canRunComputer'] == true;
-    final progress = s['progress'] is WorldCircuitProgress
-        ? s['progress'] as WorldCircuitProgress
+    final loading = s['importing'] == true;
+    final loadFailed =
+        s['loadError'] is String && (s['loadError'] as String).isNotEmpty;
+    final progressValue = loading || loadFailed
+        ? s['loadProgress']
+        : s['progress'];
+    final progress = progressValue is WorldCircuitProgress
+        ? progressValue
         : null;
     final error = _localError ?? s['error']?.toString();
     final raw = s['records'];
@@ -410,6 +428,20 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                 child: Text(s['cancelling'] == true ? '正在取消…' : '取消当前加载'),
               ),
             ),
+        ],
+        if (loadFailed && !_busy)
+          Text(
+            progress == null
+                ? '加载失败，未取得有效加载进度。'
+                : '加载失败前的最后有效进度：${_progressLabel(progress.stage)} · ${progress.completed}${progress.total > 0 ? ' / ${progress.total}' : ''}',
+          ),
+        if (loading || loadFailed) ...[
+          Text(
+            '引擎分配 ${_memorySize(progress?.diagnostics['nativeActiveBytes'])} · '
+            '峰值 ${_memorySize(progress?.diagnostics['nativePeakBytes'])} · '
+            'WASM 容量 ${_memorySize(progress?.diagnostics['wasmHeapBytes'])}',
+          ),
+          const Text('引擎分配/峰值、WASM 容量，非进程内存；容量不等于实际占用。'),
         ],
         if (error != null)
           Padding(
