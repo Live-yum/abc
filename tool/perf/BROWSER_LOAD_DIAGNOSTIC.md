@@ -1,5 +1,9 @@
 # One complete WLD browser load diagnostic
 
+This document describes the preserved default single-load mode. The separate
+opt-in three-cycle interaction protocol and exact candidate build are documented
+in [BROWSER_CYCLE_DIAGNOSTIC.md](BROWSER_CYCLE_DIAGNOSTIC.md).
+
 This separate engineering run observes one complete public Computerraria WLD
 load in a fresh, real headless Chrome, through the original Flutter UI and File
 picker. It then idles for 15 seconds, closes through the UI, and observes a
@@ -126,7 +130,8 @@ FPS nor establishes the cause of a separate cloud browser's Error 9.
 ## Running and local validation
 
 The new workflow runs only for opened/synchronized PR changes to its own
-workflow/diagnostic files or a manual dispatch. Because GitHub PR path filters
+workflow/diagnostic files or a default manual dispatch. The dedicated cycle branch
+push and explicit manual cycle mode are described in the separate cycle protocol. Because GitHub PR path filters
 use a cumulative base-to-head diff, a separate lightweight scope job checks the
 actual synchronize event's `before` to head diff. An opened PR uses base to head.
 Both endpoints must be exact 40-character lowercase SHAs resolvable to commits;
@@ -141,7 +146,7 @@ publishes the public fixture or the temporary browser profile.
 Lightweight contracts, without Flutter compilation or Chrome launch:
 
 ```sh
-python3 -m unittest discover -s tool/perf -p 'browser_load_checks_test.py'
+python3 -m unittest discover -s tool/perf -p 'browser_load_*test.py'
 node --test tool/perf/browser_load_driver_test.mjs
 python3 -m py_compile tool/perf/browser_load_diagnostic.py
 node --check tool/perf/browser_load_driver.mjs

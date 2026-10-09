@@ -1,0 +1,29 @@
+{
+  "schema": "abc.browser-product-pin.v1",
+  "label": "official-exact-1dac431-candidate",
+  "commit": "1dac431c45f82bcc298ea4bbce6abebb126dfc33",
+  "runId": "37963125990",
+  "artifactId": 11632794168,
+  "artifactZip": {
+    "bytes": 22368523,
+    "sha256": "20abe0271361ad0897d35e84e148a86fcc32c85077fa02ecf47e1e75d863f4db"
+  },
+  "archive": {
+    "bytes": 22377995,
+    "sha256": "93c8072cedd674ca614d1bfe410cb69ca474644fc902478d749a0603689a5502"
+  },
+  "webFiles": {
+    "main.dart.js": {
+      "bytes": 4189393,
+      "sha256": "7ed0b5505599b2e2e84d7e0b79c7b09a6cda11527b97f8c237adcc96a4a894b1"
+    },
+    "engine/world.wasm": {
+      "bytes": 406930,
+      "sha256": "a9af2ce7aed0b4304c21f59e4500fd9116221588840e39af1e453459d8bf4a08"
+    },
+    "engine/world.js": {
+      "bytes": 21694,
+      "sha256": "50bb9a182ac1c596d5c67b84ced4d77c69a29d6bf41a4346807d46920962b47d"
+    }
+  }
+}

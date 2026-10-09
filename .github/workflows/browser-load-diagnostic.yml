@@ -1,4 +1,4 @@
-name: One complete WLD browser load diagnostic
+name: Bounded complete WLD browser diagnostic
 
 on:
   pull_request:
@@ -7,20 +7,37 @@ on:
       - '.github/workflows/browser-load-diagnostic.yml'
       - 'tool/perf/browser_load_*'
       - 'tool/perf/BROWSER_LOAD_DIAGNOSTIC.md'
+      - 'tool/perf/BROWSER_CYCLE_DIAGNOSTIC.md'
+  push:
+    branches: ['codex/diagnostic-browser-cycles']
+    paths:
+      - '.github/workflows/browser-load-diagnostic.yml'
+      - 'tool/perf/browser_load_*'
+      - 'tool/perf/BROWSER_LOAD_DIAGNOSTIC.md'
+      - 'tool/perf/BROWSER_CYCLE_DIAGNOSTIC.md'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Preserved single-load control or three interaction cycles
+        type: choice
+        options: ['single-load', 'cycles']
+        default: single-load
 
 permissions:
   contents: read
   actions: read
 
-# Independent opt-in job: never supersede or cancel acceptance/performance CI.
+# Unique per run: this diagnostic never supersedes another measurement or CI.
 concurrency:
   group: browser-load-diagnostic-${{ github.run_id }}
   cancel-in-progress: false
 
+env:
+  BROWSER_DIAGNOSTIC_MODE: ${{ github.event_name == 'push' && 'cycles' || github.event.inputs.mode || 'single-load' }}
+
 jobs:
   scope:
-    name: Decide whether this event requests a browser measurement
+    name: Decide whether this exact event requests a browser measurement
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -35,11 +52,11 @@ jobs:
         run: python3 tool/perf/browser_load_diagnostic.py scope
 
   browser:
-    name: One original File to ready to close lifecycle
+    name: Bounded original File, UI and worker lifecycle observation
     needs: scope
     if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: ${{ (github.event_name == 'push' || github.event.inputs.mode == 'cycles') && 70 || 25 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -48,23 +65,33 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - name: Lightweight diagnostic contracts
+      - name: Lightweight diagnostic contracts, without Chrome
         run: |
-          python3 -m unittest discover -s tool/perf -p 'browser_load_checks_test.py'
+          python3 -m unittest discover -s tool/perf -p 'browser_load_*test.py'
           node --test tool/perf/browser_load_driver_test.mjs
-      - name: Verify and download existing official Web artifact
+      - name: Verify and download the exactly selected official Web artifact
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 tool/perf/browser_load_diagnostic.py prepare
+        run: |
+          if [[ "$BROWSER_DIAGNOSTIC_MODE" == cycles ]]; then
+            python3 tool/perf/browser_load_diagnostic.py prepare-cycles --product-manifest tool/perf/browser_load_product_1dac431.json
+          else
+            python3 tool/perf/browser_load_diagnostic.py prepare
+          fi
       - name: Fetch the pinned public fixture only
         run: python3 tool/computerraria_inputs.py
       - name: One bounded sandboxed Chrome reproduction
-        timeout-minutes: 15
-        run: python3 tool/perf/browser_load_diagnostic.py run
+        timeout-minutes: ${{ (github.event_name == 'push' || github.event.inputs.mode == 'cycles') && 60 || 15 }}
+        run: |
+          if [[ "$BROWSER_DIAGNOSTIC_MODE" == cycles ]]; then
+            python3 tool/perf/browser_load_diagnostic.py run-cycles
+          else
+            python3 tool/perf/browser_load_diagnostic.py run
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: browser-load-diagnostic-${{ github.run_id }}
-          path: build/browser-load-diagnostic/evidence/
+          name: browser-${{ env.BROWSER_DIAGNOSTIC_MODE }}-diagnostic-${{ github.run_id }}
+          path: ${{ env.BROWSER_DIAGNOSTIC_MODE == 'cycles' && 'build/browser-cycle-diagnostic/evidence/' || 'build/browser-load-diagnostic/evidence/' }}
           if-no-files-found: error
           retention-days: 30

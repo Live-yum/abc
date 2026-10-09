@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {runCycles} from './browser_load_cycles.mjs';
 
 export const WORLD_BYTES = 405983441;
 export const WORLD_SHA = '55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33';
@@ -82,7 +83,7 @@ export function installInstrumentation() {
     method: 'scalar-only bridge observations; Worker creation/termination observations'});
 }
 
-class Cdp {
+export class Cdp {
   constructor(socket, receive) {
     this.socket = socket;
     this.nextId = 0;
@@ -295,5 +296,11 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await main();
+  if (process.argv[6] === '--cycles=3') {
+    await runCycles(process.argv.slice(2));
+  } else if (process.argv.length === 6) {
+    await main();
+  } else {
+    throw new Error('Expected one-load arguments or explicit --cycles=3');
+  }
 }
