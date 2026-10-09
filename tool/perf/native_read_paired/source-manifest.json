@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "scope": "Diagnostic-only full BAABBA CI study; no production source overwritten",
+  "productCommit": "1dac431c45f82bcc298ea4bbce6abebb126dfc33",
+  "baselineBindingSha256": "5223b0ca10cdb243568927fd7ab911302438a7324ca7a7c456de913ef2c83aa2",
+  "candidateBindingSha256": "478fcac164a132beee8e138046274bdd7156e633ceb080e6ee774e6b1bb19411",
+  "protocol": {
+    "order": "BAABBA",
+    "processes": 6,
+    "cyclesPerProcess": 8,
+    "sampleIntervalMilliseconds": 100,
+    "quietMilliseconds": 1200,
+    "timeoutSecondsPerProcess": 600,
+    "failure": "stop immediately; preserve all existing data; attempt original source rehash"
+  },
+  "nativeBuild": {
+    "source": "fixed product native/CMakeLists.txt unchanged",
+    "buildType": "Profile",
+    "compiler": "clang",
+    "generator": "Ninja",
+    "flags": "-O3 -DNDEBUG",
+    "ABC_PERF_COUNTERS": "OFF",
+    "builds": 1,
+    "sharedAcrossArms": true
+  },
+  "aotBuildsPerArm": 1,
+  "files": [
+    {
+      "path": ".github/workflows/native-read-paired-diagnostic.yml",
+      "bytes": 8080,
+      "sha256": "f49e355e47610b9b99189374dc82f574827c8d868551dfc60b7329ea72230dfb"
+    },
+    {
+      "path": "tool/perf/native_read_paired/README.md",
+      "bytes": 6037,
+      "sha256": "aed81251fa308268d8ace9db7afc0ee13426d9a279db34e6f50be62b98a60d3e"
+    },
+    {
+      "path": "tool/perf/native_read_paired/bin/benchmark.dart",
+      "bytes": 16598,
+      "sha256": "a5272733966693fd0309871c5f96da343a2ca4f3e3e05aac80131e7d129522e6"
+    },
+    {
+      "path": "tool/perf/native_read_paired/candidate_binding.dart.txt",
+      "bytes": 33407,
+      "sha256": "478fcac164a132beee8e138046274bdd7156e633ceb080e6ee774e6b1bb19411"
+    },
+    {
+      "path": "tool/perf/native_read_paired/finalize.py",
+      "bytes": 4255,
+      "sha256": "a0d6731b322ca12e5fc906fd64971a52901440d5f5e3708e2058127a74380aa4"
+    },
+    {
+      "path": "tool/perf/native_read_paired/paired.py",
+      "bytes": 37666,
+      "sha256": "c56254eea32c70e137374c0df6de5226c47ca4b1a4c9f4e9c0caf473b1c32791"
+    },
+    {
+      "path": "tool/perf/native_read_paired/standalone.pubspec.lock",
+      "bytes": 1023,
+      "sha256": "39717eb2427f15aa33da119f5ae520156af725c4406132ea411ded4f3274c096"
+    },
+    {
+      "path": "tool/perf/native_read_paired/tests/test_ci_contract.py",
+      "bytes": 5693,
+      "sha256": "0d6148ae99b73bf18332e0d96735315305dce44815cc06f95e85b7d792838e8b"
+    },
+    {
+      "path": "tool/perf/native_read_paired/tests/test_paired.py",
+      "bytes": 16881,
+      "sha256": "17522ed99865b74d50a43e122d2a28c0ca383975cab83b14b6dc6196114c9b5f"
+    },
+    {
+      "path": "tool/perf/native_read_paired/verify_sources.py",
+      "bytes": 932,
+      "sha256": "1a8fc6d3363047d6dd09673c9be8a5b71bff0fff1aed1b4e79e8ce81d361c268"
+    }
+  ]
+}

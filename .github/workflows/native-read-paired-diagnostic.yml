@@ -1,0 +1,170 @@
+name: Fixed-source Native READ AOT paired diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/native-read-paired-diagnostic-1dac]
+    paths:
+      - .github/workflows/native-read-paired-diagnostic.yml
+      - tool/perf/native_read_paired/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-read-paired-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  DART_SUPPRESS_ANALYTICS: 'true'
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  ABC_PERF_COMMIT: 1dac431c45f82bcc298ea4bbce6abebb126dfc33
+
+jobs:
+  paired:
+    name: Complete BAABBA / unchanged native engine / AOT host wrappers
+    if: github.repository == 'Live-yum/abc'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Initialize evidence before checkout or setup can fail
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime, json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'native-read-paired'
+          (root / 'evidence').mkdir(parents=True)
+          value = {'status': 'incomplete', 'reason': 'not finished',
+                   'workflowCommit': os.environ['GITHUB_SHA'],
+                   'runId': os.environ['GITHUB_RUN_ID'], 'attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                   'startedUtc': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+          (root / 'evidence/status.json').write_text(json.dumps(value, indent=2) + '\n')
+          for name in ('xdg', 'analyzer', 'tmp', 'logs'):
+              (root / name).mkdir()
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('XDG_CONFIG_HOME=' + str(root / 'xdg') + '\n')
+              output.write('ANALYZER_STATE_LOCATION_OVERRIDE=' + str(root / 'analyzer') + '\n')
+              output.write('TMPDIR=' + str(root / 'tmp') + '\n')
+          PY
+
+      - name: Check out reviewed diagnostic definitions
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check out only the fixed product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 1dac431c45f82bcc298ea4bbce6abebb126dfc33
+          path: .native-read-product
+          persist-credentials: false
+
+      - name: Install the official native build prerequisites
+        timeout-minutes: 10
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config zlib1g-dev
+
+      - uses: ./.native-read-product/.github/actions/setup-flutter
+
+      - name: Verify source pins, runner contracts and fixed public inputs
+        id: inputs
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .native-read-product rev-parse HEAD)" = "$ABC_PERF_COMMIT"
+          python3 tool/perf/native_read_paired/verify_sources.py
+          python3 -m unittest discover -s tool/perf/native_read_paired/tests -v 2>&1 | tee "$RUNNER_TEMP/native-read-paired/logs/contracts.log"
+          (cd .native-read-product && flutter pub get --enforce-lockfile)
+          test -z "$(git -C .native-read-product status --porcelain --untracked-files=normal)"
+          python3 .native-read-product/tool/computerraria_inputs.py --output "$RUNNER_TEMP/native-read-paired/inputs"
+          python3 tool/perf/native_read_paired/paired.py candidate --baseline .native-read-product --output "$RUNNER_TEMP/native-read-paired/candidate"
+          flutter --version --machine > "$RUNNER_TEMP/native-read-paired/logs/flutter-version.json"
+          dart --version > "$RUNNER_TEMP/native-read-paired/logs/dart-version.txt" 2>&1
+          clang --version > "$RUNNER_TEMP/native-read-paired/logs/clang-version.txt"
+          cmake --version > "$RUNNER_TEMP/native-read-paired/logs/cmake-version.txt"
+          ninja --version > "$RUNNER_TEMP/native-read-paired/logs/ninja-version.txt"
+
+      - name: Build unchanged fixed-source native engine once with counters OFF
+        id: native
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S .native-read-product/native -B "$RUNNER_TEMP/native-read-paired/native-build" -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Profile '-DCMAKE_C_FLAGS_PROFILE=-O3 -DNDEBUG' \
+            -DABC_PERF_COUNTERS=OFF 2>&1 | tee "$RUNNER_TEMP/native-read-paired/logs/native-configure.log"
+          cmake --build "$RUNNER_TEMP/native-read-paired/native-build" --parallel 2 \
+            2>&1 | tee "$RUNNER_TEMP/native-read-paired/logs/native-build.log"
+          (cd .native-read-product && python3 tool/perf/computerraria_provenance.py \
+            --artifact "$RUNNER_TEMP/native-read-paired/native-build/libabc_engine.so" \
+            --cmake-cache "$RUNNER_TEMP/native-read-paired/native-build/CMakeCache.txt" \
+            --ninja-build "$RUNNER_TEMP/native-read-paired/native-build/build.ninja" \
+            --output "$RUNNER_TEMP/native-read-paired/native-build.json")
+
+      - name: Freeze complete BAABBA study and compile each actual Dart wrapper once
+        id: aot
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_dart="$RUNNER_TEMP/flutter-3.47.6/bin/cache/dart-sdk/bin/dart"
+          python3 tool/perf/native_read_paired/paired.py prepare --order BAABBA \
+            --output "$RUNNER_TEMP/native-read-paired/state" \
+            --baseline .native-read-product --candidate "$RUNNER_TEMP/native-read-paired/candidate" \
+            --world "$RUNNER_TEMP/native-read-paired/inputs/computerraria.wld" \
+            --library "$RUNNER_TEMP/native-read-paired/native-build/libabc_engine.so" \
+            --native-provenance "$RUNNER_TEMP/native-read-paired/native-build.json" \
+            --dart "$sdk_dart" --pub-cache "$PUB_CACHE"
+          python3 tool/perf/native_read_paired/paired.py build --output "$RUNNER_TEMP/native-read-paired/state"
+          python3 tool/perf/native_read_paired/paired.py check --output "$RUNNER_TEMP/native-read-paired/state"
+
+      - name: Run only the complete bounded internally paired study
+        id: measurement
+        timeout-minutes: 62
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tool/perf/native_read_paired/paired.py run \
+            --output "$RUNNER_TEMP/native-read-paired/state" --timeout-seconds 600
+
+      - name: Preserve partial or complete evidence and explicit terminal status
+        if: always()
+        timeout-minutes: 3
+        env:
+          INPUTS_OUTCOME: ${{ steps.inputs.outcome }}
+          NATIVE_OUTCOME: ${{ steps.native.outcome }}
+          AOT_OUTCOME: ${{ steps.aot.outcome }}
+          MEASUREMENT_OUTCOME: ${{ steps.measurement.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f tool/perf/native_read_paired/finalize.py; then
+            python3 tool/perf/native_read_paired/finalize.py --root "$RUNNER_TEMP/native-read-paired"
+          else
+            echo 'Diagnostic checkout unavailable; initialized evidence/status.json remains incomplete.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload only raw reports, logs and provenance, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-read-paired-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-read-paired/evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Reject any incomplete or unsuccessful study
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          status = json.loads((Path(os.environ['RUNNER_TEMP']) / 'native-read-paired/evidence/status.json').read_text())
+          assert status['status'] == 'passed', status
+          PY
