@@ -34,21 +34,25 @@ void main() {
     tearDownAll(() => build.delete(recursive: true));
 
     for (final streamed in [false, true]) {
-      test('compile borrows multiple offset writes (streamed: $streamed)',
-          () async {
-        await _withFixture(stub, streamed, (fixture) async {
-          await fixture.open();
-          expect(fixture.io.positions, [11, 0, 29]);
-          expect(fixture.io.lengths, [7, 17, 9]);
-          expect(fixture.io.borrowProbes, 3);
-          expect(fixture.io.realFile(fixture.io.scratchPath!).readAsBytesSync(),
-              _expectedFile());
-          expect(stub.metric(3), 3);
-          expect(stub.metric(9), 0);
-          fixture.close();
-          fixture.expectReleased();
-        });
-      });
+      test(
+        'compile borrows multiple offset writes (streamed: $streamed)',
+        () async {
+          await _withFixture(stub, streamed, (fixture) async {
+            await fixture.open();
+            expect(fixture.io.positions, [11, 0, 29]);
+            expect(fixture.io.lengths, [7, 17, 9]);
+            expect(fixture.io.borrowProbes, 3);
+            expect(
+              fixture.io.realFile(fixture.io.scratchPath!).readAsBytesSync(),
+              _expectedFile(),
+            );
+            expect(stub.metric(3), 3);
+            expect(stub.metric(9), 0);
+            fixture.close();
+            fixture.expectReleased();
+          });
+        },
+      );
 
       test('save writes complete before ack and retain bytes '
           '(streamed: $streamed)', () async {
@@ -66,11 +70,17 @@ void main() {
           if (streamed) {
             final source = saved['worldSource'] as Map;
             expect(source['sha256'], sha256.convert(bytes).toString());
-            expect(fixture.io.realFile(source['path'] as String).existsSync(),
-                isTrue);
-            fixture.api.dispatch('worldCircuitReleaseSource', [source['token']]);
-            expect(fixture.io.realFile(source['path'] as String).existsSync(),
-                isFalse);
+            expect(
+              fixture.io.realFile(source['path'] as String).existsSync(),
+              isTrue,
+            );
+            fixture.api.dispatch('worldCircuitReleaseSource', [
+              source['token'],
+            ]);
+            expect(
+              fixture.io.realFile(source['path'] as String).existsSync(),
+              isFalse,
+            );
           }
           expect(bytes, _expectedFile());
           fixture.expectReleased();
@@ -92,8 +102,11 @@ void main() {
           await fixture.command(WorldCircuitCommand.save());
           fixture.close();
           await fixture.open();
-          expect(records, expected,
-              reason: 'C overwrites its single buffer on every ack/close.');
+          expect(
+            records,
+            expected,
+            reason: 'C overwrites its single buffer on every ack/close.',
+          );
           fixture.close();
           fixture.expectReleased();
         });
@@ -121,9 +134,12 @@ void main() {
             fixture.io.failAt = null;
             fixture.close();
             await fixture.open();
-            expect(fixture.savedBytes(
-              await fixture.command(WorldCircuitCommand.save()),
-            ), _expectedFile());
+            expect(
+              fixture.savedBytes(
+                await fixture.command(WorldCircuitCommand.save()),
+              ),
+              _expectedFile(),
+            );
             fixture.close();
             fixture.expectReleased();
           });
@@ -145,38 +161,45 @@ void main() {
       }
     }
 
-    test('async cancellation completes current synchronous WRITE only',
-        () async {
-      await _withFixture(stub, true, (fixture) async {
-        await fixture.open();
-        fixture.io.clearWrites();
-        fixture.io.afterWrite = () {
-          fixture.api.dispatch('worldCircuitCancelOperation', []);
-        };
-        final steps = stub.metric(0), acks = stub.metric(3);
-        await expectLater(
-          fixture.command(WorldCircuitCommand.save()),
-          throwsA(isA<EngineException>().having(
-            (error) => error.message,
-            'diagnostic',
-            contains('cancelled'),
-          )),
-        );
-        expect(fixture.io.positions, [11]);
-        expect(stub.metric(0) - steps, 1);
-        expect(stub.metric(3) - acks, 1);
-        expect(stub.metric(4), 1);
-        expect(stub.pending(), 0);
-        fixture.io.afterWrite = null;
-        fixture.close();
-        await fixture.open();
-        expect(fixture.savedBytes(
-          await fixture.command(WorldCircuitCommand.save()),
-        ), _expectedFile());
-        fixture.close();
-        fixture.expectReleased();
-      });
-    });
+    test(
+      'async cancellation completes current synchronous WRITE only',
+      () async {
+        await _withFixture(stub, true, (fixture) async {
+          await fixture.open();
+          fixture.io.clearWrites();
+          fixture.io.afterWrite = () {
+            fixture.api.dispatch('worldCircuitCancelOperation', []);
+          };
+          final steps = stub.metric(0), acks = stub.metric(3);
+          await expectLater(
+            fixture.command(WorldCircuitCommand.save()),
+            throwsA(
+              isA<EngineException>().having(
+                (error) => error.message,
+                'diagnostic',
+                contains('cancelled'),
+              ),
+            ),
+          );
+          expect(fixture.io.positions, [11]);
+          expect(stub.metric(0) - steps, 1);
+          expect(stub.metric(3) - acks, 1);
+          expect(stub.metric(4), 1);
+          expect(stub.pending(), 0);
+          fixture.io.afterWrite = null;
+          fixture.close();
+          await fixture.open();
+          expect(
+            fixture.savedBytes(
+              await fixture.command(WorldCircuitCommand.save()),
+            ),
+            _expectedFile(),
+          );
+          fixture.close();
+          fixture.expectReleased();
+        });
+      },
+    );
   }, skip: !Platform.isLinux);
 }
 
@@ -226,9 +249,7 @@ class _Stub {
         'write_test_metric',
       );
   late final pending = library
-      .lookupFunction<Uint32 Function(), int Function()>(
-        'write_test_pending',
-      );
+      .lookupFunction<Uint32 Function(), int Function()>('write_test_pending');
   late final mutate = library
       .lookupFunction<Void Function(Uint32, Uint32), void Function(int, int)>(
         'write_test_mutate',
@@ -251,7 +272,9 @@ class _Fixture {
           ? api.dispatch('worldCircuitOpenSource', [
               {'path': source.path, 'length': 3, 'name': 'source.wld'},
             ])
-          : api.dispatch('worldCircuitOpen', [Uint8List.fromList([1, 2, 3])]),
+          : api.dispatch('worldCircuitOpen', [
+              Uint8List.fromList([1, 2, 3]),
+            ]),
     ) as Map;
     session = result['session'] as int;
   }
@@ -259,7 +282,9 @@ class _Fixture {
   Future<Map> command(WorldCircuitCommand command) async {
     final result = await Future<Object?>.value(
       api.dispatch('worldCircuitCommand', [
-        session, command.words, command.records,
+        session,
+        command.words,
+        command.records,
       ]),
     ) as Map;
     if (result['worldSource'] case final Map source) {
@@ -269,8 +294,9 @@ class _Fixture {
   }
 
   Uint8List savedBytes(Map saved) => streamed
-      ? io.realFile((saved['worldSource'] as Map)['path'] as String)
-          .readAsBytesSync()
+      ? io
+            .realFile((saved['worldSource'] as Map)['path'] as String)
+            .readAsBytesSync()
       : saved['world'] as Uint8List;
 
   void close() {
@@ -360,8 +386,11 @@ class _WriteHandle implements RandomAccessFile {
     final changed = original ^ 255;
     io.stub.mutate(start, changed);
     try {
-      expect(buffer[start], changed,
-          reason: 'WRITE borrows the C view rather than copying the payload.');
+      expect(
+        buffer[start],
+        changed,
+        reason: 'WRITE borrows the C view rather than copying the payload.',
+      );
       io.borrowProbes++;
     } finally {
       io.stub.mutate(start, original);

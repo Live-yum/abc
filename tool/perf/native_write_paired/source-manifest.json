@@ -15,7 +15,7 @@
   "contractFixtureSha256": {
     "native_world_circuit_write_fixture.c": "59afa0ea67c1986ef15e14c3d240ec9d52150be3193ae71db9e1b93a27288795",
     "native_world_circuit_write_owner_test.dart": "5ef7e945de256fbe6d7d000724a01d8e7d477fa8f5f67edd9b753db5ea3f14bf",
-    "native_world_circuit_write_test.dart": "35e40c848b9488b47d50f86765bf084ea418929f2b2877887fea834d5da0cf5c"
+    "native_world_circuit_write_test.dart": "4160ac25595cec2bebf4fe54c4c4205d72845fe84e4d5aa009f5f01b752e7ec2"
   },
   "protocol": {
     "order": "BAABBA",
@@ -89,8 +89,8 @@
     },
     {
       "path": "tool/perf/native_write_paired/contracts/native_world_circuit_write_test.dart.txt",
-      "bytes": 13139,
-      "sha256": "35e40c848b9488b47d50f86765bf084ea418929f2b2877887fea834d5da0cf5c"
+      "bytes": 13587,
+      "sha256": "4160ac25595cec2bebf4fe54c4c4205d72845fe84e4d5aa009f5f01b752e7ec2"
     },
     {
       "path": "tool/perf/native_write_paired/finalize.py",
