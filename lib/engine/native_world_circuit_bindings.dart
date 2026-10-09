@@ -58,6 +58,7 @@ class NativeWorldCircuitBindings {
   final Map<String, Object?> _buildInfo;
   final void Function(Directory) _deleteOutputDirectory;
   final Allocator _hashAllocator;
+  final Allocator _readAllocator;
   // Older engines and focused ABI stubs need no hashing symbols to open the
   // byte API. Resolve the optional extension only on the first ranged hash.
   late final _SourceSha256Api? _hashApi = _SourceSha256Api.load(library);
@@ -71,8 +72,10 @@ class NativeWorldCircuitBindings {
     this.library, {
     void Function(Directory)? deleteOutputDirectory,
     Allocator? hashAllocator,
+    Allocator? readAllocator,
   }) : _buildInfo = _readBuildInfo(library),
        _hashAllocator = hashAllocator ?? calloc,
+       _readAllocator = readAllocator ?? calloc,
        _deleteOutputDirectory =
            deleteOutputDirectory ??
            ((directory) => directory.deleteSync(recursive: true));
@@ -271,8 +274,9 @@ class NativeWorldCircuitBindings {
   Future<String> _hashRange(
     String stage,
     int size,
-    Uint8List Function(int, int) read,
-  ) async {
+    Uint8List Function(int, int) read, {
+    required int Function(int, Uint8List, int) readInto,
+  }) async {
     const chunkSize = 1024 * 1024;
     final api = _hashApi;
     final digest = _DigestCollector();
@@ -300,15 +304,18 @@ class NativeWorldCircuitBindings {
       }
       for (var offset = 0; offset < size;) {
         _checkCancelled();
-        final length = (size - offset).clamp(0, chunkSize),
-            bytes = read(offset, length);
-        if (bytes.length != length) {
-          throw const EngineException('Short hash source read');
-        }
+        final length = (size - offset).clamp(0, chunkSize);
         if (api != null) {
-          allocation.asTypedList(length).setAll(0, bytes);
+          if (readInto(offset, allocation.asTypedList(chunkSize), length) !=
+              length) {
+            throw const EngineException('Short hash source read');
+          }
           _checkWorld(api.update(handle, allocation, length));
         } else {
+          final bytes = read(offset, length);
+          if (bytes.length != length) {
+            throw const EngineException('Short hash source read');
+          }
           sink!.add(bytes);
         }
         offset += length;
@@ -364,6 +371,7 @@ class NativeWorldCircuitBindings {
     final worldSource = WorldCircuitSource.fromMap(source);
     worldSource.toFileMap();
     final session = _Session(0, streamed: true);
+    final inputWindow = _ReadWindow(_readAllocator);
     final out = calloc<Uint32>(),
         event = calloc<Uint32>(12),
         data = calloc<Pointer<Uint8>>();
@@ -374,6 +382,8 @@ class NativeWorldCircuitBindings {
         'hash',
         worldSource.length,
         (offset, length) => session.read(1, offset, length),
+        readInto: (offset, buffer, length) =>
+            session.readInto(1, offset, buffer, length),
       );
       _check(
         library.lookupFunction<
@@ -411,18 +421,19 @@ class NativeWorldCircuitBindings {
           if (e[4] > 1024 * 1024) {
             throw const EngineException('Stream input window exceeded');
           }
-          final bytes = session.read(e[2], e[3], e[4]), p = calloc<Uint8>(e[4]);
-          try {
-            p.asTypedList(bytes.length).setAll(0, bytes);
-            _check(
-              library.lookupFunction<
-                Int32 Function(Uint32, Uint32, Uint32, Pointer<Uint8>, Uint32),
-                int Function(int, int, int, Pointer<Uint8>, int)
-              >('abc_world_stream_supply')(task, e[2], e[3], p, bytes.length),
-            );
-          } finally {
-            calloc.free(p);
-          }
+          session.readInto(e[2], e[3], inputWindow.bytes, e[4]);
+          _check(
+            library.lookupFunction<
+              Int32 Function(Uint32, Uint32, Uint32, Pointer<Uint8>, Uint32),
+              int Function(int, int, int, Pointer<Uint8>, int)
+            >('abc_world_stream_supply')(
+              task,
+              e[2],
+              e[3],
+              inputWindow.pointer,
+              e[4],
+            ),
+          );
         } else if (e[1] != 0) {
           throw const EngineException('Unexpected stream-open event');
         }
@@ -431,6 +442,8 @@ class NativeWorldCircuitBindings {
           slice.reset();
         }
       }
+      // Decode and compile own separate windows; do not retain both at once.
+      inputWindow.close();
       _check(
         library.lookupFunction<
           Int32 Function(Uint32, Uint32, Pointer<Uint32>),
@@ -462,6 +475,7 @@ class NativeWorldCircuitBindings {
       session.close();
       rethrow;
     } finally {
+      inputWindow.close();
       if (task != 0) {
         library.lookupFunction<_OneC, _OneD>('abc_world_stream_cancel')(task);
         library.lookupFunction<_OneC, _OneD>('abc_world_stream_close')(task);
@@ -492,13 +506,18 @@ class NativeWorldCircuitBindings {
       final input = output.openSync(mode: FileMode.read);
       late final String fingerprint;
       try {
-        fingerprint = await _hashRange('hash-output', output.lengthSync(), (
-          offset,
-          length,
-        ) {
-          input.setPositionSync(offset);
-          return input.readSync(length);
-        });
+        fingerprint = await _hashRange(
+          'hash-output',
+          output.lengthSync(),
+          (offset, length) {
+            input.setPositionSync(offset);
+            return input.readSync(length);
+          },
+          readInto: (offset, buffer, length) {
+            input.setPositionSync(offset);
+            return input.readIntoSync(buffer, 0, length);
+          },
+        );
       } finally {
         input.closeSync();
       }
@@ -528,6 +547,7 @@ class NativeWorldCircuitBindings {
         data = calloc<Pointer<Uint8>>(),
         stats = calloc<Uint32>(24);
     final records = BytesBuilder(copy: false);
+    final inputWindow = _ReadWindow(_readAllocator);
     try {
       while (true) {
         _check(
@@ -570,22 +590,21 @@ class NativeWorldCircuitBindings {
             throw const EngineException('Circuit source unavailable');
           }
           file.setPositionSync(offset);
-          final bytes = file.readSync(length);
-          if (bytes.length != length) {
+          if (file.readIntoSync(inputWindow.bytes, 0, length) != length) {
             throw const EngineException('Short circuit read');
           }
-          final p = calloc<Uint8>(length);
-          try {
-            p.asTypedList(length).setAll(0, bytes);
-            _check(
-              library.lookupFunction<
-                Int32 Function(Uint32, Uint32, Uint32, Pointer<Uint8>, Uint32),
-                int Function(int, int, int, Pointer<Uint8>, int)
-              >('abc_world_circuit_supply')(id, source, offset, p, length),
-            );
-          } finally {
-            calloc.free(p);
-          }
+          _check(
+            library.lookupFunction<
+              Int32 Function(Uint32, Uint32, Uint32, Pointer<Uint8>, Uint32),
+              int Function(int, int, int, Pointer<Uint8>, int)
+            >('abc_world_circuit_supply')(
+              id,
+              source,
+              offset,
+              inputWindow.pointer,
+              length,
+            ),
+          );
         } else if (kind == 2 || kind == 3) {
           if (data.value == nullptr && length > 0) {
             throw const EngineException('Missing circuit output');
@@ -657,6 +676,7 @@ class NativeWorldCircuitBindings {
         if (save) 'world': read(3),
       };
     } finally {
+      inputWindow.close();
       calloc.free(event);
       calloc.free(data);
       calloc.free(stats);
@@ -678,6 +698,7 @@ class NativeWorldCircuitBindings {
         data = calloc<Pointer<Uint8>>(),
         stats = calloc<Uint32>(24);
     final records = BytesBuilder(copy: false);
+    final inputWindow = _ReadWindow(_readAllocator);
     try {
       final slice = Stopwatch()..start();
       while (true) {
@@ -738,22 +759,19 @@ class NativeWorldCircuitBindings {
           if (file == null || offset + length > file.lengthSync()) {
             throw const EngineException('Circuit source unavailable');
           }
-          final bytes = session.read(source, offset, length);
-          if (bytes.length != length) {
-            throw const EngineException('Short circuit read');
-          }
-          final p = calloc<Uint8>(length);
-          try {
-            p.asTypedList(length).setAll(0, bytes);
-            _check(
-              library.lookupFunction<
-                Int32 Function(Uint32, Uint32, Uint32, Pointer<Uint8>, Uint32),
-                int Function(int, int, int, Pointer<Uint8>, int)
-              >('abc_world_circuit_supply')(id, source, offset, p, length),
-            );
-          } finally {
-            calloc.free(p);
-          }
+          session.readInto(source, offset, inputWindow.bytes, length);
+          _check(
+            library.lookupFunction<
+              Int32 Function(Uint32, Uint32, Uint32, Pointer<Uint8>, Uint32),
+              int Function(int, int, int, Pointer<Uint8>, int)
+            >('abc_world_circuit_supply')(
+              id,
+              source,
+              offset,
+              inputWindow.pointer,
+              length,
+            ),
+          );
         } else if (kind == 2 || kind == 3) {
           if (data.value == nullptr && length > 0) {
             throw const EngineException('Missing circuit output');
@@ -830,6 +848,7 @@ class NativeWorldCircuitBindings {
       if (commandKind == 8) session.files[6]!.truncateSync(0);
       rethrow;
     } finally {
+      inputWindow.close();
       calloc.free(event);
       calloc.free(data);
       calloc.free(stats);
@@ -846,6 +865,36 @@ class NativeWorldCircuitBindings {
     } finally {
       session.close();
     }
+  }
+}
+
+/// One bounded input window, allocated only if an operation requests READ.
+/// Both native supply APIs copy synchronously and never retain this pointer.
+class _ReadWindow {
+  static const capacity = 1024 * 1024;
+  final Allocator allocator;
+  Pointer<Uint8> pointer = nullptr;
+  Uint8List? _bytes;
+
+  _ReadWindow(this.allocator);
+
+  Uint8List get bytes {
+    if (pointer == nullptr) {
+      pointer = allocator.allocate<Uint8>(capacity);
+      if (pointer == nullptr) {
+        throw const EngineException('Circuit read allocation failed');
+      }
+      _bytes = pointer.asTypedList(capacity);
+    }
+    return _bytes!;
+  }
+
+  void close() {
+    if (pointer == nullptr) return;
+    final owned = pointer;
+    pointer = nullptr;
+    _bytes = null;
+    allocator.free(owned);
   }
 }
 
@@ -886,6 +935,24 @@ class _Session {
   }
 
   Uint8List read(int id, int offset, int length) {
+    final result = _readFile(id, offset, length).readSync(length);
+    if (result.length != length) {
+      throw const EngineException('Short ranged circuit read');
+    }
+    _recordRead(length);
+    return result;
+  }
+
+  int readInto(int id, int offset, Uint8List buffer, int length) {
+    final count = _readFile(id, offset, length).readIntoSync(buffer, 0, length);
+    if (count != length) {
+      throw const EngineException('Short ranged circuit read');
+    }
+    _recordRead(length);
+    return count;
+  }
+
+  RandomAccessFile _readFile(int id, int offset, int length) {
     final file = files[id];
     if (file == null ||
         offset < 0 ||
@@ -906,14 +973,13 @@ class _Session {
       }
     }
     file.setPositionSync(offset);
-    final result = file.readSync(length);
-    if (result.length != length) {
-      throw const EngineException('Short ranged circuit read');
-    }
+    return file;
+  }
+
+  void _recordRead(int length) {
     readBytes += length;
     readRequests++;
     if (length > maxReadBytes) maxReadBytes = length;
-    return result;
   }
 
   void close() {
