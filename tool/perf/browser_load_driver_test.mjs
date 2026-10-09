@@ -82,7 +82,9 @@ function physicalDisplay(lit = [[0, 20], [0, 21], [31, 25]], session = 1) {
     view.setUint32(offset, 6485 + x, true); view.setUint32(offset + 4, 800 + y, true);
     view.setUint32(offset + 8, 445, true); view.setInt16(offset + 12, keys.has(`${x},${y}`) ? 18 : 0, true);
   }
-  return {session, records, resultKind: 9, resultCount: 3072, reserved: 14};
+  // Actual C PIXELS READY/DONE envelope has resultCount=0; the 3072 records
+  // arrive through separate RESULT events and are collected by the JS bridge.
+  return {session, records, resultKind: 9, resultCount: 0, reserved: 14};
 }
 const clockWords = pulses => [2, 2, 3194, 153, 1, 1, 1, 8, pulses, 0, 0, 0, 0, 0, 0, 0];
 const pixelsWords = [2, 9, 6485, 800, 64, 48, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -117,7 +119,7 @@ test('monitor summaries retain validated actual output count and fingerprints, n
 });
 
 test('monitor evidence rejects wrong shape, duplicate coordinate, wrong tile and invalid frames', () => {
-  for (const change of [r => r.resultKind = 1, r => r.resultCount = 1,
+  for (const change of [r => r.resultKind = 1,
     r => r.records = r.records.subarray(16),
     r => new DataView(r.records.buffer).setUint32(16, 6485, true),
     r => new DataView(r.records.buffer).setUint32(0, 6484, true),
@@ -306,4 +308,46 @@ test('CLI selects baseline or explicit cycle mode and rejects non-owned URL befo
   const result = spawnSync(process.execPath, [script, '1', 'https://example.invalid/', '/tmp/fixture', '/tmp/evidence', '--cycles=4'],
     {encoding: 'utf8', timeout: 3000});
   assert.equal(result.status, 1); assert.match(result.stderr, /explicit --cycles=3/);
+});
+
+
+test('actual PIXELS DONE count zero coexists with 3072 independently validated RESULT records', () => {
+  // Native producer: native/vendor/TerraWasm/src/terra_circuit_world.c:221-222
+  // clears the final envelope, assigning result_count only for SAVE/FRAGMENTS/EXTRACT.
+  // Web bridge: web/terra_world_circuit.js pump collects RESULT record bytes,
+  // then separately copies READY/DONE resultCount. Product decode checks kind/bytes.
+  const result = physicalDisplay();
+  assert.equal(result.resultKind, 9); assert.equal(result.resultCount, 0);
+  assert.equal(result.records.byteLength, 3072 * 16);
+  const summary = summarizeDisplay(result);
+  assert.equal(summary.pixelCount, 3072); assert.equal(summary.litCount, 3);
+});
+
+test('malformed monitor observation retains scalar shape and forwards original result without pixel buffers', async t => {
+  const keys = ['Worker', 'terraWorldCircuit', '__abcBrowserDiagnostic', 'addEventListener'];
+  const saved = Object.fromEntries(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  t.after(() => { for (const key of keys) {
+    if (saved[key]) Object.defineProperty(globalThis, key, saved[key]); else delete globalThis[key];
+  } });
+  const events = [];
+  globalThis.addEventListener = () => {};
+  globalThis.Worker = class { addEventListener() {} terminate() {} };
+  globalThis.__abcBrowserDiagnostic = value => events.push(JSON.parse(value));
+  const malformed = physicalDisplay(); malformed.records = malformed.records.subarray(16);
+  const compound = {clock: {session: 1}, display: malformed, displayError: null};
+  globalThis.terraWorldCircuit = Object.freeze(Object.fromEntries(['open', 'openSource', 'progress', 'command',
+    'computerFrame', 'close', 'cleanup', 'releaseSource'].map(method => [method,
+      async () => method === 'computerFrame' ? compound : malformed])));
+  installCycleInstrumentation(summarizeDisplay);
+  assert.equal(await globalThis.terraWorldCircuit.command(1, JSON.stringify(pixelsWords), '[]'), malformed);
+  assert.equal(await globalThis.terraWorldCircuit.computerFrame(1, JSON.stringify(clockWords(128)), JSON.stringify(pixelsWords)), compound);
+  const errors = events.filter(e => e.type === 'observation-error');
+  assert.equal(errors.length, 2);
+  for (const error of errors) {
+    assert.match(error.message, /shape mismatch/);
+    assert.deepEqual(error.resultShape, {resultKind: 9, resultCount: 0,
+      recordsConstructor: 'Uint8Array', recordsByteLength: 49136});
+    assert.equal('records' in error, false); assert.equal('records' in error.resultShape, false);
+    assert.ok(JSON.stringify(error).length < 600);
+  }
 });

@@ -207,3 +207,22 @@ python3 -m py_compile tool/perf/browser_load_diagnostic.py
 node --check tool/perf/browser_load_driver.mjs
 node --check tool/perf/browser_load_cycles.mjs
 ```
+
+## Preserved first-attempt observer failure
+
+Run `37967824227`, diagnostic commit
+`eebd69c26117bd8e4b5ba0d28bc9a6d82665c42b`, failed at cycle 1's first physical
+monitor observation (call 113), after the correct full File import. No physical
+clocks or renderer crashes were recorded. Its failed/partial raw evidence remains
+unchanged; this correction does not turn that attempt into a successful run.
+
+The observer had incorrectly treated the final PIXELS READY/DONE envelope's
+`resultCount` as the number of accumulated records. The native producer clears
+that envelope and sets its count only for SAVE/FRAGMENTS/EXTRACT
+(`native/vendor/TerraWasm/src/terra_circuit_world.c:221–222`); the Web bridge's
+`pump` separately accumulates RESULT payload records. PIXELS therefore has
+`resultCount=0` with 3,072 actual records. The observer now matches
+`ComputerDisplayRegion.decode`: kind 9, exactly 49,152 bytes, and every existing
+coordinate, uniqueness, tile and pixel-frame check. Synthetic fixtures use the
+realistic zero DONE count. Future monitor-observation failures record only
+scalar result kind/count, record constructor and byte length, never buffers.

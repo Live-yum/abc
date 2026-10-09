@@ -16,7 +16,10 @@ export const EMPTY_ROM_LABEL = '原始 ROM 为空。选择从地址 0 启动的 
 // FNV-1a is a compact change fingerprint, not a cryptographic integrity assertion.
 export function summarizeDisplay(result) {
   const bytes = result?.records;
-  if (result?.resultKind !== 9 || result.resultCount !== 3072 || !(bytes instanceof Uint8Array)
+  // PIXELS RESULT events carry records; the final READY/DONE envelope's
+  // resultCount stays zero (terra_circuit_world.c:221-222). Match the product
+  // ComputerDisplayRegion.decode contract: kind + actual record bytes/pixels.
+  if (result?.resultKind !== 9 || !(bytes instanceof Uint8Array)
       || bytes.byteLength !== 49152) throw new Error('Physical monitor result shape mismatch');
   const data = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const seen = new Uint8Array(3072), pixels = new Uint8Array(3072);
@@ -93,6 +96,16 @@ export function installCycleInstrumentation(displaySummary) {
     return parsed;
   };
   const monitor = row => row?.every((v, i) => v === [2, 9, 6485, 800, 64, 48, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0][i]);
+  const shape = result => {
+    const observed = {resultKind: null, resultCount: null};
+    try {
+      observed.resultKind = Number.isSafeInteger(result?.resultKind) ? result.resultKind : null;
+      observed.resultCount = Number.isSafeInteger(result?.resultCount) ? result.resultCount : null;
+      const records = result?.records, name = records?.constructor?.name;
+      return {...observed, recordsConstructor: typeof name === 'string' ? name.slice(0, 64) : null,
+        recordsByteLength: Number.isSafeInteger(records?.byteLength) ? records.byteLength : null};
+    } catch (error) { return {...observed, shapeError: String(error).slice(0, 256)}; }
+  };
   const scalar = result => ({session: result?.session, sourceSha256: result?.sourceSha256,
     stats: result?.stats, resultKind: result?.resultKind, resultCount: result?.resultCount,
     reserved: result?.reserved, hostStagesUs: result?.hostStagesUs});
@@ -116,7 +129,11 @@ export function installCycleInstrumentation(displaySummary) {
               : {...scalar(result), ...(method === 'command' && monitor(descriptor.words)
                 ? {monitor: displaySummary(result)} : {})};
             emit({type: 'bridge-result', method, callId, ...data});
-          } catch (error) { emit({type: 'observation-error', method, callId, message: String(error).slice(0, 2048)}); }
+          } catch (error) {
+            emit({type: 'observation-error', method, callId, message: String(error).slice(0, 2048),
+              ...(method === 'command' && monitor(descriptor.words) ? {resultShape: shape(result)}
+                : method === 'computerFrame' && monitor(descriptor.pixelWords) ? {resultShape: shape(result?.display)} : {})});
+          }
           return result;
         }, error => {
           emit({type: 'bridge-error', method, callId, message: String(error).slice(0, 2048)});
