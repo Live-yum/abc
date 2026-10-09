@@ -1,0 +1,125 @@
+name: Fixed-final-product native retention observation
+
+# A push to this one review branch starts only this additional diagnostic.
+# No PR is created, no existing workflow is changed, and nothing is deployed.
+on:
+  push:
+    branches: [codex/native-retention-661f9f17]
+    paths:
+      - .github/workflows/native-retention.yml
+      - integration_test/computer_native_retention_test.dart
+      - integration_test/support/native_retention_probe.dart
+      - tool/perf/native_retention*
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-retention-${{ github.run_id }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  LIBGL_ALWAYS_SOFTWARE: '1'
+  TERRA_PERF_RUNNER: ubuntu-24.04-xvfb
+
+jobs:
+  observe:
+    if: github.ref == 'refs/heads/codex/native-retention-661f9f17'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out diagnostic definitions at this exact push
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: workflow
+          persist-credentials: false
+      - name: Initialize bounded evidence destination
+        run: mkdir -p native-retention-evidence
+      - name: Check out fixed final product
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 661f9f17531e87f0b3f9f7028d70a94814c21234
+          path: product
+          persist-credentials: false
+      - name: Install the existing Linux profile dependencies
+        timeout-minutes: 10
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev zlib1g-dev xvfb mesa-utils
+      - uses: ./product/.github/actions/setup-flutter
+        timeout-minutes: 6
+      - name: Derive only new diagnostic files and audit every original file
+        run: |
+          python3 workflow/tool/perf/native_retention_prepare.py --workflow-root workflow --source product --output native-retention-evidence/derivation > native-retention-evidence/prepare.log 2>&1
+          echo "ABC_RETENTION_DERIVATION=$PWD/native-retention-evidence/derivation/derivation.json" >> "$GITHUB_ENV"
+      - name: Resolve the unchanged lockfile
+        working-directory: product
+        timeout-minutes: 5
+        run: flutter pub get --enforce-lockfile > ../native-retention-evidence/pub-get.log 2>&1
+      - name: Analyze the dedicated target and run lightweight contracts
+        working-directory: product
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          dart format --output=none --set-exit-if-changed integration_test/computer_native_retention_test.dart integration_test/support/native_retention_probe.dart tool/perf/native_retention_probe_contract.dart > ../native-retention-evidence/format.log 2>&1
+          flutter analyze --no-pub integration_test/computer_native_retention_test.dart integration_test/support/native_retention_probe.dart tool/perf/native_retention_probe_contract.dart > ../native-retention-evidence/analyze.log 2>&1
+          ABC_CONTRACT_DART="$(command -v dart)" python3 -m unittest discover -s tool/perf -p 'native_retention*_test.py' -v > ../native-retention-evidence/contracts.log 2>&1
+          python3 -m unittest discover -s tool/perf -p 'memory_probe_control*_test.py' -v > ../native-retention-evidence/inherited-contracts.log 2>&1
+      - name: Compile the independent helper with runner provenance
+        working-directory: product
+        timeout-minutes: 2
+        run: |
+          python3 tool/perf/native_retention_build.py --source . --output ../native-retention-evidence/helper > ../native-retention-evidence/helper-build.log 2>&1
+          echo "ABC_RETENTION_HELPER_BUILD=$PWD/../native-retention-evidence/helper/helper-build.json" >> "$GITHUB_ENV"
+      - name: Resolve the pinned public WLD and record the existing renderer
+        working-directory: product
+        timeout-minutes: 8
+        run: |
+          python3 tool/computerraria_inputs.py > ../native-retention-evidence/input-prepare.log 2>&1
+          cp build/public-computerraria/input-manifest.json ../native-retention-evidence/input-manifest.json
+          mkdir -p build/native-retention-tmp
+          echo "TMPDIR=$PWD/build/native-retention-tmp" >> "$GITHUB_ENV"
+          echo "COMPUTERRARIA_WLD=$PWD/build/public-computerraria/computerraria.wld" >> "$GITHUB_ENV"
+          xvfb-run -a -s '-screen 0 1440x1000x24' glxinfo -B > ../native-retention-evidence/glxinfo.txt
+          renderer="$(sed -n 's/^OpenGL renderer string: //p' ../native-retention-evidence/glxinfo.txt)"
+          test -n "$renderer"
+          echo "TERRA_PERF_RENDERER=$renderer" >> "$GITHUB_ENV"
+      - name: Compile the target, then run exactly one bounded profile process
+        working-directory: product
+        timeout-minutes: 17
+        run: >-
+          xvfb-run -a -s '-screen 0 1440x1000x24'
+          python3 tool/perf/native_retention_run.py
+          ../native-retention-evidence/run
+      - name: Preserve stage outcome without a memory-stability claim
+        if: always()
+        env:
+          OBSERVATION_JOB_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p native-retention-evidence
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path('native-retention-evidence')
+          (root / 'workflow-status.json').write_text(json.dumps({
+              'workflowCommit': os.environ['GITHUB_SHA'],
+              'runId': os.environ['GITHUB_RUN_ID'],
+              'runAttempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'jobStatus': os.environ['OBSERVATION_JOB_STATUS'],
+              'productCommit': '661f9f17531e87f0b3f9f7028d70a94814c21234',
+              'acceptanceEvidence': False,
+              'plateauEstablished': False,
+              'limits': 'Eight cycles only. Unsupported or incomplete observations cannot establish allocator attribution or memory improvement.'
+          }, indent=2) + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write('One fixed-661f9f17 eight-cycle observation. Raw calls, endpoints, provenance and all failures are preserved. No leak-free, plateau, improvement or FPS certification.\n')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        timeout-minutes: 5
+        with:
+          name: native-retention-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: native-retention-evidence/
+          if-no-files-found: error
+          retention-days: 30
