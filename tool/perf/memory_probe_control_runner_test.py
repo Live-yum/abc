@@ -245,6 +245,7 @@ class SourcePreflightTests(unittest.TestCase):
                    b'// ignore: library_private_types_in_public_api\n' + replacement)
         for name in (runner.TARGET, 'tool/perf/memory_probe_control_run.py',
                      'tool/perf/memory_probe_control_os.py',
+                     'tool/perf/memory_probe_control_rss.py',
                      'tool/perf/memory_probe_control_validate.py',
                      'integration_test/support/computer_memory_probe_telemetry.dart'):
             self.write(name, b'diagnostic overlay\n')

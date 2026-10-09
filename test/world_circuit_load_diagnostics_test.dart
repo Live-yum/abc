@@ -63,9 +63,9 @@ void main() {
         'busy': true,
         'importing': true,
         'loadProgress': _progress({
-          if (invalid != null) 'nativeActiveBytes': invalid,
-          if (invalid != null) 'nativePeakBytes': invalid,
-          if (invalid != null) 'wasmHeapBytes': invalid,
+          'nativeActiveBytes': ?invalid,
+          'nativePeakBytes': ?invalid,
+          'wasmHeapBytes': ?invalid,
         }),
       });
       expect(

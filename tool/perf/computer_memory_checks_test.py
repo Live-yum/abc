@@ -286,6 +286,37 @@ class MemoryChecksTest(unittest.TestCase):
         self.assertEqual(len(result['measurements']['cycles']), 8)
         self.assertEqual(len(result['measurements']['trends']['standard']['released']['vm.heapUsedBytes']['series']), 4)
 
+    def test_non_atomic_process_info_disagreement_retains_raw_and_growth(self):
+        before = self.run_validation()['measurements']
+        point = self.report['memoryPoints'][2]
+        rss = point['vm']['rssBytes']
+        point['vm']['maxRssBytes'] = rss - 806912
+        result = self.run_validation()
+        self.assertTrue(result['evidenceValid'], result['errors'])
+        warning, = result['rssSamplingDisagreements']
+        self.assertEqual(warning['rssBytes'], rss)
+        self.assertEqual(warning['maxRssBytes'], rss - 806912)
+        self.assertEqual(warning['rssMinusReportedMaxBytes'], 806912)
+        self.assertIn('/proc/self/statm', warning['rssSource'])
+        self.assertIn('getrusage', warning['maxRssSource'])
+        self.assertEqual(warning['samplingWindowUs'], [point['vmStartUs'], point['vmEndUs']])
+        self.assertFalse(result['plateauEstablished'])
+        self.assertEqual(result['measurements']['trends']['overall']['released']['vm.rssBytes'],
+                         before['trends']['overall']['released']['vm.rssBytes'])
+        self.assertEqual(point['vm']['maxRssBytes'], rss - 806912)
+
+    def test_heap_capacity_contradiction_remains_failure(self):
+        point = self.report['memoryPoints'][2]
+        point['vm']['heapUsedBytes'] = point['vm']['heapCapacityBytes'] + 1
+        self.assert_failed('heap capacity bound')
+
+    def test_same_status_hwm_below_rss_remains_failure(self):
+        descriptor = self.report['raw']['os']['files'][0]
+        rows = [json.loads(line) for line in (self.root / descriptor['file']).read_text().splitlines()]
+        rows[0]['processVmHwmBytes'] = rows[0]['rssBytes'] - 1
+        write_rows(self.root, descriptor, rows)
+        self.assert_failed('process HWM below current status RSS')
+
     def test_dropped_frame_even_with_rehashed_raw_file_fails(self):
         self.edit_chunk(0, lambda rows: rows.pop(1))
         self.assert_failed('raw frame count differs')

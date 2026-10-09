@@ -131,3 +131,22 @@ its unchanged lockfile, performs target syntax/analyzer checks, fetches the
 already-authorized public WLD, and invokes the paired runner once under Xvfb.
 Partial artifacts are uploaded on failure. A passing control validator means
 that control evidence is complete, not that memory stability is accepted.
+
+### Sequential ProcessInfo RSS observations
+
+The pinned Linux Dart runtime reads `ProcessInfo.currentRss` from
+`/proc/self/statm`, then obtains `ProcessInfo.maxRss` separately from
+`getrusage(RUSAGE_SELF).ru_maxrss`. These are not one atomic snapshot.
+The exact SDK implementation is
+[process_linux.cc](https://github.com/dart-lang/sdk/blob/04bcd1036cdc799ac6564988f159ee454d42c822/runtime/bin/process_linux.cc#L975);
+[Linux documents asynchronous RSS accounting](https://www.kernel.org/doc/html/latest/filesystems/proc.html).
+
+For this verified platform/SDK and explicitly non-atomic VM checkpoint only,
+RSS above the separately reported HWM produces `rssSamplingDisagreements` and
+a visible warning, retaining both raw values, their difference, the measurement
+window, sources and read order. Values are never clamped or replaced. Unknown
+sampling provenance, atomic contradictions, same-status OS HWM contradictions,
+and heap-used above heap-capacity still fail validation. Growth calculations,
+raw reconciliation and the absence of a plateau/no-leak acceptance gate are
+unchanged. Historical reports and their original failed validation remain intact;
+a revised validator output is a separately identified interpretation.

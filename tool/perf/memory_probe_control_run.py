@@ -191,6 +191,7 @@ def source_preflight(output):
     required = {TARGET, SCHEDULE, 'tool/perf/memory_probe_control_manifest.json',
                 'tool/perf/memory_probe_control_run.py',
                 'tool/perf/memory_probe_control_os.py',
+                'tool/perf/memory_probe_control_rss.py',
                 'tool/perf/memory_probe_control_validate.py',
                 'integration_test/support/computer_memory_probe_telemetry.dart'}
     if not required.issubset(new):

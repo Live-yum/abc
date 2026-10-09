@@ -253,6 +253,23 @@ class ControlChecksTest(unittest.TestCase):
         self.assertIn('vm.heapCapacityBytes', result['measurements']['baseline'])
         self.assertIn('vm.externalBytes', result['measurements']['baseline'])
 
+    def test_probe_rss_disagreement_preserves_control_limits(self):
+        point = self.report['memoryPoints'][2]
+        point['vm']['maxRssBytes'] = point['vm']['rssBytes'] - 806912
+        result = self.run_validation()
+        self.assertTrue(result['evidenceValid'], result['errors'])
+        warning, = result['rssSamplingDisagreements']
+        self.assertEqual(warning['rssMinusReportedMaxBytes'], 806912)
+        self.assertEqual(warning['samplingWindowUs'], [point['slotStartUs'], point['slotEndUs']])
+        self.assertFalse(result['plateauEstablished'])
+        self.assertFalse(result['acceptanceEvidence'])
+        self.assertTrue(result['originalGrowthStillUnresolved'])
+
+    def test_probe_heap_contradiction_remains_failure(self):
+        point = self.report['memoryPoints'][2]
+        point['vm']['heapUsedBytes'] = point['vm']['heapCapacityBytes'] + 1
+        self.assert_failed('heap capacity bound')
+
     def test_complete_product_control_reuses_original_action_validation(self):
         self.root = Path(self.temp.name) / 'product-os-only.raw'
         self.report, self.build, self.build_sha, self.external = fixture(self.root, 'product-os-only')

@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 import platform
 import re
 import signal
+import shlex
 import subprocess
 import tarfile
 import tempfile
@@ -218,6 +219,23 @@ def proc_stat(text):
     return {'state': fields[0], 'ppid': int(fields[1]), 'startTicks': int(fields[19])}
 
 
+
+def chrome_process_kind(args):
+    # Chromium may rewrite its process title into one argv entry. Ordinary
+    # argv elements remain intact; quoted title arguments are parsed separately.
+    tokens = [arg for arg in args if arg]
+    if len(tokens) == 1:
+        try:
+            tokens = shlex.split(tokens[0])
+        except ValueError:
+            return 'unknown'
+    kinds = [match.group(1) for arg in tokens
+             if (match := re.fullmatch(r'--type=([A-Za-z0-9_-]+)', arg))]
+    if len(kinds) > 1:
+        return 'unknown'
+    return kinds[0] if kinds else 'browser'
+
+
 def snapshot_process(pid, expected_start=None):
     folder = Path('/proc') / str(pid)
     begin = time.monotonic_ns()
@@ -228,7 +246,7 @@ def snapshot_process(pid, expected_start=None):
         raw_status = (folder / 'status').read_text()
         status = parse_kib(raw_status)
         args = (folder / 'cmdline').read_bytes().decode(errors='replace').split('\0')
-        kind = next((a.split('=', 1)[1] for a in args if a.startswith('--type=')), 'browser')
+        kind = chrome_process_kind(args)
         row = {'pid': pid, **stat, 'kind': kind, 'readStartMonoNs': begin,
                'rssBytes': status.get('VmRSS'), 'processHwmBytes': status.get('VmHWM'),
                'pssBytes': None, 'smapsRssBytes': None, 'smapsError': None,

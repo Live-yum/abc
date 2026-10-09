@@ -15,6 +15,8 @@ from pathlib import Path
 import re
 import sys
 
+from memory_probe_control_rss import process_info_disagreement
+
 
 WLD_BYTES = 405983441
 WLD_SHA = '55d0a24bd1f56d622003dbd30d52555e7d06d6d1bcacfc22ae506f2db5240c33'
@@ -146,6 +148,7 @@ class Validator:
         self.report, self.root, self.build = report, Path(raw_directory), build
         self.expected_commit, self.build_sha256 = expected_commit, build_sha256
         self.errors, self.warnings, self.files = [], [], []
+        self.rss_sampling_warnings = []
         self.records = {kind: [] for kind in RECORD_TYPES}
         self.frame_count = self.os_count = self.last_batch = 0
         self.last_batch = -1
@@ -658,8 +661,10 @@ class Validator:
                 for field in VM_FIELDS:
                     integer(vm[field], field, 1 if field in ('rssBytes', 'maxRssBytes', 'heapUsedBytes',
                                                            'heapCapacityBytes', 'sampledIsolates', 'sampledIsolateGroups') else 0)
-                require(vm['heapUsedBytes'] <= vm['heapCapacityBytes'] and vm['rssBytes'] <= vm['maxRssBytes'],
-                        'VM heap capacity or RSS high-water bound invalid')
+                disagreement = process_info_disagreement(vm, point, self.report['runtime'])
+                if disagreement:
+                    self.rss_sampling_warnings.append(disagreement)
+                    self.warnings.append(f'Cycle {point["cycle"]} {point["phase"]}: non-atomic ProcessInfo RSS exceeds separately reported HWM by {disagreement["rssMinusReportedMaxBytes"]} bytes; raw values retained.')
                 require(vm['sampledIsolateGroups'] <= vm['sampledIsolates'], 'more isolate groups than isolates')
                 counts = point['recorder']
                 for name in ('frames', 'frameReceipts', *RETAINED_KEYS.values(), 'receivedFrames', 'persistedFrames',
@@ -738,6 +743,7 @@ class Validator:
                 'cancelledImportNativeOutcome': (self.report['cycles'][0].get('cancelledImportNativeOutcome')
                                                 if self.report.get('cycles') else None),
                 'errors': self.errors, 'warnings': self.warnings, 'measurements': points,
+                'rssSamplingDisagreements': self.rss_sampling_warnings,
                 'raw': {'verifiedOrInspectedFiles': self.files, 'receivedFrameCount': self.frame_count,
                         'uniqueEngineFrameNumbers': len(self.engine_frames),
                         'duplicateEngineFrameRecords': self.duplicate_count,

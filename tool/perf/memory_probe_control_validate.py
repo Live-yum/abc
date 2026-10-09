@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 import sys
 
+from memory_probe_control_rss import process_info_disagreement
+
 import computer_memory_validate as original
 from computer_memory_validate import digest, integer, load_json, require, sha
 
@@ -28,6 +30,7 @@ CONTROL_SOURCES = {
     'tool/perf/memory_probe_control_manifest.json',
     'tool/perf/memory_probe_control_schedule.json',
     'tool/perf/memory_probe_control_os.py',
+    'tool/perf/memory_probe_control_rss.py',
     'tool/perf/memory_probe_control_validate.py',
 }
 POINT_KEYS = [(-1, 'baseline')] + [(cycle, phase) for cycle in range(8)
@@ -76,6 +79,7 @@ class ControlValidator(original.Validator):
         self.schedule = schedule if schedule is not None else load_json(
             Path(__file__).with_name('memory_probe_control_schedule.json'))
         self.external_summary = None
+        self.rss_sampling_warnings = []
 
     def validate_header(self):
         report = self.report
@@ -263,8 +267,10 @@ class ControlValidator(original.Validator):
         for name in original.VM_FIELDS:
             integer(vm[name], name, 1 if name in ('rssBytes', 'maxRssBytes', 'heapUsedBytes', 'heapCapacityBytes',
                                                 'sampledIsolates', 'sampledIsolateGroups') else 0)
-        require(vm['heapUsedBytes'] <= vm['heapCapacityBytes'] and vm['rssBytes'] <= vm['maxRssBytes'],
-                'VM heap capacity or RSS high-water bound invalid')
+        disagreement = process_info_disagreement(vm, point, self.report['runtime'])
+        if disagreement:
+            self.rss_sampling_warnings.append(disagreement)
+            self.warnings.append(f'Cycle {point["cycle"]} {point["phase"]}: non-atomic ProcessInfo RSS exceeds separately reported HWM by {disagreement["rssMinusReportedMaxBytes"]} bytes; raw values retained.')
         require(vm['sampledIsolateGroups'] <= vm['sampledIsolates'], 'more isolate groups than isolates')
         start = integer(telemetry['measurementStartUs'], 'probe start')
         end = integer(telemetry['measurementEndUs'], 'probe end')
@@ -558,6 +564,7 @@ class ControlValidator(original.Validator):
             'hostPid': self.report.get('hostPid'), 'reportedStatus': self.report.get('status'),
             'reportedFailure': self.report.get('failure'), 'reportedFailureStack': self.report.get('failureStack'),
             'errors': self.errors, 'warnings': self.warnings, 'measurements': measurements,
+            'rssSamplingDisagreements': self.rss_sampling_warnings,
             'externalOs': self.external_summary,
             'topology': {'nativeWorkersExpected': self.report.get('expectedNativeWorkers'),
                          'inProcessOsSamplerRetained': self.report.get('inProcessOsSamplerRetained'),

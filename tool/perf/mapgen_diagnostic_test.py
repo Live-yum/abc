@@ -280,5 +280,24 @@ class Contracts(unittest.TestCase):
                 self.assertEqual(diff.call_args.args[0][-2], ("a" if action == "synchronize" else "b") * 40)
 
 
+class WorkflowSourceIdentityTests(unittest.TestCase):
+    def test_workflow_can_have_new_comparator_but_keeps_clean_identity(self):
+        with patch.object(runner, 'command', side_effect=['a'*40, 'b'*40, '']), patch.object(runner, 'digest') as digest:
+            value = runner.source(Path('/workflow'), verify_harness=False)
+        self.assertEqual(value, {'commit': 'a'*40, 'tree': 'b'*40, 'dirty': False})
+        digest.assert_not_called()
+
+    def test_experiment_sources_still_reject_changed_frozen_harness(self):
+        for expected in (None, {'commit': 'a'*40, 'tree': 'b'*40}):
+            with patch.object(runner, 'command', side_effect=['a'*40, 'b'*40, '']), patch.object(runner, 'digest', return_value='changed'):
+                with self.assertRaisesRegex(AssertionError, 'Frozen harness changed'):
+                    runner.source(Path('/experiment'), expected)
+
+    def test_workflow_dirty_identity_is_rejected(self):
+        with patch.object(runner, 'command', side_effect=['a'*40, 'b'*40, ' M file']):
+            with self.assertRaisesRegex(AssertionError, 'Dirty source'):
+                runner.source(Path('/workflow'), verify_harness=False)
+
+
 if __name__ == "__main__":
     unittest.main()

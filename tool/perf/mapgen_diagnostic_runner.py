@@ -35,14 +35,15 @@ def command(argv, cwd=None, env=None):
     return (result.stdout or result.stderr).strip()
 
 
-def source(root, expected=None):
+def source(root, expected=None, *, verify_harness=True):
     value = {"commit": command(["git", "rev-parse", "HEAD"], root),
              "tree": command(["git", "rev-parse", "HEAD^{tree}"], root),
              "dirty": bool(command(["git", "status", "--porcelain", "--untracked-files=normal"], root))}
     assert not value["dirty"], f"Dirty source: {root}"
     if expected:
         assert all(value[key] == expected[key] for key in ("commit", "tree")), "Wrong pin/tree"
-    assert {path: digest(root / path) for path in HARNESS} == HARNESS, "Frozen harness changed"
+    if verify_harness:
+        assert {path: digest(root / path) for path in HARNESS} == HARNESS, "Frozen harness changed"
     return value
 
 
@@ -161,7 +162,7 @@ def prepare(args):
     args.work.mkdir(parents=True)
     state = {"schema": "abc.mapgen-factorial.v1", "status": "preparing", "pins": PINS,
              "groups": GROUPS, "sequence": schedule(), "harness": HARNESS,
-             "workflowSource": source(args.workflow_root),
+             "workflowSource": source(args.workflow_root, verify_harness=False),
              "machine": machine(), "toolchain": toolchain(), "variants": {}, "attempts": [],
              "overallAcceptance": "unestablished", "newWorkloads": "uncompared",
              "scope": "Additional MAP-only source-factor experiment, not replacement of original comparisons",

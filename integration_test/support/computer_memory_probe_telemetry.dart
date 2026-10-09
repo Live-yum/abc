@@ -1,6 +1,6 @@
 // Test-only measurement-overhead observation. Never retains VM response bodies.
 import 'dart:async';
-import 'dart:developer' show Service, Timeline;
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:vm_service/vm_service.dart';
@@ -14,7 +14,7 @@ class ComputerMemoryProbeTelemetry {
   int _messages = 0, _utf8Bytes = 0, _maximumUtf8Bytes = 0;
 
   Future<_ObservedVmService> _connect() async {
-    final uri = (await Service.getInfo()).serverUri;
+    final uri = (await developer.Service.getInfo()).serverUri;
     if (uri == null) {
       throw StateError('VM service unavailable');
     }
@@ -37,7 +37,7 @@ class ComputerMemoryProbeTelemetry {
   }
 
   Future<Map<String, Object?>> measure() async {
-    final started = Timeline.now;
+    final started = developer.Timeline.now;
     final service = _service ??= await _connect();
     _messages = 0;
     _utf8Bytes = 0;
@@ -47,7 +47,7 @@ class ComputerMemoryProbeTelemetry {
     // and then reads group memory. Decoding that profile is part of the measured
     // process's own allocation overhead, not an inert observer.
     final vm = await memory.memorySnapshot(service: service);
-    final ended = Timeline.now;
+    final ended = developer.Timeline.now;
     return {
       'vm': vm,
       'telemetry': {
@@ -84,7 +84,7 @@ class _ObservedVmService extends VmService {
     bool? reset,
     bool? gc,
   }) async {
-    final started = Timeline.now;
+    final started = developer.Timeline.now;
     final result = await super.getAllocationProfile(
       isolateId,
       reset: reset,
@@ -92,7 +92,7 @@ class _ObservedVmService extends VmService {
     );
     profileCalls.add({
       'startUs': started,
-      'endUs': Timeline.now,
+      'endUs': developer.Timeline.now,
       'gcRequested': gc == true,
       'classCount': result.members?.length,
       'dateLastServiceGC': result.dateLastServiceGC,

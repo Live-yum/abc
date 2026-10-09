@@ -72,6 +72,22 @@ class BrowserDiagnosticChecks(unittest.TestCase):
         self.assertEqual(diagnostic.proc_stat('101 (chrome (worker)) ' + ' '.join(fields)),
                          {'state': 'S', 'ppid': 25, 'startTicks': 123456})
 
+    def test_chrome_process_title_and_normal_argv_have_same_strict_type(self):
+        for args in (['/opt/google/chrome/chrome', '--type=renderer', '--lang=en-US', ''],
+                     ['/opt/google/chrome/chrome --type=renderer --lang=en-US', ''],
+                     ['chrome\t--type=renderer\n--lang=en-US']):
+            self.assertEqual(diagnostic.chrome_process_kind(args), 'renderer')
+        self.assertEqual(diagnostic.chrome_process_kind(['chrome', '--type=gpu-process']), 'gpu-process')
+
+    def test_process_type_rejects_embedded_and_ambiguous_flags(self):
+        for args in (['chrome', 'prefix--type=renderer'], ['chrome', '--label=--type=renderer'],
+                     ['chrome', '--type=renderer/suffix'], ['chrome', '--type=renderer=other'],
+                     ['chrome', '--user-data-dir=/tmp/path --type=renderer'],
+                     ['chrome --label=\"text --type=renderer\"']):
+            self.assertNotEqual(diagnostic.chrome_process_kind(args), 'renderer')
+        self.assertEqual(diagnostic.chrome_process_kind(['chrome --type=renderer --type=utility']), 'unknown')
+        self.assertEqual(diagnostic.chrome_process_kind(['chrome', '--type=renderer', '--type=renderer']), 'unknown')
+
     def test_no_renderer_or_unverified_sandbox_does_not_pass(self):
         self.assertFalse(diagnostic.sandbox_verified(None))
         self.assertFalse(diagnostic.sandbox_verified({'processes': []}))
