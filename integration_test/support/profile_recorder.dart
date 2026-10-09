@@ -19,6 +19,8 @@ class ProfileRecorder {
   final frames = <FrameTiming>[];
   final windows = <Map<String, Object?>>[];
   final dispatches = <Map<String, Object?>>[];
+  final viewportSnapshots = <Map<String, Object?>>[];
+  final failureDiagnostics = <Map<String, Object?>>[];
   String? activeScope;
 
   void start() => SchedulerBinding.instance.addTimingsCallback(_receive);

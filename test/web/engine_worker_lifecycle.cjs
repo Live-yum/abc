@@ -102,6 +102,29 @@ function harness(owner, bridge, timeoutMs = 1000) {
   const dying = tcw.client.close(b); const rejected = assert.rejects(dying, {code:'COMPUTATION_OWNER_LOST'});
   tcw.workers[0].onerror({message:'unexpected worker exit'}); await rejected;
 
+  let finishStream, finishCommand, releasedSource, streamCancelled = false;
+  const streamResult = () => ({session:7,stats:Array(24).fill(0),resultKind:0,resultCount:0,reserved:0,records:new Uint8Array()});
+  const sourceBlob = new Blob([new Uint8Array([7,8,9])]);
+  const streamed = harness('worldCircuit', {
+    openSource:async source => { assert.ok(source instanceof Blob); assert.equal(source.size,3); await new Promise(resolve => { finishStream=resolve; }); return streamResult(); },
+    progress:async () => ({stage:'compile',phase:1,completed:2,total:3}),
+    cancelOperation:async () => { streamCancelled=true; finishCommand?.(); },
+    command:async (_,words) => { if (words==='wait') await new Promise(resolve => { finishCommand=resolve; }); return {...streamResult(),worldSource:{blob:sourceBlob,size:3,name:'staged.wld',token:11}}; },
+    releaseSource:async token => { releasedSource=token; },
+    close:async()=>{},
+  });
+  const sourceOpening=streamed.client.openSource(sourceBlob,null);
+  await sleep(0);
+  assert.equal((await streamed.client.progress()).stage,'compile','Progress must bypass the active import');
+  finishStream();const streamedId=(await sourceOpening).session;
+  const running=streamed.client.command(streamedId,'wait','[]');
+  const afterRunning=streamed.client.command(streamedId,'next','[]');
+  await sleep(0);await streamed.client.cancelOperation();assert.equal(streamCancelled,true);
+  const firstOutput=await running,secondOutput=await afterRunning;
+  assert.notEqual(firstOutput.worldSource.token,secondOutput.worldSource.token,'Public output identity cannot alias a native token');
+  await streamed.client.close(streamedId);await streamed.client.releaseSource(firstOutput.worldSource.token);assert.equal(releasedSource,11);
+  await streamed.client.dispose();await streamed.client.releaseSource(secondOutput.worldSource.token);
+
   // Missing Worker support must fail; browser entrypoints cannot load heavy WASM.
   const browser = vm.createContext({document:{baseURI:'http://test/'}, TextEncoder, TextDecoder, Uint8Array, setTimeout, clearTimeout});
   for (const file of ['terra_worker_rpc.js','terra_engine.js','terra_world_circuit.js','terra_circuit.js']) vm.runInContext(fs.readFileSync(require.resolve('../../web/'+file),'utf8'), browser);

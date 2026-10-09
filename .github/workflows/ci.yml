@@ -31,6 +31,12 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run verify:sources
+      - name: Verify the bundled offline CJK font and public fixture downloader
+        run: |
+          python3 -m venv "$RUNNER_TEMP/font-tools"
+          "$RUNNER_TEMP/font-tools/bin/python" -m pip install --disable-pip-version-check fonttools==4.61.1
+          "$RUNNER_TEMP/font-tools/bin/python" tool/verify_cjk_font.py
+          python3 -m unittest discover -s tool -p 'computerraria_inputs_test.py'
       - run: npm run build:circuit-rules
       - name: Check reproducible rules artifacts
         run: git diff --exit-code -- assets/private/circuit_rules_native.js assets/private/circuit_rules.provenance.json web/engine/circuit_rules_web.js
@@ -190,7 +196,10 @@ jobs:
           "$cmake_root/bin/cmake" --version
           echo "$cmake_root/bin" >> "$GITHUB_PATH"
           printf 'cmake.dir=%s\n' "$cmake_root" >> android/local.properties
-      - run: flutter build apk --release --no-pub
+      # Flutter 3.47 filters dev-only native plugins during mode-specific
+      # tooling generation. --no-pub would retain pub-get's debug registrant.
+      - run: flutter build apk --release
+      - run: git diff --exit-code -- pubspec.lock
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: terraforge-android-unsigned-${{ github.event.pull_request.head.sha || github.sha }}

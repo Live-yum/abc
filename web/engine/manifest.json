@@ -5,25 +5,26 @@
     "64-bit-pointer-safety",
     "persistent-allocation-lifetime",
     "native-zlib-bridge",
-    "abc-host-integration"
+    "abc-host-integration",
+    "full-world-pixels-v1"
   ],
   "artifacts": {
     "world.js": {
       "bytes": 21330,
-      "sha256": "1ef8e6507abe27dc16daf72fb64de0aa4eb71d66a52a3e487b863618064c5a1d"
+      "sha256": "957c19caf1995131ac8bc462d66f0cf81df2a0be48adb1ae1070c7cdb4366e87"
     },
     "world.wasm": {
-      "bytes": 438514,
-      "sha256": "ca0cc3569976d359d66ab5f19d8e0a34d819009d8d058e8d09d4947c6968147c"
+      "bytes": 439742,
+      "sha256": "8ec58666a19a3507dc2cdcc578dc7b0d5425f0ca667db8ea4f143f18dd27dc7b"
     },
     "player.js": {
       "bytes": 64516,
-      "sha256": "95bfdcea6dfbbc98a6b069ea13c360bfd8a762cfa71b153a2adf523faef599be"
+      "sha256": "dc3fb611b14adccc891042f6e3f9754b42c96c947548f02740835a28046cd7d8"
     },
     "player.wasm": {
-      "bytes": 66245,
-      "sha256": "597206bffbdfe7caa781bacaff6cab124844f0062b1955b0a2aabbcbbd4303b0"
+      "bytes": 66302,
+      "sha256": "48c4881f8ebf03d0b68be359e6c65717518ff2d54e2db21eea6c7aff77c33bc0"
     }
   },
-  "sourceManifestSha256": "9b55c8ad55a4ce8ad848c58e8c9ec80fb78285405f6a7cccc44c8c95b74dbb7a"
+  "sourceManifestSha256": "539e4369e9517bad5c1d2337241c51d37150eef983376c069b48947783c1cd7c"
 }

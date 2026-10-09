@@ -47,6 +47,9 @@ def identity(report):
         'warmupCycles': report.get('methodology', {}).get('warmupCycles'),
         'measuredCycles': report.get('methodology', {}).get('measuredCycles'),
         'gcDiagnosticEnabled': report.get('methodology', {}).get('gcDiagnosticEnabled'),
+        'heapMeasurementMethods': sorted({row.get('heapMeasurementMethod', 'unreported')
+                                          for row in report.get('memory', [])
+                                          if row.get('heapUsedBytes') is not None}),
     }
 
 

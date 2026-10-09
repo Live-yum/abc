@@ -1,0 +1,17 @@
+--- a/app/tdriver/src/graphics.rs
++++ b/app/tdriver/src/graphics.rs
+@@ -171,12 +171,14 @@
+  ******************************************************************************/
+ 
+ // Define our grid data structure
++#[cfg(not(target_arch = "riscv32"))]
+ struct SpriteGrid {
+     spritesheet: Texture2D,
+     sprite_size: u16,  // Size of each sprite in the spritesheet
+     tile_indices: Vec<usize>,  // Which sprite index to display at each grid position
+ }
+ 
++#[cfg(not(target_arch = "riscv32"))]
+ impl SpriteGrid {
+     fn new() -> Self {
+         // Load the spritesheet texture

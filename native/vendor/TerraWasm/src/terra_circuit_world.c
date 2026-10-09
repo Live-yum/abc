@@ -221,7 +221,7 @@ int32_t terra_circuit_world_step(uint32_t handle,uint32_t work_units,TerraCircui
         if(status==TCW_CONTINUE&&!work)break;
     }
     memset(out,0,sizeof(*out));out->abi_version=1;out->kind=w->phase==CX_IDLE?TCW_READY:TCW_MORE;out->phase=w->phase;out->completed=w->x;out->total=w->width;
-    if(w->phase==CX_IDLE){out->result_kind=w->command.kind;out->reserved=w->twld_state&1u;if(w->command.kind==TCW_SAVE){out->source_id=w->output_source;out->result_count=w->save_result_size;out->reserved=w->twld_saved_size;}else if(w->command.kind==TCW_FRAGMENTS||w->command.kind==TCW_EXTRACT)out->result_count=cx_fragments_result_count(w);}
+    if(w->phase==CX_IDLE){out->result_kind=w->command.kind;out->reserved=(w->twld_state&1u)|(w->optimization?2u:0u);if(w->command.kind==TCW_SAVE){out->source_id=w->output_source;out->result_count=w->save_result_size;out->reserved=w->twld_saved_size;}else if(w->command.kind==TCW_FRAGMENTS||w->command.kind==TCW_EXTRACT)out->result_count=cx_fragments_result_count(w);}
     return w->phase==CX_IDLE?TCW_OK:TCW_CONTINUE;
 }
 int32_t terra_circuit_world_stats(uint32_t handle,TerraCircuitWorldStats* out){

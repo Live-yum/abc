@@ -113,8 +113,11 @@ embeds the Dart/Embedder/GC timeline with named operation spans. Timeline tracin
 adds overhead and its report must only be compared to equally traced runs.
 
 Between lifecycles, owners close, widgets unmount and references leave scope.
-Only then does the VM-service probe request GC for all isolates and record Dart
-heap usage/capacity/external bytes, process RSS and max RSS. GC is outside frame
+Only then does the VM-service probe request GC once per unique isolate group
+and record group heap usage/capacity/external bytes, process RSS and max RSS.
+UI and worker isolates can share one heap; their per-isolate values must not be
+summed. Reports record the method and both isolate/group counts; older
+per-isolate-sum reports are not comparable to this measurement. GC is outside frame
 measurement windows. RSS includes native engines, image/GPU caches and allocator
 retention; it is not equivalent to Dart retained heap. The raw cycle series is
 preserved. One passing run does not prove absence of leaks.

@@ -4,6 +4,7 @@ from itertools import count, product
 import unittest
 from unittest.mock import patch
 
+import compare as core_compare
 import ui_compare
 import ui_validate
 
@@ -17,7 +18,8 @@ def report(value=10):
         'runId': f'test-{next(_run_ids)}',
         'buildMode': 'profile', 'status': 'passed', 'tier': 'synthetic-small-ui',
         'iterations': 3, 'warmup': 1,
-        'runtime': {'platform': 'linux', 'osVersion': 'test', 'dartVersion': 'test',
+        'runtime': {'heapMeasurementMethod': ui_validate.HEAP_MEASUREMENT_METHOD,
+                    'memorySource': 'unique isolate-group heaps', 'platform': 'linux', 'osVersion': 'test', 'dartVersion': 'test',
                     'flutterVersion': 'test', 'commit': 'test-revision', 'runner': 'test-runner',
                     'checkedOutHead': 'test-checkout', 'workingTreeDirty': False,
                     'renderer': 'measured-software-renderer', 'physicalWidth': 1280,
@@ -30,7 +32,10 @@ def report(value=10):
             'samples': [{'success': True, 'uiUs': [value], 'rasterUs': [value]}] * 3,
         } for op in sorted(ui_validate.REQUIRED)],
         'memory': [{'cycle': cycle, 'warmup': cycle == 0,
-                    'rssBytes': 100, 'heapUsedBytes': 50, 'externalBytes': 0}
+                    'rssBytes': 100, 'heapUsedBytes': 50, 'externalBytes': 0,
+                    'heapMeasurementMethod': ui_validate.HEAP_MEASUREMENT_METHOD,
+                    'sampledIsolates': 2, 'sampledIsolateGroups': 1,
+                    'gc': 'requested-all-isolate-groups'}
                    for cycle in range(4)],
         'controllerOperations': [{'id': 'dispatch.' + action, 'action': action,
                                  'sampleCount': 3, 'samples': [{'durationMs': value}] * 3,
@@ -58,6 +63,24 @@ class EvidenceGateTests(unittest.TestCase):
         candidate = report()
         candidate['memory'][-1]['heapUsedBytes'] = None
         self.assertTrue(ui_validate.validate(candidate))
+
+    def test_core_comparator_separates_heap_measurement_methods(self):
+        sample = {'suite': 'native', 'runtime': 'Dart', 'buildMode': 'release',
+                  'tier': 'ci', 'memory': [{'heapUsedBytes': 100}]}
+        previous = core_compare.identity(sample)
+        sample['memory'][0]['heapMeasurementMethod'] = ui_validate.HEAP_MEASUREMENT_METHOD
+        self.assertNotEqual(core_compare.identity(sample), previous)
+
+    def test_old_per_isolate_heap_reports_are_not_comparable(self):
+        baseline = [report() for _ in range(5)]
+        candidate = [report() for _ in range(5)]
+        for sample in baseline:
+            sample['runtime'].pop('heapMeasurementMethod')
+            for row in sample['memory']:
+                row.pop('heapMeasurementMethod')
+                row.pop('sampledIsolateGroups')
+                row['gc'] = 'requested-all-isolates'
+        self.assertEqual(ui_compare.compare(baseline, candidate)['status'], 'inconclusive')
 
     def test_missing_renderer_cannot_pass(self):
         candidate = report()

@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.27)
 project(abc_engine C)
+# Flutter's Linux runner configures C++ Profile flags, but this C engine and its
+# C subproject need the matching Release flags as well. Otherwise UI profile
+# measurements would silently execute an unoptimized wiring engine.
+if(NOT DEFINED CMAKE_C_FLAGS_PROFILE OR CMAKE_C_FLAGS_PROFILE STREQUAL "")
+ set(CMAKE_C_FLAGS_PROFILE "${CMAKE_C_FLAGS_RELEASE}" CACHE STRING "C flags for Flutter Profile" FORCE)
+endif()
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(ABC_TERRA_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/vendor/TerraWasm" CACHE PATH "Authorized pointer-safe TerraWasm source")

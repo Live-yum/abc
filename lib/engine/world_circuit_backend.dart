@@ -1,5 +1,83 @@
 import 'dart:typed_data';
 
+/// A ranged immutable input or an explicitly owned streamed output. A native
+/// path and a Web Blob are descriptors, never a request to materialize bytes.
+class WorldCircuitSource {
+  final String name;
+  final int length;
+  final String? path;
+  final Object? blob;
+  final String? token;
+  final String? sha256;
+  const WorldCircuitSource.file({
+    required this.path,
+    required this.length,
+    required this.name,
+    this.token,
+    this.sha256,
+  }) : blob = null;
+  const WorldCircuitSource.blob({
+    required this.blob,
+    required this.length,
+    required this.name,
+    this.token,
+    this.sha256,
+  }) : path = null;
+  factory WorldCircuitSource.fromMap(Map<dynamic, dynamic> map) =>
+      WorldCircuitSource.file(
+        path: map['path'] as String,
+        length: map['length'] as int,
+        name: map['name'] as String,
+        token: map['token'] as String?,
+        sha256: map['sha256'] as String?,
+      );
+  Map<String, Object?> toFileMap() {
+    if (path == null || length <= 0 || length > 0x7fffffff) {
+      throw const FormatException('Invalid ranged world source');
+    }
+    return {'path': path, 'length': length, 'name': name, 'token': token};
+  }
+}
+
+class WorldCircuitProgress {
+  final String stage;
+  final int phase, completed, total;
+  final Map<String, Object?> diagnostics;
+  const WorldCircuitProgress({
+    required this.stage,
+    required this.phase,
+    required this.completed,
+    required this.total,
+    this.diagnostics = const {},
+  });
+  factory WorldCircuitProgress.fromMap(Map<dynamic, dynamic> map) =>
+      WorldCircuitProgress(
+        stage: map['stage'] as String,
+        phase: map['phase'] as int,
+        completed: map['completed'] as int,
+        total: map['total'] as int,
+        diagnostics: Map<String, Object?>.from(
+          map['diagnostics'] as Map? ?? {},
+        ),
+      );
+}
+
+/// Optional capability; old small-world backends and test doubles stay valid.
+abstract interface class WorldCircuitSourceBackend
+    implements WorldCircuitBackend {
+  Future<WorldCircuitResult> openWorldCircuitSource(
+    WorldCircuitSource world, {
+    WorldCircuitSource? twld,
+    void Function(WorldCircuitProgress)? onProgress,
+  });
+  Future<WorldCircuitProgress?> worldCircuitProgress();
+  Future<void> cancelWorldCircuitOperation();
+
+  /// Completed outputs outlive their session until released. Picker inputs
+  /// carry no token and are never deleted by this method.
+  Future<void> releaseWorldCircuitSource(WorldCircuitSource source);
+}
+
 /// Real whole-world wiring VM. Sessions retain an immutable original; save
 /// returns a candidate WLD for normal validation/adoption, never overwrites it.
 abstract interface class WorldCircuitBackend {
@@ -47,6 +125,50 @@ class WorldCircuitCommand {
     0,
     0,
   ]);
+
+  /// Actual retained PixelBox cells only, sorted x then y. Non-pixel cells are
+  /// absent. Records have the same coordinate/type/frame layout as viewport.
+  factory WorldCircuitCommand.pixels(int x, int y, int width, int height) =>
+      WorldCircuitCommand._([
+        1,
+        9,
+        x,
+        y,
+        width,
+        height,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+      ]);
+
+  /// Optional equivalent device-dedup fast path. The backend accepts changes
+  /// only while idle; callers pause and drain queued physical pulses first.
+  factory WorldCircuitCommand.optimization(bool enabled) =>
+      WorldCircuitCommand._([
+        1,
+        10,
+        0,
+        0,
+        0,
+        0,
+        0,
+        enabled ? 1 : 0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+      ]);
   factory WorldCircuitCommand.trigger(
     int x,
     int y, {
@@ -171,6 +293,8 @@ class WorldCircuitResult {
   final Uint8List records;
   final Uint8List? world;
   final Uint8List? twld;
+  final WorldCircuitSource? worldSource, twldSource;
+  final String? sourceSha256, twldSourceSha256;
 
   /// The terminal READY metadata, not a RESULT batch's page count.
   final int resultKind, resultCount, reserved;
@@ -181,6 +305,10 @@ class WorldCircuitResult {
     this.records, {
     this.world,
     this.twld,
+    this.worldSource,
+    this.twldSource,
+    this.sourceSha256,
+    this.twldSourceSha256,
     this.resultKind = 0,
     this.resultCount = 0,
     this.reserved = 0,
@@ -193,6 +321,14 @@ class WorldCircuitResult {
         map['records'] as Uint8List,
         world: map['world'] as Uint8List?,
         twld: map['twld'] as Uint8List?,
+        worldSource: map['worldSource'] is Map
+            ? WorldCircuitSource.fromMap(map['worldSource'] as Map)
+            : null,
+        twldSource: map['twldSource'] is Map
+            ? WorldCircuitSource.fromMap(map['twldSource'] as Map)
+            : null,
+        sourceSha256: map['sourceSha256'] as String?,
+        twldSourceSha256: map['twldSourceSha256'] as String?,
         resultKind: map['resultKind'] as int? ?? 0,
         resultCount: map['resultCount'] as int? ?? 0,
         reserved: map['reserved'] as int? ?? 0,
@@ -203,6 +339,12 @@ class WorldCircuitResult {
   int get devices => stats[11];
   int get networks => stats[13];
   int get ticks => stats[18] + (stats[19] << 32);
+  bool get hasWireHeadPixels => resultKind != 6 && (reserved & 1) != 0;
+  bool get circuitOptimizationEnabled => resultKind != 6 && (reserved & 2) != 0;
+  int get activeBytes => stats[16];
+  int get peakBytes => stats[17];
+  int get netPulses => stats[20] + (stats[21] << 32);
+  int get gatesFired => stats[22] + (stats[23] << 32);
 }
 
 /// Wire validation is shared by command construction and the isolate boundary.
@@ -210,7 +352,7 @@ void validateWorldCircuitCommand(List<int> words, List<int> records) {
   if (words.length != 16 ||
       words[0] != 1 ||
       words[1] < 1 ||
-      words[1] > 8 ||
+      words[1] > 10 ||
       words[9] != 0 ||
       words[14] != 0 ||
       words[15] != 0 ||
@@ -218,6 +360,18 @@ void validateWorldCircuitCommand(List<int> words, List<int> records) {
       records.length > 65536 * 4 ||
       [...words, ...records].any((v) => v < 0 || v > 0xffffffff)) {
     throw const FormatException('Invalid circuit command');
+  }
+  if (words[1] == 9 &&
+      (records.isNotEmpty ||
+          words[4] == 0 ||
+          words[5] == 0 ||
+          words[4] * words[5] > 65536 ||
+          words[12] != 0)) {
+    throw const FormatException('Invalid circuit pixel query');
+  }
+  if (words[1] == 10 &&
+      (records.isNotEmpty || words[7] > 1 || words[12] != 0)) {
+    throw const FormatException('Invalid circuit optimization mode');
   }
   if (words[1] == 7 || words[1] == 8) {
     if (words[8] < 1 || words[8] > 32768) {

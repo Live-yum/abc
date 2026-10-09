@@ -5,6 +5,8 @@ import json
 import math
 from pathlib import Path
 
+HEAP_MEASUREMENT_METHOD = 'vm-service-isolate-groups-v1'
+
 REQUIRED = {
     'ui.workspace.mount', 'ui.workspace.close', 'ui.wld.import',
     'ui.wld.reopen', 'ui.wld.pan-zoom', 'ui.wld.overlay-controls',
@@ -93,6 +95,15 @@ def validate(report):
     if len(memory) != report.get('iterations', 0) + report.get('warmup', 0):
         errors.append('Missing lifecycle memory snapshots')
     if report.get('runtime', {}).get('platform') != 'web':
+        if runtime.get('heapMeasurementMethod') != HEAP_MEASUREMENT_METHOD:
+            errors.append('Native heap evidence must count unique isolate groups')
+        for row in memory:
+            groups, isolates = row.get('sampledIsolateGroups'), row.get('sampledIsolates')
+            if (row.get('heapMeasurementMethod') != HEAP_MEASUREMENT_METHOD or
+                    row.get('gc') != 'requested-all-isolate-groups' or
+                    not isinstance(groups, int) or not isinstance(isolates, int) or
+                    groups < 1 or isolates < groups):
+                errors.append('Invalid unique isolate-group heap sample')
         if any(row.get('rssBytes') is None or row.get('heapUsedBytes') is None for row in memory):
             errors.append('Missing native RSS/VM heap evidence')
     return errors

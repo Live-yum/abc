@@ -1,18 +1,23 @@
 # Whole-world circuit integration
 
-This path uses the separately supplied TerraWasm circuit-world compiler, wiring VM,
+This path uses the authorized vendored TerraWasm circuit-world compiler, wiring VM,
 mechanical scheduler and WLD encoder. It is independent of the small component
-sandbox. No engine implementation or game fixture is included here.
+sandbox. Full original world files and game artwork are not distributed.
+See [the complete Computerraria workflow](COMPUTERRARIA.md) for large source
+import, profile verification, physical program loading and actual monitors.
 
 ## Supported contract
 
-- Load an engine-recognized sectioned WLD (host input cap 64 MiB), with optional
-  TWLD (16 MiB input cap). Engine rejects legacy WLD and future-layout/read-only
+- Load an engine-recognized sectioned WLD. The ordinary byte API is capped at
+  64 MiB; the dedicated source picker accepts WLD files up to 1 GiB without
+  materializing them in Dart. Optional compressed TWLD is capped at 16 MiB. Engine rejects legacy WLD and future-layout/read-only
   worlds. The host never changes their version or strips protection flags.
 - Compile complete-world electrical connectivity; query bounded viewports and
   optional wall layer; trigger ordinary wire pulses or actual HitSwitch behavior;
   read/write engine-supported lamps; advance actual 60 Hz mechanical ticks.
-- UI run sends six simulation ticks per 100 ms when idle. It intentionally slows
+- Ordinary UI run sends six simulation ticks per 100 ms when idle. A verified
+  Computerraria session instead sends bounded physical clock pulses after a
+  program is loaded; device ticks cannot substitute for its CPU clock. It intentionally slows
   under load rather than dropping native simulation steps or faking device state.
   Each run batch refreshes the last accepted viewport inside the same serialized
   operation. Pause stops future tick requests; an already accepted atomic command completes.
@@ -29,11 +34,12 @@ sandbox. No engine implementation or game fixture is included here.
 Native methods are dispatched only on the pre-existing owning engine isolate.
 Close the conventional WLD before opening a circuit session and close the circuit
 before conventional adoption. One native circuit session is accepted at a time.
-Native scratch/output use newly created temporary random-access files; Web uses
-separate byte stores, capped at 128 MiB per source. Circuit retained native working
-allocations are limited to 128 MiB; query results are limited to 8 MiB. These are
-not process-RSS limits. A single large operation is synchronous inside the native
-worker; Web yields between event batches.
+Native scratch/output use newly created temporary random-access files; large
+Web sources use OPFS-backed scratch stores and bounded Blob slices. The small
+Web byte API retains a separately capped memory fallback. Circuit retained native
+working allocations are limited to 192 MiB; query results are limited to 8 MiB.
+These are not process-RSS limits. Native/Web workers yield between bounded event
+batches; progress and cancellation remain separate from source-file ownership.
 
 All public C descriptors are pointer-free words. A separate native pointer output
 is copied before acknowledgement. Native builds require the private pointer-safe
@@ -57,5 +63,6 @@ No call uses the legacy uint32 pointer descriptors on a 64-bit host.
 Run native proof with `native/world_circuit_smoke.dart`; run Web proof with
 `test/web/world_circuit_smoke.cjs` and authorized JS/WASM artifacts. Release 326,
 legacy rejection, future read-only rejection, TWLD/mod rules, fragment objects,
-large-world memory behavior and every device family are not yet independently
-verified by this integration's fixture. Do not present them as tested parity.
+every device family are not established by the small synthetic fixture. Full-world
+CPU/display evidence and profile acceptance are tracked separately in
+[the computer workflow](COMPUTERRARIA.md). Do not present them as tested parity.

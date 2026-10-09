@@ -15,7 +15,7 @@ if (!isMainThread) {
   };
   let context;
   const scope = {
-    console, URL, WebAssembly, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer,
+    console, URL, WebAssembly, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, Blob,
     setTimeout, clearTimeout, performance, WorkerGlobalScope: function(){},
     location:{href:base+'terra_engine_worker.js?owner='+workerData.owner},
     postMessage(data, transfers) { parentPort.postMessage(data, transfers); },

@@ -1,0 +1,20 @@
+[package]
+name = "tdriver"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+
+# [target.'cfg(target_arch="riscv32")'.profile.release]
+[profile.release]
+panic = "abort"
+opt-level = "z"
+overflow-checks = false
+lto = true
+
+[target.'cfg(not(target_arch = "riscv32"))'.dependencies]
+tui = { package = "ratatui", version = "0.20.1" }
+macroquad = "0.3"
+crossterm = "0.25"
+
+

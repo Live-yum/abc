@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "full-world-pixels-v1",
+  "baseSourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
+  "baseDistributedManifestSha256": "9b55c8ad55a4ce8ad848c58e8c9ec80fb78285405f6a7cccc44c8c95b74dbb7a",
+  "reviewedPurpose": "Add bounded read-only TCW_PIXELS=9 query of actual retained pixel state/metadata. Add idle-only TCW_OPTIMIZATION=10, default OFF preserving prior per-TripWire device-mask clears; ON uses equivalent independent-generation dedup with safe wrap handling. Existing compiled topology/lazy representation is shared and unchanged; TWLD compatibility is independent. No CPU, electrical, pixel, ROM/RAM, pending input or RNG state is changed by switching.",
+  "patch": {
+    "path": "native/patches/full-world-pixels.patch",
+    "sha256": "c8eb1040c6d70262d0fd880e277e65747bfae45a1e3c0ac399220d153a968d54",
+    "bytes": 14887
+  },
+  "files": [
+    {
+      "path": "include/terra_circuit_world.h",
+      "beforeSha256": "6728a2c78cc025aa40e34660217d7b5323485898dac8b780ffb3bfecb9712f8f",
+      "afterSha256": "b8fe117c8bb6ad8eb731313ec7b9fc7d1be2264f7c14d9f5579eb086ec654de9",
+      "beforeBytes": 6543,
+      "afterBytes": 7459
+    },
+    {
+      "path": "src/terra_abi.c",
+      "beforeSha256": "fbf85a40d92725a4ec4961947d7043dd0f102189e176a52c3d86406dd0753bdc",
+      "afterSha256": "15bf8fd1958814f776e6957b0c270640672ed750af5ab4bdb01203054777d585",
+      "beforeBytes": 4304,
+      "afterBytes": 4452
+    },
+    {
+      "path": "src/terra_circuit_devices.c",
+      "beforeSha256": "4b584e668f1c20492974d84d2e523de82c5875482fec77f005d377f550e66174",
+      "afterSha256": "aca9d4fef000daa33d64e1e7de5a90698ebd461d6dec13c9655acc15a1d63ac7",
+      "beforeBytes": 15719,
+      "afterBytes": 16371
+    },
+    {
+      "path": "src/terra_circuit_query.c",
+      "beforeSha256": "adede2c3dd371f18e5804b0a27b91a7df18f7196ac986873212849659c0afa8c",
+      "afterSha256": "4ada9f1d446e26d9fb8ffef8ff3b99da77de9df444430a7e123e0bc9de2aafec",
+      "beforeBytes": 18110,
+      "afterBytes": 20041
+    },
+    {
+      "path": "src/terra_circuit_world.c",
+      "beforeSha256": "af78e5cf1e7884d97a16a516390d7ffbf1786a66a928509ab0402bdbbc112cfd",
+      "afterSha256": "68d8fc056acdfadee0f751031f72a7168e3049e123e29e4f366164669d61127b",
+      "beforeBytes": 19491,
+      "afterBytes": 19517
+    },
+    {
+      "path": "src/terra_circuit_world_internal.h",
+      "beforeSha256": "2d982d3f755a6100515322fd8a26cf9acb1fe20a1c86f459abdc2a9b6265d452",
+      "afterSha256": "90950c38a5ecf6e3d7cbe94ad3c9a54a6628bd00ddf2823c0639be787eb7296f",
+      "beforeBytes": 9555,
+      "afterBytes": 9609
+    }
+  ]
+}

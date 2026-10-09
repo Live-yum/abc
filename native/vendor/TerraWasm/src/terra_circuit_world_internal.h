@@ -40,9 +40,9 @@ typedef struct CxBinding {
     uint32_t x,y,nets[4],opposite[4],gate; TxTile tile;
 } CxBinding;
 typedef struct CxInputPoint { uint32_t x,y,value,index; } CxInputPoint;
-typedef struct CxDevice { uint32_t x,y,nets[4],pulse_nets[4],gate; TxTile tile,initial; uint32_t cooldown,saved_cooldown,wire_hit_mask; int32_t can_deactivate; } CxDevice;
+typedef struct CxDevice { uint32_t x,y,nets[4],pulse_nets[4],gate; TxTile tile,initial; uint32_t cooldown,saved_cooldown,wire_hit_mask,wire_hit_epoch; int32_t can_deactivate; } CxDevice;
 typedef struct CxActuationPolicy { uint32_t device,x,y; uint32_t valid; TxTile above[10]; } CxActuationPolicy;
-typedef struct CxPixel { uint32_t x,y,h[4],v[4]; uint8_t state,initial,hit_h,hit_v,custom,marked; uint8_t reserved[2]; } CxPixel;
+typedef struct CxPixel { uint32_t x,y,h[4],v[4],cell_word; uint8_t state,initial,hit_h,hit_v,custom,marked; uint8_t reserved[2]; } CxPixel;
 typedef struct CxModTile { TerraTwldTile tile; TxTile vanilla; } CxModTile;
 typedef struct CxPort { uint32_t net,pixel; uint8_t axis,colour; uint16_t reserved; } CxPort;
 typedef struct CxFragments CxFragments;
@@ -89,7 +89,7 @@ typedef struct CxWorld {
     CxPort* ports; uint32_t port_count;
     uint32_t* pixel_touched; uint32_t pixel_touched_count;
     uint8_t* pixel_snapshot;
-    uint32_t vm_trip_index;
+    uint32_t vm_trip_index,wire_trip_epoch,optimization;
     uint32_t vm_source_gate;
     CxOverride* overrides; uint32_t override_count,override_capacity;
     CxOverride* override_snapshot; uint32_t override_snapshot_capacity,override_saved_count;

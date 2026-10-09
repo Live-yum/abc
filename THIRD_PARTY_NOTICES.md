@@ -3,7 +3,7 @@
 This repository contains the specifically authorized source subsets and generated
 runtime artifacts below. Their inclusion does not create a new license grant or
 change upstream ownership. No general upstream license was identified in the
-supplied source trees; these components are not relicensed under a license for
+private supplied source trees; these components are not relicensed under a license for
 the original TerraForge code.
 
 ## TerraWasm
@@ -43,7 +43,25 @@ package dependencies retain their upstream licenses. Consult their distributed
 license files and the application license registry for those terms.
 
 Terraria names and embedded compatibility tables remain attributable to their
-respective rights holders. No Terraria artwork atlases, game programs, personal
+respective rights holders. No Terraria artwork atlases or Terraria executables, personal
 world/player saves, private real-save fixtures, `.abcpack` archives, signing
 material, credentials, logs or proof output are distributed in this repository.
 Synthetic test fixtures are generated locally by the project scripts.
+
+## Computerraria program and physical computer layout
+
+- Upstream: [misprit7/computerraria](https://github.com/misprit7/computerraria),
+  commit `0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8`, MIT,
+  Copyright (c) 2023 Xander Naumenko. Full permission notice is retained in
+  `vendor/computerraria/LICENSE` and `assets/computer/LICENSE`.
+- `assets/computer/pong.bin` is the 2,288-byte RV32I ROM program, SHA-256
+  `d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d`.
+  The unchanged Pong source, driver sources, two host-only cfg guards, build
+  script and per-file provenance are in `vendor/computerraria`.
+- Physical clock/reset/ROM/RAM coordinates are verified against the pinned
+  original world. The app enables this fixed layout only for its exact source
+  hash, matching actual anchors and the decoded TWLD compatibility profile.
+- The flat color monitor reduces actual pixel frame states to mean colors
+  measured from WireHead's pinned `e6009d010ca54ff43d04b44697accc7115807b9c`
+  16-by-16 source frames. It is an approximation of sprite appearance. The
+  WireHead PNG, Terraria textures, full WLD and TWLD are not distributed.

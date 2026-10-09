@@ -32,6 +32,7 @@ class PlatformFiles implements FileGateway {
       'achievements' => ['dat', 'bak'],
       'project' => ['json'],
       'resources' => ['abcpack'],
+      'computerProgram' => ['bin', 'txt'],
       _ => ['wld', 'plr', 'dat', 'bak', 'json'],
     };
     final types = [
@@ -52,7 +53,9 @@ class PlatformFiles implements FileGateway {
     if (!extensions.contains(extension)) {
       throw const FormatException('所选文件扩展名不符合当前导入类型。');
     }
-    final limit = kind == 'resources'
+    final limit = kind == 'computerProgram'
+        ? 3 * 1024 * 1024
+        : kind == 'resources'
         ? 256 * 1024 * 1024
         : kind == 'world' || kind == 'save' || kind == 'map'
         ? 128 * 1024 * 1024

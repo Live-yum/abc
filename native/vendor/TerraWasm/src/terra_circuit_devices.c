@@ -24,7 +24,7 @@ int cx_devices_column(CxWorld* w){
     for(uint32_t i=0;i<w->policy_count;){CxActuationPolicy* p=w->policies+i;fill_policy(w,p,w->x,w->column);if(w->x>=p->x+2u||w->x+1u==w->width){finish_policy(w,p);w->policies[i]=w->policies[--w->policy_count];}else ++i;}
     w->column_device_first=w->device_count;
     for(uint32_t y=0;y<w->height;y++){TxTile* t=w->column+y;if(!t->active&&!t->actuator)continue;
-        if(t->type==445u||t->type==0xfffeu){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->custom=t->type==0xfffeu;p->state=p->initial=p->custom?(uint8_t)((t->frame_x/18)&3u)|((uint8_t)((t->frame_y/18)&3u)<<2):(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;}
+        if(t->type==445u||t->type==0xfffeu){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->custom=t->type==0xfffeu;p->cell_word=t->type|((uint32_t)(t->active|(t->actuator<<1)|(t->inactive<<2)|(p->custom?8u:0u)|(t->wall?16u:0u))<<16)|(cx_wire_mask(t)<<24);p->state=p->initial=p->custom?(uint8_t)((t->frame_x/18)&3u)|((uint8_t)((t->frame_y/18)&3u)<<2):(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;}
         if(is_switch(t->type)||t->actuator||t->type==130u||t->type==131u){if(!grow(w,(void**)&w->devices,&w->device_capacity,w->device_count+1u,sizeof(CxDevice)))return TCW_MEMORY;CxDevice* d=w->devices+w->device_count++;memset(d,0,sizeof(*d));d->x=w->x;d->y=y;d->tile=d->initial=*t;if(t->type==144u)d->tile.frame_y=0;if(t->actuator||t->type==130u||t->type==131u){int s=prepare_policy(w,d);if(s)return s;}}
     }return TCW_OK;
 }
@@ -53,7 +53,10 @@ uint32_t cx_pixel_find(CxWorld* w,uint32_t x,uint32_t y){uint32_t lo=0,hi=w->pix
 CxDevice* cx_device_find(CxWorld* w,uint32_t x,uint32_t y){uint32_t lo=0,hi=w->device_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;CxDevice* p=w->devices+m;if(p->x<x||(p->x==x&&p->y<y))lo=m+1;else hi=m;}return lo<w->device_count&&w->devices[lo].x==x&&w->devices[lo].y==y?w->devices+lo:NULL;}
 static int check_mech(CxWorld* w,CxDevice* d,uint32_t time){if(d->cooldown||w->mech_count>=CX_MECH_LIMIT)return 0;if(w->mech_count>=w->mech_capacity)return -1;d->cooldown=time;w->mechs[w->mech_count++]=(uint32_t)(d-w->devices);return 1;}
 static int toggle_timer(CxWorld* w,CxDevice* d){if(d->tile.frame_y==0){d->tile.frame_y=18;if(check_mech(w,d,18000u)<0)return -1;}else d->tile.frame_y=0;return 0;}
-int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->twld_state)w->pixel_touched_count=0;for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
+/* Device dedup belongs to one TripWire. Epochs avoid clearing every unrelated
+ * switch for each gate output; wrapping the epoch restores an empty generation.
+ * Epoch state is transient, so cancellation starts fresh on the next trip. */
+int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->twld_state)w->pixel_touched_count=0;if(w->optimization){if(++w->wire_trip_epoch==0u){for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_epoch=0;w->wire_trip_epoch=1u;}}else for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
 int cx_net_hit(void* context,uint32_t net){
     CxWorld* w=(CxWorld*)context;uint32_t group=net+1u,lo=0,hi=w->port_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;if(w->ports[m].net<group)lo=m+1;else hi=m;}
     while(lo<w->port_count&&w->ports[lo].net==group){CxPort* port=w->ports+lo++;
@@ -62,7 +65,7 @@ int cx_net_hit(void* context,uint32_t net){
             else if(d->tile.type==131u)d->tile.type=130u;else{if(d->can_deactivate<0)return cx_fail(w,TCW_UNSUPPORTED,"active stone support neighborhood is unavailable");/* Unlike DeActive, ActiveStone always calls CanKillTile, even with an empty cell above. */if(d->can_deactivate&&d->tile.wall!=350u)d->tile.type=131u;}continue;
         }
         if(port->axis==2u){CxDevice* d=w->devices+port->pixel;if(w->vm_trip_index==1u&&d->x>=w->seed_x&&d->x-w->seed_x<w->seed_width&&d->y>=w->seed_y&&d->y-w->seed_y<w->seed_height)continue;if(toggle_timer(w,d)<0)return -1;continue;}
-        if(port->axis==3u){CxDevice* d=w->devices+port->pixel;uint32_t x=d->x-(uint32_t)(d->tile.frame_x%36/18),y=d->y-(uint32_t)(d->tile.frame_y%36/18);CxDevice* base=cx_device_find(w,x,y);if(!base)continue;uint32_t bit=1u<<port->colour;if(base->wire_hit_mask&bit)continue;
+        if(port->axis==3u){CxDevice* d=w->devices+port->pixel;uint32_t x=d->x-(uint32_t)(d->tile.frame_x%36/18),y=d->y-(uint32_t)(d->tile.frame_y%36/18);CxDevice* base=cx_device_find(w,x,y);if(!base)continue;if(w->optimization&&base->wire_hit_epoch!=w->wire_trip_epoch){base->wire_hit_epoch=w->wire_trip_epoch;base->wire_hit_mask=0;}uint32_t bit=1u<<port->colour;if(base->wire_hit_mask&bit)continue;
             if(w->vm_trip_index==1u&&d->x>=w->seed_x&&d->x-w->seed_x<w->seed_width&&d->y>=w->seed_y&&d->y-w->seed_y<w->seed_height)continue;
             base->wire_hit_mask|=bit;int shift=base->tile.frame_x>=36?-36:36;for(uint32_t a=x;a<x+2u;a++)for(uint32_t b=y;b<y+2u;b++){CxDevice* part=cx_device_find(w,a,b);if(part&&part->tile.type==411u)part->tile.frame_x=(int16_t)(part->tile.frame_x+shift);}continue;
         }

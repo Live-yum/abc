@@ -1,0 +1,22 @@
+{
+  "elf_entry": 8,
+  "hardware_reset_pc": 0,
+  "machine": 243,
+  "flags": 0,
+  "elf_bytes": 20420,
+  "elf_sha256": "4ac484d740ed7e485a53c9232ded661f9d82c9e82800c2d6dbba41e9dabd67d5",
+  "load_image_bytes": 2288,
+  "load_image_sha256": "d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d",
+  "sections": [
+    {
+      "name": ".text",
+      "physical_address": 0,
+      "bytes": 2004
+    },
+    {
+      "name": ".eh_frame",
+      "physical_address": 2004,
+      "bytes": 284
+    }
+  ]
+}

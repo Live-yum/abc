@@ -7,13 +7,17 @@ import 'package:vm_service/vm_service_io.dart';
 
 VmService? _service;
 
+const heapMeasurementMethod = 'vm-service-isolate-groups-v1';
+
 Map<String, Object?> runtimeMetadata() => {
   'platform': Platform.operatingSystem,
   'osVersion': Platform.operatingSystemVersion,
   'dartVersion': Platform.version,
   'processors': Platform.numberOfProcessors,
   'processorModel': _processorModel(),
-  'memorySource': 'ProcessInfo RSS + VM service all-isolate heaps after GC',
+  'memorySource':
+      'ProcessInfo RSS + VM service unique isolate-group heaps after GC',
+  'heapMeasurementMethod': heapMeasurementMethod,
 };
 
 String? _processorModel() {
@@ -40,36 +44,81 @@ Map<String, Object?> runtimeOverrides() => {
 
 int currentRss() => ProcessInfo.currentRss;
 
-Future<Map<String, Object?>> memorySnapshot() async {
+Future<Map<String, Object?>> memorySnapshot({VmService? service}) async {
   var heapUsed = 0, heapCapacity = 0, external = 0;
-  var sampledIsolates = 0, exitedIsolates = 0;
+  var sampledIsolates = 0, sampledGroups = 0;
+  var exitedIsolates = 0, exitedGroups = 0;
   String? unavailable;
   try {
-    if (_service == null) {
-      final info = await Service.getInfo();
-      final uri = info.serverUri;
-      if (uri == null) throw StateError('VM service not enabled');
-      _service = await vmServiceConnectUri(
-        uri.replace(scheme: 'ws', path: '${uri.path}ws').toString(),
-      );
+    if (service == null) {
+      if (_service == null) {
+        final info = await Service.getInfo();
+        final uri = info.serverUri;
+        if (uri == null) throw StateError('VM service not enabled');
+        _service = await vmServiceConnectUri(
+          uri.replace(scheme: 'ws', path: '${uri.path}ws').toString(),
+        );
+      }
+      service = _service!;
     }
-    final vm = await _service!.getVM();
-    for (final isolate in vm.isolates ?? <IsolateRef>[]) {
-      // This runs only between complete lifecycle cycles, never in frame windows.
+    final vm = await service.getVM();
+    final groups = <String, List<String>>{};
+    for (final ref in vm.isolates ?? <IsolateRef>[]) {
       try {
-        await _service!.getAllocationProfile(isolate.id!, gc: true);
-        final memory = await _service!.getMemoryUsage(isolate.id!);
-        heapUsed += memory.heapUsage ?? 0;
-        heapCapacity += memory.heapCapacity ?? 0;
-        external += memory.externalUsage ?? 0;
-        sampledIsolates++;
+        final isolate = await service.getIsolate(ref.id!);
+        final groupId = isolate.isolateGroupId;
+        if (groupId == null || groupId.isEmpty) {
+          throw StateError('VM service did not identify an isolate group');
+        }
+        (groups[groupId] ??= []).add(ref.id!);
       } on SentinelException catch (error) {
-        // A just-closed MAP/compute owner can exit after getVM lists it.
         if (error.sentinel.kind != SentinelKind.kCollected) rethrow;
         exitedIsolates++;
       }
     }
-    if (sampledIsolates == 0) throw StateError('No live isolate heap sampled');
+    for (final entry in groups.entries) {
+      // Isolate.spawn shares its group's heap. Summing getMemoryUsage for each
+      // isolate would count that heap repeatedly. GC and read it once per group,
+      // only between lifecycle/frame windows. A MAP owner may just have exited.
+      var collected = true, liveMembers = entry.value.length;
+      for (final representative in entry.value) {
+        try {
+          await service.getAllocationProfile(representative, gc: true);
+          collected = false;
+          break;
+        } on SentinelException catch (error) {
+          if (error.sentinel.kind != SentinelKind.kCollected) rethrow;
+          exitedIsolates++;
+          liveMembers--;
+        }
+      }
+      if (collected) {
+        exitedGroups++;
+        continue;
+      }
+      try {
+        final memory = await service.getIsolateGroupMemoryUsage(entry.key);
+        if (memory.heapUsage == null ||
+            memory.heapCapacity == null ||
+            memory.externalUsage == null) {
+          throw StateError('VM service returned incomplete group memory usage');
+        }
+        heapUsed += memory.heapUsage!;
+        heapCapacity += memory.heapCapacity!;
+        external += memory.externalUsage!;
+        sampledGroups++;
+        sampledIsolates += liveMembers;
+      } on SentinelException catch (error) {
+        if (error.sentinel.kind != SentinelKind.kExpired &&
+            error.sentinel.kind != SentinelKind.kCollected) {
+          rethrow;
+        }
+        exitedGroups++;
+      }
+    }
+    if (sampledGroups == 0) {
+      throw StateError('No live isolate-group heap sampled');
+    }
   } catch (error) {
     unavailable = error.toString();
   }
@@ -80,8 +129,11 @@ Future<Map<String, Object?>> memorySnapshot() async {
     'heapCapacityBytes': unavailable == null ? heapCapacity : null,
     'externalBytes': unavailable == null ? external : null,
     'sampledIsolates': sampledIsolates,
+    'sampledIsolateGroups': sampledGroups,
     'exitedIsolatesDuringProbe': exitedIsolates,
-    'gc': unavailable == null ? 'requested-all-isolates' : 'unavailable',
+    'exitedIsolateGroupsDuringProbe': exitedGroups,
+    'heapMeasurementMethod': heapMeasurementMethod,
+    'gc': unavailable == null ? 'requested-all-isolate-groups' : 'unavailable',
     'heapUnavailable': ?unavailable,
   };
 }

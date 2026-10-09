@@ -1,0 +1,215 @@
+name: Complete Computerraria acceptance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: computerraria-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  ABC_PERF_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  native:
+    name: Full public world Native OFF and ON
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-performance
+      - name: Fetch and verify the pinned public fixture only
+        run: |
+          python3 tool/computerraria_inputs.py
+          mkdir -p build/computerraria/raw/native build/computerraria/tmp/native
+          cp build/public-computerraria/input-manifest.json build/computerraria/raw/native/
+          echo "TMPDIR=$PWD/build/computerraria/tmp/native" >> "$GITHUB_ENV"
+      - name: Build and record actual release Native artifact
+        run: |
+          sudo apt-get update && sudo apt-get install -y build-essential cmake zlib1g-dev
+          cmake -S native -B build/computerraria/native -DCMAKE_BUILD_TYPE=Release -DABC_PERF_COUNTERS=ON
+          cmake --build build/computerraria/native --parallel 2
+          python3 tool/perf/computerraria_provenance.py --artifact build/computerraria/native/libabc_engine.so --cmake-cache build/computerraria/native/CMakeCache.txt --output build/computerraria/raw/native/build.json
+      - name: Three default OFF lifecycles, including full paired save and reopen
+        env:
+          ABC_COMPUTERRARIA_OPTIMIZED: '0'
+          ABC_COMPUTERRARIA_SAVE: '1'
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite computerraria-native-standard --runs 3
+          --timeout-seconds 1200 --output-dir build/computerraria/raw/native --
+          dart run native/computerraria_acceptance.dart build/computerraria/native/libabc_engine.so
+          build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
+          - assets/computer/pong.bin {report}
+      - name: Three ON lifecycles with the identical program, input and physical pulses
+        if: ${{ !cancelled() }}
+        env:
+          ABC_COMPUTERRARIA_OPTIMIZED: '1'
+          ABC_COMPUTERRARIA_SAVE: '1'
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite computerraria-native-optimized --runs 3
+          --timeout-seconds 1200 --output-dir build/computerraria/raw/native --
+          dart run native/computerraria_acceptance.dart build/computerraria/native/libabc_engine.so
+          build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
+          - assets/computer/pong.bin {report}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: computerraria-raw-native
+          path: build/computerraria/raw/native/
+          if-no-files-found: warn
+          retention-days: 30
+
+  web:
+    name: Full public world release WASM OFF and ON
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-performance
+      - name: Fetch and verify the pinned public fixture only
+        run: |
+          python3 tool/computerraria_inputs.py
+          mkdir -p build/computerraria/raw/web build/computerraria/tmp/web
+          cp build/public-computerraria/input-manifest.json build/computerraria/raw/web/
+          echo "TMPDIR=$PWD/build/computerraria/tmp/web" >> "$GITHUB_ENV"
+      - name: Build actual pinned Emscripten release artifacts and source hashes
+        run: |
+          git clone --depth 1 --branch 5.0.7 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          test "$(git -C "$RUNNER_TEMP/emsdk" rev-parse HEAD)" = "41190c21c662e9cc1962aea94e71cbae9fd2fc87"
+          "$RUNNER_TEMP/emsdk/emsdk" install 5.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 5.0.7
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          ABC_WEB_OUTPUT="$PWD/build/computerraria/engine-web" bash tool/build_web_engine.sh
+          cp build/computerraria/engine-web/manifest.json build/computerraria/raw/web/engine-manifest.json
+          python3 tool/perf/computerraria_provenance.py --artifact build/computerraria/engine-web/world.js --artifact build/computerraria/engine-web/world.wasm --cmake-cache build/wasm-wld/CMakeCache.txt --output build/computerraria/raw/web/build.json
+      - name: Three default OFF file-owner lifecycles and paired save/reopen
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite computerraria-web-standard --runs 3
+          --timeout-seconds 1200 --output-dir build/computerraria/raw/web --
+          node test/web/computerraria_file_acceptance.cjs
+          build/computerraria/engine-web/world.js build/computerraria/engine-web/world.wasm
+          build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
+          {report} --pong assets/computer/pong.bin --input - --save
+      - name: Three ON file-owner lifecycles with identical physical inputs
+        if: ${{ !cancelled() }}
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite computerraria-web-optimized --runs 3
+          --timeout-seconds 1200 --output-dir build/computerraria/raw/web --
+          node test/web/computerraria_file_acceptance.cjs
+          build/computerraria/engine-web/world.js build/computerraria/engine-web/world.wasm
+          build/public-computerraria/computerraria.wld build/public-computerraria/computerraria.twld
+          {report} --pong assets/computer/pong.bin --input - --save --optimized
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: computerraria-raw-web
+          path: build/computerraria/raw/web/
+          if-no-files-found: warn
+          retention-days: 30
+
+  ui-profile:
+    name: Actual Linux profile, 3 processes × 2 cycles × 2 modes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      TERRA_PERF_RUNNER: ubuntu-24.04-xvfb
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install real Linux profile and display dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev zlib1g-dev xvfb mesa-utils
+      - uses: ./.github/actions/setup-performance
+      - name: Fetch only the explicit pinned public inputs
+        run: |
+          python3 tool/computerraria_inputs.py
+          mkdir -p build/computerraria/raw/ui build/computerraria/tmp/ui
+          cp build/public-computerraria/input-manifest.json build/computerraria/raw/ui/
+          echo "TMPDIR=$PWD/build/computerraria/tmp/ui" >> "$GITHUB_ENV"
+          echo "COMPUTERRARIA_WLD=$PWD/build/public-computerraria/computerraria.wld" >> "$GITHUB_ENV"
+          echo "COMPUTERRARIA_TWLD=$PWD/build/public-computerraria/computerraria.twld" >> "$GITHUB_ENV"
+      - name: Record observed software renderer
+        run: |
+          xvfb-run -a -s '-screen 0 1440x1000x24' glxinfo -B > build/computerraria/raw/ui/glxinfo.txt
+          cat build/computerraria/raw/ui/glxinfo.txt
+          renderer="$(sed -n 's/^OpenGL renderer string: //p' build/computerraria/raw/ui/glxinfo.txt)"
+          test -n "$renderer"
+          echo "TERRA_PERF_RENDERER=$renderer" >> "$GITHUB_ENV"
+      - name: Three actual profile application processes
+        run: >-
+          python3 tool/perf/run_ci_suite.py --suite computerraria-ui --runs 3
+          --timeout-seconds 1200 --output-dir build/computerraria/raw/ui --
+          xvfb-run -a -s "-screen 0 1440x1000x24" bash tool/perf/computerraria_profile.sh {report}
+      - name: Preserve complete actual profile application bundle on success or failure
+        if: always()
+        run: |
+          if test -d build/linux/x64/profile/bundle; then
+            tar -czf build/computerraria/linux-profile-bundle.tar.gz -C build/linux/x64/profile bundle
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: computerraria-raw-ui
+          path: build/computerraria/raw/ui/
+          if-no-files-found: warn
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: computerraria-linux-profile-bundle
+          path: build/computerraria/linux-profile-bundle.tar.gz
+          if-no-files-found: warn
+          retention-days: 30
+
+  acceptance-report:
+    name: Exact state equality and measured frame/latency/memory report
+    needs: [native, web, ui-profile]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Check evidence validator failure cases
+        run: python3 -m unittest discover -s tool/perf -p 'computerraria_checks_test.py'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: computerraria-raw-*
+          path: build/computerraria/candidate
+      - name: Validate all reports and compare identical physical checkpoints
+        if: always()
+        env:
+          NATIVE_JOB_RESULT: ${{ needs.native.result }}
+          WEB_JOB_RESULT: ${{ needs.web.result }}
+          UI_JOB_RESULT: ${{ needs.ui-profile.result }}
+        run: python3 tool/perf/computerraria_compare.py --reports build/computerraria/candidate --output build/computerraria/summary --expected-commit "$ABC_PERF_COMMIT" --require-job-results
+      - name: Publish observed values and explicit calibration status
+        if: always()
+        run: |
+          if test -f build/computerraria/summary/comparison.md; then
+            cat build/computerraria/summary/comparison.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: computerraria-acceptance-and-calibration
+          path: build/computerraria/summary/
+          if-no-files-found: error
+          retention-days: 30

@@ -33,7 +33,7 @@ class _NativeEngine
         PlayerProjectionBackend,
         CircuitBackend,
         RegionBackend,
-        WorldCircuitBackend,
+        WorldCircuitSourceBackend,
         WorldMapBackend,
         CircuitRulesBackend {
   Future<void>? _circuitRulesReady;
@@ -88,6 +88,59 @@ class _NativeEngine
   }) async => WorldCircuitResult.fromMap(
     (await _call('worldCircuitOpen', [world, twld])) as Map,
   );
+  @override
+  Future<WorldCircuitResult> openWorldCircuitSource(
+    WorldCircuitSource world, {
+    WorldCircuitSource? twld,
+    void Function(WorldCircuitProgress)? onProgress,
+  }) async {
+    var polling = false, finished = false;
+    final timer = onProgress == null
+        ? null
+        : Timer.periodic(const Duration(milliseconds: 100), (_) async {
+            if (polling || finished) return;
+            polling = true;
+            try {
+              final p = await worldCircuitProgress();
+              if (!finished && p != null) onProgress(p);
+            } catch (_) {
+              // The owning operation reports its own error. A progress poll
+              // racing a failed/closed owner must not create an unhandled task.
+            } finally {
+              polling = false;
+            }
+          });
+    try {
+      return WorldCircuitResult.fromMap(
+        (await _call('worldCircuitOpenSource', [
+          world.toFileMap(),
+          twld?.toFileMap(),
+        ])) as Map,
+      );
+    } finally {
+      finished = true;
+      timer?.cancel();
+    }
+  }
+
+  @override
+  Future<WorldCircuitProgress?> worldCircuitProgress() async {
+    final value = await _call('worldCircuitProgress', []);
+    return value == null ? null : WorldCircuitProgress.fromMap(value as Map);
+  }
+
+  @override
+  Future<void> cancelWorldCircuitOperation() async {
+    await _call('worldCircuitCancelOperation', []);
+  }
+
+  @override
+  Future<void> releaseWorldCircuitSource(WorldCircuitSource source) async {
+    if (source.token != null) {
+      await _call('worldCircuitReleaseSource', [source.token]);
+    }
+  }
+
   @override
   Future<WorldCircuitResult> commandWorldCircuit(
     int session,
@@ -301,22 +354,36 @@ void _engineWorker(SendPort replies) {
     return;
   }
   final requests = ReceivePort();
+  Future<void> tail = Future.value();
   replies.send(['ready', requests.sendPort]);
   requests.listen((dynamic raw) {
     final message = raw as List<dynamic>;
-    try {
-      replies.send([
-        message[0],
-        true,
-        engine.dispatch(message[1] as String, message[2] as List<dynamic>),
-      ]);
-    } catch (error) {
-      replies.send([
-        message[0],
-        false,
-        error.toString(),
-        error is EngineException ? error.code : null,
-      ]);
+    Future<void> execute() async {
+      try {
+        final value = engine.dispatch(
+          message[1] as String,
+          message[2] as List<dynamic>,
+        );
+        final result = value is Future ? await value : value;
+        replies.send([message[0], true, result]);
+      } catch (error) {
+        replies.send([
+          message[0],
+          false,
+          error.toString(),
+          error is EngineException ? error.code : null,
+        ]);
+      }
+    }
+
+    // These two controls only read host progress/set a cancellation flag. They
+    // never invoke C while another operation is suspended. All engine work
+    // remains FIFO on this single owner, including unrelated document requests.
+    if (message[1] == 'worldCircuitProgress' ||
+        message[1] == 'worldCircuitCancelOperation') {
+      unawaited(execute());
+    } else {
+      tail = tail.then((_) => execute());
     }
   });
 }

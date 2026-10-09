@@ -2,13 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../domain/computerraria_computer.dart';
+import '../domain/computer_provenance.dart';
 import 'world_circuit_backend.dart';
 
-/// UI lifecycle for the actual 60 Hz circuit scheduler. Wall-clock callbacks
-/// merely enqueue native ticks; device timing and wiring are engine-owned.
+/// UI lifecycle for the circuit scheduler and verified physical computer.
+/// Device ticks and hardware clock pulses remain distinct engine commands.
 class WorldCircuitSession extends ChangeNotifier {
   final WorldCircuitBackend backend;
-  final Uint8List _original;
+  final Uint8List? _original;
+  final WorldCircuitSource? source, companion;
   final Uint8List? _originalTwld;
   WorldCircuitResult? result;
   bool dirty = false;
@@ -16,6 +19,47 @@ class WorldCircuitSession extends ChangeNotifier {
   bool busy = false;
   Object? error;
   Timer? _timer;
+  Timer? _progressTimer;
+  bool _pollingProgress = false;
+  WorldCircuitProgress? progress;
+  bool computerVerified = false;
+  bool compatibilityProfile = false;
+  bool programIncomplete = false;
+  bool programBaselineKnown = true;
+  ComputerProvenanceRecord? _restoredProvenance;
+  bool get restoredFromExport => _restoredProvenance != null;
+  String? programName;
+  Uint8List _program = Uint8List(0);
+  Uint8List get programImage => Uint8List.fromList(_program);
+  final Map<String, Uint8List> displayFrames = {};
+  final Stopwatch _runWatch = Stopwatch();
+  int physicalPulses = 0, displayedFrames = 0, _lastDisplayMicros = 0;
+  int _measuredPulses = 0, _measuredFrames = 0;
+  int clockBatch = 128;
+  bool optimizationEnabled = false;
+  int _programGeneration = 0;
+  final Set<String> _heldKeys = {}, _pendingKeys = {};
+  Set<String> get heldKeys => Set.unmodifiable(_heldKeys);
+  double get physicalClockHz => _runWatch.elapsedMicroseconds == 0
+      ? 0
+      : _measuredPulses * 1000000 / _runWatch.elapsedMicroseconds;
+  double get displayPollHz => _runWatch.elapsedMicroseconds == 0
+      ? 0
+      : _measuredFrames * 1000000 / _runWatch.elapsedMicroseconds;
+  bool get canRunComputer =>
+      computerVerified &&
+      programName != null &&
+      !programIncomplete &&
+      programBaselineKnown;
+  bool get streamed => source != null;
+  void markSaved() {
+    if (_closed || _closing) return;
+    dirty = false;
+    notifyListeners();
+  }
+
+  bool _closing = false;
+  Future<void>? _closeFuture;
   WorldCircuitCommand? _viewport;
   bool _closed = false;
   final Map<int, WorldCircuitFragment> _fragments = {};
@@ -23,13 +67,63 @@ class WorldCircuitSession extends ChangeNotifier {
   Future<void> _queue = Future.value();
   WorldCircuitSession(this.backend, Uint8List original, {Uint8List? twld})
     : _original = Uint8List.fromList(original),
-      _originalTwld = twld == null ? null : Uint8List.fromList(twld);
+      _originalTwld = twld == null ? null : Uint8List.fromList(twld),
+      source = null,
+      companion = null;
 
-  Future<T> _serial<T>(Future<T> Function() task) {
+  WorldCircuitSession.fromSource(this.backend, this.source, {this.companion})
+    : _original = null,
+      _originalTwld = null {
+    if (source == null || backend is! WorldCircuitSourceBackend) {
+      throw ArgumentError('Streaming world backend and source are required');
+    }
+  }
+
+  Future<WorldCircuitResult> _openOriginal() async {
+    final input = source;
+    if (input == null) {
+      return backend.openWorldCircuit(_original!, twld: _originalTwld);
+    }
+    return (backend as WorldCircuitSourceBackend).openWorldCircuitSource(
+      input,
+      twld: companion,
+    );
+  }
+
+  Future<void> cancelOperation() async {
+    pause();
+    _programGeneration++;
+    if (backend is WorldCircuitSourceBackend) {
+      await (backend as WorldCircuitSourceBackend)
+          .cancelWorldCircuitOperation();
+    }
+  }
+
+  Future<T> _serial<T>(Future<T> Function() task, {bool notifyState = true}) {
     final work = _queue.then((_) async {
-      if (_closed) throw StateError('Circuit session is closed');
+      if (_closed || _closing) throw StateError('Circuit session is closed');
       busy = true;
-      notifyListeners();
+      if (backend is WorldCircuitSourceBackend) {
+        _progressTimer = Timer.periodic(const Duration(milliseconds: 250), (
+          _,
+        ) async {
+          if (_pollingProgress || _closed || _closing || !busy) return;
+          _pollingProgress = true;
+          try {
+            final next = await (backend as WorldCircuitSourceBackend)
+                .worldCircuitProgress();
+            if (next != null && busy && !_closed && !_closing) {
+              progress = next;
+              notifyListeners();
+            }
+          } catch (_) {
+            // The authoritative operation reports its own failure.
+          } finally {
+            _pollingProgress = false;
+          }
+        });
+      }
+      if (notifyState) notifyListeners();
       try {
         return await task();
       } catch (e) {
@@ -37,8 +131,11 @@ class WorldCircuitSession extends ChangeNotifier {
         pause();
         rethrow;
       } finally {
+        _progressTimer?.cancel();
+        _progressTimer = null;
         busy = false;
-        if (!_closed) notifyListeners();
+        if (!running) _runWatch.stop();
+        if (!_closed && notifyState) notifyListeners();
       }
     });
     _queue = work.then<void>((_) {}, onError: (Object _, StackTrace _) {});
@@ -47,9 +144,295 @@ class WorldCircuitSession extends ChangeNotifier {
 
   Future<void> open() => _serial(() async {
     if (result != null) throw StateError('Circuit already open');
-    result = await backend.openWorldCircuit(_original, twld: _originalTwld);
+    result = await _openOriginal();
+    compatibilityProfile = result!.hasWireHeadPixels;
     error = null;
   });
+
+  /// The original content hash and physical anchors jointly gate the fixed
+  /// memory map. Merely naming another world "computerraria" never enables it.
+  Future<bool> verifyComputer({ComputerProvenanceRecord? provenance}) =>
+      _serial(() async {
+        if (computerVerified) return true;
+        final active = result;
+        computerVerified = false;
+        final candidate = provenance ?? _restoredProvenance;
+        final issuedPair =
+            active != null &&
+            candidate != null &&
+            candidate.matches(
+              active.sourceSha256 ?? '',
+              active.twldSourceSha256 ?? '',
+            );
+        final originalPair =
+            active != null &&
+            active.sourceSha256 == ComputerrariaComputer.sourceSha256 &&
+            active.twldSourceSha256 == ComputerrariaComputer.companionSha256;
+        if (active == null ||
+            (!issuedPair && !originalPair) ||
+            active.width != 15200 ||
+            active.height != 7200 ||
+            !active.hasWireHeadPixels) {
+          return false;
+        }
+        final ready = await backend.commandWorldCircuit(
+          active.session,
+          ComputerrariaComputer.ready(),
+        );
+        ComputerrariaComputer.isReady(ready);
+        final points = <int>[];
+        for (final address in [0, ComputerrariaComputer.romBytes - 4]) {
+          final (x, y) = ComputerrariaComputer.romLamp(address, 0);
+          points.addAll([x, y, 0, 0]);
+        }
+        for (final mirror in [0, 1]) {
+          final (x, y) = ComputerrariaComputer.ramLamp(
+            0x100000,
+            31,
+            mirror: mirror,
+          );
+          points.addAll([x, y, 0, 0]);
+        }
+        final lamps = await backend.commandWorldCircuit(
+          active.session,
+          WorldCircuitCommand.lamps(points),
+        );
+        final data = ByteData.sublistView(lamps.records);
+        if (lamps.records.length != points.length * 4) {
+          throw const FormatException('计算机存储器锚点不完整。');
+        }
+        for (var at = 0; at < points.length; at += 4) {
+          if (data.getUint32(at * 4, Endian.little) != points[at] ||
+              data.getUint32(at * 4 + 4, Endian.little) != points[at + 1] ||
+              data.getUint32(at * 4 + 12, Endian.little) != 419) {
+            throw const FormatException('计算机存储器与已核验布局不匹配。');
+          }
+        }
+        await _refreshComputerDisplays(active.session);
+        _restoredProvenance = issuedPair ? candidate : null;
+        if (issuedPair) {
+          _program = candidate.programImage;
+          programName = candidate.programName;
+          physicalPulses = candidate.physicalPulses ?? 0;
+        }
+        programBaselineKnown = true;
+        computerVerified = true;
+        return true;
+      });
+
+  Future<void> _refreshComputerDisplays(int id) async {
+    for (final region in [
+      ComputerrariaComputer.mono,
+      ComputerrariaComputer.color,
+    ]) {
+      final response = await backend.commandWorldCircuit(
+        id,
+        WorldCircuitCommand.pixels(
+          region.x,
+          region.y,
+          region.width,
+          region.height,
+        ),
+      );
+      final rgba = region.decode(response);
+      if (!listEquals(displayFrames[region.name], rgba)) {
+        displayFrames[region.name] = rgba;
+      }
+    }
+    displayedFrames++;
+    if (_runWatch.isRunning) _measuredFrames++;
+  }
+
+  Future<void> refreshComputerDisplays() => _serial(() async {
+    if (!computerVerified || result == null) throw StateError('计算机布局尚未核验。');
+    await _refreshComputerDisplays(result!.session);
+  });
+
+  Future<void> setOptimization(bool enabled) {
+    pause(releaseKeys: false);
+    return _serial(() async {
+      final active = result;
+      if (active == null) throw StateError('请先载入世界电路。');
+      final next = await backend.commandWorldCircuit(
+        active.session,
+        WorldCircuitCommand.optimization(enabled),
+      );
+      if (next.circuitOptimizationEnabled != enabled) {
+        throw StateError('引擎未确认电路优化模式，当前会话保持暂停。');
+      }
+      result = next;
+      optimizationEnabled = enabled;
+      _runWatch.reset();
+      _measuredPulses = 0;
+      _measuredFrames = 0;
+      _lastDisplayMicros = 0;
+      if (computerVerified) await _refreshComputerDisplays(active.session);
+    });
+  }
+
+  Future<void> _resetComputer(int id) async {
+    for (var i = 0; i < 3; i++) {
+      final ready = await backend.commandWorldCircuit(
+        id,
+        ComputerrariaComputer.ready(),
+      );
+      if (ComputerrariaComputer.isReady(ready)) break;
+      await backend.commandWorldCircuit(id, ComputerrariaComputer.clock());
+      dirty = true;
+    }
+    if (!ComputerrariaComputer.isReady(
+      await backend.commandWorldCircuit(id, ComputerrariaComputer.ready()),
+    )) {
+      await backend.commandWorldCircuit(
+        id,
+        ComputerrariaComputer.resetSignal(),
+      );
+      dirty = true;
+    }
+    for (final command in ComputerrariaComputer.resetBus) {
+      await backend.commandWorldCircuit(id, command);
+      dirty = true;
+    }
+  }
+
+  Future<void> loadProgram(String name, Uint8List bytes) {
+    final image = ComputerrariaComputer.parseProgram(name, bytes);
+    pause();
+    final generation = ++_programGeneration;
+    return _serial(() async {
+      if (!computerVerified ||
+          result == null ||
+          programIncomplete ||
+          !programBaselineKnown) {
+        throw StateError('请先导入并核验完整计算机；中断加载后需重新导入。');
+      }
+      final id = result!.session;
+      programIncomplete = true;
+      await _resetComputer(id);
+      var lamps = 0;
+      for (final records in ComputerrariaComputer.programWrites(
+        _program,
+        image,
+      )) {
+        if (_closing || generation != _programGeneration) {
+          throw StateError('程序加载已取消，请重新导入世界。');
+        }
+        result = await backend.commandWorldCircuit(
+          id,
+          WorldCircuitCommand.lamps(records, write: true),
+        );
+        dirty = true;
+        lamps += records.length ~/ 4;
+        progress = WorldCircuitProgress(
+          stage: '写入实际 ROM 灯位',
+          phase: 0,
+          completed: lamps,
+          total: 0,
+        );
+        notifyListeners();
+        await Future<void>.delayed(Duration.zero);
+      }
+      if (_closing || generation != _programGeneration) {
+        throw StateError('程序加载已取消，请重新导入世界。');
+      }
+      await _resetComputer(id);
+      _program = image;
+      programName = name;
+      programIncomplete = false;
+      programBaselineKnown = true;
+      dirty = true;
+      physicalPulses = 0;
+      displayedFrames = 0;
+      _measuredPulses = 0;
+      _measuredFrames = 0;
+      _lastDisplayMicros = 0;
+      _runWatch.reset();
+      await _refreshComputerDisplays(id);
+      progress = null;
+    });
+  }
+
+  Future<void> stepComputer([int pulses = 1]) {
+    if (pulses < 1 || pulses > 128) throw RangeError.range(pulses, 1, 128);
+    return _serial(() async {
+      if (!canRunComputer || result == null) {
+        throw StateError('请先完整加载 RV32I 程序。');
+      }
+      await _applyComputerKeys(result!.session);
+      result = await backend.commandWorldCircuit(
+        result!.session,
+        ComputerrariaComputer.clock(pulses),
+      );
+      physicalPulses += pulses;
+      dirty = true;
+      await _refreshComputerDisplays(result!.session);
+    });
+  }
+
+  void setComputerKey(String direction, bool pressed) {
+    ComputerrariaComputer.key(direction); // Validate even a release event.
+    if (_closed || _closing) return;
+    if (!pressed) {
+      if (_heldKeys.remove(direction)) notifyListeners();
+      return;
+    }
+    if (!canRunComputer) throw StateError('请先加载程序再使用已校准的方向键。');
+    if (_heldKeys.add(direction)) {
+      _pendingKeys.add(direction);
+      notifyListeners();
+    }
+  }
+
+  void releaseComputerKeys() {
+    final hadKeys = _heldKeys.isNotEmpty || _pendingKeys.isNotEmpty;
+    _heldKeys.clear();
+    _pendingKeys.clear();
+    if (hadKeys && !_closed) notifyListeners();
+  }
+
+  Future<void> _applyComputerKeys(int id) async {
+    final keys = {..._pendingKeys, ..._heldKeys};
+    _pendingKeys.clear();
+    for (final key in keys) {
+      await backend.commandWorldCircuit(id, ComputerrariaComputer.key(key));
+      dirty = true;
+    }
+  }
+
+  void _scheduleComputer() {
+    if (!running || _closing || _closed) return;
+    _timer = Timer(const Duration(milliseconds: 1), () async {
+      if (!running || _closing || _closed) return;
+      if (busy) {
+        _scheduleComputer();
+        return;
+      }
+      var publishFrame = false;
+      try {
+        await _serial(() async {
+          if (!running || result == null) return;
+          await _applyComputerKeys(result!.session);
+          result = await backend.commandWorldCircuit(
+            result!.session,
+            ComputerrariaComputer.clock(clockBatch.clamp(32, 128)),
+          );
+          physicalPulses += clockBatch.clamp(32, 128);
+          _measuredPulses += clockBatch.clamp(32, 128);
+          dirty = true;
+          final now = _runWatch.elapsedMicroseconds;
+          if (!running || now - _lastDisplayMicros >= 16667) {
+            await _refreshComputerDisplays(result!.session);
+            _lastDisplayMicros = _runWatch.elapsedMicroseconds;
+            publishFrame = true;
+          }
+        }, notifyState: false);
+        if (publishFrame && !_closed && !_closing) notifyListeners();
+      } catch (_) {
+        pause();
+      }
+      if (running) _scheduleComputer();
+    });
+  }
 
   Future<WorldCircuitResult> command(
     WorldCircuitCommand command, {
@@ -60,8 +443,16 @@ class WorldCircuitSession extends ChangeNotifier {
     final next = await backend.commandWorldCircuit(active.session, command);
     // Fragment queries return eight-word records, unlike the viewport. Keep
     // those out of the live four-word display and retain its current state.
-    if (command.words[1] != 7 && command.words[1] != 8) result = next;
-    if (command.mutates) dirty = true;
+    if (command.words[1] != 4 &&
+        command.words[1] != 7 &&
+        command.words[1] != 8 &&
+        command.words[1] != 9) {
+      result = next;
+    }
+    if (command.mutates) {
+      dirty = true;
+      if (computerVerified) programBaselineKnown = false;
+    }
     if (command.words[1] == 1) {
       _viewport = WorldCircuitCommand.viewport(
         command.words[2],
@@ -76,7 +467,12 @@ class WorldCircuitSession extends ChangeNotifier {
       result = await backend.commandWorldCircuit(active.session, _viewport!);
     }
     error = null;
-    return command.words[1] == 7 || command.words[1] == 8 ? next : result!;
+    return command.words[1] == 4 ||
+            command.words[1] == 7 ||
+            command.words[1] == 8 ||
+            command.words[1] == 9
+        ? next
+        : result!;
   });
 
   Future<WorldCircuitFragmentPage> fragments({
@@ -141,7 +537,15 @@ class WorldCircuitSession extends ChangeNotifier {
   }
 
   void run() {
-    if (_closed || running || result == null) return;
+    if (_closed || _closing || running || result == null) return;
+    if (computerVerified) {
+      if (!canRunComputer) throw StateError('请先完整加载 RV32I 程序。');
+      running = true;
+      _runWatch.start();
+      _scheduleComputer();
+      notifyListeners();
+      return;
+    }
     running = true;
     _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (busy || !running) return;
@@ -158,10 +562,12 @@ class WorldCircuitSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void pause() {
+  void pause({bool releaseKeys = true}) {
     _timer?.cancel();
     _timer = null;
     running = false;
+    if (releaseKeys) releaseComputerKeys();
+    if (!busy) _runWatch.stop();
     if (!_closed) notifyListeners();
   }
 
@@ -173,16 +579,46 @@ class WorldCircuitSession extends ChangeNotifier {
       result = null;
       _fragments.clear();
       _indexedGeometry = null;
-      result = await backend.openWorldCircuit(_original, twld: _originalTwld);
+      result = await _openOriginal();
+      compatibilityProfile = result!.hasWireHeadPixels;
       dirty = false;
+      computerVerified = false;
+      optimizationEnabled = false;
+      programIncomplete = false;
+      programBaselineKnown = true;
+      programName = null;
+      _program = Uint8List(0);
+      displayFrames.clear();
+      physicalPulses = 0;
+      displayedFrames = 0;
+      _measuredPulses = 0;
+      _measuredFrames = 0;
+      _lastDisplayMicros = 0;
+      _runWatch.reset();
       error = null;
     });
   }
 
   /// Flush pending commands and stop before closing a world handle or adopting
   /// returned WLD bytes in the application's ordinary save pipeline.
-  Future<void> close() async {
+  Future<void> close() => _closeFuture ??= _close().catchError((Object e) {
+    _closeFuture = null;
+    throw e;
+  });
+
+  Future<void> _close() async {
     pause();
+    _closing = true;
+    _programGeneration++;
+    _progressTimer?.cancel();
+    if (result == null && busy && backend is WorldCircuitSourceBackend) {
+      try {
+        await (backend as WorldCircuitSourceBackend)
+            .cancelWorldCircuitOperation();
+      } catch (e) {
+        error = e;
+      }
+    }
     await _queue;
     if (_closed) return;
     final active = result;
@@ -190,12 +626,14 @@ class WorldCircuitSession extends ChangeNotifier {
     result = null;
     _fragments.clear();
     _indexedGeometry = null;
+    displayFrames.clear();
     _closed = true;
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _progressTimer?.cancel();
     // Caller must await close before dispose; asynchronous engine teardown is
     // deliberately not hidden in a synchronous Widget disposal callback.
     assert(_closed, 'Await WorldCircuitSession.close before dispose');

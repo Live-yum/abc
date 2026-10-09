@@ -26,11 +26,16 @@ or desktop 64-bit processes.
 
 ## Android
 
-`flutter build apk --release --no-pub` invokes the NDK through Gradle's externalNativeBuild,
+`flutter build apk --release` invokes the NDK through Gradle's externalNativeBuild,
 using CMake 3.31.1. Gradle packages `libabc_engine.so` for the selected ABIs.
 CI installs the pinned CMake distribution in an isolated Python environment and
 sets Android's `cmake.dir` explicitly, so it does not depend on an SDK image
 already containing that exact CMake version.
+Keep mode-specific tooling generation enabled: Flutter 3.47 regenerates the
+Android plugin registrant for release to exclude dev-only `integration_test`.
+Using `--no-pub` immediately after a general `flutter pub get` retains its debug
+registrant and fails because Gradle correctly omits that plugin from release.
+CI verifies that this release build leaves `pubspec.lock` unchanged.
 The release build has no signing configuration and produces an unsigned APK; no
 production signing or Play Store publishing is configured. A local debug build
 uses Android's normal development tooling.

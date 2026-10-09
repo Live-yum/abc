@@ -99,11 +99,39 @@ int cx_command_complete(CxWorld* w){
     if(w->command.kind==TCW_TICKS){int s=cx_seed_reserve(w,4u);if(s)return s;s=cx_operation_begin(w);if(s)return s;w->tick_remaining=w->command.count;w->tick_stage=0;w->phase=CX_TICKS;return TCW_OK;}
     w->phase=CX_IDLE;return TCW_OK;
 }
+static int query_pixels(CxWorld* w,const TerraCircuitWorldCommand* cmd){
+    if(!cmd->width||!cmd->height||cmd->x>=w->width||cmd->y>=w->height||cmd->width>w->width-cmd->x||cmd->height>w->height-cmd->y||(uint64_t)cmd->width*cmd->height>65536u||cmd->data_count||cmd->flags)return TCW_INVALID;
+    uint32_t lo=0,hi=w->pixel_count;
+    while(lo<hi){uint32_t m=lo+(hi-lo)/2u;if(w->pixels[m].x<cmd->x)lo=m+1u;else hi=m;}
+    uint32_t first=lo,count=0;
+    for(uint32_t i=first;i<w->pixel_count&&w->pixels[i].x<cmd->x+cmd->width;i++)if(w->pixels[i].y>=cmd->y&&w->pixels[i].y<cmd->y+cmd->height)++count;
+    int s=reserve_result(w,count);if(s)return s;
+    w->result_count=0;
+    for(uint32_t i=first;i<w->pixel_count&&w->pixels[i].x<cmd->x+cmd->width;i++){
+        CxPixel* p=w->pixels+i;if(p->y<cmd->y||p->y>=cmd->y+cmd->height)continue;
+        uint32_t* out=w->result+w->result_count++*4u;
+        out[0]=p->x;out[1]=p->y;out[2]=p->cell_word;
+        if(out[2]&(2u<<16)){CxDevice* d=cx_device_find(w,p->x,p->y);if(d)out[2]=(out[2]&~(4u<<16))|((uint32_t)d->tile.inactive<<18);}
+        out[3]=p->custom?18u*(p->state&3u)|((18u*((p->state>>2)&3u))<<16):18u*p->state;
+    }
+    w->command=*cmd;cx_emit(w,TCW_RESULT,0,0,w->result_count*16u,w->result);w->event.result_kind=TCW_PIXELS;w->event.result_count=w->result_count;return TCW_CONTINUE;
+}
 int32_t terra_circuit_world_command(uint32_t handle,const TerraCircuitWorldCommand* input){
     CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;if(!input)return TCW_INVALID;if(w->phase!=CX_IDLE||w->event.kind)return TCW_STATE;
-    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=1||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_EXTRACT||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
+    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=1||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_OPTIMIZATION||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
     /* A rejected bounded query must not poison SAVE's earlier dispatch path. */
     w->error=0;
+    if(cmd.kind==TCW_OPTIMIZATION){
+        if(cmd.mask>1u||cmd.data_count||cmd.flags)return TCW_INVALID;
+        if(w->optimization!=cmd.mask){
+            /* Transient dedup metadata has no saved-world meaning. Reset it at
+             * the idle boundary so switching cannot alias an earlier epoch. */
+            for(uint32_t i=0;i<w->device_count;i++){w->devices[i].wire_hit_mask=0;w->devices[i].wire_hit_epoch=0;}
+            w->wire_trip_epoch=0;w->optimization=cmd.mask;
+        }
+        w->command=cmd;return TCW_OK;
+    }
+    if(cmd.kind==TCW_PIXELS)return query_pixels(w,&cmd);
     if(cmd.kind==TCW_FRAGMENTS||cmd.kind==TCW_EXTRACT)return cx_fragments_begin(w,&cmd);
     if(cmd.kind==TCW_TRIGGER&&(cmd.flags&1u)){int s=cx_interaction_rect(w,&cmd);if(s<0)return TCW_INVALID;if(!s){w->command=cmd;return TCW_OK;}}
     if((cmd.kind==TCW_VIEWPORT||cmd.kind==TCW_TRIGGER)&&(!cmd.width||!cmd.height||cmd.x>=w->width||cmd.y>=w->height||cmd.width>w->width-cmd.x||cmd.height>w->height-cmd.y))return TCW_INVALID;

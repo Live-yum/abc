@@ -38,6 +38,19 @@ def verify_exact_files(root, expected):
 
 
 def main():
+    # Bundled data is the attributed RV32I Pong ROM, never a world file or host
+    # emulator. Keep program/source identity independent of the WLD fixture.
+    computer_root = ROOT / "vendor/computerraria"
+    computer = json.loads((computer_root / "pong-provenance.json").read_text())
+    if computer["source_commit"] != "0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8":
+        raise ValueError("Unexpected Computerraria source revision")
+    verify_sha_records(computer_root, computer["files"])
+    pong = read_file(ROOT, "assets/computer/pong.bin")
+    if len(pong) != 2288 or sha256(pong) != "d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d":
+        raise ValueError("Bundled Pong program identity mismatch")
+    if read_file(ROOT, "assets/computer/LICENSE") != read_file(computer_root, "LICENSE"):
+        raise ValueError("Bundled Pong MIT notice differs from its source")
+
     # These two allowlisted WLD assets must be exact original synthetic output,
     # never user saves placed under a permitted fixture filename.
     with tempfile.TemporaryDirectory(prefix="terraforge-fixtures-") as directory:
@@ -57,6 +70,20 @@ def main():
         raise ValueError("Unexpected TerraWasm base revision")
     terra_bytes = verify_sha_records(terra_root, terra["files"])
     verify_exact_files(terra_root, {row["path"] for row in terra["files"]} | {"SOURCE_MANIFEST.json"})
+    for patch_ref in terra.get("localPatches", []):
+        patch_bytes = read_file(ROOT, patch_ref["manifest"])
+        if sha256(patch_bytes) != patch_ref["sha256"]:
+            raise ValueError("Reviewed local-patch manifest changed")
+        patch = json.loads(patch_bytes)
+        if patch["id"] != patch_ref["id"] or patch["baseSourceCommit"] != terra["sourceCommit"]:
+            raise ValueError("Local patch does not identify the pinned source base")
+        verify_sha_records(ROOT, [patch["patch"]])
+        for change in patch["files"]:
+            if len(change["beforeSha256"]) != 64 or not change["beforeBytes"]:
+                raise ValueError("Local patch omits its original source identity")
+            data = read_file(terra_root, change["path"])
+            if sha256(data) != change["afterSha256"] or len(data) != change["afterBytes"]:
+                raise ValueError(f"Reviewed local patch differs: {change['path']}")
 
     viewer_root = ROOT / "vendor/viewer-circuit"
     viewer = json.loads((viewer_root / "retrieved-source-manifest.json").read_text())

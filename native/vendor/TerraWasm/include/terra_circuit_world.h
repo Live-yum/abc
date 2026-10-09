@@ -16,7 +16,7 @@ enum TerraCircuitWorldEventKind {
 enum TerraCircuitWorldCommandKind {
     TCW_VIEWPORT = 1, TCW_TRIGGER = 2, TCW_TICKS = 3,
     TCW_READ_LAMPS = 4, TCW_WRITE_LAMPS = 5, TCW_SAVE = 6,
-    TCW_FRAGMENTS = 7, TCW_EXTRACT = 8
+    TCW_FRAGMENTS = 7, TCW_EXTRACT = 8, TCW_PIXELS = 9, TCW_OPTIMIZATION = 10
 };
 enum TerraCircuitWorldStatus {
     TCW_OK = 0, TCW_CONTINUE = 1,
@@ -26,7 +26,8 @@ enum TerraCircuitWorldStatus {
 /* Exactly twelve little-endian uint32 words. WRITE.data_ptr is borrowed until
  * ack; READ.data_ptr is zero. RESULT holds 16-byte cell records. READY is idle.
  * phase/completed/total are progress, independent of the source byte range.
- * Non-SAVE READY.reserved bit 0 identifies native WireHead pixel-wave rules.
+ * Non-SAVE READY.reserved bit 1 reports the optional device-dedup fast path;
+ * it defaults OFF and is independent of bit 0's native WireHead pixel-wave rules.
  * They are selected ONLY by a TWLD tile-map entry named WireHead/ColorPixelBox,
  * never by the filename or saved numeric mod ID. Ordinary worlds retain vanilla
  * per-TripWire PixelBox rules; the mod profile reproduces its documented same-
@@ -51,6 +52,16 @@ typedef struct TerraCircuitWorldEvent {
 /* VIEWPORT.flags bit 1 requests the separate wall layer. Its records remain
  * 16 bytes: [x,y,wallId|flags<<16,wallPaint]. Wall flags: active=1, layer=32,
  * invisible=64, fullbright=128. The wire mask is zero for this layer. */
+/* PIXELS uses a bounded x/y/width/height rectangle (area <=65536), flags=0.
+ * It returns only actual retained pixel tiles, sorted x then y; non-pixel cells
+ * are absent. Records match VIEWPORT's 16-byte layout. Wire masks derive from
+ * compiled ports; frames derive from the live pixel state. No source rescan,
+ * CPU decode, display-controller shortcut or framebuffer write is performed. */
+/* OPTIMIZATION uses mask=0 (prior per-trip mask clear, default) or 1 (generation
+ * dedup). It is accepted only at the ordinary idle command boundary. It changes
+ * no electrical, pixel, ROM/RAM, input or RNG state. Both modes retain the
+ * existing compiled topology and lazy lamp representation. It neither selects
+ * the TWLD compatibility profile nor claims a full WireHead implementation. */
 typedef struct TerraCircuitWorldCommand {
     uint32_t abi_version, kind, x, y, width, height, stride, mask;
     uint32_t count;

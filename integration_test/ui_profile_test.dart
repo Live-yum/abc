@@ -38,6 +38,7 @@ import 'support/profile_memory_native.dart'
     as memory;
 import 'support/profile_recorder.dart';
 import 'support/profile_controller.dart';
+import 'support/profile_navigation.dart';
 import 'support/profile_inputs_native.dart'
     if (dart.library.js_interop) 'support/profile_inputs_web.dart'
     as inputs;
@@ -246,11 +247,13 @@ void main() {
         'controllerOperations': recorder.controllerResults(),
         'controllerSemantics': 'Exact awaited production TerraController dispatch latency, excluding frame settling and fixture bookkeeping. Safe variants and associated UI macro scope are recorded; private argument values and filenames are omitted. Completion returned does not mean accepted: the associated UI workflow separately asserts success or expected rejection.',
         'frameClockDiagnostics': recorder.clockDiagnostics(),
+        'viewportSnapshots': recorder.viewportSnapshots,
+        'failureDiagnostics': recorder.failureDiagnostics,
         'memory': snapshots,
         'resourcePhases': resourcePhases,
         'resourcePhaseSemantics': 'Actual installer phase transitions against an in-memory synthetic transport/storage. Downloading includes synthetic fetch plus integrity/decompression work; verifying includes normalization/activation. These are not real network or disk measurements.',
         'frameSemantics': 'Actual engine FrameTiming build/raster durations. overBudgetFrames counts UI or raster work over the display budget, not inferred FPS or compositor drops. latency includes deliberate UI pumping and gesture pacing.',
-        'memorySemantics': 'Process RSS and all Dart isolate heaps after requested GC between complete workspace lifecycles. RSS includes native engines, renderer and cache retention. Native heap is not Dart heap. Raw benchmark measurements remain resident and their counts are recorded; compare matching harness runs. A completed run or a positive slope alone does not prove absence/presence of a leak.',
+        'memorySemantics': 'Process RSS and unique Dart isolate-group heaps after one requested GC per group between complete workspace lifecycles. RSS includes native engines, renderer and cache retention. Native heap is not Dart heap. Raw benchmark measurements remain resident and their counts are recorded; compare matching harness runs. A completed run or a positive slope alone does not prove absence/presence of a leak.',
         'gaps': [
           'Only the reported device, renderer and viewport were measured; no Android/iOS/macOS/Web claims from Linux.',
           'Tiny public synthetic fixtures do not establish large real-world WLD/PLR/MAP performance.',
@@ -347,6 +350,10 @@ Future<void> _runCycle(
       await tester.pumpWidget(TerraForgeApp(controller: controller));
       await workspace.initialize();
       await run.settle();
+      recorder.viewportSnapshots.add({
+        'cycle': cycle,
+        ...run.navigator.viewport(),
+      });
     }, interaction: 'mount production TerraForgeApp');
     await run.navigation();
     await run.world();
@@ -359,6 +366,9 @@ Future<void> _runCycle(
     await run.resourcePaths();
     await run.failAndCancel();
     await run.localFileInputs(localInputs);
+  } catch (error) {
+    await run.recordFailure('cycle', error);
+    rethrow;
   } finally {
     await run.measure('ui.workspace.close', () async {
       await workspace.close();
@@ -399,6 +409,28 @@ class _Scenario {
   final OnlineFixture resourceFixture;
   final FixtureResourceTransport transport;
   final OnlineResourceService resources;
+  late final navigator = ProfileNavigation(tester, settle);
+  bool _failureRecorded = false;
+
+  Future<void> recordFailure(String stage, Object error) async {
+    if (_failureRecorded) return;
+    _failureRecorded = true;
+    try {
+      recorder.failureDiagnostics.add({
+        'cycle': cycle,
+        'stage': stage,
+        'errorType': error.runtimeType.toString(),
+        ...await navigator.diagnose(),
+      });
+    } catch (diagnosticError) {
+      recorder.failureDiagnostics.add({
+        'cycle': cycle,
+        'stage': stage,
+        'errorType': error.runtimeType.toString(),
+        'diagnosticsErrorType': diagnosticError.runtimeType.toString(),
+      });
+    }
+  }
 
   Future<void> measure(
     String id,
@@ -406,7 +438,18 @@ class _Scenario {
     String interaction = 'controller dispatch with production UI rendered',
   }) async {
     if (_debugSmoke) debugPrint('Workflow smoke: $id');
-    await recorder.measure(id, cycle, warmup, action, interaction: interaction);
+    try {
+      await recorder.measure(
+        id,
+        cycle,
+        warmup,
+        action,
+        interaction: interaction,
+      );
+    } catch (error) {
+      await recordFailure(id, error);
+      rethrow;
+    }
   }
 
   Future<void> settle() async {
@@ -427,16 +470,7 @@ class _Scenario {
     await settle();
   }
 
-  Future<void> go(String title) async {
-    if (find.byType(NavigationBar).evaluate().isNotEmpty) {
-      await tap(find.text('更多'));
-      await tap(
-        find.descendant(of: find.byType(Drawer), matching: find.text(title)),
-      );
-    } else {
-      await tap(find.text(title));
-    }
-  }
+  Future<void> go(String title) => navigator.go(title);
 
   Future<void> action(
     String id,

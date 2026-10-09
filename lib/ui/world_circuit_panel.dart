@@ -1,7 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../domain/computerraria_computer.dart';
+import '../engine/world_circuit_backend.dart';
+import 'computer_display.dart';
 
 /// Schematic view of actual VM records, not a rendered game-world preview.
 class WorldCircuitPanel extends StatefulWidget {
@@ -21,10 +27,105 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
   final _y = TextEditingController(text: '0');
   final _width = TextEditingController(text: '48');
   final _height = TextEditingController(text: '32');
+  final _computerFocus = FocusNode(debugLabel: 'physical computer input');
   int _mask = 15;
+  bool _colorDisplay = false;
   int? _selectedX, _selectedY;
   String? _localError;
   bool get _busy => widget.state['busy'] == true;
+  bool get _inputEnabled =>
+      widget.state['keyboardVerified'] == true &&
+      widget.state['canRunComputer'] == true;
+
+  void _input(String direction, bool pressed) {
+    unawaited(
+      widget.dispatch('worldCircuitInput', {
+        'direction': direction,
+        'pressed': pressed,
+      }),
+    );
+  }
+
+  void _releaseInput() {
+    unawaited(
+      Future<void>.microtask(
+        () => widget.dispatch('worldCircuitReleaseKeys', const {}),
+      ),
+    );
+  }
+
+  KeyEventResult _computerKey(FocusNode node, KeyEvent event) {
+    if (!_inputEnabled) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    final direction =
+        key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.keyW
+        ? 'up'
+        : key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.keyS
+        ? 'down'
+        : key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyA
+        ? 'left'
+        : key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyD
+        ? 'right'
+        : null;
+    if (direction == null) return KeyEventResult.ignored;
+    if (event is KeyDownEvent) _input(direction, true);
+    if (event is KeyUpEvent) _input(direction, false);
+    return KeyEventResult.handled;
+  }
+
+  Widget _directionButton(String direction, String label, IconData icon) {
+    final held = (widget.state['heldKeys'] as Iterable? ?? const []).contains(
+      direction,
+    );
+    return Semantics(
+      label: '计算机$label',
+      button: true,
+      enabled: _inputEnabled,
+      onTap: !_inputEnabled
+          ? null
+          : () {
+              _computerFocus.requestFocus();
+              _input(direction, true);
+              _input(direction, false);
+            },
+      child: GestureDetector(
+        excludeFromSemantics: true,
+        onTapDown: !_inputEnabled
+            ? null
+            : (_) {
+                _computerFocus.requestFocus();
+                _input(direction, true);
+              },
+        onTapUp: !_inputEnabled ? null : (_) => _input(direction, false),
+        onTapCancel: !_inputEnabled ? null : () => _input(direction, false),
+        child: Container(
+          width: 56,
+          height: 48,
+          decoration: BoxDecoration(
+            color: held
+                ? Theme.of(context).colorScheme.primaryContainer
+                : Theme.of(context).colorScheme.surface,
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: _inputEnabled ? null : Theme.of(context).disabledColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _progressLabel(String stage) => switch (stage) {
+    'hash' => '核验完整文件',
+    'open' || 'decode' => '分段读取世界',
+    'compile' => '编译真实接线',
+    'command' || 'run' => '执行电路操作',
+    'save' => '生成模拟副本',
+    'ready' => '电路已就绪',
+    _ => stage,
+  };
   Future<void> _send(
     String action, [
     Map<String, Object?> args = const {},
@@ -101,6 +202,8 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
 
   @override
   void dispose() {
+    _releaseInput();
+    _computerFocus.dispose();
     _x.dispose();
     _y.dispose();
     _width.dispose();
@@ -114,6 +217,11 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         open = s['open'] == true,
         dirty = s['dirty'] == true,
         running = s['running'] == true;
+    final computer = s['computerVerified'] == true;
+    final canRunComputer = s['canRunComputer'] == true;
+    final progress = s['progress'] is WorldCircuitProgress
+        ? s['progress'] as WorldCircuitProgress
+        : null;
     final error = _localError ?? s['error']?.toString();
     final raw = s['records'];
     final records = raw is Uint8List ? raw : Uint8List(0);
@@ -156,7 +264,53 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        const Text('使用真实接线与设备时钟。下方为电路示意图，显示引擎返回的方块和线色。点击格子触发开关；保存会生成待验证的世界副本。'),
+        const Text(
+          '导入完整 WLD 后运行真实接线。Computerraria 需配套 TWLD 恢复显示器规则，并加载 RV32I 程序；无需安装 tModLoader 或 WireHead。',
+        ),
+        if (!open && s['streamingAvailable'] == true) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => _send('worldCircuitChooseWorld'),
+                icon: const Icon(Icons.folder_open),
+                label: const Text('选择完整 WLD'),
+              ),
+              OutlinedButton(
+                onPressed: _busy || s['sourceName'] == null
+                    ? null
+                    : () => _send('worldCircuitChooseTwld'),
+                child: const Text('选择配套 TWLD'),
+              ),
+              if (s['companionName'] != null)
+                TextButton(
+                  onPressed: _busy
+                      ? null
+                      : () => _send('worldCircuitClearTwld'),
+                  child: const Text('移除配套文件'),
+                ),
+              FilledButton(
+                onPressed: _busy || s['sourceName'] == null
+                    ? null
+                    : () => _send('worldCircuitImport'),
+                child: const Text('导入完整电路'),
+              ),
+            ],
+          ),
+          if (s['sourceName'] != null)
+            Text(
+              '${s['sourceName']} · ${((s['sourceBytes'] as num? ?? 0) / 1048576).toStringAsFixed(1)} MiB',
+            ),
+          Text(
+            s['companionName'] == null
+                ? '未选择 TWLD：使用原版电路规则。'
+                : '配套文件：${s['companionName']}（导入后核验）',
+          ),
+        ],
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -170,16 +324,33 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               ),
             if (open) ...[
               FilledButton.icon(
-                onPressed: _busy ? null : () => _send('worldCircuitToggle'),
+                onPressed: running
+                    ? () => _send('worldCircuitPause')
+                    : _busy || (computer && !canRunComputer)
+                    ? null
+                    : () => _send('worldCircuitToggle'),
                 icon: Icon(running ? Icons.pause : Icons.play_arrow),
-                label: Text(running ? '暂停' : '运行'),
+                label: Text(
+                  running
+                      ? '暂停'
+                      : computer
+                      ? '运行物理时钟'
+                      : '运行',
+                ),
               ),
               OutlinedButton(
-                onPressed: _busy || running
+                onPressed: _busy || running || (computer && !canRunComputer)
                     ? null
                     : () => _send('worldCircuitStep'),
-                child: const Text('单步'),
+                child: Text(computer ? '单个时钟脉冲' : '单步'),
               ),
+              if (computer)
+                OutlinedButton(
+                  onPressed: _busy || running || !canRunComputer
+                      ? null
+                      : () => _send('worldCircuitStep', {'pulses': 128}),
+                  child: const Text('128 个脉冲'),
+                ),
               OutlinedButton(
                 onPressed: _busy
                     ? null
@@ -213,11 +384,30 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             ],
           ],
         ),
-        if (_busy)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: LinearProgressIndicator(),
+        if (_busy && !running) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: LinearProgressIndicator(
+              value: progress != null && progress.total > 0
+                  ? (progress.completed / progress.total).clamp(0, 1)
+                  : null,
+            ),
           ),
+          if (progress != null)
+            Text(
+              '${_progressLabel(progress.stage)} · ${progress.completed}${progress.total > 0 ? ' / ${progress.total}' : ''}',
+            ),
+          if (s['importing'] == true || s['programIncomplete'] == true)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: s['cancelling'] == true
+                    ? null
+                    : () => _send('worldCircuitCancel'),
+                child: Text(s['cancelling'] == true ? '正在取消…' : '取消当前加载'),
+              ),
+            ),
+        ],
         if (error != null)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -226,6 +416,138 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
+        if (s['provenanceWarning'] != null)
+          Text(s['provenanceWarning'] as String),
+        if (open) ...[
+          SwitchListTile(
+            title: const Text('电路优化'),
+            subtitle: const Text('减少无关设备的逐次清理。切换会暂停运行并保留当前状态。'),
+            value: s['optimizationEnabled'] == true,
+            onChanged: _busy && !running
+                ? null
+                : (enabled) =>
+                      _send('worldCircuitOptimization', {'enabled': enabled}),
+            contentPadding: EdgeInsets.zero,
+          ),
+          const Text('两种模式共用分组缓存和惰性状态；此开关控制设备信号去重加速，与 TWLD 显示器兼容配置分开。'),
+        ],
+        if (open && computer) ...[
+          const SizedBox(height: 12),
+          const Text('已核验：完整 Computerraria 内容、实际存储器坐标及 TWLD 显示器。'),
+          if (s['restoredFromExport'] == true)
+            const Text('已匹配本机导出的完整配对文件；保留保存时的实际 CPU、ROM 和显示器状态。'),
+          Text(
+            s['programName'] == null
+                ? '原始 ROM 为空。选择从地址 0 启动的 RV32I .bin 或十六进制 .txt。'
+                : 'ROM 程序：${s['programName']}',
+          ),
+          if (s['programIncomplete'] == true)
+            const Text('程序加载未完成；请重置原始世界后重新加载程序。'),
+          if (s['programBaselineKnown'] == false)
+            const Text('底层电路操作改变了未跟踪的状态，请重置后再替换程序或保存可续跑文件。'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed:
+                    _busy ||
+                        running ||
+                        s['programIncomplete'] == true ||
+                        s['programBaselineKnown'] == false
+                    ? null
+                    : () => _send('worldCircuitLoadPong'),
+                icon: const Icon(Icons.sports_esports),
+                label: const Text('载入 Pong 程序'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed:
+                    _busy ||
+                        running ||
+                        s['programIncomplete'] == true ||
+                        s['programBaselineKnown'] == false
+                    ? null
+                    : () => _send('worldCircuitLoadProgram'),
+                icon: const Icon(Icons.memory),
+                label: const Text('加载 RV32I 程序'),
+              ),
+              OutlinedButton(
+                onPressed: _busy
+                    ? null
+                    : () => _send('worldCircuitRefreshDisplay'),
+                child: const Text('读取显示器'),
+              ),
+              ChoiceChip(
+                label: const Text('黑白 64 × 48'),
+                selected: !_colorDisplay,
+                onSelected: (_) => setState(() => _colorDisplay = false),
+              ),
+              ChoiceChip(
+                label: const Text('彩色 176 × 96'),
+                selected: _colorDisplay,
+                onSelected: (_) => setState(() => _colorDisplay = true),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Builder(
+            builder: (context) {
+              final region = _colorDisplay
+                  ? ComputerrariaComputer.color
+                  : ComputerrariaComputer.mono;
+              final frames = s['displayFrames'] as Map? ?? const {};
+              final rgba = frames[region.name];
+              return Focus(
+                focusNode: _computerFocus,
+                onKeyEvent: _computerKey,
+                onFocusChange: (focused) {
+                  if (!focused) _releaseInput();
+                },
+                child: GestureDetector(
+                  onTap: _computerFocus.requestFocus,
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: math.min(
+                          800,
+                          MediaQuery.sizeOf(context).height *
+                              .65 *
+                              region.width /
+                              region.height,
+                        ),
+                      ),
+                      child: ComputerDisplay(
+                        rgba: rgba is Uint8List ? rgba : Uint8List(0),
+                        width: region.width,
+                        height: region.height,
+                        label: '${region.name}，显示实际物理像素状态',
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          Text(
+            '已执行 ${s['physicalPulses'] ?? 0} 个物理时钟脉冲 · 当前模式实测 ${((s['clockHz'] as num?) ?? 0).toStringAsFixed(1)} Hz · 显示读取 ${((s['displayHz'] as num?) ?? 0).toStringAsFixed(1)} 次/秒',
+          ),
+          const Text('时钟脉冲不等于 CPU 指令。运行速度取决于设备；彩色视图用实际帧状态对应的平面平均色。'),
+          if (s['keyboardVerified'] == true) ...[
+            const Text('点显示器后使用方向键或 WASD；屏幕方向键也可长按。失去焦点或暂停会释放输入。'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _directionButton('left', '向左', Icons.arrow_back),
+                _directionButton('up', '向上', Icons.arrow_upward),
+                _directionButton('down', '向下', Icons.arrow_downward),
+                _directionButton('right', '向右', Icons.arrow_forward),
+              ],
+            ),
+          ] else
+            const Text('键盘映射待实际传感器校准，当前未启用方向键。'),
+        ],
         if (open) ...[
           const SizedBox(height: 12),
           Wrap(

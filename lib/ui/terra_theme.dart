@@ -13,6 +13,10 @@ abstract final class TerraColors {
       red = Color(0xffeb978b);
 }
 
+// CanvasKit cannot use host-installed CJK fonts. Bundle this family so Chinese
+// labels and user-entered names render offline on Web and native targets.
+const terraFontFamily = 'TerraForge CJK';
+
 ThemeData terraTheme() => ThemeData(
   useMaterial3: true,
   brightness: Brightness.dark,
@@ -25,11 +29,8 @@ ThemeData terraTheme() => ThemeData(
     error: TerraColors.red,
     outline: TerraColors.border,
   ),
-  fontFamilyFallback: const [
-    'Noto Sans CJK SC',
-    'Microsoft YaHei',
-    'PingFang SC',
-  ],
+  fontFamily: terraFontFamily,
+  fontFamilyFallback: const [terraFontFamily],
   textTheme: const TextTheme(
     bodyMedium: TextStyle(fontSize: 13, height: 1.5),
     bodySmall: TextStyle(fontSize: 11, color: TerraColors.muted, height: 1.5),
@@ -45,7 +46,12 @@ ThemeData terraTheme() => ThemeData(
     fillColor: const Color(0xff101c25),
     isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
-    labelStyle: const TextStyle(color: TerraColors.muted, fontSize: 12),
+    labelStyle: const TextStyle(
+      color: TerraColors.muted,
+      fontSize: 12,
+      fontFamily: terraFontFamily,
+      fontFamilyFallback: [terraFontFamily],
+    ),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(9),
       borderSide: const BorderSide(color: TerraColors.border),
@@ -61,8 +67,8 @@ ThemeData terraTheme() => ThemeData(
       textStyle: const TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w700,
-        fontFamily: 'Noto Sans CJK SC',
-        fontFamilyFallback: ['Microsoft YaHei', 'PingFang SC'],
+        fontFamily: terraFontFamily,
+        fontFamilyFallback: [terraFontFamily],
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
     ),
@@ -75,8 +81,8 @@ ThemeData terraTheme() => ThemeData(
       textStyle: const TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        fontFamily: 'Noto Sans CJK SC',
-        fontFamilyFallback: ['Microsoft YaHei', 'PingFang SC'],
+        fontFamily: terraFontFamily,
+        fontFamilyFallback: [terraFontFamily],
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
     ),
@@ -86,13 +92,25 @@ ThemeData terraTheme() => ThemeData(
     backgroundColor: TerraColors.card,
     selectedColor: const Color(0xff29443e),
     side: const BorderSide(color: TerraColors.border),
-    labelStyle: const TextStyle(fontSize: 11),
+    labelStyle: const TextStyle(
+      fontSize: 11,
+      color: TerraColors.text,
+      fontFamily: terraFontFamily,
+      fontFamilyFallback: [terraFontFamily],
+    ),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
   ),
   navigationBarTheme: const NavigationBarThemeData(
     backgroundColor: TerraColors.sidebar,
     indicatorColor: Color(0xff29443e),
-    labelTextStyle: WidgetStatePropertyAll(TextStyle(fontSize: 10)),
+    labelTextStyle: WidgetStatePropertyAll(
+      TextStyle(
+        fontSize: 10,
+        color: TerraColors.text,
+        fontFamily: terraFontFamily,
+        fontFamilyFallback: [terraFontFamily],
+      ),
+    ),
   ),
   dialogTheme: DialogThemeData(
     backgroundColor: TerraColors.card,

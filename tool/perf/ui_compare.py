@@ -18,7 +18,8 @@ from ui_validate import validate
 
 MATCH_FIELDS = ('platform', 'osVersion', 'dartVersion', 'processors', 'processorModel',
                 'flutterVersion', 'runner', 'renderer', 'physicalWidth',
-                'physicalHeight', 'devicePixelRatio', 'refreshRateHz')
+                'physicalHeight', 'devicePixelRatio', 'refreshRateHz',
+                'memorySource', 'heapMeasurementMethod')
 
 
 def signature(report):

@@ -1,0 +1,158 @@
+--- a/include/terra_circuit_world.h
++++ b/include/terra_circuit_world.h
+@@ -16,7 +16,7 @@
+ enum TerraCircuitWorldCommandKind {
+     TCW_VIEWPORT = 1, TCW_TRIGGER = 2, TCW_TICKS = 3,
+     TCW_READ_LAMPS = 4, TCW_WRITE_LAMPS = 5, TCW_SAVE = 6,
+-    TCW_FRAGMENTS = 7, TCW_EXTRACT = 8
++    TCW_FRAGMENTS = 7, TCW_EXTRACT = 8, TCW_PIXELS = 9, TCW_OPTIMIZATION = 10
+ };
+ enum TerraCircuitWorldStatus {
+     TCW_OK = 0, TCW_CONTINUE = 1,
+@@ -26,7 +26,8 @@
+ /* Exactly twelve little-endian uint32 words. WRITE.data_ptr is borrowed until
+  * ack; READ.data_ptr is zero. RESULT holds 16-byte cell records. READY is idle.
+  * phase/completed/total are progress, independent of the source byte range.
+- * Non-SAVE READY.reserved bit 0 identifies native WireHead pixel-wave rules.
++ * Non-SAVE READY.reserved bit 1 reports the optional device-dedup fast path;
++ * it defaults OFF and is independent of bit 0's native WireHead pixel-wave rules.
+  * They are selected ONLY by a TWLD tile-map entry named WireHead/ColorPixelBox,
+  * never by the filename or saved numeric mod ID. Ordinary worlds retain vanilla
+  * per-TripWire PixelBox rules; the mod profile reproduces its documented same-
+@@ -51,6 +52,16 @@
+ /* VIEWPORT.flags bit 1 requests the separate wall layer. Its records remain
+  * 16 bytes: [x,y,wallId|flags<<16,wallPaint]. Wall flags: active=1, layer=32,
+  * invisible=64, fullbright=128. The wire mask is zero for this layer. */
++/* PIXELS uses a bounded x/y/width/height rectangle (area <=65536), flags=0.
++ * It returns only actual retained pixel tiles, sorted x then y; non-pixel cells
++ * are absent. Records match VIEWPORT's 16-byte layout. Wire masks derive from
++ * compiled ports; frames derive from the live pixel state. No source rescan,
++ * CPU decode, display-controller shortcut or framebuffer write is performed. */
++/* OPTIMIZATION uses mask=0 (prior per-trip mask clear, default) or 1 (generation
++ * dedup). It is accepted only at the ordinary idle command boundary. It changes
++ * no electrical, pixel, ROM/RAM, input or RNG state. Both modes retain the
++ * existing compiled topology and lazy lamp representation. It neither selects
++ * the TWLD compatibility profile nor claims a full WireHead implementation. */
+ typedef struct TerraCircuitWorldCommand {
+     uint32_t abi_version, kind, x, y, width, height, stride, mask;
+     uint32_t count;
+--- a/src/terra_abi.c
++++ b/src/terra_abi.c
+@@ -95,6 +95,8 @@
+     ",\"circuitWorldAbiVersion\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
+     ",\"circuitWorldFragmentObjects\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
+     ",\"circuitWorldFragmentSupports\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
++    ",\"circuitWorldPixels\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
++    ",\"circuitWorldOptimization\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_WLD)
+     ",\"playerWorkspaceAbiVersion\":" TERRAX_STRINGIFY(TERRAWASM_FEATURE_PLR)
+     ",\"sourceCommit\":\"" TERRAX_BUILD_COMMIT "\""
+     ",\"dirty\":" TERRAX_STRINGIFY(TERRAX_BUILD_DIRTY)
+--- a/src/terra_circuit_devices.c
++++ b/src/terra_circuit_devices.c
+@@ -24,7 +24,7 @@
+     for(uint32_t i=0;i<w->policy_count;){CxActuationPolicy* p=w->policies+i;fill_policy(w,p,w->x,w->column);if(w->x>=p->x+2u||w->x+1u==w->width){finish_policy(w,p);w->policies[i]=w->policies[--w->policy_count];}else ++i;}
+     w->column_device_first=w->device_count;
+     for(uint32_t y=0;y<w->height;y++){TxTile* t=w->column+y;if(!t->active&&!t->actuator)continue;
+-        if(t->type==445u||t->type==0xfffeu){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->custom=t->type==0xfffeu;p->state=p->initial=p->custom?(uint8_t)((t->frame_x/18)&3u)|((uint8_t)((t->frame_y/18)&3u)<<2):(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;}
++        if(t->type==445u||t->type==0xfffeu){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->custom=t->type==0xfffeu;p->cell_word=t->type|((uint32_t)(t->active|(t->actuator<<1)|(t->inactive<<2)|(p->custom?8u:0u)|(t->wall?16u:0u))<<16)|(cx_wire_mask(t)<<24);p->state=p->initial=p->custom?(uint8_t)((t->frame_x/18)&3u)|((uint8_t)((t->frame_y/18)&3u)<<2):(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;}
+         if(is_switch(t->type)||t->actuator||t->type==130u||t->type==131u){if(!grow(w,(void**)&w->devices,&w->device_capacity,w->device_count+1u,sizeof(CxDevice)))return TCW_MEMORY;CxDevice* d=w->devices+w->device_count++;memset(d,0,sizeof(*d));d->x=w->x;d->y=y;d->tile=d->initial=*t;if(t->type==144u)d->tile.frame_y=0;if(t->actuator||t->type==130u||t->type==131u){int s=prepare_policy(w,d);if(s)return s;}}
+     }return TCW_OK;
+ }
+@@ -53,7 +53,10 @@
+ CxDevice* cx_device_find(CxWorld* w,uint32_t x,uint32_t y){uint32_t lo=0,hi=w->device_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;CxDevice* p=w->devices+m;if(p->x<x||(p->x==x&&p->y<y))lo=m+1;else hi=m;}return lo<w->device_count&&w->devices[lo].x==x&&w->devices[lo].y==y?w->devices+lo:NULL;}
+ static int check_mech(CxWorld* w,CxDevice* d,uint32_t time){if(d->cooldown||w->mech_count>=CX_MECH_LIMIT)return 0;if(w->mech_count>=w->mech_capacity)return -1;d->cooldown=time;w->mechs[w->mech_count++]=(uint32_t)(d-w->devices);return 1;}
+ static int toggle_timer(CxWorld* w,CxDevice* d){if(d->tile.frame_y==0){d->tile.frame_y=18;if(check_mech(w,d,18000u)<0)return -1;}else d->tile.frame_y=0;return 0;}
+-int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->twld_state)w->pixel_touched_count=0;for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
++/* Device dedup belongs to one TripWire. Epochs avoid clearing every unrelated
++ * switch for each gate output; wrapping the epoch restores an empty generation.
++ * Epoch state is transient, so cancellation starts fresh on the next trip. */
++int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->twld_state)w->pixel_touched_count=0;if(w->optimization){if(++w->wire_trip_epoch==0u){for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_epoch=0;w->wire_trip_epoch=1u;}}else for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
+ int cx_net_hit(void* context,uint32_t net){
+     CxWorld* w=(CxWorld*)context;uint32_t group=net+1u,lo=0,hi=w->port_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;if(w->ports[m].net<group)lo=m+1;else hi=m;}
+     while(lo<w->port_count&&w->ports[lo].net==group){CxPort* port=w->ports+lo++;
+@@ -62,7 +65,7 @@
+             else if(d->tile.type==131u)d->tile.type=130u;else{if(d->can_deactivate<0)return cx_fail(w,TCW_UNSUPPORTED,"active stone support neighborhood is unavailable");/* Unlike DeActive, ActiveStone always calls CanKillTile, even with an empty cell above. */if(d->can_deactivate&&d->tile.wall!=350u)d->tile.type=131u;}continue;
+         }
+         if(port->axis==2u){CxDevice* d=w->devices+port->pixel;if(w->vm_trip_index==1u&&d->x>=w->seed_x&&d->x-w->seed_x<w->seed_width&&d->y>=w->seed_y&&d->y-w->seed_y<w->seed_height)continue;if(toggle_timer(w,d)<0)return -1;continue;}
+-        if(port->axis==3u){CxDevice* d=w->devices+port->pixel;uint32_t x=d->x-(uint32_t)(d->tile.frame_x%36/18),y=d->y-(uint32_t)(d->tile.frame_y%36/18);CxDevice* base=cx_device_find(w,x,y);if(!base)continue;uint32_t bit=1u<<port->colour;if(base->wire_hit_mask&bit)continue;
++        if(port->axis==3u){CxDevice* d=w->devices+port->pixel;uint32_t x=d->x-(uint32_t)(d->tile.frame_x%36/18),y=d->y-(uint32_t)(d->tile.frame_y%36/18);CxDevice* base=cx_device_find(w,x,y);if(!base)continue;if(w->optimization&&base->wire_hit_epoch!=w->wire_trip_epoch){base->wire_hit_epoch=w->wire_trip_epoch;base->wire_hit_mask=0;}uint32_t bit=1u<<port->colour;if(base->wire_hit_mask&bit)continue;
+             if(w->vm_trip_index==1u&&d->x>=w->seed_x&&d->x-w->seed_x<w->seed_width&&d->y>=w->seed_y&&d->y-w->seed_y<w->seed_height)continue;
+             base->wire_hit_mask|=bit;int shift=base->tile.frame_x>=36?-36:36;for(uint32_t a=x;a<x+2u;a++)for(uint32_t b=y;b<y+2u;b++){CxDevice* part=cx_device_find(w,a,b);if(part&&part->tile.type==411u)part->tile.frame_x=(int16_t)(part->tile.frame_x+shift);}continue;
+         }
+--- a/src/terra_circuit_query.c
++++ b/src/terra_circuit_query.c
+@@ -99,11 +99,39 @@
+     if(w->command.kind==TCW_TICKS){int s=cx_seed_reserve(w,4u);if(s)return s;s=cx_operation_begin(w);if(s)return s;w->tick_remaining=w->command.count;w->tick_stage=0;w->phase=CX_TICKS;return TCW_OK;}
+     w->phase=CX_IDLE;return TCW_OK;
+ }
++static int query_pixels(CxWorld* w,const TerraCircuitWorldCommand* cmd){
++    if(!cmd->width||!cmd->height||cmd->x>=w->width||cmd->y>=w->height||cmd->width>w->width-cmd->x||cmd->height>w->height-cmd->y||(uint64_t)cmd->width*cmd->height>65536u||cmd->data_count||cmd->flags)return TCW_INVALID;
++    uint32_t lo=0,hi=w->pixel_count;
++    while(lo<hi){uint32_t m=lo+(hi-lo)/2u;if(w->pixels[m].x<cmd->x)lo=m+1u;else hi=m;}
++    uint32_t first=lo,count=0;
++    for(uint32_t i=first;i<w->pixel_count&&w->pixels[i].x<cmd->x+cmd->width;i++)if(w->pixels[i].y>=cmd->y&&w->pixels[i].y<cmd->y+cmd->height)++count;
++    int s=reserve_result(w,count);if(s)return s;
++    w->result_count=0;
++    for(uint32_t i=first;i<w->pixel_count&&w->pixels[i].x<cmd->x+cmd->width;i++){
++        CxPixel* p=w->pixels+i;if(p->y<cmd->y||p->y>=cmd->y+cmd->height)continue;
++        uint32_t* out=w->result+w->result_count++*4u;
++        out[0]=p->x;out[1]=p->y;out[2]=p->cell_word;
++        if(out[2]&(2u<<16)){CxDevice* d=cx_device_find(w,p->x,p->y);if(d)out[2]=(out[2]&~(4u<<16))|((uint32_t)d->tile.inactive<<18);}
++        out[3]=p->custom?18u*(p->state&3u)|((18u*((p->state>>2)&3u))<<16):18u*p->state;
++    }
++    w->command=*cmd;cx_emit(w,TCW_RESULT,0,0,w->result_count*16u,w->result);w->event.result_kind=TCW_PIXELS;w->event.result_count=w->result_count;return TCW_CONTINUE;
++}
+ int32_t terra_circuit_world_command(uint32_t handle,const TerraCircuitWorldCommand* input){
+     CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;if(!input)return TCW_INVALID;if(w->phase!=CX_IDLE||w->event.kind)return TCW_STATE;
+-    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=1||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_EXTRACT||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
++    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=1||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_OPTIMIZATION||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
+     /* A rejected bounded query must not poison SAVE's earlier dispatch path. */
+     w->error=0;
++    if(cmd.kind==TCW_OPTIMIZATION){
++        if(cmd.mask>1u||cmd.data_count||cmd.flags)return TCW_INVALID;
++        if(w->optimization!=cmd.mask){
++            /* Transient dedup metadata has no saved-world meaning. Reset it at
++             * the idle boundary so switching cannot alias an earlier epoch. */
++            for(uint32_t i=0;i<w->device_count;i++){w->devices[i].wire_hit_mask=0;w->devices[i].wire_hit_epoch=0;}
++            w->wire_trip_epoch=0;w->optimization=cmd.mask;
++        }
++        w->command=cmd;return TCW_OK;
++    }
++    if(cmd.kind==TCW_PIXELS)return query_pixels(w,&cmd);
+     if(cmd.kind==TCW_FRAGMENTS||cmd.kind==TCW_EXTRACT)return cx_fragments_begin(w,&cmd);
+     if(cmd.kind==TCW_TRIGGER&&(cmd.flags&1u)){int s=cx_interaction_rect(w,&cmd);if(s<0)return TCW_INVALID;if(!s){w->command=cmd;return TCW_OK;}}
+     if((cmd.kind==TCW_VIEWPORT||cmd.kind==TCW_TRIGGER)&&(!cmd.width||!cmd.height||cmd.x>=w->width||cmd.y>=w->height||cmd.width>w->width-cmd.x||cmd.height>w->height-cmd.y))return TCW_INVALID;
+--- a/src/terra_circuit_world.c
++++ b/src/terra_circuit_world.c
+@@ -221,7 +221,7 @@
+         if(status==TCW_CONTINUE&&!work)break;
+     }
+     memset(out,0,sizeof(*out));out->abi_version=1;out->kind=w->phase==CX_IDLE?TCW_READY:TCW_MORE;out->phase=w->phase;out->completed=w->x;out->total=w->width;
+-    if(w->phase==CX_IDLE){out->result_kind=w->command.kind;out->reserved=w->twld_state&1u;if(w->command.kind==TCW_SAVE){out->source_id=w->output_source;out->result_count=w->save_result_size;out->reserved=w->twld_saved_size;}else if(w->command.kind==TCW_FRAGMENTS||w->command.kind==TCW_EXTRACT)out->result_count=cx_fragments_result_count(w);}
++    if(w->phase==CX_IDLE){out->result_kind=w->command.kind;out->reserved=(w->twld_state&1u)|(w->optimization?2u:0u);if(w->command.kind==TCW_SAVE){out->source_id=w->output_source;out->result_count=w->save_result_size;out->reserved=w->twld_saved_size;}else if(w->command.kind==TCW_FRAGMENTS||w->command.kind==TCW_EXTRACT)out->result_count=cx_fragments_result_count(w);}
+     return w->phase==CX_IDLE?TCW_OK:TCW_CONTINUE;
+ }
+ int32_t terra_circuit_world_stats(uint32_t handle,TerraCircuitWorldStats* out){
+--- a/src/terra_circuit_world_internal.h
++++ b/src/terra_circuit_world_internal.h
+@@ -40,9 +40,9 @@
+     uint32_t x,y,nets[4],opposite[4],gate; TxTile tile;
+ } CxBinding;
+ typedef struct CxInputPoint { uint32_t x,y,value,index; } CxInputPoint;
+-typedef struct CxDevice { uint32_t x,y,nets[4],pulse_nets[4],gate; TxTile tile,initial; uint32_t cooldown,saved_cooldown,wire_hit_mask; int32_t can_deactivate; } CxDevice;
++typedef struct CxDevice { uint32_t x,y,nets[4],pulse_nets[4],gate; TxTile tile,initial; uint32_t cooldown,saved_cooldown,wire_hit_mask,wire_hit_epoch; int32_t can_deactivate; } CxDevice;
+ typedef struct CxActuationPolicy { uint32_t device,x,y; uint32_t valid; TxTile above[10]; } CxActuationPolicy;
+-typedef struct CxPixel { uint32_t x,y,h[4],v[4]; uint8_t state,initial,hit_h,hit_v,custom,marked; uint8_t reserved[2]; } CxPixel;
++typedef struct CxPixel { uint32_t x,y,h[4],v[4],cell_word; uint8_t state,initial,hit_h,hit_v,custom,marked; uint8_t reserved[2]; } CxPixel;
+ typedef struct CxModTile { TerraTwldTile tile; TxTile vanilla; } CxModTile;
+ typedef struct CxPort { uint32_t net,pixel; uint8_t axis,colour; uint16_t reserved; } CxPort;
+ typedef struct CxFragments CxFragments;
+@@ -89,7 +89,7 @@
+     CxPort* ports; uint32_t port_count;
+     uint32_t* pixel_touched; uint32_t pixel_touched_count;
+     uint8_t* pixel_snapshot;
+-    uint32_t vm_trip_index;
++    uint32_t vm_trip_index,wire_trip_epoch,optimization;
+     uint32_t vm_source_gate;
+     CxOverride* overrides; uint32_t override_count,override_capacity;
+     CxOverride* override_snapshot; uint32_t override_snapshot_capacity,override_saved_count;

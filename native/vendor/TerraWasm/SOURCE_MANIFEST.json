@@ -2,7 +2,7 @@
   "schema": 1,
   "sourceRepository": "Live-yum/TerraWasm",
   "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
-  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs.",
+  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The explicitly recorded full-world-pixels-v1 local patch adds a read-only retained-pixel query and equivalent device-dedup generation optimization; its original/current hashes and reviewed diff are distributed under native/patches.",
   "license": "No upstream license grant identified; inclusion is user-authorized and does not relicense upstream material.",
   "files": [
     {
@@ -92,8 +92,8 @@
     },
     {
       "path": "include/terra_circuit_world.h",
-      "bytes": 6543,
-      "sha256": "6728a2c78cc025aa40e34660217d7b5323485898dac8b780ffb3bfecb9712f8f"
+      "bytes": 7459,
+      "sha256": "b8fe117c8bb6ad8eb731313ec7b9fc7d1be2264f7c14d9f5579eb086ec654de9"
     },
     {
       "path": "include/terra_color_data.h",
@@ -222,8 +222,8 @@
     },
     {
       "path": "src/terra_abi.c",
-      "bytes": 4304,
-      "sha256": "fbf85a40d92725a4ec4961947d7043dd0f102189e176a52c3d86406dd0753bdc"
+      "bytes": 4452,
+      "sha256": "15bf8fd1958814f776e6957b0c270640672ed750af5ab4bdb01203054777d585"
     },
     {
       "path": "src/terra_api.c",
@@ -247,8 +247,8 @@
     },
     {
       "path": "src/terra_circuit_devices.c",
-      "bytes": 15719,
-      "sha256": "4b584e668f1c20492974d84d2e523de82c5875482fec77f005d377f550e66174"
+      "bytes": 16371,
+      "sha256": "aca9d4fef000daa33d64e1e7de5a90698ebd461d6dec13c9655acc15a1d63ac7"
     },
     {
       "path": "src/terra_circuit_fragments.inc",
@@ -262,8 +262,8 @@
     },
     {
       "path": "src/terra_circuit_query.c",
-      "bytes": 18110,
-      "sha256": "adede2c3dd371f18e5804b0a27b91a7df18f7196ac986873212849659c0afa8c"
+      "bytes": 20041,
+      "sha256": "4ada9f1d446e26d9fb8ffef8ff3b99da77de9df444430a7e123e0bc9de2aafec"
     },
     {
       "path": "src/terra_circuit_rules.c",
@@ -292,13 +292,13 @@
     },
     {
       "path": "src/terra_circuit_world.c",
-      "bytes": 19491,
-      "sha256": "af78e5cf1e7884d97a16a516390d7ffbf1786a66a928509ab0402bdbbc112cfd"
+      "bytes": 19517,
+      "sha256": "68d8fc056acdfadee0f751031f72a7168e3049e123e29e4f366164669d61127b"
     },
     {
       "path": "src/terra_circuit_world_internal.h",
-      "bytes": 9555,
-      "sha256": "2d982d3f755a6100515322fd8a26cf9acb1fe20a1c86f459abdc2a9b6265d452"
+      "bytes": 9609,
+      "sha256": "90950c38a5ecf6e3d7cbe94ad3c9a54a6628bd00ddf2823c0639be787eb7296f"
     },
     {
       "path": "src/terra_commands.c",
@@ -494,6 +494,13 @@
       "path": "src/terra_zlib_bridge.c",
       "bytes": 2953,
       "sha256": "90d525c13fd448abcd473ed53912e9a59af4849d6faa75d2948d8dbbfdbc4bc7"
+    }
+  ],
+  "localPatches": [
+    {
+      "id": "full-world-pixels-v1",
+      "manifest": "native/patches/full-world-pixels.json",
+      "sha256": "ee3bb706e7f4cd9437faaa61247182bc5943957b0a93c63dcc21082fb2efa824"
     }
   ]
 }
