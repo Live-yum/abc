@@ -186,7 +186,8 @@ Future<void> _quiet(
   journal.boundary('drain-end', cycle);
 }
 
-Future<_ObservedBackend> _cycle({
+// ignore: library_private_types_in_public_api
+Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
   required WidgetTester tester,
   required int cycle,
   required WorldCircuitSource source,
@@ -302,8 +303,9 @@ Future<_ObservedBackend> _cycle({
       final pending = controller.dispatch('worldCircuitImport');
       final watch = Stopwatch()..start();
       while (state()['importing'] != true || events.isEmpty) {
-        if (watch.elapsed > const Duration(seconds: 10))
+        if (watch.elapsed > const Duration(seconds: 10)) {
           fail('Import never entered cancellable state');
+        }
         await tester.pump(const Duration(milliseconds: 16));
       }
       evidence['cancelRequestedAfterNativeOpenStarted'] = true;
@@ -444,16 +446,19 @@ Future<_ObservedBackend> _cycle({
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('eight bounded WLD memory attribution cycles', (tester) async {
-    if (!kProfileMode || !Platform.isLinux)
+    if (!kProfileMode || !Platform.isLinux) {
       fail('Requires real Linux Flutter profile');
+    }
     binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
     final source = await inputs.computerInput();
     final path = Platform.environment['ABC_MEMORY_RAW_DIRECTORY'];
-    if (path == null || path.isEmpty)
+    if (path == null || path.isEmpty) {
       fail('Explicit new raw directory required');
-    final directory = Directory(path!);
-    if (directory.existsSync())
+    }
+    final directory = Directory(path);
+    if (directory.existsSync()) {
       fail('Raw directory must be new; no mixed attempts');
+    }
     await directory.create(recursive: true);
     final recorder = ProfileRecorder(
       frameBudgetUs: 1000000 / 60,
@@ -481,7 +486,7 @@ void main() {
         journal.boundary('cycle-start', cycle);
         final evidence = <String, Object?>{};
         cycles.add(evidence);
-        final backend = await _cycle(
+        final backend = await runComputerMemoryDiagnosticCycle(
           tester: tester,
           cycle: cycle,
           source: source,
@@ -535,11 +540,11 @@ void main() {
         await journal.flush('final-received-tail');
         osResult = await os?.finish();
         if (osResult != null) {
-          if (osResult!['error'] != null) {
+          if (osResult['error'] != null) {
             status = 'failed';
-            failure = '$failure; OS sampler: ${osResult!['error']}';
+            failure = '$failure; OS sampler: ${osResult['error']}';
           }
-          final files = osResult!['files'] as List;
+          final files = osResult['files'] as List;
           for (var i = 0; i < files.length; i++) {
             final row = Map<String, Object?>.from(files[i] as Map);
             files[i] = {

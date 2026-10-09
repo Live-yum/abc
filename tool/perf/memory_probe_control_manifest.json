@@ -1,0 +1,37 @@
+{
+  "schema": "abc.memory-probe-control-manifest.v1",
+  "baseCommit": "51bc8eaa76b145b0d9bec3c95977779af43b676c",
+  "productChangeAllowed": false,
+  "arms": [
+    "probe-only",
+    "product-os-only"
+  ],
+  "processInvocationsPerArm": 1,
+  "runtimeSecondsPerArm": 600,
+  "buildSecondsPerArm": 300,
+  "plannedCycles": 8,
+  "plannedCheckpoints": 17,
+  "inProcessOsSampler": "retained in both arms; identical 10ms RSS/100ms smaps helper",
+  "externalOsSampler": "one distinct monitor per arm; only its verified owned app PID",
+  "vmCallsByArm": {
+    "probe-only": 17,
+    "product-os-only": 0
+  },
+  "expectedNativeWorkersByArm": {
+    "probe-only": 0,
+    "product-os-only": 1
+  },
+  "schedule": "tool/perf/memory_probe_control_schedule.json",
+  "scheduleSha256": "bedae8b1416f4124160c4e75323436e3b04df4fc1b709c89a04a34070087657a",
+  "originalTestBaseSha256": "5a51807e47db39804d8a93393125503851ea7f6efc869c079edb9c07fd668742",
+  "originalTestAllowedChange": "_cycle( becomes runComputerMemoryDiagnosticCycle( at definition and call only; one library_private_types_in_public_api ignore comment at the public definition",
+  "measurementsAreComparableBy": "named stage and nominal fixed schedule; actual delays/overruns are reported, never compressed",
+  "finalQuiet": "three 16ms frame barriers and at least1200ms real quiet in both arms; no extra per-probe quiet",
+  "nativeAllocationCounters": "OFF; no malloc_trim or allocator modifications",
+  "originalObservation": {
+    "releasedCheckpointRssNetMiB": 199.05078125,
+    "matchedReleasedQuietLastRssNetMiB": 205.4609375,
+    "plateauEstablished": false,
+    "causalAttribution": "unresolved"
+  }
+}

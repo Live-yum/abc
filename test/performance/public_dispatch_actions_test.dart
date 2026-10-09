@@ -197,7 +197,7 @@ void main() {
             expect(app.view.error, isEmpty, reason: '$name: ${app.view.error}');
             final phase = bench.cycle == -1 ? 'cold' : 'warm';
             final row = bench.rows['workspace.$id/$fixture/$phase'];
-            if (row != null)
+            if (row != null) {
               row.addAll({
                 'controller': 'Workspace',
                 'action': name,
@@ -210,6 +210,7 @@ void main() {
                       : 'real-native-codec',
                 },
               });
+            }
           }
 
           Future<Map<String, dynamic>> readback(String kind) async {
@@ -281,7 +282,7 @@ void main() {
               kills.any(
                 (x) =>
                     x['persistentNpcId'] == 'SyntheticCreature' &&
-                    x['killCount'] == 50,
+                    x['killCount'] == 17,
               ),
               isTrue,
             );
@@ -293,6 +294,29 @@ void main() {
               ),
               isTrue,
             );
+            // Batch unlock preserves positive counts and unlocks zero/missing
+            // known entries; unknown original records must also survive export.
+            expect(
+              kills.any(
+                (x) =>
+                    x['persistentNpcId'] == 'SyntheticLockedCreature' &&
+                    x['killCount'] == 50,
+              ),
+              isTrue,
+            );
+            for (final section in ['sightings', 'chats']) {
+              final rows = edited['bestiary'][section] as List;
+              for (final id in [
+                'SyntheticCreature',
+                'SyntheticLockedCreature',
+              ]) {
+                expect(
+                  rows.any((row) => row['persistentNpcId'] == id),
+                  isTrue,
+                  reason: '$section must include $id after export and reopen',
+                );
+              }
+            }
             await action('rules.preset-clone', 'worldPresetClone', {
               'id': 'synthetic-preset',
             });
@@ -463,11 +487,11 @@ void main() {
               bench.memory('after-close-gc', diagnostic);
             }
           }
-          await bench.write(output!, 'running');
+          await bench.write(output, 'running');
         }
         status = 'passed';
       } finally {
-        await bench.write(output!, status);
+        await bench.write(output, status);
         await vm_memory.closeMemoryProbe();
         await root.delete(recursive: true);
       }

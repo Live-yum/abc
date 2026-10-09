@@ -1,0 +1,111 @@
+name: Fixed-pin rules-only diagnostic
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - '.github/workflows/rules-only-diagnostic.yml'
+      - 'tool/perf/rules_diagnostic/**'
+  workflow_dispatch:
+    inputs:
+      observations:
+        description: Auxiliary probes alter allocation timing; keep groups separate
+        type: choice
+        options: ['off', auxiliary]
+        default: 'off'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rules-only-diagnostic-${{ github.ref }}-${{ inputs.observations || 'off' }}
+  cancel-in-progress: false
+
+jobs:
+  scope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scope contracts
+        run: python3 tool/perf/rules_diagnostic/test_event_scope.py
+      - id: scope
+        run: python3 tool/perf/rules_diagnostic/event_scope.py
+  rules-only:
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    name: Rules-only ABBAAB (${{ inputs.observations || 'off' }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      OBSERVATIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.observations || 'off' }}
+    steps:
+      - name: Checkout diagnostic source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout fixed baseline inputs
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: a5612b474fc8dc50d41b3bc6b87234d30ba97e02
+          path: build/rules-pins/baseline
+          persist-credentials: false
+      - name: Checkout fixed candidate inputs
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: cddd936f95d31b14a76503e13ffc89173110a057
+          path: build/rules-pins/candidate
+          persist-credentials: false
+      - name: Set exact Node version
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.23.3'
+          check-latest: false
+      - name: Verify pins and prepare without rebuilding
+        run: |
+          python3 tool/perf/rules_diagnostic/prepare_inputs.py \
+            --baseline-source build/rules-pins/baseline \
+            --candidate-source build/rules-pins/candidate \
+            --output-dir build/perf/rules-diagnostic/prepared
+          python3 - <<'PY'
+          import hashlib, json, pathlib, subprocess
+          root = pathlib.Path('.')
+          revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          files = [root / '.github/workflows/rules-only-diagnostic.yml', *sorted((root / 'tool/perf/rules_diagnostic').glob('*'))]
+          record = {'schema': 'abc.rules-only-workflow-source.v1', 'repository': 'Live-yum/abc', 'commit': revision,
+                    'files': {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()}}
+          pathlib.Path('build/perf/rules-diagnostic/workflow-source.json').write_text(json.dumps(record, indent=2) + '\n')
+          PY
+      - name: Lightweight validator and observer contracts
+        run: |
+          python3 build/perf/rules-diagnostic/prepared/run_diagnostic.py
+          python3 build/perf/rules-diagnostic/prepared/test_diagnostic.py \
+            > build/perf/rules-diagnostic/validation.log 2>&1
+          cat build/perf/rules-diagnostic/validation.log
+      - name: Exactly six rules-only processes
+        run: >-
+          python3 build/perf/rules-diagnostic/prepared/run_diagnostic.py
+          --execute --observations "$OBSERVATIONS" --timeout-seconds 300
+          --output-dir "build/perf/rules-diagnostic/$OBSERVATIONS"
+      - name: Preserve this diagnostic group
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rules-only-${{ env.OBSERVATIONS }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/perf/rules-diagnostic/${{ env.OBSERVATIONS }}/
+            build/perf/rules-diagnostic/prepared/input-manifest.json
+            build/perf/rules-diagnostic/prepared/source-manifest.json
+            build/perf/rules-diagnostic/workflow-source.json
+            build/perf/rules-diagnostic/validation.log
+          if-no-files-found: warn
+          retention-days: 30

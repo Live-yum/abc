@@ -1,0 +1,128 @@
+name: Additional fixed-pin MAP generation causal diagnostic
+
+# A new PR can register this workflow without merging into the default branch.
+# It diagnoses older A/B products and cannot accept the current PR product.
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - .github/workflows/performance-mapgen-diagnostic.yml
+      - tool/perf/mapgen_diagnostic*.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mapgen-fixed-pin-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  MAPGEN_WORKFLOW_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  scope:
+    name: Check this push changed the additional MAP diagnostic
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.MAPGEN_WORKFLOW_HEAD }}
+          persist-credentials: false
+          fetch-depth: 2
+      - id: scope
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tool/perf')
+          from mapgen_diagnostic_contract import diagnostic_changed
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          enabled = os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch'
+          if not enabled:
+              # PR paths are cumulative; check only this push for repeat control.
+              before = event.get('before') if event.get('action') == 'synchronize' else event['pull_request']['base']['sha']
+              assert isinstance(before, str) and re.fullmatch(r'[0-9a-f]{40}', before), 'Missing before SHA; use manual dispatch'
+              subprocess.run(['git', 'fetch', '--no-tags', '--depth=1', 'origin', before], check=True)
+              paths = subprocess.check_output(['git', 'diff', '--name-only', before, 'HEAD'], text=True).splitlines()
+              enabled = diagnostic_changed(paths)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('run=' + str(enabled).lower() + '\n')
+          PY
+
+  mapgen:
+    name: MAP only / A, A plus SHA, A plus query, B / 3 processes each
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out the diagnostic workflow head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.MAPGEN_WORKFLOW_HEAD }}
+          persist-credentials: false
+      - name: Check out fixed product A
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: a5612b474fc8dc50d41b3bc6b87234d30ba97e02
+          path: build/mapgen-source-A
+          persist-credentials: false
+      - name: Check out fixed product B
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: cddd936f95d31b14a76503e13ffc89173110a057
+          path: build/mapgen-source-B
+          persist-credentials: false
+      - name: Install the existing native build dependencies
+        timeout-minutes: 10
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake zlib1g-dev
+      - name: Run lightweight diagnostic contracts
+        timeout-minutes: 2
+        run: python3 -m unittest discover -s tool/perf -p 'mapgen_diagnostic_test.py' -v
+      - name: Build all four isolated variants sequentially and archive actual objects
+        run: >-
+          python3 tool/perf/mapgen_diagnostic_runner.py prepare
+          --workflow-root . --baseline build/mapgen-source-A --candidate build/mapgen-source-B
+          --work build/mapgen-variant-work --output build/mapgen-diagnostic-evidence
+      - name: Run separate frozen and auxiliary groups, 12 serial processes each
+        run: >-
+          python3 tool/perf/mapgen_diagnostic_runner.py run
+          --workflow-root . --baseline build/mapgen-source-A --candidate build/mapgen-source-B
+          --work build/mapgen-variant-work --output build/mapgen-diagnostic-evidence
+      - name: Validate retained evidence and apply the unchanged comparator only to frozen reports
+        if: always()
+        timeout-minutes: 10
+        run: >-
+          python3 tool/perf/mapgen_diagnostic_validate.py
+          --candidate build/mapgen-source-B --output build/mapgen-diagnostic-evidence
+      - name: Publish scope and diagnostic result
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          path = Path('build/mapgen-diagnostic-evidence/summary.json')
+          result = json.loads(path.read_text()) if path.exists() else {'status': 'missing-summary'}
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write('Additional MAP-only fixed a5612b4/cddd936 experiment: ' + result['status'] + '\n\n')
+              output.write('Two derived variants have their own patch, tree and local commit identities.\n\n')
+              output.write('Original regressions remain. Auxiliary data is excluded from frozen comparison. ')
+              output.write('Current-head acceptance, the other five suites and new workloads remain unestablished.\n')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        timeout-minutes: 5
+        with:
+          name: mapgen-factorial-${{ env.MAPGEN_WORKFLOW_HEAD }}-attempt-${{ github.run_attempt }}
+          path: build/mapgen-diagnostic-evidence/
+          if-no-files-found: error
+          retention-days: 30

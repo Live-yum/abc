@@ -60,6 +60,16 @@ Uint8List publicPerformanceCatalog() {
           'killCountNeededToFullyUnlock': 50,
         },
       },
+      {
+        'id': 2,
+        'persistentNpcId': 'SyntheticLockedCreature',
+        'name': 'Synthetic locked creature',
+        'unlockRule': {
+          'kind': 'kills',
+          'persistentNpcId': 'SyntheticLockedCreature',
+          'killCountNeededToFullyUnlock': 50,
+        },
+      },
     ],
     'world-rule-presets': [preset],
     'player-conversion-profiles': [
