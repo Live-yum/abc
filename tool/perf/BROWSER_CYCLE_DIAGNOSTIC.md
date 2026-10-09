@@ -226,3 +226,19 @@ that envelope and sets its count only for SAVE/FRAGMENTS/EXTRACT
 coordinate, uniqueness, tile and pixel-frame check. Synthetic fixtures use the
 realistic zero DONE count. Future monitor-observation failures record only
 scalar result kind/count, record constructor and byte length, never buffers.
+
+## Preserved second-attempt monitor-selector failure
+
+Run `37969035697`, diagnostic commit
+`755a69a633a3fcb73e01b5aa48d44d693d54c95d`, completed the ON/Pong boot and recorded
+116,096 physical pulse acknowledgements and 910 display observations, with no
+bridge errors or renderer crashes. It then failed its 30-second monitor-focus
+control lookup. The failed/partial evidence is retained; keyboard interaction
+and the full three-cycle protocol were not established by that attempt.
+
+The actual accessibility tree exposes the exact monitor label as an enabled,
+focusable `button` (node 541), with same-label StaticText/InlineTextBox descendants.
+Flutter's GestureDetector merges its image semantics into that button. The
+selector now accepts a unique enabled exact-label button or image, while excluding
+text, ignored/disabled nodes and ambiguous actionable matches. A reduced fixture
+from that actual AX tree and negative selector cases cover this diagnostic-only fix.

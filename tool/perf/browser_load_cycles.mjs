@@ -219,9 +219,12 @@ export function observeCycleEvent(state, event) {
 }
 
 function hasLabel(nodes, label) { return nodes.some(n => !n.ignored && n.name?.value === label); }
-function displayNode(nodes) {
+export function displayNode(nodes) {
+  // Flutter merges the image with its GestureDetector into an actionable button.
+  // Same-label StaticText/InlineTextBox descendants are not focus-click targets.
   const found = nodes.filter(n => !n.ignored && n.name?.value === DISPLAY_LABEL
-    && ['image', 'img'].includes(n.role?.value));
+    && ['button', 'image', 'img'].includes(n.role?.value)
+    && !n.properties?.some(p => p.name === 'disabled' && p.value?.value === true));
   return found.length === 1 ? found[0] : null;
 }
 export function optimizationNode(nodes) {

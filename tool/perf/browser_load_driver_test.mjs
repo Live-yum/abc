@@ -71,7 +71,7 @@ test('frozen production-shaped bridge is forwarded without mutating, retaining o
 });
 
 // Synthetic cycle contracts: never starts Chrome or invokes a real product.
-import {CYCLE_LIMITS, clickGeometry, summarizeDisplay, commandKind, installCycleInstrumentation,
+import {CYCLE_LIMITS, clickGeometry, displayNode, summarizeDisplay, commandKind, installCycleInstrumentation,
   newCycleState, observeCycleEvent, releaseWindow, releaseWindowComplete, ownershipSnapshot, quietCloseEvidence, cycleReadyEvidence, closedEvidence, optimizationNode, checked, uiPulses} from './browser_load_cycles.mjs';
 
 function physicalDisplay(lit = [[0, 20], [0, 21], [31, 25]], session = 1) {
@@ -349,5 +349,55 @@ test('malformed monitor observation retains scalar shape and forwards original r
       recordsConstructor: 'Uint8Array', recordsByteLength: 49136});
     assert.equal('records' in error, false); assert.equal('records' in error.resultShape, false);
     assert.ok(JSON.stringify(error).length < 600);
+  }
+});
+
+
+// Reduced from run37969035697 failure-accessibility.json. Keep actual role,
+// focusability, label and parent/child structure; omit unrelated Chrome fields.
+function observedMonitorAX() {
+  return [
+    {nodeId: '541', ignored: false, role: {type: 'role', value: 'button'},
+      name: {type: 'computedString', value: '黑白显示器，显示实际物理像素状态'},
+      properties: [{name: 'focusable', value: {type: 'booleanOrUndefined', value: true}}],
+      childIds: ['3474'], backendDOMNodeId: 541},
+    {nodeId: '3474', ignored: false, role: {type: 'internalRole', value: 'StaticText'},
+      name: {type: 'computedString', value: '黑白显示器，显示实际物理像素状态'},
+      properties: [], parentId: '541', childIds: ['-1000012662'], backendDOMNodeId: 3474},
+    {nodeId: '-1000012662', ignored: false, role: {type: 'internalRole', value: 'InlineTextBox'},
+      name: {type: 'computedString', value: '黑白显示器，显示实际物理像素状态'},
+      properties: [], parentId: '3474', childIds: []},
+  ];
+}
+
+test('actual Flutter merged monitor button is selected despite same-label text descendants', () => {
+  const nodes = observedMonitorAX();
+  assert.equal(displayNode(nodes), nodes[0]);
+  assert.equal(displayNode(nodes).backendDOMNodeId, 541);
+  assert.equal(displayNode(nodes.slice(1)), null);
+});
+
+test('monitor image roles remain supported without selecting static label text', () => {
+  for (const role of ['image', 'img']) {
+    const nodes = observedMonitorAX(); nodes[0].role.value = role;
+    assert.equal(displayNode(nodes), nodes[0]);
+  }
+});
+
+test('disabled, ignored and non-exact monitor labels cannot be focus-click targets', () => {
+  for (const change of [node => node.properties.push({name: 'disabled', value: {type: 'boolean', value: true}}),
+    node => node.ignored = true,
+    node => node.name.value += ' unrelated']) {
+    const nodes = observedMonitorAX(); change(nodes[0]);
+    assert.equal(displayNode(nodes), null);
+  }
+});
+
+test('multiple actionable exact-label monitors fail closed even across button/image roles', () => {
+  for (const role of ['button', 'image', 'img']) {
+    const nodes = observedMonitorAX();
+    const extra = structuredClone(nodes[0]); extra.nodeId = '999'; extra.backendDOMNodeId = 999;
+    extra.role.value = role; nodes.push(extra);
+    assert.equal(displayNode(nodes), null);
   }
 });
