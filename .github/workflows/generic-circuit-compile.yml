@@ -44,6 +44,7 @@ jobs:
           pathlib.Path('build/generic-review/source-manifest.json').write_text(json.dumps({'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'files': rows}, indent=2) + '\n')
           PY
       - name: Analyze final product and test sources
+        id: analyze
         run: flutter analyze --no-pub
       - name: Focused generic controls, fixture driver and ownership contracts
         timeout-minutes: 8
@@ -64,6 +65,7 @@ jobs:
           test/workspace_view_snapshot_test.dart
           test/workspace_circuit_updates_test.dart
       - name: Real shared-theme desktop and mobile synthetic screenshots
+        if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
         timeout-minutes: 4
         env:
           ABC_GENERIC_VISUAL_DIR: build/generic-review/visual

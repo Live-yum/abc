@@ -168,10 +168,7 @@ void main() {
 
         // Discover and select a real input record through its visible label.
         final pressure = find.widgetWithText(ListTile, '压力板');
-        await Scrollable.ensureVisible(
-          tester.element(pressure),
-          alignment: .3,
-        );
+        await Scrollable.ensureVisible(tester.element(pressure), alignment: .3);
         await tester.tap(pressure);
         await tester.pump();
         expect(
@@ -180,10 +177,7 @@ void main() {
           reason: 'Selection does not operate the circuit.',
         );
         final operate = find.text('操作所选设备');
-        await Scrollable.ensureVisible(
-          tester.element(operate),
-          alignment: .5,
-        );
+        await Scrollable.ensureVisible(tester.element(operate), alignment: .5);
         await tester.tap(operate);
         await tester.pumpAndSettle();
         expect(workspace.view.error, isEmpty);

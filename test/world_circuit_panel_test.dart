@@ -153,7 +153,7 @@ void main() {
         _panel(_state()..['optimizationSupported'] = supported, calls),
       );
       expect(find.textContaining('后续运行结果可能不同'), findsOneWidget);
-      expect(find.textContaining('现有像素不会重算'), findsOneWidget);
+      expect(find.textContaining('历史显示不会重算'), findsOneWidget);
       final toggle = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
       expect(toggle.value, isFalse);
       if (supported) {
