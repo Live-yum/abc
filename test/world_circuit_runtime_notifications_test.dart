@@ -7,23 +7,73 @@ import 'package:terraforge/engine/world_circuit_session.dart';
 
 import 'support/computer_circuit_backend.dart';
 
+class _HeldBackend extends ComputerCircuitBackend {
+  Completer<void>? activeClock;
+
+  @override
+  Future<WorldCircuitResult> commandWorldCircuit(
+    int session,
+    WorldCircuitCommand command,
+  ) async {
+    final clock = command.words[1] == 2 && command.words[2] == 3194;
+    if (clock) activeClock = holdClock;
+    final result = await super.commandWorldCircuit(session, command);
+    if (clock) activeClock = null;
+    return result;
+  }
+}
+
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() complete,
+  String label,
+) async {
+  for (var turn = 0; turn < 100 && !complete(); turn++) {
+    await tester.pump(const Duration(milliseconds: 1));
+  }
+  expect(complete(), isTrue, reason: '$label did not finish in 100 pump turns');
+}
+
+Future<void> _pumpOperation(
+  WidgetTester tester,
+  Future<void> operation,
+  String label,
+) async {
+  var complete = false;
+  Object? failure;
+  StackTrace? failureStack;
+  final tracked = operation.then<void>(
+    (_) {
+      complete = true;
+    },
+    onError: (Object error, StackTrace stack) {
+      failure = error;
+      failureStack = stack;
+      complete = true;
+    },
+  );
+  await _pumpUntil(tester, () => complete, label);
+  await tracked;
+  if (failure != null) Error.throwWithStackTrace(failure!, failureStack!);
+}
+
 void main() {
   testWidgets('dirty, reentrant ordinary, pause and close preserve routing', (
     tester,
   ) async {
-    final backend = ComputerCircuitBackend();
+    final backend = _HeldBackend();
     final session = WorldCircuitSession.fromSource(
       backend,
       const WorldCircuitSource.file(path: '/fixture.wld', length: 1, name: 'wld'),
     );
     await session.open();
     await session.verifyComputer();
-    // Program loading yields with a zero-duration timer between ROM batches.
-    // Drive this setup outside FakeAsync before testing the controlled pump.
-    await tester.runAsync(
-      () => session
-          .loadProgram('loop.bin', Uint8List.fromList([0x6f, 0, 0, 0]))
-          .timeout(const Duration(seconds: 10)),
+    // Keep the session queue, its timer yields and continuations in the same
+    // FakeAsync zone. A runAsync call cannot migrate an existing future chain.
+    await _pumpOperation(
+      tester,
+      session.loadProgram('loop.bin', Uint8List.fromList([0x6f, 0, 0, 0])),
+      'program load',
     );
     expect(session.canRunComputer, isTrue);
     session.markSaved();
@@ -35,13 +85,25 @@ void main() {
 
     Future<void> complete() async {
       final gate = backend.holdClock!;
-      await tester.pump(const Duration(milliseconds: 1));
+      await _pumpUntil(
+        tester,
+        () => identical(backend.activeClock, gate),
+        'clock accepts held gate',
+      );
+      // This real-zone wait touches no product futures or state. Stopwatch's
+      // existing publication interval elapses while the fake-zone gate is held.
       await tester.runAsync(() => Future<void>.delayed(
         const Duration(milliseconds: 20),
       ));
+      final before = session.physicalPulses, published = reasons.length;
       backend.holdClock = Completer<void>();
       gate.complete();
-      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () => session.physicalPulses == before + 128 &&
+            !session.busy && reasons.length > published,
+        'completed batch publishes',
+      );
     }
 
     await complete();
@@ -69,12 +131,15 @@ void main() {
     expect(session.isRuntimeFramePublication, isFalse);
 
     reasons.clear();
-    await tester.pump(const Duration(milliseconds: 1));
+    await _pumpUntil(
+      tester,
+      () => identical(backend.activeClock, backend.holdClock),
+      'last clock accepts held gate',
+    );
     session.pause();
     backend.holdClock!.complete();
     backend.holdClock = null;
-    await tester.pump();
-    await session.close();
+    await _pumpOperation(tester, session.close(), 'session close');
     expect(reasons, isNotEmpty);
     expect(reasons, everyElement(isFalse));
     session.dispose();

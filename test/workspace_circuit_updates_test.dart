@@ -34,15 +34,19 @@ class _Sources implements WorldCircuitFileGateway {
 
 class _Backend extends ComputerCircuitBackend {
   int completedClocks = 0;
+  Completer<void>? activeClock;
 
   @override
   Future<WorldCircuitResult> commandWorldCircuit(
     int session,
     WorldCircuitCommand command,
   ) async {
+    final clock = command.words[1] == 2 && command.words[2] == 3194;
+    if (clock) activeClock = holdClock;
     final result = await super.commandWorldCircuit(session, command);
-    if (command.words[1] == 2 && command.words[2] == 3194) {
+    if (clock) {
       completedClocks++;
+      activeClock = null;
     }
     if (command.words[1] == 9 && completedClocks.isOdd) {
       ByteData.sublistView(result.records).setInt16(12, 18, Endian.little);
@@ -92,17 +96,71 @@ Future<void> _navigate(WidgetTester tester, String title) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _completeBatch(WidgetTester tester, _Backend backend) async {
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() complete,
+  String label,
+) async {
+  for (var turn = 0; turn < 100 && !complete(); turn++) {
+    await tester.pump(const Duration(milliseconds: 1));
+  }
+  expect(complete(), isTrue, reason: '$label did not finish in 100 pump turns');
+}
+
+Future<void> _pumpOperation(
+  WidgetTester tester,
+  Future<void> operation,
+  String label,
+) async {
+  var complete = false;
+  Object? failure;
+  StackTrace? failureStack;
+  final tracked = operation.then<void>(
+    (_) {
+      complete = true;
+    },
+    onError: (Object error, StackTrace stack) {
+      failure = error;
+      failureStack = stack;
+      complete = true;
+    },
+  );
+  await _pumpUntil(tester, () => complete, label);
+  await tracked;
+  if (failure != null) Error.throwWithStackTrace(failure!, failureStack!);
+}
+
+Future<void> _completeBatch(
+  WidgetTester tester,
+  Workspace workspace,
+  _Backend backend,
+) async {
   final gate = backend.holdClock!;
-  await tester.pump(const Duration(milliseconds: 1));
-  // The production throttle intentionally uses Stopwatch, not the fake widget
-  // clock. Advance wall time with the backend held; no timing is asserted.
+  await _pumpUntil(
+    tester,
+    () => identical(backend.activeClock, gate),
+    'clock accepts held gate',
+  );
+  // Only wall time crosses into runAsync. Every product future and controlled
+  // gate stays in FakeAsync, including the session's serialized queue.
   await tester.runAsync(() => Future<void>.delayed(
     const Duration(milliseconds: 20),
   ));
-  backend.holdClock = Completer<void>();
-  gate.complete();
-  await tester.pump();
+  final before = backend.completedClocks;
+  var published = false;
+  void observe() => published = true;
+  workspace.addListener(observe);
+  try {
+    backend.holdClock = Completer<void>();
+    gate.complete();
+    await _pumpUntil(
+      tester,
+      () => backend.completedClocks == before + 1 && published,
+      'completed batch publishes',
+    );
+  } finally {
+    workspace.removeListener(observe);
+  }
 }
 
 Future<void> _pause(
@@ -113,8 +171,7 @@ Future<void> _pause(
   final paused = workspace.dispatch('worldCircuitPause');
   if (!(backend.holdClock?.isCompleted ?? true)) backend.holdClock!.complete();
   backend.holdClock = null;
-  await tester.pump();
-  await paused;
+  await _pumpOperation(tester, paused, 'pause and refresh');
   await tester.pumpAndSettle();
 }
 
@@ -130,12 +187,12 @@ void main() {
       final workspace = _Workspace(backend);
       await workspace.dispatch('worldCircuitChooseWorld');
       await workspace.dispatch('worldCircuitImport');
-      // No widgets are mounted yet. Loading yields between ROM batches, so
-      // its zero-duration timers need a real async zone rather than FakeAsync.
-      await tester.runAsync(
-        () => workspace
-            .dispatch('worldCircuitLoadProgram')
-            .timeout(const Duration(seconds: 10)),
+      // Pump the session's zero-duration ROM yields without switching the
+      // existing Workspace/session future chain into a different zone.
+      await _pumpOperation(
+        tester,
+        workspace.dispatch('worldCircuitLoadProgram'),
+        'program load',
       );
       expect(workspace.worldCircuitView['canRunComputer'], isTrue);
       final proxy = size.width < 1000
@@ -176,7 +233,7 @@ void main() {
       for (final pulses in [128, 256, 384]) {
         workspace.viewReads = 0;
         workspace.circuitReads = 0;
-        await _completeBatch(tester, backend);
+        await _completeBatch(tester, workspace, backend);
         expect(workspace.viewReads, 0);
         expect(workspace.circuitReads, greaterThan(0));
         expect(broadEvents, pulses ~/ 128);
@@ -203,7 +260,7 @@ void main() {
       }
       workspace.addListener(ordinaryReentry);
       workspace.viewReads = 0;
-      await _completeBatch(tester, backend);
+      await _completeBatch(tester, workspace, backend);
       workspace.removeListener(ordinaryReentry);
       expect(reentered, isTrue);
       expect(workspace.viewReads, greaterThan(0));
@@ -211,7 +268,7 @@ void main() {
       await _navigate(tester, '工作台');
       workspace.viewReads = 0;
       workspace.circuitReads = 0;
-      await _completeBatch(tester, backend);
+      await _completeBatch(tester, workspace, backend);
       expect(workspace.viewReads, 0);
       expect(workspace.circuitReads, 0,
           reason: 'No offscreen panel reads or full-shell snapshots');
@@ -229,7 +286,11 @@ void main() {
       expect(find.textContaining('未知的计算机方向键'), findsNothing);
 
       workspace.viewReads = 0;
-      await workspace.dispatch('worldCircuitSave');
+      await _pumpOperation(
+        tester,
+        workspace.dispatch('worldCircuitSave'),
+        'save world',
+      );
       await tester.pumpAndSettle();
       expect(workspace.viewReads, greaterThan(0));
       expect(workspace.worldCircuitView['dirty'], isFalse);
@@ -238,14 +299,18 @@ void main() {
       await workspace.dispatch('worldCircuitToggle');
       await tester.pump();
       workspace.viewReads = 0;
-      await _completeBatch(tester, backend);
+      await _completeBatch(tester, workspace, backend);
       expect(workspace.viewReads, greaterThan(0),
           reason: 'First dirty transition also refreshes shell');
       expect(workspace.worldCircuitView['dirty'], isTrue);
       await _pause(tester, workspace, backend);
 
       final oldIdentity = workspace.worldCircuitView['displayIdentity'];
-      await workspace.dispatch('worldCircuitClose', {'discard': true});
+      await _pumpOperation(
+        tester,
+        workspace.dispatch('worldCircuitClose', {'discard': true}),
+        'close world',
+      );
       await tester.pumpAndSettle();
       expect(find.byType(ComputerDisplay), findsNothing);
       expect(workspace.worldCircuitView['open'], isFalse);
@@ -258,8 +323,7 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsWidgets);
       backend.holdOpen!.complete();
       backend.holdOpen = null;
-      await tester.pump();
-      await importing;
+      await _pumpOperation(tester, importing, 'reimport world');
       await tester.pumpAndSettle();
       expect(workspace.worldCircuitView['busy'], isFalse);
       expect(workspace.worldCircuitView['importing'], isFalse);
@@ -280,9 +344,9 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
       proxy?.dispose();
-      await workspace.close();
+      await _pumpOperation(tester, workspace.close(), 'workspace teardown');
       workspace.dispose();
-      await replacement.close();
+      await _pumpOperation(tester, replacement.close(), 'replacement teardown');
       replacement.dispose();
       expect(tester.takeException(), isNull);
     }, timeout: const Timeout(Duration(seconds: 60)));
