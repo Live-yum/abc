@@ -65,6 +65,7 @@ void main() {
         final bucket = PageStorageBucket();
         final controller = ScrollController();
         final restoredController = ScrollController();
+        final revisitedController = ScrollController();
         final timings = HostStageTimings();
         const scrollKey = PageStorageKey('circuit');
         final scroll = find.byKey(scrollKey);
@@ -81,7 +82,12 @@ void main() {
                     child: Column(
                       children: [
                         WorldCircuitPanel(
-                          state: _state()..['open'] = open,
+                          state: _state()
+                            ..['open'] = open
+                            ..['fragments'] = {
+                              'total': 0,
+                              'items': const <Map<String, Object?>>[],
+                            },
                           hostStages: timings,
                           dispatch: (action, args) async {},
                         ),
@@ -118,10 +124,7 @@ void main() {
             await tester.tap(find.text('性能明细 / Performance'));
             await tester.pumpAndSettle();
             expect(tester.takeException(), isNull);
-            expect(
-              bucket.readState(tester.element(performance)),
-              expanded,
-            );
+            expect(bucket.readState(tester.element(performance)), expanded);
             expect(bucket.readState(tester.element(scroll)), isA<double>());
             expect(bucket.readState(tester.element(scroll)), savedOffset);
             expect(controller.offset, savedOffset);
@@ -139,10 +142,20 @@ void main() {
           expect(tester.takeException(), isNull);
           expect(restoredController.offset, restorationOffset);
           expect(bucket.readState(tester.element(scroll)), restorationOffset);
+
+          // Leave again without scrolling: child layouts must not replace the
+          // saved parent offset before a second return to the circuit page.
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpWidget(app(open: true, scroll: revisitedController));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(revisitedController.offset, restorationOffset);
+          expect(bucket.readState(tester.element(scroll)), restorationOffset);
         } finally {
           await tester.pumpWidget(const SizedBox());
           controller.dispose();
           restoredController.dispose();
+          revisitedController.dispose();
         }
       },
       timeout: const Timeout(Duration(seconds: 30)),

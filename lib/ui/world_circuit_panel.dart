@@ -290,6 +290,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         SizedBox(
           width: 90,
           child: TextField(
+            key: PageStorageKey('world-circuit-coordinate-$label'),
             controller: controller,
             enabled: open && !_busy,
             keyboardType: TextInputType.number,
@@ -506,6 +507,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             SizedBox(
               height: 240,
               child: ListView.builder(
+                key: const PageStorageKey('world-circuit-fragments'),
                 itemCount: ((s['fragments'] as Map)['items'] as List).length,
                 itemBuilder: (context, index) {
                   final row =
@@ -699,6 +701,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             SizedBox(
               height: math.min(192, _controls.length * 64).toDouble(),
               child: ListView.builder(
+                key: const PageStorageKey('world-circuit-controls'),
                 itemCount: _controls.length,
                 itemBuilder: (context, index) {
                   final control = _controls[index];
