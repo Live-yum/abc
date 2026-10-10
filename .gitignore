@@ -27,6 +27,7 @@ node_modules/
 !assets/qa/synthetic-objects.wld
 !assets/qa/synthetic-circuit.wld
 !assets/qa/synthetic-modern.wld
+!test/fixtures/generic-circuit/synthetic-visible-pixelbox.wld
 *.plr
 *.twld
 *.tplr

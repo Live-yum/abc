@@ -2,7 +2,7 @@ name: Generic circuit compilation and synthetic UI review
 
 on:
   push:
-    branches: [codex/generic-circuit-compile-999b]
+    branches: [codex/generic-circuit-compile-999b, codex/generic-timer-pixelbox-5c]
 
 permissions:
   contents: read
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-flutter
       - name: Resolve existing locked dependencies
@@ -139,6 +139,40 @@ jobs:
         with:
           name: native-light-review-${{ github.sha }}
           path: build/light-review/
+          if-no-files-found: error
+          retention-days: 30
+
+  visible-pixelbox-persistence:
+    name: Actual native PixelBox UI / saved WLD reopen
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-flutter
+      - name: Resolve locked dependencies and build the real native backend
+        run: |
+          set -euo pipefail
+          sudo apt-get update && sudo apt-get install -y build-essential cmake zlib1g-dev
+          flutter pub get --enforce-lockfile
+          cmake -S native -B build/native-visible -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-visible --parallel 2
+          python3 tool/generate_visible_pixelbox_fixture.py --check test/fixtures/generic-circuit/synthetic-visible-pixelbox.wld
+      - name: Mounted shared-theme app, visible OFF/ON pixels, save and new-owner reopen
+        timeout-minutes: 8
+        env:
+          ABC_VISIBLE_PIXELBOX_DIR: build/visible-pixelbox-review
+        run: |
+          set -euo pipefail
+          mkdir -p "$ABC_VISIBLE_PIXELBOX_DIR"
+          export TERRAFORGE_ENGINE_LIBRARY="$PWD/build/native-visible/libabc_engine.so"
+          flutter test --no-pub --concurrency=1 --update-goldens test/visible_pixelbox_persistence_test.dart 2>&1 | tee "$ABC_VISIBLE_PIXELBOX_DIR/test.log"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: visible-pixelbox-review-${{ github.sha }}
+          path: build/visible-pixelbox-review/
           if-no-files-found: error
           retention-days: 30
 
