@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'dart:developer' show Timeline;
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
@@ -397,7 +396,8 @@ void main() {
               ui.FramePhase.vsyncStart,
             ),
             'inWindow':
-                frame.timestampInMicroseconds(ui.FramePhase.vsyncStart) >= start &&
+                frame.timestampInMicroseconds(ui.FramePhase.vsyncStart) >=
+                    start &&
                 frame.timestampInMicroseconds(ui.FramePhase.vsyncStart) < end,
             'buildUs': frame.buildDuration.inMicroseconds,
             'rasterUs': frame.rasterDuration.inMicroseconds,
