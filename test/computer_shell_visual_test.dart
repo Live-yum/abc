@@ -1,5 +1,4 @@
 // Static responsive screenshots, not native-device or runtime performance QA.
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
