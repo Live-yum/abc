@@ -1,0 +1,40 @@
+name: Inspect fixed full-shell diagnostic evidence
+
+on:
+  push:
+    branches: [codex/inspect-shell-evidence-5f267]
+    paths:
+      - .github/workflows/inspect-shell-evidence.yml
+      - .github/scripts/extract_shell_evidence.py
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: inspect-shell-evidence-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    if: github.repository == 'Live-yum/abc' && github.ref == 'refs/heads/codex/inspect-shell-evidence-5f267'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify original identity and extract only bounded text evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/extract_shell_evidence.py "$RUNNER_TEMP/shell-evidence-small"
+      - name: Preserve fixed-artifact text evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: shell-evidence-11654427205-${{ github.sha }}
+          path: ${{ runner.temp }}/shell-evidence-small/
+          if-no-files-found: error
+          retention-days: 30
+
