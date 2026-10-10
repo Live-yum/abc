@@ -151,7 +151,7 @@ void main() {
       if (session.isRuntimeFramePublication && !nested) {
         nested = true;
         session.notifyListeners();
-        expect(session.isRuntimeFramePublication, isTrue,
+        expectSync(session.isRuntimeFramePublication, isTrue,
             reason: 'Outer synchronous notification reason restored');
       }
     });
