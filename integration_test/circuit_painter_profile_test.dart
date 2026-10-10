@@ -18,7 +18,8 @@ import 'package:terraforge/ui/world_circuit_panel.dart';
 import '../test/support/circuit_painter_c61_reference.dart';
 
 const _base = 'c61d7a1d8c5155515808611fdf2c3b5992b666f3';
-const _fixtureHash = 'fb159a71b949453a6da80642737c77c48b4b3fa8bba43a0fc00cbb97358f6e9c';
+const _fixtureHash =
+    'fb159a71b949453a6da80642737c77c48b4b3fa8bba43a0fc00cbb97358f6e9c';
 const _columns = 48, _rows = 32, _x = 40, _y = 50;
 const _limit = 20000;
 
@@ -30,7 +31,11 @@ Uint8List _fixture() {
     final flags = (i % 4 == 0 ? 1 : 0) | (i % 17 == 0 ? 2 : 0);
     data.setUint32(offset, _x + i % _columns, Endian.little);
     data.setUint32(offset + 4, _y + i ~/ _columns, Endian.little);
-    data.setUint32(offset + 8, (i % 13) | (flags << 16) | (15 << 24), Endian.little);
+    data.setUint32(
+      offset + 8,
+      (i % 13) | (flags << 16) | (15 << 24),
+      Endian.little,
+    );
     data.setInt16(offset + 12, (i % 3) * 18, Endian.little);
   }
   return bytes;
@@ -45,7 +50,8 @@ class _Invalidations extends ChangeNotifier {
 }
 
 class _ObservedPainter extends CustomPainter {
-  _ObservedPainter(this.delegate, _Invalidations signal) : super(repaint: signal);
+  _ObservedPainter(this.delegate, _Invalidations signal)
+    : super(repaint: signal);
   final CustomPainter delegate;
   final samples = <Map<String, int>>[];
   bool recording = false;
@@ -86,7 +92,10 @@ Future<Map<String, Object?>> _imageProof(ui.Image image) async {
   }
 }
 
-Future<Map<String, Object?>> _oracleProof(CustomPainter painter, Size size) async {
+Future<Map<String, Object?>> _oracleProof(
+  CustomPainter painter,
+  Size size,
+) async {
   final recorder = ui.PictureRecorder();
   painter.paint(Canvas(recorder), size);
   final picture = recorder.endRecording();
@@ -101,8 +110,14 @@ Future<Map<String, Object?>> _oracleProof(CustomPainter painter, Size size) asyn
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  testWidgets('bounded visible generic circuit painter profile', (tester) async {
-    expect(kProfileMode, isTrue, reason: 'An official profile build is required.');
+  testWidgets('bounded visible generic circuit painter profile', (
+    tester,
+  ) async {
+    expect(
+      kProfileMode,
+      isTrue,
+      reason: 'An official profile build is required.',
+    );
     binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
     final arm = Platform.environment['ABC_PAINTER_ARM'];
     final width = int.parse(Platform.environment['ABC_PAINTER_WIDTH']!);
@@ -134,12 +149,25 @@ void main() {
       'scenario': 'visible-generic-circuit-painter',
       'referenceCommit': _base,
       'sourceCommit': const String.fromEnvironment('PAINTER_SOURCE_COMMIT'),
-      'sourceManifestSha256': const String.fromEnvironment('PAINTER_SOURCE_MANIFEST_SHA256'),
+      'sourceManifestSha256': const String.fromEnvironment(
+        'PAINTER_SOURCE_MANIFEST_SHA256',
+      ),
       'renderer': const String.fromEnvironment('PAINTER_RENDERER'),
       'arm': arm,
       'buildMode': 'profile',
-      'scene': {'width': width, 'height': height, 'dpr': 1, 'columns': _columns, 'rows': _rows},
-      'fixture': {'sha256': _fixtureHash, 'bytes': bytes.length, 'records': _columns * _rows, 'wireMask': 15},
+      'scene': {
+        'width': width,
+        'height': height,
+        'dpr': 1,
+        'columns': _columns,
+        'rows': _rows,
+      },
+      'fixture': {
+        'sha256': _fixtureHash,
+        'bytes': bytes.length,
+        'records': _columns * _rows,
+        'wireMask': 15,
+      },
       'invalidationPeriodUs': 16000,
       'limits': [
         'Visible rendering microbenchmark; no world engine or controller throughput.',
@@ -155,14 +183,24 @@ void main() {
     try {
       // Render a first frame so GTK exposes its window. The host runner resizes
       // that owned X11 window; no TestFlutterView or surface-size override is used.
-      await tester.pumpWidget(MaterialApp(theme: terraTheme(), home: const Text('Preparing circuit scene')));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: terraTheme(),
+          home: const Text('Preparing circuit scene'),
+        ),
+      );
       final waiting = Stopwatch()..start();
-      while (tester.view.physicalSize != Size(width.toDouble(), height.toDouble()) ||
+      while (tester.view.physicalSize !=
+              Size(width.toDouble(), height.toDouble()) ||
           tester.view.devicePixelRatio != 1) {
         if (waiting.elapsed > const Duration(seconds: 20)) {
-          fail('The actual Flutter window never reached the requested size/DPR.');
+          fail(
+            'The actual Flutter window never reached the requested size/DPR.',
+          );
         }
-        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)),
+        );
         await tester.pump();
       }
       stage = 'production-painter';
@@ -175,10 +213,20 @@ void main() {
                 padding: const EdgeInsets.all(20),
                 child: WorldCircuitPanel(
                   state: {
-                    'open': true, 'busy': false, 'dirty': false,
-                    'width': 600, 'height': 400, 'optimizationEnabled': false,
-                    'optimizationSupported': true, 'records': bytes,
-                    'viewport': {'x': _x, 'y': _y, 'width': _columns, 'height': _rows},
+                    'open': true,
+                    'busy': false,
+                    'dirty': false,
+                    'width': 600,
+                    'height': 400,
+                    'optimizationEnabled': false,
+                    'optimizationSupported': true,
+                    'records': bytes,
+                    'viewport': {
+                      'x': _x,
+                      'y': _y,
+                      'width': _columns,
+                      'height': _rows,
+                    },
                   },
                   dispatch: (action, args) async {
                     fail('A painter scene must not send an engine command.');
@@ -193,7 +241,10 @@ void main() {
       final wiring = find.bySemanticsLabel('实际世界电路视口，点击选择设备或线路');
       await Scrollable.ensureVisible(tester.element(wiring), alignment: .5);
       await tester.pumpAndSettle();
-      final sourcePaint = find.descendant(of: wiring, matching: find.byType(CustomPaint));
+      final sourcePaint = find.descendant(
+        of: wiring,
+        matching: find.byType(CustomPaint),
+      );
       expect(sourcePaint, findsOneWidget);
       final size = tester.getSize(sourcePaint);
       final sourceRect = tester.getRect(sourcePaint);
@@ -203,13 +254,25 @@ void main() {
       expect(sourceRect.bottom, lessThanOrEqualTo(height.toDouble()));
       final production = tester.widget<CustomPaint>(sourcePaint).painter!;
       final reference = C61CircuitPainter(
-        bytes, _x, _y, _columns, _rows,
+        bytes,
+        _x,
+        _y,
+        _columns,
+        _rows,
         selectionColor: TerraColors.mint,
       );
       report['productionPainterType'] = production.runtimeType.toString();
-      report['productionCanvas'] = [sourceRect.left, sourceRect.top, size.width, size.height];
+      report['productionCanvas'] = [
+        sourceRect.left,
+        sourceRect.top,
+        size.width,
+        size.height,
+      ];
       const canvasKey = ValueKey('visible-painter-profile-canvas');
-      final probe = _ObservedPainter(arm == 'A' ? reference : production, signal);
+      final probe = _ObservedPainter(
+        arm == 'A' ? reference : production,
+        signal,
+      );
       observed = probe;
       await tester.pumpWidget(
         MaterialApp(
@@ -243,19 +306,32 @@ void main() {
         expect(rect.bottom, lessThanOrEqualTo(physical.height / dpr));
         return {
           'surfaceWidth': physical.width / dpr,
-          'surfaceHeight': physical.height / dpr, 'dpr': dpr,
-          'left': rect.left, 'top': rect.top,
-          'width': rect.width, 'height': rect.height,
+          'surfaceHeight': physical.height / dpr,
+          'dpr': dpr,
+          'left': rect.left,
+          'top': rect.top,
+          'width': rect.width,
+          'height': rect.height,
         };
       }
+
       Future<Map<String, Object?>> capture() async {
         final boundary = tester.renderObject<RenderRepaintBoundary>(canvas);
-        return (await tester.runAsync(() async => _imageProof(await boundary.toImage(pixelRatio: 1))))!;
+        return (await tester.runAsync(
+          () async => _imageProof(await boundary.toImage(pixelRatio: 1)),
+        ))!;
       }
+
       report['viewportBefore'] = viewport();
-      final oracle = (await tester.runAsync(() => _oracleProof(reference, size)))!;
+      final oracle = (await tester.runAsync(
+        () => _oracleProof(reference, size),
+      ))!;
       final before = await capture();
-      expect(before, oracle, reason: 'The actual visible canvas must match c61 before measurement.');
+      expect(
+        before,
+        oracle,
+        reason: 'The actual visible canvas must match c61 before measurement.',
+      );
       report['oracleRgbaSha256'] = oracle['rgbaSha256'];
       report['pixelsBefore'] = before;
 
@@ -275,24 +351,35 @@ void main() {
       final start = Timeline.now;
       probe.recording = true;
       stage = 'steady';
-      await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 20)));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(seconds: 20)),
+      );
       final end = Timeline.now;
       probe.recording = false;
       timer?.cancel();
       final invalidations = signal.count - invalidationsBefore;
       final paintCount = probe.count - paintsBefore;
       report['window'] = {
-        'startUs': start, 'endUs': end, 'elapsedUs': end - start,
-        'invalidations': invalidations, 'paints': paintCount,
+        'startUs': start,
+        'endUs': end,
+        'elapsedUs': end - start,
+        'invalidations': invalidations,
+        'paints': paintCount,
       };
       stage = 'drain';
-      await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 2)));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(seconds: 2)),
+      );
       collectFrames = false;
       SchedulerBinding.instance.removeTimingsCallback(receive);
       await tester.pump();
       report['viewportAfter'] = viewport();
       final after = await capture();
-      expect(after, before, reason: 'The scene must remain pixel-identical after measurement.');
+      expect(
+        after,
+        before,
+        reason: 'The scene must remain pixel-identical after measurement.',
+      );
       report['pixelsAfter'] = after;
       expect(invalidations, greaterThan(0));
       expect(paintCount, greaterThan(0));
@@ -306,20 +393,26 @@ void main() {
         for (final frame in frames)
           {
             'frameNumber': frame.frameNumber,
-            'vsyncStartUs': frame.timestampInMicroseconds(FramePhase.vsyncStart),
-            'inWindow': frame.timestampInMicroseconds(FramePhase.vsyncStart) >= start &&
-                frame.timestampInMicroseconds(FramePhase.vsyncStart) < end,
+            'vsyncStartUs': frame.timestampInMicroseconds(
+              ui.FramePhase.vsyncStart,
+            ),
+            'inWindow':
+                frame.timestampInMicroseconds(ui.FramePhase.vsyncStart) >= start &&
+                frame.timestampInMicroseconds(ui.FramePhase.vsyncStart) < end,
             'buildUs': frame.buildDuration.inMicroseconds,
             'rasterUs': frame.rasterDuration.inMicroseconds,
             'totalSpanUs': frame.totalSpan.inMicroseconds,
           },
       ];
       final selected = frames.where((frame) {
-        final at = frame.timestampInMicroseconds(FramePhase.vsyncStart);
+        final at = frame.timestampInMicroseconds(ui.FramePhase.vsyncStart);
         return at >= start && at < end;
       }).toList();
       expect(selected, isNotEmpty);
-      expect(selected.map((frame) => frame.frameNumber).toSet().length, selected.length);
+      expect(
+        selected.map((frame) => frame.frameNumber).toSet().length,
+        selected.length,
+      );
       report['windowFrameCount'] = selected.length;
       expect(tester.takeException(), isNull);
       report['status'] = 'success';
