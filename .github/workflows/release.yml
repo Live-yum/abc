@@ -1,0 +1,55 @@
+name: Publish verified main preview
+
+on:
+  workflow_run:
+    workflows: [Flutter CI]
+    types: [completed]
+    branches: [main]
+  # Bootstrap the already merged, successful build when this workflow is added.
+  # Later workflow edits only verify the existing preview, never overwrite it.
+  push:
+    branches: [main]
+    paths: [.github/workflows/release.yml]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Flutter CI push-to-main run to publish or verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verified-main-preview-${{ github.event.workflow_run.id || inputs.run_id || '38007059507' }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'Live-yum/abc' &&
+      ((github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository) ||
+       (github.event_name != 'workflow_run' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      # Only trusted main workflow code is executed, never source/artifact code
+      # from the triggering build, and never pull_request_target.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Test publisher's fail-closed guards
+        run: python3 -m unittest discover -s tool/release -p '*_test.py' -v
+      - name: Publish or verify SHA-bound preview assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id || '38007059507' }}
+        run: python3 tool/release/publish.py
