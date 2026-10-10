@@ -104,3 +104,13 @@ jobs:
             ${{ runner.temp }}/shell-paired-results/
           if-no-files-found: error
           retention-days: 30
+      - name: Upload compact shell profile logs and reports
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: full-shell-paired-logs-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/shell-paired-results/*.log
+            ${{ runner.temp }}/shell-paired-results/*.json
+          if-no-files-found: warn
+          retention-days: 30

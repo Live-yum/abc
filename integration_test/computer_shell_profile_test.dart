@@ -200,20 +200,37 @@ void main() {
         }
         await until(10000000);
         keys.add({'event': 'up-down', 'atUs': Timeline.now});
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowUp);
+        await tester.sendKeyDownEvent(
+          LogicalKeyboardKey.arrowUp,
+          physicalKey: PhysicalKeyboardKey.arrowUp,
+        );
         await until(10250000);
-        await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowUp);
+        await tester.sendKeyUpEvent(
+          LogicalKeyboardKey.arrowUp,
+          physicalKey: PhysicalKeyboardKey.arrowUp,
+        );
         keys.add({'event': 'up-up', 'atUs': Timeline.now});
         await until(20000000);
         keys.add({'event': 'down-down', 'atUs': Timeline.now});
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowDown);
+        await tester.sendKeyDownEvent(
+          LogicalKeyboardKey.arrowDown,
+          physicalKey: PhysicalKeyboardKey.arrowDown,
+        );
         await until(20250000);
-        await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowDown);
+        await tester.sendKeyUpEvent(
+          LogicalKeyboardKey.arrowDown,
+          physicalKey: PhysicalKeyboardKey.arrowDown,
+        );
         keys.add({'event': 'down-up', 'atUs': Timeline.now});
         await until(30000000);
       });
       final end = Timeline.now;
       final readDelta = workspace.fullViewReads - readsBefore;
+      expect(keys.map((key) => key['event']),
+          ['up-down', 'up-up', 'down-down', 'down-up'],
+          reason: 'Missing bounded framework key sequence.');
+      expect(end - start, greaterThanOrEqualTo(30000000),
+          reason: 'Steady window did not finish its bounded schedule.');
       stage = 'drain';
       await dispatch('worldCircuitPause');
       // Timings batches can arrive late; filtering uses frame timestamps.
