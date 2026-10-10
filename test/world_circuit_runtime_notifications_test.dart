@@ -26,12 +26,14 @@ class _HeldBackend extends ComputerCircuitBackend {
 Future<void> _pumpUntil(
   WidgetTester tester,
   bool Function() complete,
-  String label,
-) async {
+  String label, {
+  String Function()? diagnostics,
+}) async {
   for (var turn = 0; turn < 100 && !complete(); turn++) {
     await tester.pump(const Duration(milliseconds: 1));
   }
-  expect(complete(), isTrue, reason: '$label did not finish in 100 pump turns');
+  expect(complete(), isTrue, reason: '$label did not finish in 100 pump turns'
+      '${diagnostics == null ? '' : ': ${diagnostics()}'}');
 }
 
 Future<void> _pumpOperation(
@@ -96,14 +98,41 @@ void main() {
         const Duration(milliseconds: 20),
       ));
       final before = session.physicalPulses, published = reasons.length;
-      backend.holdClock = Completer<void>();
-      gate.complete();
-      await _pumpUntil(
-        tester,
-        () => session.physicalPulses == before + 128 &&
-            !session.busy && reasons.length > published,
-        'completed batch publishes',
-      );
+      final publicationPulses = <int>[];
+      final publicationBusy = <bool>[];
+      void observePublication() {
+        publicationPulses.add(session.physicalPulses);
+        publicationBusy.add(session.busy);
+      }
+      String describe() =>
+          'pulses=${session.physicalPulses} expected=${before + 128}, '
+          'busy=${session.busy}, running=${session.running}, '
+          'reasons=$reasons (before=$published), '
+          'publicationPulses=$publicationPulses, '
+          'publicationBusy=$publicationBusy, '
+          'gateReleased=${gate.isCompleted}, '
+          'activeClock=${backend.activeClock == null ? 'none' : identical(backend.activeClock, gate) ? 'released' : identical(backend.activeClock, backend.holdClock) ? 'next' : 'other'}, '
+          'error=${session.error}';
+      session.addListener(observePublication);
+      try {
+        backend.holdClock = Completer<void>();
+        gate.complete();
+        await _pumpUntil(
+          tester,
+          () => session.physicalPulses == before + 128 &&
+              reasons.length > published && publicationBusy.isNotEmpty,
+          'completed batch publishes',
+          diagnostics: describe,
+        );
+        // The completed serial operation is idle when it publishes. A 1 ms
+        // pump can also launch the next held batch, so idle must be observed
+        // synchronously at publication instead of after the pump returns.
+        expect(publicationPulses, everyElement(before + 128),
+            reason: describe());
+        expect(publicationBusy, everyElement(isFalse), reason: describe());
+      } finally {
+        session.removeListener(observePublication);
+      }
     }
 
     await complete();
