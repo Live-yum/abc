@@ -21,6 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          fetch-depth: 2
           persist-credentials: false
       - uses: ./.github/actions/setup-flutter
       - name: Resolve existing locked dependencies
@@ -48,6 +49,8 @@ jobs:
         run: flutter analyze --no-pub
       - name: Focused generic controls, fixture driver and ownership contracts
         timeout-minutes: 8
+        env:
+          ABC_CIRCUIT_PAINTER_DIR: build/generic-review/painter-equivalence
         run: >-
           flutter test --no-pub --concurrency=1
           test/computerraria_computer_test.dart
@@ -62,8 +65,33 @@ jobs:
           test/circuit_display_region_test.dart
           test/generic_circuit_profile_selection_test.dart
           test/world_circuit_panel_test.dart
+          test/world_circuit_painter_test.dart
+          test/world_circuit_confirmation_lifecycle_test.dart
           test/workspace_view_snapshot_test.dart
           test/workspace_circuit_updates_test.dart
+      - name: Confirm the prior panel reproduces the disposal defect
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          baseline=c61d7a1d8c5155515808611fdf2c3b5992b666f3
+          control="$RUNNER_TEMP/c61-confirmation-control"
+          git cat-file -e "$baseline^{commit}"
+          git worktree add --detach "$control" "$baseline"
+          cp test/world_circuit_confirmation_lifecycle_test.dart "$control/test/"
+          (
+            cd "$control"
+            flutter pub get --enforce-lockfile
+          )
+          set +e
+          (
+            cd "$control"
+            flutter test --no-pub --concurrency=1 test/world_circuit_confirmation_lifecycle_test.dart
+          ) > build/generic-review/confirmation-negative-control.log 2>&1
+          result=$?
+          set -e
+          printf '%s\n' "$result" > build/generic-review/confirmation-negative-control.exit
+          test "$result" -ne 0
+          grep -F 'setState() called after dispose' build/generic-review/confirmation-negative-control.log
       - name: Real shared-theme desktop and mobile synthetic screenshots
         if: ${{ !cancelled() && steps.analyze.outcome == 'success' }}
         timeout-minutes: 4
@@ -75,5 +103,80 @@ jobs:
         with:
           name: generic-circuit-review-${{ github.sha }}
           path: build/generic-review/
+          if-no-files-found: error
+          retention-days: 30
+
+  native-lights:
+    name: Source-oracle wired lights / Native contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y build-essential cmake zlib1g-dev
+      - name: Native sanitizer footprint and existing wiring contracts
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -euo pipefail
+          mkdir -p build/light-review
+          cmake -S native -B build/native-asan -DABC_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/native-asan --parallel 2
+          for contract in circuit_device_epoch_contract circuit_wld_pixel_contract circuit_wired_light_contract; do
+            cc -g -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer -I native/vendor/TerraWasm/include -I native/vendor/TerraWasm/src "native/$contract.c" build/native-asan/terra/libterrax_world_static.a -lm -lz -o "build/$contract"
+            "build/$contract" | tee "build/light-review/$contract.log"
+          done
+      - name: Full WLD light fixtures, rollback, save and reopen
+        run: |
+          set -euo pipefail
+          cmake -S native -B build/native-release -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-release --parallel 2
+          python3 tool/test_wired_lights.py build/native-release/libabc_engine.so --output build/light-review/native-lights.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: native-light-review-${{ github.sha }}
+          path: build/light-review/
+          if-no-files-found: error
+          retention-days: 30
+
+  web-lights:
+    name: Source-oracle wired lights / rebuilt Web engine
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Install pinned official Emscripten
+        run: |
+          git clone --depth 1 --branch 5.0.7 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          test "$(git -C "$RUNNER_TEMP/emsdk" rev-parse HEAD)" = "41190c21c662e9cc1962aea94e71cbae9fd2fc87"
+          "$RUNNER_TEMP/emsdk/emsdk" install 5.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 5.0.7
+      - name: Build, record and validate actual engine artifacts
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          ABC_WEB_OUTPUT="$PWD/web/engine" bash tool/build_web_engine.sh
+          node tool/record_web_engine.mjs
+          python3 tool/verify_authorized_sources.py
+      - name: Execute shared original light WLD scenarios in real WASM
+        run: |
+          set -euo pipefail
+          mkdir -p build/light-web-review
+          python3 tool/test_wired_lights.py --export-fixtures build/light-fixtures
+          node test/web/world_circuit_lights_contract.cjs web/engine/world.js web/engine/world.wasm build/light-fixtures | tee build/light-web-review/contract.log
+          tar -czf build/light-web-review/verified-web-engine.tar.gz web/engine/world.js web/engine/world.wasm web/engine/player.js web/engine/player.wasm web/engine/manifest.json web/engine/circuit_rules.engine-provenance.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: web-light-review-${{ github.sha }}
+          path: build/light-web-review/
           if-no-files-found: error
           retention-days: 30

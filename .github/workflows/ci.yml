@@ -92,6 +92,8 @@ jobs:
           node tool/test_web_binary_map.mjs
           node test/web/world_circuit_smoke.cjs web/engine/world.js web/engine/world.wasm build/circuit.wld
           node test/web/world_circuit_fragments_smoke.cjs web/engine/world.js web/engine/world.wasm build/fragments.wld
+          python3 tool/test_wired_lights.py --export-fixtures build/light-fixtures
+          node test/web/world_circuit_lights_contract.cjs web/engine/world.js web/engine/world.wasm build/light-fixtures
       - name: Actual binary MAP worker lifecycle contracts
         run: |
           dart run tool/perf/write_map_fixture.dart build/synthetic.map
@@ -147,7 +149,7 @@ jobs:
         run: |
           cmake -S native -B build/native -DABC_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
           cmake --build build/native --parallel 2
-          for contract in circuit_device_epoch_contract circuit_wld_pixel_contract; do
+          for contract in circuit_device_epoch_contract circuit_wld_pixel_contract circuit_wired_light_contract; do
             cc -g -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer -I native/vendor/TerraWasm/include -I native/vendor/TerraWasm/src "native/$contract.c" build/native/terra/libterrax_world_static.a -lm -lz -o "build/$contract"
           done
           cc -g -fsanitize=address,undefined -fno-omit-frame-pointer -I native native/native_contract.c -L build/native -labc_engine -Wl,-rpath,"$PWD/build/native" -o build/native_contract
@@ -160,11 +162,13 @@ jobs:
           build/native_contract build/synthetic.wld build/synthetic-player.json
           build/circuit_device_epoch_contract
           build/circuit_wld_pixel_contract
+          build/circuit_wired_light_contract
           build/region_contract build/objects.wld
       - name: Build complete native application engine
         run: |
           cmake -S native -B build/native-release -DCMAKE_BUILD_TYPE=Release
           cmake --build build/native-release --parallel 2
+          python3 tool/test_wired_lights.py build/native-release/libabc_engine.so --output build/native-wired-lights.json
           echo "TERRAFORGE_ENGINE_LIBRARY=$PWD/build/native-release/libabc_engine.so" >> "$GITHUB_ENV"
           echo "TERRAFORGE_WORLD_FIXTURE=$PWD/build/synthetic.wld" >> "$GITHUB_ENV"
           echo "TERRAFORGE_CIRCUIT_FIXTURE=$PWD/build/circuit.wld" >> "$GITHUB_ENV"

@@ -148,25 +148,32 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
     }
   }
 
-  Future<bool> _confirm(String text) async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('确认操作'),
-          content: Text(text),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('继续'),
-            ),
-          ],
-        ),
-      ) ??
-      false;
+  Future<bool> _confirm(String text) async {
+    final identity = widget.state['displayIdentity'];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认操作'),
+        content: Text(text),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('继续'),
+          ),
+        ],
+      ),
+    );
+    // A root dialog may outlive its panel, session, or selected display region.
+    // Runtime frame updates keep this identity and do not cancel confirmation.
+    return mounted &&
+        confirmed == true &&
+        widget.state['open'] == true &&
+        identical(identity, widget.state['displayIdentity']);
+  }
   Future<void> _viewport({bool pixels = false}) async {
     final x = int.tryParse(_x.text),
         y = int.tryParse(_y.text),
@@ -850,6 +857,8 @@ class _CircuitPainter extends CustomPainter {
     final data = ByteData.sublistView(bytes),
         sx = size.width / width,
         sy = size.height / height;
+    final wirePaint = Paint()
+      ..strokeWidth = math.max(1, math.min(sx, sy) / 12);
     for (var offset = 0; offset + 16 <= bytes.length; offset += 16) {
       final cx = data.getUint32(offset, Endian.little) - x,
           cy = data.getUint32(offset + 4, Endian.little) - y;
@@ -881,18 +890,16 @@ class _CircuitPainter extends CustomPainter {
       for (var channel = 0; channel < 4; channel++) {
         if ((wires & (1 << channel)) == 0) continue;
         final d = (channel - 1.5) * math.min(sx, sy) / 7;
-        final p = Paint()
-          ..color = colours[channel]
-          ..strokeWidth = math.max(1, math.min(sx, sy) / 12);
+        wirePaint.color = colours[channel];
         canvas.drawLine(
           Offset(rect.left, rect.center.dy + d),
           Offset(rect.right, rect.center.dy + d),
-          p,
+          wirePaint,
         );
         canvas.drawLine(
           Offset(rect.center.dx + d, rect.top),
           Offset(rect.center.dx + d, rect.bottom),
-          p,
+          wirePaint,
         );
       }
       if ((flags & 2) != 0) {

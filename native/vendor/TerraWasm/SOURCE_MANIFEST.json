@@ -2,7 +2,7 @@
   "schema": 1,
   "sourceRepository": "Live-yum/TerraWasm",
   "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
-  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v5-sparse-lamp-checkpoints patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; shared physical gate-wave VM code is unchanged. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches. The WLD Web export list additionally exposes the existing four incremental SHA-256 functions; the C hash implementation is unchanged. Sparse READ_LAMPS reuses existing checkpoints at complete-column boundaries and yields after every restore; other command scans retain their prior behavior.",
+  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v6-wired-light-footprints patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; shared physical gate-wave VM code is unchanged. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches. The WLD Web export list additionally exposes the existing four incremental SHA-256 functions; the C hash implementation is unchanged. Sparse READ_LAMPS reuses existing checkpoints at complete-column boundaries and yields after every restore; other command scans retain their prior behavior. Ordinary connected type-42/type-93 light footprints now have independent frame-state execution and save projection; complete unconnected decorations add no mutable retained entries. Decompiled Terraria source is used only as a behavioral oracle and is not redistributed.",
   "license": "No upstream license grant identified; inclusion is user-authorized and does not relicense upstream material.",
   "files": [
     {
@@ -237,13 +237,13 @@
     },
     {
       "path": "src/terra_circuit_compile.c",
-      "bytes": 26672,
-      "sha256": "0952d1dc46dabadde739c858ec7c05fb1802b5548ed4b862774e402e64a83233"
+      "bytes": 26704,
+      "sha256": "c392fadf25e71fba1cc02c32a92a9e35392b989b2e0490524da46a190c3ef430"
     },
     {
       "path": "src/terra_circuit_devices.c",
-      "bytes": 18670,
-      "sha256": "4a1955f40f5f92e1718f7cd1c4003f5956056a067026a2d2b4230d3877e9964e"
+      "bytes": 21936,
+      "sha256": "8b89343a5104f9eccd452a758e901dec0849a7b73d0252dcf66fc3ed0aa74aef"
     },
     {
       "path": "src/terra_circuit_fragments.inc",
@@ -262,8 +262,8 @@
     },
     {
       "path": "src/terra_circuit_rules.c",
-      "bytes": 13374,
-      "sha256": "35277f86b3c91afdbc3537fa7b19ffd8c0b83a47545c1ae3e78f05a6fa832829"
+      "bytes": 13538,
+      "sha256": "7c5f0847885894ac507e74afa095e59807f1ee1d70de26594b7437e00d14096a"
     },
     {
       "path": "src/terra_circuit_supports.inc",
@@ -277,13 +277,13 @@
     },
     {
       "path": "src/terra_circuit_world.c",
-      "bytes": 18842,
-      "sha256": "21ec49bf23773d62bf4d0515340b0250c2e395d5c3f685103053fee03531ae76"
+      "bytes": 18919,
+      "sha256": "11b48ed97105aeaa0bdf9845d1ea07d0d4bf12000f2baa281c8ad01484ad9799"
     },
     {
       "path": "src/terra_circuit_world_internal.h",
-      "bytes": 9371,
-      "sha256": "d85f28f916e568608a309ba335941e52717503781a3fb3bc4c0fd5f04f9e8044"
+      "bytes": 9413,
+      "sha256": "2cccc1fcf05c73dd8523826cf7933e9842787010ab73fce71a7c00f556e6bd95"
     },
     {
       "path": "src/terra_commands.c",
@@ -483,9 +483,9 @@
   ],
   "localPatches": [
     {
-      "id": "full-world-pixels-v5-sparse-lamp-checkpoints",
+      "id": "full-world-pixels-v6-wired-light-footprints",
       "manifest": "native/patches/full-world-pixels.json",
-      "sha256": "9c42b79a26dae81ecdc245b3c05ac3bad31772b16b573c61b2250cfe735c1f23"
+      "sha256": "f1a269701ddf4f968efea570c6af9f61323e09f7aba4f8a258560223dd20e04b"
     }
   ]
 }

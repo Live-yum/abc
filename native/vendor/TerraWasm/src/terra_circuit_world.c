@@ -38,7 +38,7 @@ void cx_free(CxWorld* w,void* pointer) {
 }
 int cx_fail(CxWorld* w,int status,const char* message) {
     if(w)w->error=(uint32_t)-status;
-    tx_set_error(status==TCW_MEMORY?"TERRAX_CIRCUIT_MEMORY":status==TCW_FORMAT?"TERRAX_CIRCUIT_FORMAT":"TERRAX_CIRCUIT_STATE",message);
+    tx_set_error(status==TCW_MEMORY?"TERRAX_CIRCUIT_MEMORY":status==TCW_FORMAT?"TERRAX_CIRCUIT_FORMAT":status==TCW_UNSUPPORTED?"TERRAX_CIRCUIT_UNSUPPORTED":"TERRAX_CIRCUIT_STATE",message);
     return status;
 }
 static int grow_pages(CxWorld* w,void*** pages,uint32_t* capacity,uint32_t needed) {
@@ -205,7 +205,7 @@ int32_t terra_circuit_world_step(uint32_t handle,uint32_t work_units,TerraCircui
         else if(w->phase==CX_QUERY)status=cx_query_step(w,&work);
         else if(w->phase==CX_RUN){
             uint32_t n=work;work=0;status=terra_vm_step(w->vm,n);
-            if(status<0)status=cx_fail(w,status==TERRA_VM_OOM||status==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE,"native circuit execution failed and was rolled back");
+            if(status<0)status=w->error?-(int)w->error:cx_fail(w,status==TERRA_VM_OOM||status==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE,"native circuit execution failed and was rolled back");
             else if(status==TERRA_VM_OK){
                 if(w->trigger_remaining>1u){--w->trigger_remaining;status=terra_vm_begin(w->vm,w->trigger_nets,w->trigger_count);if(status<0)status=cx_fail(w,TCW_MEMORY,"native circuit pulse allocation failed");}
                 else status=cx_command_complete(w);

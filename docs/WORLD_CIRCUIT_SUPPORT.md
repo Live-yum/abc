@@ -33,6 +33,16 @@ Its program loader and known layout are not production features.
 - NPC/player movement, automatic pressure-plate collisions and full game
   physics are not simulated. A pressure-plate action is explicit interaction.
   Mod-only devices and data absent from WLD are not reconstructed.
+- Ordinary wired hanging lanterns (type 42, 1×2) and standing lamps (type 93,
+  1×3) update their complete frames once per colour and TripWire, including
+  unwired members of a connected fixture. Queries and candidate saves reflect
+  those frames. Incomplete, incoherent, or directional pre-actuated footprints
+  explicitly reject the triggering transaction; other furniture families are
+  not implied. See the pinned [source-parity matrix](TERRARIA_SOURCE_PARITY.md).
+- Same-network interacting timers still have a known ordering difference:
+  this engine visits retained devices in coordinate order, whereas the game
+  discovers them in wire traversal order. Simple timer interval tests do not
+  establish equivalence for those mutually disabling networks.
 - Reset closes the session and reopens a private copy of the original input.
 - Save returns a separate candidate WLD. Application must validate/reopen and
   adopt this candidate using its usual undo/save flow. No original file is changed.

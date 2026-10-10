@@ -10,6 +10,56 @@
 #define CX_MECH_LIMIT 999u
 extern void tx_set_error(const char*,const char*);
 
+/* Independent implementation of Wiring.ToggleHangingLantern/ToggleLamp at
+ * source commit 8255d34616c780af12079425ac92a0a7aed87d71. Only the ordinary
+ * complete 1x2 and 1x3 frame families are supported here. */
+uint32_t cx_wired_light_height(uint32_t type){return type==42u?2u:type==93u?3u:0u;}
+
+static int retain_wired_light(const CxWorld* w,uint32_t y,const TxTile* tile){
+    uint32_t height=cx_wired_light_height(tile->type);if(!height)return 0;
+    if(cx_wire_mask(tile))return 1;
+    if(tile->frame_y<0||tile->frame_y%18)return 0;
+    uint32_t offset=(uint32_t)(tile->frame_y/18)%height;
+    if(y<offset||height>w->height-(y-offset))return 0;
+    /* The full column is already decoded. Retain unwired sibling cells only
+     * when their tiny implied footprint contains a wired member. */
+    for(uint32_t row=0;row<height;row++){
+        const TxTile* part=w->column+y-offset+row;
+        if(part->active&&part->type==tile->type&&cx_wire_mask(part))return 1;
+    }
+    return 0;
+}
+
+static int hit_wired_light(CxWorld* w,CxDevice* hit,uint32_t colour){
+    uint32_t height=cx_wired_light_height(hit->tile.type);
+    if(!height||hit->tile.frame_y<0||hit->tile.frame_y%18||
+       (hit->tile.frame_x!=0&&hit->tile.frame_x!=18))
+        return cx_fail(w,TCW_UNSUPPORTED,"wired light has an unsupported frame");
+    uint32_t offset=(uint32_t)(hit->tile.frame_y/18)%height;
+    if(hit->y<offset||height>w->height-(hit->y-offset))
+        return cx_fail(w,TCW_UNSUPPORTED,"wired light footprint is outside the world");
+    uint32_t top=hit->y-offset;CxDevice* parts[3];
+    int32_t style=hit->tile.frame_y-(int32_t)(offset*18u);
+    for(uint32_t row=0;row<height;row++){
+        CxDevice* part=cx_device_find(w,hit->x,top+row);parts[row]=part;
+        if(!part||!part->tile.active||part->tile.type!=hit->tile.type||
+           part->tile.frame_x!=hit->tile.frame_x||part->tile.frame_y!=style+(int32_t)(row*18u))
+            return cx_fail(w,TCW_UNSUPPORTED,"wired light requires a complete coherent footprint");
+        /* Normal lamps are non-solid and cannot be deactivated by wiring.
+         * Reactivating an already-inactive part depends on which tile BFS hits
+         * first; an aggregate net cannot reconstruct that directional fact. */
+        if(part->tile.actuator&&part->tile.inactive)
+            return cx_fail(w,TCW_UNSUPPORTED,"pre-actuated wired light requires directional traversal");
+    }
+    CxDevice* base=parts[0];
+    if(w->optimization&&base->wire_hit_epoch!=w->wire_trip_epoch){base->wire_hit_epoch=w->wire_trip_epoch;base->wire_hit_mask=0;}
+    uint32_t bit=1u<<colour;if(base->wire_hit_mask&bit)return TCW_OK;
+    base->wire_hit_mask|=bit;
+    int16_t frame=base->tile.frame_x==0?18:0;
+    for(uint32_t row=0;row<height;row++)parts[row]->tile.frame_x=frame;
+    return TCW_OK;
+}
+
 static int grow(CxWorld* w,void** data,uint32_t* capacity,uint32_t count,uint32_t size){if(count<=*capacity)return 1;uint32_t n=*capacity?*capacity*2u:64u;while(n<count){if(n>UINT32_MAX/2u)return 0;n*=2u;}if((uint64_t)n*size>UINT32_MAX)return 0;void* p=cx_alloc(w,n*size);if(!p)return 0;if(*data)memcpy(p,*data,*capacity*size);cx_free(w,*data);*data=p;*capacity=n;return 1;}
 static int is_switch(uint32_t type){switch(type){case 132:case 135:case 136:case 144:case 314:case 411:case 423:case 428:case 440:case 441:case 442:case 467:case 468:case 476:return 1;default:return 0;}}
 int cx_devices_prepare(CxWorld* w){for(uint32_t i=0;i<2;i++){w->previous_columns[i]=(TxTile*)cx_alloc(w,w->height*sizeof(TxTile));if(!w->previous_columns[i])return TCW_MEMORY;}return TCW_OK;}
@@ -40,7 +90,7 @@ int cx_devices_column(CxWorld* w){
                 if(y&&cx_inside_wiring(w,w->x,y-1u))p->connected_v|=(uint8_t)(mask&cx_wire_mask(w->column+y-1u));
                 if(y+1u<w->height&&cx_inside_wiring(w,w->x,y+1u))p->connected_v|=(uint8_t)(mask&cx_wire_mask(w->column+y+1u));
             }}
-        if(is_switch(t->type)||t->actuator||t->type==130u||t->type==131u){if(!grow(w,(void**)&w->devices,&w->device_capacity,w->device_count+1u,sizeof(CxDevice)))return TCW_MEMORY;CxDevice* d=w->devices+w->device_count++;memset(d,0,sizeof(*d));d->x=w->x;d->y=y;d->tile=d->initial=*t;if(t->type==144u)d->tile.frame_y=0;if(t->actuator||t->type==130u||t->type==131u){int s=prepare_policy(w,d);if(s)return s;}}
+        if(is_switch(t->type)||retain_wired_light(w,y,t)||t->actuator||t->type==130u||t->type==131u){if(!grow(w,(void**)&w->devices,&w->device_capacity,w->device_count+1u,sizeof(CxDevice)))return TCW_MEMORY;CxDevice* d=w->devices+w->device_count++;memset(d,0,sizeof(*d));d->x=w->x;d->y=y;d->tile=d->initial=*t;if(t->type==144u)d->tile.frame_y=0;if(t->actuator||t->type==130u||t->type==131u){int s=prepare_policy(w,d);if(s)return s;}}
     }return TCW_OK;
 }
 void cx_devices_bind_column(CxWorld* w){for(uint32_t i=w->column_device_first;i<w->device_count;i++){CxDevice* d=w->devices+i;for(uint32_t c=0;c<4;c++)d->pulse_nets[c]=d->nets[c]=w->ids[d->y*4u+c];d->gate=w->gate_at_y[d->y];}memcpy(w->previous_columns[w->x&1u],w->column,w->height*sizeof(TxTile));}
@@ -59,14 +109,14 @@ int cx_devices_compile(CxWorld* w){
     w->pixel_compat_unsupported=0;for(uint32_t i=0;i<w->pixel_count;i++)w->pixel_compat_unsupported+=!cx_pixel_topology_supported(w->pixels+i);
     uint64_t count=0;for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;count+=p->h[c]!=0;count+=p->v[c]!=0;}
     for(uint32_t i=0;i<w->device_count;i++)if(w->devices[i].tile.type==144u||w->devices[i].tile.type==411u)for(uint32_t c=0;c<4;c++)count+=w->devices[i].nets[c]!=0;
-    for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){count+=w->devices[i].tile.actuator!=0;count+=w->devices[i].tile.type==130u||w->devices[i].tile.type==131u;}
+    for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){count+=w->devices[i].tile.actuator&&!cx_wired_light_height(w->devices[i].tile.type);count+=cx_wired_light_height(w->devices[i].tile.type)!=0;count+=w->devices[i].tile.type==130u||w->devices[i].tile.type==131u;}
     if(count>UINT32_MAX/sizeof(CxPort))return TCW_MEMORY;
     w->ports=(CxPort*)cx_alloc(w,(count?count:1u)*sizeof(CxPort));w->pixel_touched=(uint32_t*)cx_alloc(w,(w->pixel_count?w->pixel_count:1u)*4u);w->pixel_snapshot=(uint8_t*)cx_alloc(w,w->pixel_count?w->pixel_count:1u);
     w->mech_capacity=w->device_count?w->device_count:1u;if(w->mech_capacity>CX_MECH_LIMIT)w->mech_capacity=CX_MECH_LIMIT;w->mechs=(uint32_t*)cx_alloc(w,w->mech_capacity*4u);w->mechs_snapshot=(uint32_t*)cx_alloc(w,w->mech_capacity*4u);
     if(!w->ports||!w->pixel_touched||!w->pixel_snapshot||!w->mechs||!w->mechs_snapshot)return TCW_MEMORY;
     for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(p->h[c])w->ports[w->port_count++]=(CxPort){p->h[c],i,0,(uint8_t)c,0};if(p->v[c])w->ports[w->port_count++]=(CxPort){p->v[c],i,1,(uint8_t)c,0};}
     for(uint32_t i=0;i<w->device_count;i++)if(w->devices[i].tile.type==144u||w->devices[i].tile.type==411u)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c])w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,w->devices[i].tile.type==144u?2:3,(uint8_t)c,0};
-    for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){if(w->devices[i].tile.actuator)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,4,(uint8_t)c,0};if(w->devices[i].tile.type==130u||w->devices[i].tile.type==131u)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,5,(uint8_t)c,0};}
+    for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){if(cx_wired_light_height(w->devices[i].tile.type))w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,6,(uint8_t)c,0};else if(w->devices[i].tile.actuator)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,4,(uint8_t)c,0};if(w->devices[i].tile.type==130u||w->devices[i].tile.type==131u)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,5,(uint8_t)c,0};}
     qsort(w->ports,w->port_count,sizeof(CxPort),compare_ports);return TCW_OK;
 }
 uint32_t cx_pixel_find(CxWorld* w,uint32_t x,uint32_t y){uint32_t lo=0,hi=w->pixel_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;CxPixel* p=w->pixels+m;if(p->x<x||(p->x==x&&p->y<y))lo=m+1;else hi=m;}return lo<w->pixel_count&&w->pixels[lo].x==x&&w->pixels[lo].y==y?lo:CX_NONE;}
@@ -80,6 +130,7 @@ int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index
 int cx_net_hit(void* context,uint32_t net){
     CxWorld* w=(CxWorld*)context;uint32_t group=net+1u,lo=0,hi=w->port_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;if(w->ports[m].net<group)lo=m+1;else hi=m;}
     while(lo<w->port_count&&w->ports[lo].net==group){CxPort* port=w->ports+lo++;
+        if(port->axis==6u){CxDevice* d=w->devices+port->pixel;if(cx_seed_contains(w,d->x,d->y))continue;int s=hit_wired_light(w,d,port->colour);if(s)return s;continue;}
         if(port->axis>=4u){CxDevice* d=w->devices+port->pixel;if(cx_seed_contains(w,d->x,d->y)||(w->vm_source_gate&&d->gate==w->vm_source_gate))continue;
             if(port->axis==4u){if(d->tile.inactive)d->tile.inactive=0;else if(cx_actuatable_type(d->tile.type)){if(d->can_deactivate<0)return cx_fail(w,TCW_UNSUPPORTED,"actuator support neighborhood is not representable for this malformed tile frame");if(d->can_deactivate)d->tile.inactive=1;}}
             else if(d->tile.type==131u)d->tile.type=130u;else{if(d->can_deactivate<0)return cx_fail(w,TCW_UNSUPPORTED,"active stone support neighborhood is unavailable");/* Unlike DeActive, ActiveStone always calls CanKillTile, even with an empty cell above. */if(d->can_deactivate&&d->tile.wall!=350u)d->tile.type=131u;}continue;
@@ -161,7 +212,7 @@ static uint32_t timer_interval(const CxDevice* d){switch(d->tile.frame_x/18){cas
 int cx_ticks_step(CxWorld* w,uint32_t* work){
     while(*work&&w->tick_remaining){
         if(w->tick_stage==0){++w->ticks;w->tick_cursor=w->mech_count;w->tick_stage=1;--*work;}
-        if(w->tick_stage==2){int s=terra_vm_step(w->vm,*work);*work=0;if(s<0)return cx_fail(w,TCW_STATE,"timer circuit pulse failed and was rolled back");if(s==TERRA_VM_MORE)return TCW_CONTINUE;w->tick_stage=1;continue;}
+        if(w->tick_stage==2){int s=terra_vm_step(w->vm,*work);*work=0;if(s<0)return w->error?-(int)w->error:cx_fail(w,TCW_STATE,"timer circuit pulse failed and was rolled back");if(s==TERRA_VM_MORE)return TCW_CONTINUE;w->tick_stage=1;continue;}
         while(*work&&w->tick_cursor){uint32_t at=--w->tick_cursor,id=w->mechs[at];CxDevice* d=w->devices+id;--*work;if(d->cooldown)d->cooldown--;
             if(d->tile.type==144u){if(d->tile.frame_y==0)d->cooldown=0;else if(d->cooldown%timer_interval(d)==0u){d->cooldown=18000u;w->trigger_count=0;for(uint32_t c=0;c<4;c++)if(d->pulse_nets[c])w->trigger_nets[w->trigger_count++]=d->pulse_nets[c]-1u;w->seed_x=d->x;w->seed_y=d->y;w->seed_width=w->seed_height=1;
                     uint32_t avail=cx_vm_available(w);if(!avail||terra_vm_set_budget(w->vm,avail)<0||terra_vm_begin(w->vm,w->trigger_nets,w->trigger_count)<0)return TCW_MEMORY;w->tick_stage=2;return TCW_CONTINUE;}}

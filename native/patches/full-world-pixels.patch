@@ -175,9 +175,13 @@
 @@ -16 +21 @@
 -        uint32_t id=++w->labels_count;if(!cx_words_size(w,&w->parents,id+1u))return 0;cx_set_word(&w->parents,id,id);return id;
 +        uint32_t id=++w->labels_count;if(!cx_words_size(w,&w->parents,id+1u))return 0;compile_set_word(&w->parents,id,id);return id;
-@@ -25 +30 @@
+@@ -25,3 +30,3 @@
 -    a=root(w,a);b=root(w,b);if(a>b){uint32_t t=a;a=b;b=t;}cx_set_word(&w->parents,b,a);return a;
+-}
+-static int important_tile(const TxTile* t){return t->active&&(t->type==419u||t->type==420u||t->type==424u||t->type==445u||t->actuator||t->type==132u||t->type==135u||t->type==136u||t->type==144u||t->type==33u||t->type==4u||t->type==429u||t->type==423u);}
 +    a=root(w,a);b=root(w,b);if(a>b){uint32_t t=a;a=b;b=t;}compile_set_word(&w->parents,b,a);return a;
++}
++static int important_tile(const TxTile* t){return t->active&&(t->type==419u||t->type==420u||t->type==424u||t->type==445u||t->actuator||t->type==132u||t->type==135u||t->type==136u||t->type==144u||t->type==33u||cx_wired_light_height(t->type)||t->type==4u||t->type==429u||t->type==423u);}
 @@ -57,0 +63,28 @@
 +/* Keep the original column/colour/row visit order, including every junction
 + * and PixelBox route. A gap in a colour's list is an unwired cell and breaks
@@ -318,9 +322,59 @@
 +        for(uint32_t g=1;g<=w->networks;g++)compile_set_word(&w->member_ends,g,compile_word(&w->member_ends,g)+w->code_size);
 --- a/src/terra_circuit_devices.c
 +++ b/src/terra_circuit_devices.c
-@@ -10,0 +11 @@
+@@ -10,0 +11,51 @@
 +extern void tx_set_error(const char*,const char*);
-@@ -23,0 +25,8 @@
++
++/* Independent implementation of Wiring.ToggleHangingLantern/ToggleLamp at
++ * source commit 8255d34616c780af12079425ac92a0a7aed87d71. Only the ordinary
++ * complete 1x2 and 1x3 frame families are supported here. */
++uint32_t cx_wired_light_height(uint32_t type){return type==42u?2u:type==93u?3u:0u;}
++
++static int retain_wired_light(const CxWorld* w,uint32_t y,const TxTile* tile){
++    uint32_t height=cx_wired_light_height(tile->type);if(!height)return 0;
++    if(cx_wire_mask(tile))return 1;
++    if(tile->frame_y<0||tile->frame_y%18)return 0;
++    uint32_t offset=(uint32_t)(tile->frame_y/18)%height;
++    if(y<offset||height>w->height-(y-offset))return 0;
++    /* The full column is already decoded. Retain unwired sibling cells only
++     * when their tiny implied footprint contains a wired member. */
++    for(uint32_t row=0;row<height;row++){
++        const TxTile* part=w->column+y-offset+row;
++        if(part->active&&part->type==tile->type&&cx_wire_mask(part))return 1;
++    }
++    return 0;
++}
++
++static int hit_wired_light(CxWorld* w,CxDevice* hit,uint32_t colour){
++    uint32_t height=cx_wired_light_height(hit->tile.type);
++    if(!height||hit->tile.frame_y<0||hit->tile.frame_y%18||
++       (hit->tile.frame_x!=0&&hit->tile.frame_x!=18))
++        return cx_fail(w,TCW_UNSUPPORTED,"wired light has an unsupported frame");
++    uint32_t offset=(uint32_t)(hit->tile.frame_y/18)%height;
++    if(hit->y<offset||height>w->height-(hit->y-offset))
++        return cx_fail(w,TCW_UNSUPPORTED,"wired light footprint is outside the world");
++    uint32_t top=hit->y-offset;CxDevice* parts[3];
++    int32_t style=hit->tile.frame_y-(int32_t)(offset*18u);
++    for(uint32_t row=0;row<height;row++){
++        CxDevice* part=cx_device_find(w,hit->x,top+row);parts[row]=part;
++        if(!part||!part->tile.active||part->tile.type!=hit->tile.type||
++           part->tile.frame_x!=hit->tile.frame_x||part->tile.frame_y!=style+(int32_t)(row*18u))
++            return cx_fail(w,TCW_UNSUPPORTED,"wired light requires a complete coherent footprint");
++        /* Normal lamps are non-solid and cannot be deactivated by wiring.
++         * Reactivating an already-inactive part depends on which tile BFS hits
++         * first; an aggregate net cannot reconstruct that directional fact. */
++        if(part->tile.actuator&&part->tile.inactive)
++            return cx_fail(w,TCW_UNSUPPORTED,"pre-actuated wired light requires directional traversal");
++    }
++    CxDevice* base=parts[0];
++    if(w->optimization&&base->wire_hit_epoch!=w->wire_trip_epoch){base->wire_hit_epoch=w->wire_trip_epoch;base->wire_hit_mask=0;}
++    uint32_t bit=1u<<colour;if(base->wire_hit_mask&bit)return TCW_OK;
++    base->wire_hit_mask|=bit;
++    int16_t frame=base->tile.frame_x==0?18:0;
++    for(uint32_t row=0;row<height;row++)parts[row]->tile.frame_x=frame;
++    return TCW_OK;
++}
+@@ -23,0 +75,8 @@
 +    /* Complete the previous pixel column's right-neighbour evidence without
 +     * rescanning the world or retaining a world-sized adjacency map. */
 +    for(uint32_t i=w->pixel_column_first;i<w->pixel_count;i++){
@@ -329,8 +383,9 @@
 +            p->connected_h|=(uint8_t)(cx_wire_mask(w->column+p->y)&(p->cell_word>>24));
 +    }
 +    w->pixel_column_first=w->pixel_count;
-@@ -27 +36,7 @@
+@@ -27,2 +86,8 @@
 -        if(t->type==445u||t->type==0xfffeu){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->custom=t->type==0xfffeu;p->state=p->initial=p->custom?(uint8_t)((t->frame_x/18)&3u)|((uint8_t)((t->frame_y/18)&3u)<<2):(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;}
+-        if(is_switch(t->type)||t->actuator||t->type==130u||t->type==131u){if(!grow(w,(void**)&w->devices,&w->device_capacity,w->device_count+1u,sizeof(CxDevice)))return TCW_MEMORY;CxDevice* d=w->devices+w->device_count++;memset(d,0,sizeof(*d));d->x=w->x;d->y=y;d->tile=d->initial=*t;if(t->type==144u)d->tile.frame_y=0;if(t->actuator||t->type==130u||t->type==131u){int s=prepare_policy(w,d);if(s)return s;}}
 +        if(t->type==445u){if(!grow(w,(void**)&w->pixels,&w->pixel_capacity,w->pixel_count+1u,sizeof(CxPixel)))return TCW_MEMORY;CxPixel* p=w->pixels+w->pixel_count;memset(p,0,sizeof(*p));p->x=w->x;p->y=y;p->cell_word=t->type|((uint32_t)(t->active|(t->actuator<<1)|(t->inactive<<2)|(t->wall?16u:0u))<<16)|(cx_wire_mask(t)<<24);p->state=p->initial=(uint8_t)(t->frame_x==18);w->pixel_at_y[y]=++w->pixel_count;
 +            if(cx_inside_wiring(w,w->x,y)){
 +                uint32_t mask=cx_wire_mask(t);
@@ -338,28 +393,37 @@
 +                if(y&&cx_inside_wiring(w,w->x,y-1u))p->connected_v|=(uint8_t)(mask&cx_wire_mask(w->column+y-1u));
 +                if(y+1u<w->height&&cx_inside_wiring(w,w->x,y+1u))p->connected_v|=(uint8_t)(mask&cx_wire_mask(w->column+y+1u));
 +            }}
-@@ -37,0 +53,4 @@
++        if(is_switch(t->type)||retain_wired_light(w,y,t)||t->actuator||t->type==130u||t->type==131u){if(!grow(w,(void**)&w->devices,&w->device_capacity,w->device_count+1u,sizeof(CxDevice)))return TCW_MEMORY;CxDevice* d=w->devices+w->device_count++;memset(d,0,sizeof(*d));d->x=w->x;d->y=y;d->tile=d->initial=*t;if(t->type==144u)d->tile.frame_y=0;if(t->actuator||t->type==130u||t->type==131u){int s=prepare_policy(w,d);if(s)return s;}}
+@@ -37,0 +103,4 @@
 +int cx_pixel_topology_supported(const CxPixel* p){
 +    for(uint32_t c=0;c<4;c++)if((p->connected_h&p->connected_v&(1u<<c))&&p->h[c]!=p->v[c])return 0;
 +    return 1;
 +}
-@@ -40 +59,2 @@
+@@ -40 +109,2 @@
 -    uint64_t count=0;for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(w->twld_state&&p->custom&&p->h[c]==p->v[c])continue;count+=p->h[c]!=0;if(!w->twld_state||p->custom)count+=p->v[c]!=0;}
 +    w->pixel_compat_unsupported=0;for(uint32_t i=0;i<w->pixel_count;i++)w->pixel_compat_unsupported+=!cx_pixel_topology_supported(w->pixels+i);
 +    uint64_t count=0;for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;count+=p->h[c]!=0;count+=p->v[c]!=0;}
-@@ -47 +67 @@
+@@ -42 +112 @@
+-    for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){count+=w->devices[i].tile.actuator!=0;count+=w->devices[i].tile.type==130u||w->devices[i].tile.type==131u;}
++    for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){count+=w->devices[i].tile.actuator&&!cx_wired_light_height(w->devices[i].tile.type);count+=cx_wired_light_height(w->devices[i].tile.type)!=0;count+=w->devices[i].tile.type==130u||w->devices[i].tile.type==131u;}
+@@ -47 +117 @@
 -    for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(w->twld_state&&p->custom&&p->h[c]==p->v[c])continue;if(p->h[c])w->ports[w->port_count++]=(CxPort){p->h[c],i,0,(uint8_t)c,0};if((!w->twld_state||p->custom)&&p->v[c])w->ports[w->port_count++]=(CxPort){p->v[c],i,1,(uint8_t)c,0};}
 +    for(uint32_t i=0;i<w->pixel_count;i++)for(uint32_t c=0;c<4;c++){CxPixel* p=w->pixels+i;if(p->h[c])w->ports[w->port_count++]=(CxPort){p->h[c],i,0,(uint8_t)c,0};if(p->v[c])w->ports[w->port_count++]=(CxPort){p->v[c],i,1,(uint8_t)c,0};}
-@@ -56 +76,4 @@
+@@ -49 +119 @@
+-    for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){if(w->devices[i].tile.actuator)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,4,(uint8_t)c,0};if(w->devices[i].tile.type==130u||w->devices[i].tile.type==131u)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,5,(uint8_t)c,0};}
++    for(uint32_t i=0;i<w->device_count;i++)for(uint32_t c=0;c<4;c++)if(w->devices[i].nets[c]){if(cx_wired_light_height(w->devices[i].tile.type))w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,6,(uint8_t)c,0};else if(w->devices[i].tile.actuator)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,4,(uint8_t)c,0};if(w->devices[i].tile.type==130u||w->devices[i].tile.type==131u)w->ports[w->port_count++]=(CxPort){w->devices[i].nets[c],i,5,(uint8_t)c,0};}
+@@ -56 +126,4 @@
 -int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->twld_state)w->pixel_touched_count=0;for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
 +/* Device dedup belongs to one TripWire. Epochs avoid clearing every unrelated
 + * switch for each gate output; wrapping the epoch restores an empty generation.
 + * Epoch state is transient, so cancellation starts fresh on the next trip. */
 +int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->optimization)w->pixel_touched_count=0;if(w->optimization){if(++w->wire_trip_epoch==0u){for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_epoch=0;w->wire_trip_epoch=1u;}}else for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
-@@ -65 +88 @@
+@@ -59,0 +133 @@
++        if(port->axis==6u){CxDevice* d=w->devices+port->pixel;if(cx_seed_contains(w,d->x,d->y))continue;int s=hit_wired_light(w,d,port->colour);if(s)return s;continue;}
+@@ -65 +139 @@
 -        if(port->axis==3u){CxDevice* d=w->devices+port->pixel;uint32_t x=d->x-(uint32_t)(d->tile.frame_x%36/18),y=d->y-(uint32_t)(d->tile.frame_y%36/18);CxDevice* base=cx_device_find(w,x,y);if(!base)continue;uint32_t bit=1u<<port->colour;if(base->wire_hit_mask&bit)continue;
 +        if(port->axis==3u){CxDevice* d=w->devices+port->pixel;uint32_t x=d->x-(uint32_t)(d->tile.frame_x%36/18),y=d->y-(uint32_t)(d->tile.frame_y%36/18);CxDevice* base=cx_device_find(w,x,y);if(!base)continue;if(w->optimization&&base->wire_hit_epoch!=w->wire_trip_epoch){base->wire_hit_epoch=w->wire_trip_epoch;base->wire_hit_mask=0;}uint32_t bit=1u<<port->colour;if(base->wire_hit_mask&bit)continue;
-@@ -69,2 +92,11 @@
+@@ -69,2 +143,11 @@
 -        CxPixel* p=w->pixels+port->pixel;if(!p->marked){p->marked=1;w->pixel_touched[w->pixel_touched_count++]=port->pixel;}uint8_t bit=(uint8_t)(1u<<port->colour);
 -        if(w->twld_state){if(port->axis)p->hit_v^=bit;else p->hit_h^=bit;}else if(port->axis)p->hit_v|=bit;else p->hit_h|=bit;
 +        CxPixel* p=w->pixels+port->pixel;uint8_t bit=(uint8_t)(1u<<port->colour);
@@ -373,7 +437,7 @@
 +        if(!p->marked){p->marked=1;w->pixel_touched[w->pixel_touched_count++]=port->pixel;}
 +        if(w->optimization)p->hit_h^=bit;
 +        else if(port->axis)p->hit_v|=bit;else p->hit_h|=bit;
-@@ -75,3 +107,8 @@
+@@ -75,3 +158,8 @@
 -        if(p->custom){uint8_t both=p->hit_h&p->hit_v;for(uint32_t c=0;c<4;c++)if(both&(1u<<c))p->state^=(uint8_t)(1u<<(3u-c));}
 -        else if(w->twld_state){uint32_t n=(uint32_t)__builtin_popcount((unsigned)p->hit_h);p->state^=(uint8_t)((n*(n-1u)/2u)&1u);}
 -        else if(p->hit_h&&p->hit_v)p->state^=1u;
@@ -385,7 +449,7 @@
 +            uint32_t n=(uint32_t)__builtin_popcount((unsigned)p->hit_h);
 +            p->state^=(uint8_t)((n*(n-1u)/2u)&1u);
 +        }else if(p->hit_h&&p->hit_v)p->state^=1u;
-@@ -81,3 +118,16 @@
+@@ -81,3 +169,16 @@
 -int cx_trip_end(void* context){CxWorld* w=(CxWorld*)context;return w->twld_state?0:pixel_pass(w);}
 -int cx_wave_begin(void* context){(void)context;return 0;}
 -int cx_wave_end(void* context){CxWorld* w=(CxWorld*)context;return w->twld_state?pixel_pass(w):0;}
@@ -405,6 +469,9 @@
 +    }
 +    return TCW_OK;
 +}
+@@ -114 +215 @@
+-        if(w->tick_stage==2){int s=terra_vm_step(w->vm,*work);*work=0;if(s<0)return cx_fail(w,TCW_STATE,"timer circuit pulse failed and was rolled back");if(s==TERRA_VM_MORE)return TCW_CONTINUE;w->tick_stage=1;continue;}
++        if(w->tick_stage==2){int s=terra_vm_step(w->vm,*work);*work=0;if(s<0)return w->error?-(int)w->error:cx_fail(w,TCW_STATE,"timer circuit pulse failed and was rolled back");if(s==TERRA_VM_MORE)return TCW_CONTINUE;w->tick_stage=1;continue;}
 --- a/src/terra_circuit_fragments.inc
 +++ b/src/terra_circuit_fragments.inc
 @@ -52 +52 @@
@@ -496,9 +563,13 @@
 @@ -116 +116 @@
 -    cb.trip_begin=cx_trip_begin;cb.net_hit=cx_net_hit;cb.trip_end=cx_trip_end;cb.wave_begin=cx_wave_begin;cb.wave_end=cx_wave_end;
 +    cb.trip_begin=cx_trip_begin;cb.net_hit=cx_net_hit;cb.trip_end=cx_trip_end;cb.wave_end=cx_pixel_wave_end;
-@@ -132 +132 @@
+@@ -120,0 +121 @@
++    if(cx_wired_light_height(b->tile.type)){CxDevice* d=cx_device_find(w,b->x,b->y);return (d?d->tile.frame_x:b->tile.frame_x)==0;}
+@@ -132,2 +133,2 @@
 -    else if(t->active&&(t->type==445u||t->type==0xfffeu)){uint32_t i=cx_pixel_find(w,x,y);if(i!=CX_NONE){CxPixel* p=w->pixels+i;t->frame_x=(int16_t)(18u*(p->custom?p->state&3u:p->state));if(p->custom)t->frame_y=(int16_t)(18u*((p->state>>2)&3u));}}
+-    else if(t->active&&(t->type==132u||t->type==136u||t->type==144u||t->type==411u)){CxDevice* d=cx_device_find(w,x,y);if(d){t->frame_x=d->tile.frame_x;t->frame_y=d->tile.frame_y;}}
 +    else if(t->active&&t->type==445u){uint32_t i=cx_pixel_find(w,x,y);if(i!=CX_NONE)t->frame_x=(int16_t)(18u*w->pixels[i].state);}
++    else if(t->active&&(t->type==132u||t->type==136u||t->type==144u||t->type==411u||cx_wired_light_height(t->type))){CxDevice* d=cx_device_find(w,x,y);if(d){t->frame_x=d->tile.frame_x;t->frame_y=d->tile.frame_y;}}
 --- a/src/terra_circuit_twld.c
 +++ /dev/null
 @@ -1,602 +0,0 @@
@@ -1177,6 +1248,9 @@
 -uint32_t cx_vm_available(CxWorld* w){uint64_t used=w->bytes;TerraTwldStats t;if(w->twld){terra_twld_stats(w->twld,&t);used+=t.allocated_bytes;}return used<w->maximum?w->maximum-(uint32_t)used:0u;}
 +static uint32_t vm_bytes(CxWorld* w) { uint32_t bytes=0;TerraVmStats s;if(w->vm){terra_vm_stats(w->vm,&s);bytes=s.allocated_bytes;}return bytes; }
 +uint32_t cx_vm_available(CxWorld* w){uint64_t used=w->bytes;return used<w->maximum?w->maximum-(uint32_t)used:0u;}
+@@ -41 +41 @@
+-    tx_set_error(status==TCW_MEMORY?"TERRAX_CIRCUIT_MEMORY":status==TCW_FORMAT?"TERRAX_CIRCUIT_FORMAT":"TERRAX_CIRCUIT_STATE",message);
++    tx_set_error(status==TCW_MEMORY?"TERRAX_CIRCUIT_MEMORY":status==TCW_FORMAT?"TERRAX_CIRCUIT_FORMAT":status==TCW_UNSUPPORTED?"TERRAX_CIRCUIT_UNSUPPORTED":"TERRAX_CIRCUIT_STATE",message);
 @@ -82 +82 @@
 -    memset(&w->event,0,sizeof(w->event));w->event.abi_version=1;w->event.kind=kind;
 +    memset(&w->event,0,sizeof(w->event));w->event.abi_version=TERRA_CIRCUIT_WORLD_ABI;w->event.kind=kind;
@@ -1203,6 +1277,9 @@
 -        else if(w->phase==CX_SAVE_PATCH){int s=cx_twld_save_begin(w);if(s<0)return s;if(!w->twld)w->phase=CX_IDLE;}
 -        else if(w->phase==CX_TWLD&&w->twld_mode==2u){w->twld_output_offset+=w->event.length;w->output_length=0;}
 +        else if(w->phase==CX_SAVE_PATCH)w->phase=CX_IDLE;
+@@ -209 +208 @@
+-            if(status<0)status=cx_fail(w,status==TERRA_VM_OOM||status==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE,"native circuit execution failed and was rolled back");
++            if(status<0)status=w->error?-(int)w->error:cx_fail(w,status==TERRA_VM_OOM||status==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE,"native circuit execution failed and was rolled back");
 @@ -215 +213,0 @@
 -        else if(w->phase==CX_TWLD)status=cx_twld_step(w,&work);
 @@ -219 +217 @@
@@ -1259,6 +1336,8 @@
 +int cx_pixel_topology_supported(const CxPixel*);
 @@ -177 +170,0 @@
 -int cx_mod_vanilla(CxWorld*,uint32_t,uint32_t,TxTile*);
+@@ -179,0 +173 @@
++uint32_t cx_wired_light_height(uint32_t);
 --- a/src/terra_wld.c
 +++ b/src/terra_wld.c
 @@ -865,2 +865,5 @@

@@ -170,6 +170,7 @@ void cx_operation_rollback(CxWorld*);
 int cx_seed_reserve(CxWorld*,uint32_t);
 int cx_override_reserve(CxWorld*,uint32_t);
 int cx_lazy_toggle(const TxTile*);
+uint32_t cx_wired_light_height(uint32_t);
 int cx_seed_contains(const CxWorld*,uint32_t,uint32_t);
 int cx_inside_wiring(const CxWorld*,uint32_t,uint32_t);
 int cx_devices_prepare(CxWorld*);
