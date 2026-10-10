@@ -110,6 +110,27 @@ Future<void> _waitFor(
   fail('Timed out: $reason');
 }
 
+Future<void> _drainClose(WidgetTester tester, Workspace workspace) async {
+  var done = false;
+  Object? failure;
+  StackTrace? failureStack;
+  final closing = workspace.close().then<void>(
+    (_) {
+      done = true;
+    },
+    onError: (Object error, StackTrace stack) {
+      failure = error;
+      failureStack = stack;
+      done = true;
+    },
+  );
+  // Closing drains Futures created by UI actions in this fake-async zone.
+  // Keep pumping that zone instead of waiting for them inside runAsync alone.
+  await _waitFor(tester, () => done, 'native workspace close');
+  await closing;
+  if (failure != null) Error.throwWithStackTrace(failure!, failureStack!);
+}
+
 Future<Uint8List> _decodedFrame(WidgetTester tester, Uint8List expected) async {
   final raw = find.descendant(
     of: find.byType(ComputerDisplay),
@@ -149,6 +170,10 @@ void main() {
   final fontHashes = <String, String>{};
   setUpAll(() async {
     if (library == null) return;
+    // The process-owned engine outlives individual widget-test fake clocks.
+    // Initialize its ReceivePort in the real setup zone, without opening a WLD.
+    final backend = createTerraEngine() as WorldCircuitSourceBackend;
+    expect(await backend.worldCircuitProgress(), isNull);
     for (final entry in const {
       terraFontFamily: 'assets/fonts/TerraForgeCJK-Regular.otf',
       'MaterialIcons': 'fonts/MaterialIcons-Regular.otf',
@@ -455,7 +480,7 @@ void main() {
             await button('关闭');
             expect(state()['open'], isFalse);
             await tester.pumpWidget(const SizedBox.shrink());
-            await tester.runAsync(workspace.close);
+            await _drainClose(tester, workspace);
             workspace.dispose();
 
             // A new Workspace/owner opens the actual exported file from disk.
@@ -486,6 +511,9 @@ void main() {
             await confirm();
             expect(state()['open'], isFalse);
             expect(find.byType(ComputerDisplay), findsNothing);
+            // Native idle can precede the dialog route's reverse animation.
+            // It must still leave the tree once that animation settles.
+            await tester.pumpAndSettle();
             expect(find.byType(AlertDialog), findsNothing);
             expect(_hash(saved.readAsBytesSync()), savedHash);
             expect(_hash(original.readAsBytesSync()), originalHash);
@@ -498,7 +526,8 @@ void main() {
                   'schema': 'abc.visible-pixelbox-persistence.v1',
                   'status': 'passed',
                   'kind': 'original-synthetic-WLD-native-full-app-functional-observation',
-                  'rasterizer': 'same Flutter widget-test rasterizer for both layouts',
+                  'rasterizer':
+                      'same Flutter widget-test rasterizer for both layouts',
                   'notMeasured': [
                     'native device rendering',
                     'FPS',
@@ -537,12 +566,15 @@ void main() {
               );
             }
           } finally {
-            await tester.pumpWidget(const SizedBox.shrink());
-            await tester.runAsync(workspace.close);
-            workspace.dispose();
-            directory.deleteSync(recursive: true);
-            WidgetController.hitTestWarningShouldBeFatal = previousHitTest;
-            debugDisableShadows = previousShadows;
+            try {
+              await tester.pumpWidget(const SizedBox.shrink());
+              await _drainClose(tester, workspace);
+              workspace.dispose();
+              directory.deleteSync(recursive: true);
+            } finally {
+              WidgetController.hitTestWarningShouldBeFatal = previousHitTest;
+              debugDisableShadows = previousShadows;
+            }
           }
         },
         skip: library == null,
