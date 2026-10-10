@@ -143,7 +143,12 @@ contracts passed during this audit. The first official diagnostic run
 [38057554463](https://github.com/Live-yum/abc/actions/runs/38057554463), pinned to
 `11f669da12788e556e3057b6bd9b3ca6db1c1947`, also passed the three
 ASan/UBSan C contracts and the rebuilt Web artifact’s 36 fixture/mode cases.
-The eight timer-driven rollback cases were added after that run and passed
-locally; they still require validation on the final PR head.
+The eight timer-driven rollback cases were added after that run. The Native
+job in [full CI run 38060354468](https://github.com/Live-yum/abc/actions/runs/38060354468),
+pinned to `ca7ee6ba74556a69432a09d1f8729a51bffd04d6`, subsequently passed
+those eight cases, the 16 fixture combinations, and the sanitizer contracts.
+That run’s separate Web job failed before its tests because a shallow checkout
+lacked the fixed c61 source object required by the provenance test; Native
+success does not imply that the entire run passed.
 Flutter UI/device performance and full game-world parity remain separate
 acceptance work. SDK-dependent checks run in official CI.
