@@ -337,8 +337,9 @@ int32_t terra_vm_step(TerraCircuitVm* vm, uint32_t max_operations) {
             break;
         }
         case VM_TRIP_END:
-            if (vm->callbacks.trip_end && vm->callbacks.trip_end(vm->context) < 0)
-                return vm_fail(vm, TERRA_VM_CALLBACK);
+            status = vm->callbacks.trip_end ? vm->callbacks.trip_end(vm->context) : 0;
+            if (status < 0) return vm_fail(vm, TERRA_VM_CALLBACK);
+            if (status > 0) break;
             vm->seen_clear_index = 0;
             vm->phase = VM_TRIP_CLEAR;
             break;
@@ -427,6 +428,13 @@ int32_t terra_vm_set_budget(TerraCircuitVm* vm, uint32_t max_bytes) {
     if (vm->active) return TERRA_VM_STATE;
     vm->maximum = max_bytes ? max_bytes : UINT32_MAX;
     return vm->allocated <= vm->maximum ? TERRA_VM_OK : TERRA_VM_LIMIT;
+}
+
+int32_t terra_vm_set_owner_budget(TerraCircuitVm* vm, uint32_t max_bytes) {
+    if (!vm || !max_bytes) return TERRA_VM_INVALID;
+    if (max_bytes < vm->allocated) return TERRA_VM_LIMIT;
+    vm->maximum = max_bytes;
+    return TERRA_VM_OK;
 }
 
 void terra_vm_stats(const TerraCircuitVm* vm, TerraVmStats* out) {

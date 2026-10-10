@@ -44,6 +44,7 @@ typedef struct CxActuationPolicy { uint32_t device,x,y; uint32_t valid; TxTile a
 typedef struct CxPixel { uint32_t x,y,h[4],v[4],cell_word; uint8_t state,initial,hit_h,hit_v,marked; uint8_t connected_h,connected_v,reserved; } CxPixel;
 typedef struct CxPort { uint32_t net,pixel; uint8_t axis,colour; uint16_t reserved; } CxPort;
 typedef struct CxFragments CxFragments;
+typedef struct CxTimerOrder CxTimerOrder;
 typedef struct CxWorld {
     uint32_t id, world_handle, maximum, bytes, peak, phase, error;
     TxWorld* world;
@@ -89,6 +90,8 @@ typedef struct CxWorld {
     uint8_t* pixel_snapshot;
     uint32_t vm_trip_index,wire_trip_epoch,optimization;
     uint32_t vm_source_gate;
+    CxTimerOrder* timer_order;
+    uint32_t timer_hit_count,timer_first,timer_hit_colours,timer_order_unsupported,timer_hit_events;
     CxOverride* overrides; uint32_t override_count,override_capacity;
     CxOverride* override_snapshot; uint32_t override_snapshot_capacity,override_saved_count;
     CxBinding* bindings; uint32_t binding_count,binding_capacity;
@@ -111,6 +114,18 @@ typedef struct CxWorld {
 } CxWorld;
 
 void* cx_alloc(CxWorld*,uint32_t);
+void* cx_optional_alloc(CxWorld*,uint32_t);
+void cx_timer_order_prepare(CxWorld*);
+void cx_timer_order_cell(CxWorld*,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
+void cx_timer_order_gates(CxWorld*);
+void cx_timer_order_finish(CxWorld*);
+void cx_timer_order_free(CxWorld*);
+void cx_timer_order_reset(CxWorld*);
+void cx_timer_order_begin(CxWorld*);
+void cx_timer_order_hit(CxWorld*,CxDevice*,uint32_t,uint32_t);
+int cx_timer_order_step(CxWorld*);
+int cx_toggle_timer(CxWorld*,CxDevice*);
+uint32_t cx_bound_wire_mask(CxWorld*,uint32_t,uint32_t);
 void cx_free(CxWorld*,void*);
 int cx_fail(CxWorld*,int,const char*);
 int cx_bytes_append(CxWorld*,CxBytes*,const void*,uint32_t);

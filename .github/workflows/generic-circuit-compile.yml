@@ -107,7 +107,7 @@ jobs:
           retention-days: 30
 
   native-lights:
-    name: Source-oracle wired lights / Native contracts
+    name: Source-oracle lights and timers / Native contracts
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -124,7 +124,7 @@ jobs:
           mkdir -p build/light-review
           cmake -S native -B build/native-asan -DABC_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
           cmake --build build/native-asan --parallel 2
-          for contract in circuit_device_epoch_contract circuit_wld_pixel_contract circuit_wired_light_contract; do
+          for contract in circuit_device_epoch_contract circuit_wld_pixel_contract circuit_wired_light_contract circuit_timer_order_contract; do
             cc -g -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer -I native/vendor/TerraWasm/include -I native/vendor/TerraWasm/src "native/$contract.c" build/native-asan/terra/libterrax_world_static.a -lm -lz -o "build/$contract"
             "build/$contract" | tee "build/light-review/$contract.log"
           done
@@ -134,6 +134,8 @@ jobs:
           cmake -S native -B build/native-release -DCMAKE_BUILD_TYPE=Release
           cmake --build build/native-release --parallel 2
           python3 tool/test_wired_lights.py build/native-release/libabc_engine.so --output build/light-review/native-lights.json
+          python3 tool/test_timer_fifo.py build/native-release/libabc_engine.so --output build/light-review/native-timers.json
+          python3 tool/test_timer_gate_origins.py build/native-release/libabc_engine.so --output build/light-review/native-timer-gates.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -177,7 +179,7 @@ jobs:
           retention-days: 30
 
   web-lights:
-    name: Source-oracle wired lights / rebuilt Web engine
+    name: Source-oracle lights and timers / rebuilt Web engine
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -199,6 +201,7 @@ jobs:
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           ABC_WEB_OUTPUT="$PWD/web/engine" bash tool/build_web_engine.sh
           node tool/record_web_engine.mjs
+          python3 -m unittest discover -s tool -p 'authorized_source_additions_test.py'
           python3 tool/verify_authorized_sources.py
       - name: Execute shared original light WLD scenarios in real WASM
         run: |
@@ -206,6 +209,8 @@ jobs:
           mkdir -p build/light-web-review
           python3 tool/test_wired_lights.py --export-fixtures build/light-fixtures
           node test/web/world_circuit_lights_contract.cjs web/engine/world.js web/engine/world.wasm build/light-fixtures | tee build/light-web-review/contract.log
+          python3 tool/test_timer_fifo.py --export-fixtures build/timer-fixtures
+          node test/web/world_circuit_timer_contract.cjs web/engine/world.js web/engine/world.wasm build/timer-fixtures | tee build/light-web-review/timers-contract.log
           tar -czf build/light-web-review/verified-web-engine.tar.gz web/engine/world.js web/engine/world.wasm web/engine/player.js web/engine/player.wasm web/engine/manifest.json web/engine/circuit_rules.engine-provenance.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()

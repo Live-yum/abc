@@ -2,13 +2,13 @@
   "schema": 1,
   "sourceRepository": "Live-yum/TerraWasm",
   "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
-  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v6-wired-light-footprints patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; shared physical gate-wave VM code is unchanged. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches. The WLD Web export list additionally exposes the existing four incremental SHA-256 functions; the C hash implementation is unchanged. Sparse READ_LAMPS reuses existing checkpoints at complete-column boundaries and yields after every restore; other command scans retain their prior behavior. Ordinary connected type-42/type-93 light footprints now have independent frame-state execution and save projection; complete unconnected decorations add no mutable retained entries. Decompiled Terraria source is used only as a behavioral oracle and is not redistributed.",
+  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v7-timer-fifo-order patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; physical gate-wave policy is retained while trip-end work can yield before pixel and gate evaluation. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches. The WLD Web export list additionally exposes the existing four incremental SHA-256 functions; the C hash implementation is unchanged. Sparse READ_LAMPS reuses existing checkpoints at complete-column boundaries and yields after every restore; other command scans retain their prior behavior. Ordinary connected type-42/type-93 light footprints now have independent frame-state execution and save projection; complete unconnected decorations add no mutable retained entries. Decompiled Terraria source is used only as a behavioral oracle and is not redistributed. Bounded ordinary-wire multi-timer domains replay independent source-oracle FIFO timer order with optional evictable topology and seed-order caches. New local files carry explicit original-implementation provenance rather than fabricated upstream identities. Unsupported ordering domains reject affected commands transactionally; see the parity document for limits.",
   "license": "No upstream license grant identified; inclusion is user-authorized and does not relicense upstream material.",
   "files": [
     {
       "path": "CMakeLists.txt",
-      "bytes": 25494,
-      "sha256": "e9d473343c337306af0e17256be7ef3a71ea18872a24144b89cd3b916a017da5"
+      "bytes": 25539,
+      "sha256": "13ca35fcd82ef93368a47fb913c73f2c5831b01746a9ad5d27a32a69f21048ce"
     },
     {
       "path": "README.md",
@@ -82,8 +82,8 @@
     },
     {
       "path": "include/terra_circuit_vm.h",
-      "bytes": 5528,
-      "sha256": "ab5a6b9de349d7ddf5b206034cafb364acdac3568f5c7eac90b00054659de2ea"
+      "bytes": 5914,
+      "sha256": "a2e53842d027a57a8565f38979fe2108ca7213ed2c2a4779bce94542d1f20165"
     },
     {
       "path": "include/terra_circuit_world.h",
@@ -237,13 +237,13 @@
     },
     {
       "path": "src/terra_circuit_compile.c",
-      "bytes": 26704,
-      "sha256": "c392fadf25e71fba1cc02c32a92a9e35392b989b2e0490524da46a190c3ef430"
+      "bytes": 26883,
+      "sha256": "815f8bc8babf5b19a0b75d011475d244d6a6f2dbaeaf902c7d11ad6da7e11d88"
     },
     {
       "path": "src/terra_circuit_devices.c",
-      "bytes": 21936,
-      "sha256": "8b89343a5104f9eccd452a758e901dec0849a7b73d0252dcf66fc3ed0aa74aef"
+      "bytes": 22045,
+      "sha256": "9c5d89b23cd17a79c3c0098e03b244a6034a50380d04f8f59c6a835c0073533e"
     },
     {
       "path": "src/terra_circuit_fragments.inc",
@@ -257,13 +257,13 @@
     },
     {
       "path": "src/terra_circuit_query.c",
-      "bytes": 20267,
-      "sha256": "141d6b96c20cfdb96fbe804d29e9007486462acca785c7a0e4aa8bd6269a42df"
+      "bytes": 20518,
+      "sha256": "d834d6048e3f26724208a2f00858490eb5d3ba5c0f7aa182bb8806e85a13aff0"
     },
     {
       "path": "src/terra_circuit_rules.c",
-      "bytes": 13538,
-      "sha256": "7c5f0847885894ac507e74afa095e59807f1ee1d70de26594b7437e00d14096a"
+      "bytes": 14212,
+      "sha256": "02f364eaddd6d2611d4251300990bcea047cae882f15f49c8283f4e7bcf098c0"
     },
     {
       "path": "src/terra_circuit_supports.inc",
@@ -271,19 +271,24 @@
       "sha256": "af85808cd12c7994ff7efab98bb6d4254b4b9309ea45cd94ed1bc512ce2a9b13"
     },
     {
+      "path": "src/terra_circuit_timer_order.c",
+      "bytes": 12626,
+      "sha256": "2c4dba557077d6b45de3804e59a8edbabf816ff2f46cd1947573d1f6b265de1c"
+    },
+    {
       "path": "src/terra_circuit_vm.c",
-      "bytes": 18646,
-      "sha256": "0e7f3b171115b8fb684a3bbe2eeaf7bedba5b57a17d20be442b1e951b0290716"
+      "bytes": 18939,
+      "sha256": "666b4ffa3aee8aebff63edfa8729773022ea60e9499807cc916335f6d492a251"
     },
     {
       "path": "src/terra_circuit_world.c",
-      "bytes": 18919,
-      "sha256": "11b48ed97105aeaa0bdf9845d1ea07d0d4bf12000f2baa281c8ad01484ad9799"
+      "bytes": 19947,
+      "sha256": "ed79b8cbe797c2a34d87571fe32c64e44c4a2ff5710ff17001383439df8b713a"
     },
     {
       "path": "src/terra_circuit_world_internal.h",
-      "bytes": 9413,
-      "sha256": "2cccc1fcf05c73dd8523826cf7933e9842787010ab73fce71a7c00f556e6bd95"
+      "bytes": 10141,
+      "sha256": "3635ba50af93041801c872117ba5e222f678a2b99cdae071d9bdeb189fb953f8"
     },
     {
       "path": "src/terra_commands.c",
@@ -483,9 +488,9 @@
   ],
   "localPatches": [
     {
-      "id": "full-world-pixels-v6-wired-light-footprints",
+      "id": "full-world-pixels-v7-timer-fifo-order",
       "manifest": "native/patches/full-world-pixels.json",
-      "sha256": "f1a269701ddf4f968efea570c6af9f61323e09f7aba4f8a258560223dd20e04b"
+      "sha256": "0fb4d649de9a75ccba15ab78e3c698d2ffb1f6f4be71a54e942d566a599aacc9"
     }
   ]
 }

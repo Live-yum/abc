@@ -21,16 +21,29 @@ CxWorld* cx_lookup(uint32_t id) {
     return NULL;
 }
 static uint32_t vm_bytes(CxWorld* w) { uint32_t bytes=0;TerraVmStats s;if(w->vm){terra_vm_stats(w->vm,&s);bytes=s.allocated_bytes;}return bytes; }
+static int optional_index_evictable(CxWorld* w){TerraVmStats s={0};if(w->vm)terra_vm_stats(w->vm,&s);return !w->operation_active&&!s.active;}
 uint32_t cx_vm_available(CxWorld* w){uint64_t used=w->bytes;return used<w->maximum?w->maximum-(uint32_t)used:0u;}
 void* cx_alloc(CxWorld* w,uint32_t bytes) {
     uint64_t n=(uint64_t)bytes+sizeof(CxAllocation)+32u;
+    if(n<=UINT32_MAX&&(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum&&optional_index_evictable(w))cx_timer_order_free(w);
     if(n>UINT32_MAX||(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum) {
         cx_fail(w,TCW_MEMORY,"circuit allocation exceeds the available process memory budget");return NULL;
     }
     CxAllocation* p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));
+    if(!p&&w->timer_order&&optional_index_evictable(w)){cx_timer_order_free(w);p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));}
     if(!p){cx_fail(w,TCW_MEMORY,"circuit allocation failed");return NULL;}
     p->v.bytes=(uint32_t)n;w->bytes+=(uint32_t)n;
     if(w->bytes+vm_bytes(w)>w->peak)w->peak=w->bytes+vm_bytes(w);
+    return p+1;
+}
+/* Optional traversal indexes must never make an otherwise loadable world fail. */
+void* cx_optional_alloc(CxWorld* w,uint32_t bytes) {
+    uint64_t n=(uint64_t)bytes+sizeof(CxAllocation)+32u;
+    if(n>UINT32_MAX||(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum)return NULL;
+    CxAllocation* p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));
+    if(!p)return NULL;p->v.bytes=(uint32_t)n;w->bytes+=(uint32_t)n;
+    if(w->bytes+vm_bytes(w)>w->peak)w->peak=w->bytes+vm_bytes(w);
+    if(w->vm)terra_vm_set_owner_budget(w->vm,cx_vm_available(w));
     return p+1;
 }
 void cx_free(CxWorld* w,void* pointer) {
@@ -132,6 +145,7 @@ int cx_cache_flush(CxWorld* w){
 static void destroy(CxWorld* w){
     if(!w)return;terra_vm_destroy(w->vm);w->vm=NULL;
     cx_fragments_free(w);
+    cx_timer_order_free(w);
     cx_words_free(w,&w->parents);cx_words_free(w,&w->code_ends);cx_words_free(w,&w->member_ends);cx_words_free(w,&w->previous_gate);
     cx_bytes_free(w,&w->map);cx_bytes_free(w,&w->checkpoints);cx_bytes_free(w,&w->code);cx_bytes_free(w,&w->members);
 #define RELEASE(field) cx_free(w,w->field)

@@ -122,11 +122,11 @@ int cx_devices_compile(CxWorld* w){
 uint32_t cx_pixel_find(CxWorld* w,uint32_t x,uint32_t y){uint32_t lo=0,hi=w->pixel_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;CxPixel* p=w->pixels+m;if(p->x<x||(p->x==x&&p->y<y))lo=m+1;else hi=m;}return lo<w->pixel_count&&w->pixels[lo].x==x&&w->pixels[lo].y==y?lo:CX_NONE;}
 CxDevice* cx_device_find(CxWorld* w,uint32_t x,uint32_t y){uint32_t lo=0,hi=w->device_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;CxDevice* p=w->devices+m;if(p->x<x||(p->x==x&&p->y<y))lo=m+1;else hi=m;}return lo<w->device_count&&w->devices[lo].x==x&&w->devices[lo].y==y?w->devices+lo:NULL;}
 static int check_mech(CxWorld* w,CxDevice* d,uint32_t time){if(d->cooldown||w->mech_count>=CX_MECH_LIMIT)return 0;if(w->mech_count>=w->mech_capacity)return -1;d->cooldown=time;w->mechs[w->mech_count++]=(uint32_t)(d-w->devices);return 1;}
-static int toggle_timer(CxWorld* w,CxDevice* d){if(d->tile.frame_y==0){d->tile.frame_y=18;if(check_mech(w,d,18000u)<0)return -1;}else d->tile.frame_y=0;return 0;}
+int cx_toggle_timer(CxWorld* w,CxDevice* d){if(d->tile.frame_y==0){d->tile.frame_y=18;if(check_mech(w,d,18000u)<0)return -1;}else d->tile.frame_y=0;return 0;}
 /* Device dedup belongs to one TripWire. Epochs avoid clearing every unrelated
  * switch for each gate output; wrapping the epoch restores an empty generation.
  * Epoch state is transient, so cancellation starts fresh on the next trip. */
-int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;if(!w->optimization)w->pixel_touched_count=0;if(w->optimization){if(++w->wire_trip_epoch==0u){for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_epoch=0;w->wire_trip_epoch=1u;}}else for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
+int cx_trip_begin(void* context){CxWorld* w=(CxWorld*)context;++w->vm_trip_index;TerraVmGateRef source;w->vm_source_gate=terra_vm_current_gate(w->vm,&source)==1&&source.group==0?source.offset:0;cx_timer_order_begin(w);if(!w->optimization)w->pixel_touched_count=0;if(w->optimization){if(++w->wire_trip_epoch==0u){for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_epoch=0;w->wire_trip_epoch=1u;}}else for(uint32_t i=0;i<w->device_count;i++)w->devices[i].wire_hit_mask=0;return 0;}
 int cx_net_hit(void* context,uint32_t net){
     CxWorld* w=(CxWorld*)context;uint32_t group=net+1u,lo=0,hi=w->port_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;if(w->ports[m].net<group)lo=m+1;else hi=m;}
     while(lo<w->port_count&&w->ports[lo].net==group){CxPort* port=w->ports+lo++;
@@ -135,7 +135,7 @@ int cx_net_hit(void* context,uint32_t net){
             if(port->axis==4u){if(d->tile.inactive)d->tile.inactive=0;else if(cx_actuatable_type(d->tile.type)){if(d->can_deactivate<0)return cx_fail(w,TCW_UNSUPPORTED,"actuator support neighborhood is not representable for this malformed tile frame");if(d->can_deactivate)d->tile.inactive=1;}}
             else if(d->tile.type==131u)d->tile.type=130u;else{if(d->can_deactivate<0)return cx_fail(w,TCW_UNSUPPORTED,"active stone support neighborhood is unavailable");/* Unlike DeActive, ActiveStone always calls CanKillTile, even with an empty cell above. */if(d->can_deactivate&&d->tile.wall!=350u)d->tile.type=131u;}continue;
         }
-        if(port->axis==2u){CxDevice* d=w->devices+port->pixel;if(w->vm_trip_index==1u&&d->x>=w->seed_x&&d->x-w->seed_x<w->seed_width&&d->y>=w->seed_y&&d->y-w->seed_y<w->seed_height)continue;if(toggle_timer(w,d)<0)return -1;continue;}
+        if(port->axis==2u){CxDevice* d=w->devices+port->pixel;if(w->vm_trip_index==1u&&d->x>=w->seed_x&&d->x-w->seed_x<w->seed_width&&d->y>=w->seed_y&&d->y-w->seed_y<w->seed_height)continue;cx_timer_order_hit(w,d,port->colour,group);continue;}
         if(port->axis==3u){CxDevice* d=w->devices+port->pixel;uint32_t x=d->x-(uint32_t)(d->tile.frame_x%36/18),y=d->y-(uint32_t)(d->tile.frame_y%36/18);CxDevice* base=cx_device_find(w,x,y);if(!base)continue;if(w->optimization&&base->wire_hit_epoch!=w->wire_trip_epoch){base->wire_hit_epoch=w->wire_trip_epoch;base->wire_hit_mask=0;}uint32_t bit=1u<<port->colour;if(base->wire_hit_mask&bit)continue;
             if(w->vm_trip_index==1u&&d->x>=w->seed_x&&d->x-w->seed_x<w->seed_width&&d->y>=w->seed_y&&d->y-w->seed_y<w->seed_height)continue;
             base->wire_hit_mask|=bit;int shift=base->tile.frame_x>=36?-36:36;for(uint32_t a=x;a<x+2u;a++)for(uint32_t b=y;b<y+2u;b++){CxDevice* part=cx_device_find(w,a,b);if(part&&part->tile.type==411u)part->tile.frame_x=(int16_t)(part->tile.frame_x+shift);}continue;
@@ -166,7 +166,7 @@ static int pixel_pass(CxWorld* w){
         p->hit_h=p->hit_v=p->marked=0;
     }w->pixel_touched_count=0;return 0;
 }
-int cx_trip_end(void* context){CxWorld* w=(CxWorld*)context;return w->optimization?0:pixel_pass(w);}
+int cx_trip_end(void* context){CxWorld* w=(CxWorld*)context;int s=cx_timer_order_step(w);if(s)return s;return w->optimization?0:pixel_pass(w);}
 int cx_pixel_wave_end(void* context){CxWorld* w=(CxWorld*)context;return w->optimization?pixel_pass(w):0;}
 int cx_set_optimization(CxWorld* w,uint32_t enabled){
     if(w->phase!=CX_IDLE||w->event.kind)return TCW_STATE;
@@ -176,6 +176,7 @@ int cx_set_optimization(CxWorld* w,uint32_t enabled){
         return TCW_UNSUPPORTED;
     }
     if(w->optimization!=enabled){
+        cx_timer_order_reset(w);
         for(uint32_t i=0;i<w->device_count;i++){w->devices[i].wire_hit_mask=0;w->devices[i].wire_hit_epoch=0;}
         for(uint32_t i=0;i<w->pixel_count;i++)w->pixels[i].hit_h=w->pixels[i].hit_v=w->pixels[i].marked=0;
         w->pixel_touched_count=0;w->wire_trip_epoch=0;w->optimization=enabled;
@@ -185,7 +186,7 @@ int cx_set_optimization(CxWorld* w,uint32_t enabled){
 int cx_interact(CxWorld* w){
     CxDevice* d=cx_device_find(w,w->command.x,w->command.y);if(!d)return 0;
     uint32_t type=d->tile.type;
-    if(type==144u){if(toggle_timer(w,d)<0)return -1;return 0;}
+    if(type==144u){if(cx_toggle_timer(w,d)<0)return -1;return 0;}
     if(type==136u){d->tile.frame_y=d->tile.frame_y==0?18:0;return 1;}
     if(type==132u||type==411u){int32_t fx=d->tile.frame_x/18,dx=(-fx)%4,dy=-(d->tile.frame_y/18),shift=36;if(dx<-1){dx+=2;shift=-36;}int32_t x=(int32_t)d->x+dx,y=(int32_t)d->y+dy;if(x<0||y<0)return -1;
         if(type==411u){CxDevice* base=cx_device_find(w,(uint32_t)x,(uint32_t)y);if(base&&check_mech(w,base,60u)<0)return -1;}

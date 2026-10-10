@@ -98,10 +98,15 @@ static int32_t transaction_begin(void* context){
 }
 int cx_operation_begin(CxWorld* w){
     if(w->operation_active)return TCW_STATE;
+    TerraVmStats current;terra_vm_stats(w->vm,&current);if(current.active)return TCW_STATE;
     if(w->override_capacity>w->override_snapshot_capacity){CxOverride* p=(CxOverride*)cx_alloc(w,w->override_capacity*sizeof(CxOverride));if(!p)return TCW_MEMORY;cx_free(w,w->override_snapshot);w->override_snapshot=p;w->override_snapshot_capacity=w->override_capacity;}
-    uint32_t available=cx_vm_available(w);if(!available)return TCW_MEMORY;
-    int s=terra_vm_set_budget(w->vm,available);if(s<0)return TCW_MEMORY;
-    s=terra_vm_batch_begin(w->vm);if(s<0)return s==TERRA_VM_OOM||s==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE;
+    uint32_t available=cx_vm_available(w);
+    int s=available?terra_vm_set_budget(w->vm,available):TERRA_VM_LIMIT;
+    if((s==TERRA_VM_LIMIT||s==TERRA_VM_OOM)&&w->timer_order){cx_timer_order_free(w);available=cx_vm_available(w);s=available?terra_vm_set_budget(w->vm,available):TERRA_VM_LIMIT;}
+    if(s<0)return TCW_MEMORY;
+    s=terra_vm_batch_begin(w->vm);
+    if((s==TERRA_VM_OOM||s==TERRA_VM_LIMIT)&&w->timer_order){cx_timer_order_free(w);available=cx_vm_available(w);if(available&&terra_vm_set_budget(w->vm,available)==0)s=terra_vm_batch_begin(w->vm);}
+    if(s<0)return s==TERRA_VM_OOM||s==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE;
     snapshot(w);w->operation_active=1;return TCW_OK;
 }
 void cx_operation_commit(CxWorld* w){if(w->operation_active){terra_vm_batch_commit(w->vm);w->operation_active=0;}w->interaction_pending=0;}
@@ -114,8 +119,10 @@ int cx_create_vm(CxWorld* w){
     w->general_snapshot=(uint8_t*)cx_alloc(w,w->general_count?w->general_count:1u);if(!w->general_snapshot)return TCW_MEMORY;
     random_seed(w,(int32_t)w->world->worldId);TerraVmCallbacks cb;memset(&cb,0,sizeof(cb));cb.next_candidate=next_candidate;cb.evaluate=evaluate;cb.transaction_begin=transaction_begin;cb.transaction_rollback=transaction_rollback;
     cb.trip_begin=cx_trip_begin;cb.net_hit=cx_net_hit;cb.trip_end=cx_trip_end;cb.wave_end=cx_pixel_wave_end;
-    uint32_t maximum=cx_vm_available(w);if(!maximum)return TCW_MEMORY;
-    int s=terra_vm_create(w->networks,maximum,&cb,w,&w->vm);return s<0?cx_fail(w,TCW_MEMORY,"native wiring VM does not fit the remaining memory budget"):TCW_OK;
+    uint32_t maximum=cx_vm_available(w);if(!maximum&&w->timer_order){cx_timer_order_free(w);maximum=cx_vm_available(w);}if(!maximum)return TCW_MEMORY;
+    int s=terra_vm_create(w->networks,maximum,&cb,w,&w->vm);
+    if(s<0&&w->timer_order){cx_timer_order_free(w);s=terra_vm_create(w->networks,cx_vm_available(w),&cb,w,&w->vm);}
+    return s<0?cx_fail(w,TCW_MEMORY,"native wiring VM does not fit the remaining memory budget"):TCW_OK;
 }
 uint32_t cx_true_lamp(CxWorld* w,const CxBinding* b){
     if(cx_wired_light_height(b->tile.type)){CxDevice* d=cx_device_find(w,b->x,b->y);return (d?d->tile.frame_x:b->tile.frame_x)==0;}

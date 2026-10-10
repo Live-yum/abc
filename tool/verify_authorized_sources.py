@@ -37,6 +37,27 @@ def verify_exact_files(root, expected):
         raise ValueError(f"Unexpected source closure: extra={actual - expected}, missing={expected - actual}")
 
 
+def verify_created_source_records(root, records, existing_paths):
+    """New local implementation files have no upstream before-file identity."""
+    seen = set(existing_paths)
+    for record in records:
+        path = record["path"]
+        commit = record.get("introducedAfterCommit", "")
+        digest = record.get("afterSha256", "")
+        if (path in seen or record.get("beforeExists") is not False
+                or record.get("origin") != "original-abc-implementation"
+                or len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit)
+                or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest)
+                or "beforeSha256" in record or "beforeBytes" in record
+                or type(record.get("afterBytes")) is not int
+                or record["afterBytes"] <= 0):
+            raise ValueError("Created source omits or contradicts its local origin")
+        seen.add(path)
+        data = read_file(root, path)
+        if len(data) != record["afterBytes"] or sha256(data) != digest:
+            raise ValueError(f"Reviewed created source differs: {path}")
+
+
 def main():
     # Bundled data is the attributed RV32I Pong ROM, never a world file or host
     # emulator. Keep program/source identity independent of the WLD fixture.
@@ -84,6 +105,10 @@ def main():
                 raise ValueError("Removed source omits its original identity")
             if (terra_root / removed["path"]).exists():
                 raise ValueError(f"Removed source unexpectedly present: {removed['path']}")
+        verify_created_source_records(
+            terra_root, patch.get("createdFiles", []),
+            {entry["path"] for entry in patch["files"] + patch.get("removedFiles", [])},
+        )
         for change in patch["files"]:
             if len(change["beforeSha256"]) != 64 or not change["beforeBytes"]:
                 raise ValueError("Local patch omits its original source identity")

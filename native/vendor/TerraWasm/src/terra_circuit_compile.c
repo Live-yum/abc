@@ -81,11 +81,13 @@ static int sparse_wires(CxWorld* w,uint32_t* work){
         if(w->error)return -(int)w->error;
         w->ids[y*4u+c]=right;w->up=down;
         if(w->phase==CX_COUNT&&w->pixel_at_y[y])cx_pixel_ports(w,y,c,right,down);
+        if(w->phase==CX_WRITE)cx_timer_order_cell(w,y,c,right,down,left,up);
         ++w->col_row;--*work;
     }
     if(w->col_colour<4u)return TCW_CONTINUE;
     memcpy(w->front,w->ids,w->height*16u);
     if(w->phase==CX_COUNT)cx_devices_bind_column(w);
+    if(w->phase==CX_WRITE)cx_timer_order_gates(w);
     w->col_stage=4;w->emit_y=w->emit_colour=w->emit_phase=0;return 2;
 }
 int cx_scan_step(CxWorld* w,uint32_t* work){
@@ -310,8 +312,8 @@ int cx_compile_step(CxWorld* w,uint32_t* work){
         if(w->x<w->width)return TCW_CONTINUE;
         if(w->cursor!=w->tile_end)return cx_fail(w,TCW_FORMAT,"circuit tile section does not end at its declared boundary");
         if(w->phase==CX_TOPOLOGY){w->gates=w->gate_cursor;w->column_gates[w->width]=w->gates;w->phase=CX_ROOTS;w->phase_cursor=1;}
-        else if(w->phase==CX_COUNT){cx_devices_end_columns(w);w->phase=CX_LAYOUT;w->phase_cursor=1;w->layout_code=w->layout_member=0;}
-        else{cx_free(w,w->compile_rows);w->compile_rows=NULL;w->phase=CX_FLUSH;w->flush_index=0;}
+        else if(w->phase==CX_COUNT){cx_devices_end_columns(w);cx_timer_order_prepare(w);w->phase=CX_LAYOUT;w->phase_cursor=1;w->layout_code=w->layout_member=0;}
+        else{cx_timer_order_finish(w);cx_free(w,w->compile_rows);w->compile_rows=NULL;w->phase=CX_FLUSH;w->flush_index=0;}
         return TCW_OK;
     }
     if(w->phase>=CX_ROOTS&&w->phase<=CX_MAP_ENCODE){
