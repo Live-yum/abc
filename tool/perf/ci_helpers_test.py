@@ -133,14 +133,30 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(row['medianMs'], source['operations'][0]['medianMs'])
         self.assertIn('whole macro', row['measurementScope'])
 
-    def test_current_inventory_contains_early_computer_dispatches(self):
+    def test_current_inventory_contains_generic_not_cpu_dispatches(self):
         inventory = json.loads(Path(__file__).with_name('action_gaps.json').read_text())
         names = {row['action'] for row in inventory['actions']}
-        self.assertTrue({'worldCircuitCancel', 'worldCircuitChooseWorld',
-            'worldCircuitImport', 'worldCircuitInput', 'worldCircuitLoadPong',
-            'worldCircuitLoadProgram', 'worldCircuitOptimization',
-            'worldCircuitPause', 'worldCircuitRefreshDisplay',
-            'worldCircuitReleaseKeys'} <= names)
+        self.assertTrue({'worldCircuitCancel', 'worldCircuitChooseWorld', 'worldCircuitImport',
+                         'worldCircuitOptimization', 'worldCircuitPause', 'worldCircuitViewport',
+                         'worldCircuitReadDisplay', 'worldCircuitTrigger', 'worldCircuitStep'} <= names)
+        self.assertFalse({'worldCircuitInput', 'worldCircuitLoadPong', 'worldCircuitLoadProgram',
+                          'worldCircuitReleaseKeys'} & names)
+
+    def test_legacy_ui_keeps_history_without_filling_generic_action_gap(self):
+        self.inventory['worldCircuitWorkloadId'] = 'generic-wld-controls-v1'
+        self.inventory['actions'].append({'controller': 'Workspace', 'action': 'worldCircuitStep',
+            'operationIds': [], 'availability': 'available', 'reason': 'not measured'})
+        source = core_report(); source.update(suite='computerraria-ui', runtime={'workingTreeDirty': False})
+        source['operations'][0]['id'] = 'computer.single-physical-clock.standard'
+        report = build_coverage(self.inventory, [('old.json', source)], [])
+        self.assertFalse(report['actions'][-1]['profileWorkflowMeasured'])
+        self.assertEqual(report['actions'][-1]['status'], 'gap')
+        self.assertEqual(report['counts']['historical-profile-workflow'], 1)
+        source['suite'] = 'generic-world-ui'; source['workloadId'] = 'generic-wld-controls-v1'
+        source['operations'][0]['id'] = 'circuit.single-tick.standard'
+        report = build_coverage(self.inventory, [('new.json', source)], [])
+        self.assertTrue(report['actions'][-1]['profileWorkflowMeasured'])
+        self.assertFalse(report['actions'][-1]['profileDispatchMeasured'])
 
 
 class ExecutionTests(unittest.TestCase):

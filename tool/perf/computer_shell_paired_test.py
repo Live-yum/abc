@@ -47,6 +47,13 @@ class ShellSummaryTest(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 summarize(data)
 
+    def test_generic_shell_cannot_enter_legacy_cpu_pairing(self):
+        data = report()
+        data.update(schema='abc.generic-shell-profile.v1', workloadId='generic-wld-controls-v1',
+                    scenario='full-terraforge-shell-generic-wld')
+        with self.assertRaises(ValueError):
+            summarize(data)
+
     def test_lifecycle_and_incomplete_capture_failures(self):
         for key, value in [('closed', False), ('cleanup', 'failed'),
                            ('status', 'failed'), ('droppedFrames', 1)]:

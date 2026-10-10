@@ -5,8 +5,8 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:terraforge/domain/computer_provenance.dart';
-import 'package:terraforge/domain/computerraria_computer.dart';
+import 'support/computerraria/provenance.dart';
+import 'support/computerraria/layout.dart';
 import 'package:terraforge/platform/vault.dart';
 import 'package:terraforge/platform/vault_native.dart';
 

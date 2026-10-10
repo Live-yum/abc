@@ -1,10 +1,11 @@
+// Test-only physical computer fixture. Never import into production lib.
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
 
-import '../platform/vault.dart';
-import 'computerraria_computer.dart';
+import 'package:terraforge/platform/vault.dart';
+import 'layout.dart';
 
 const _maxSafeInteger = 9007199254740991;
 

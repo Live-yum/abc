@@ -5,21 +5,32 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 import 'package:terraforge/engine/world_circuit_session.dart';
 
-import 'support/computer_circuit_backend.dart';
-
-class _HeldBackend extends ComputerCircuitBackend {
-  Completer<void>? activeClock;
-
+class _HeldBackend implements WorldCircuitBackend {
+  Completer<void>? holdClock, activeClock;
+  int ticks = 0;
+  WorldCircuitResult snapshot() {
+    final stats = List<int>.filled(24, 0);
+    stats[2] = 128;
+    stats[3] = 96;
+    stats[18] = ticks;
+    return WorldCircuitResult(1, stats, Uint8List(0));
+  }
+  @override
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async => snapshot();
+  @override
+  Future<void> closeWorldCircuit(int session) async {}
   @override
   Future<WorldCircuitResult> commandWorldCircuit(
-    int session,
-    WorldCircuitCommand command,
+    int session, WorldCircuitCommand command,
   ) async {
-    final clock = command.words[1] == 2 && command.words[2] == 3194;
-    if (clock) activeClock = holdClock;
-    final result = await super.commandWorldCircuit(session, command);
-    if (clock) activeClock = null;
-    return result;
+    if (command.words[1] == 3) {
+      final gate = holdClock;
+      activeClock = gate;
+      await gate?.future;
+      ticks += command.words[8];
+      activeClock = null;
+    }
+    return snapshot();
   }
 }
 
@@ -29,14 +40,14 @@ Future<void> _pumpUntil(
   String label, {
   String Function()? diagnostics,
 }) async {
-  for (var turn = 0; turn < 100 && !complete(); turn++) {
+  for (var turn = 0; turn < 200 && !complete(); turn++) {
     await tester.pump(const Duration(milliseconds: 1));
   }
   expect(
     complete(),
     isTrue,
     reason:
-        '$label did not finish in 100 pump turns'
+        '$label did not finish in 200 pump turns'
         '${diagnostics == null ? '' : ': ${diagnostics()}'}',
   );
 }
@@ -69,24 +80,8 @@ void main() {
     tester,
   ) async {
     final backend = _HeldBackend();
-    final session = WorldCircuitSession.fromSource(
-      backend,
-      const WorldCircuitSource.file(
-        path: '/fixture.wld',
-        length: 1,
-        name: 'wld',
-      ),
-    );
+    final session = WorldCircuitSession(backend, Uint8List(1));
     await session.open();
-    await session.verifyComputer();
-    // Keep the session queue, its timer yields and continuations in the same
-    // FakeAsync zone. A runAsync call cannot migrate an existing future chain.
-    await _pumpOperation(
-      tester,
-      session.loadProgram('loop.bin', Uint8List.fromList([0x6f, 0, 0, 0])),
-      'program load',
-    );
-    expect(session.canRunComputer, isTrue);
     session.markSaved();
     final reasons = <bool>[];
     session.addListener(() => reasons.add(session.isRuntimeFramePublication));
@@ -101,21 +96,16 @@ void main() {
         () => identical(backend.activeClock, gate),
         'clock accepts held gate',
       );
-      // This real-zone wait touches no product futures or state. Stopwatch's
-      // existing publication interval elapses while the fake-zone gate is held.
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
-      );
-      final before = session.physicalPulses, published = reasons.length;
+      final before = backend.ticks, published = reasons.length;
       final publicationPulses = <int>[];
       final publicationBusy = <bool>[];
       void observePublication() {
-        publicationPulses.add(session.physicalPulses);
+        publicationPulses.add(backend.ticks);
         publicationBusy.add(session.busy);
       }
 
       String describe() =>
-          'pulses=${session.physicalPulses} expected=${before + 128}, '
+          'pulses=${backend.ticks} expected=${before + 6}, '
           'busy=${session.busy}, running=${session.running}, '
           'reasons=$reasons (before=$published), '
           'publicationPulses=$publicationPulses, '
@@ -136,7 +126,7 @@ void main() {
         await _pumpUntil(
           tester,
           () =>
-              session.physicalPulses == before + 128 &&
+              backend.ticks == before + 6 &&
               reasons.length > published &&
               publicationBusy.isNotEmpty,
           'completed batch publishes',
@@ -147,7 +137,7 @@ void main() {
         // synchronously at publication instead of after the pump returns.
         expect(
           publicationPulses,
-          everyElement(before + 128),
+          everyElement(before + 6),
           reason: describe(),
         );
         expect(publicationBusy, everyElement(isFalse), reason: describe());

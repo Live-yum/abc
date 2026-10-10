@@ -1,0 +1,77 @@
+name: Generic circuit compilation and synthetic UI review
+
+on:
+  push:
+    branches: [codex/generic-circuit-compile-999b]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generic-circuit-compile-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+
+jobs:
+  compile-and-fixtures:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-flutter
+      - name: Resolve existing locked dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Format and preserve the exact SDK-parsed sources
+        run: |
+          set -euo pipefail
+          mkdir -p build/generic-review
+          dart format lib test native integration_test test_driver tool/perf tool/map_worker.dart | tee build/generic-review/format.log
+          git diff --binary -- '*.dart' > build/generic-review/format.patch
+          python3 - <<'PY'
+          import hashlib, json, pathlib, subprocess, tarfile
+          root = pathlib.Path('.')
+          paths = sorted(p for p in subprocess.check_output(['git', 'ls-files'], text=True).splitlines() if p.endswith('.dart'))
+          rows = []
+          with tarfile.open('build/generic-review/formatted-sources.tar.gz', 'w:gz') as archive:
+              for path in paths:
+                  data = (root / path).read_bytes()
+                  rows.append({'path': path, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
+                  archive.add(path, arcname=path, recursive=False)
+          pathlib.Path('build/generic-review/source-manifest.json').write_text(json.dumps({'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'files': rows}, indent=2) + '\n')
+          PY
+      - name: Analyze final product and test sources
+        run: flutter analyze --no-pub
+      - name: Focused generic controls, fixture driver and ownership contracts
+        timeout-minutes: 8
+        run: >-
+          flutter test --no-pub --concurrency=1
+          test/computerraria_computer_test.dart
+          test/computer_provenance_test.dart
+          test/computer_circuit_session_test.dart
+          test/computer_workspace_test.dart
+          test/world_circuit_load_workspace_test.dart
+          test/computer_runtime_batch_test.dart
+          test/world_circuit_progress_lifecycle_test.dart
+          test/world_circuit_runtime_notifications_test.dart
+          test/generic_circuit_runtime_test.dart
+          test/circuit_display_region_test.dart
+          test/generic_circuit_profile_selection_test.dart
+          test/world_circuit_panel_test.dart
+          test/workspace_view_snapshot_test.dart
+          test/workspace_circuit_updates_test.dart
+      - name: Real shared-theme desktop and mobile synthetic screenshots
+        timeout-minutes: 4
+        env:
+          ABC_GENERIC_VISUAL_DIR: build/generic-review/visual
+        run: flutter test --no-pub --update-goldens test/generic_circuit_visual_test.dart
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: generic-circuit-review-${{ github.sha }}
+          path: build/generic-review/
+          if-no-files-found: error
+          retention-days: 30

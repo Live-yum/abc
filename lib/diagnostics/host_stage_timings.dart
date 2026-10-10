@@ -53,7 +53,7 @@ class HostStageTimings {
         : 'flutter-native-host',
     'unit': 'microseconds',
     'clock': 'Dart Stopwatch; worker performance.now converted to microseconds',
-    'scope': 'since latest physical run start; most recent 128 calls per stage',
+    'scope': 'since latest circuit run start; most recent 128 calls per stage',
     'generation': generation,
     'capacityPerStage': capacity,
     'maxStages': maxStages,

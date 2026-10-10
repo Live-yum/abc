@@ -1029,27 +1029,11 @@
     },
     {
       "controller": "Workspace",
-      "action": "worldCircuitInput",
+      "action": "worldCircuitLocateFragment",
       "operationIds": [],
       "status": "gap",
       "availability": "available",
-      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
-    },
-    {
-      "controller": "Workspace",
-      "action": "worldCircuitLoadPong",
-      "operationIds": [],
-      "status": "gap",
-      "availability": "available",
-      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
-    },
-    {
-      "controller": "Workspace",
-      "action": "worldCircuitLoadProgram",
-      "operationIds": [],
-      "status": "gap",
-      "availability": "available",
-      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+      "reason": "Generic circuit action has no accepted current-workload measurement yet; legacy CPU UI evidence is historical only."
     },
     {
       "controller": "Workspace",
@@ -1081,15 +1065,15 @@
     },
     {
       "controller": "Workspace",
-      "action": "worldCircuitRefreshDisplay",
+      "action": "worldCircuitReadDisplay",
       "operationIds": [],
       "status": "gap",
       "availability": "available",
-      "reason": "Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage."
+      "reason": "Generic circuit action has no accepted current-workload measurement yet; legacy CPU UI evidence is historical only."
     },
     {
       "controller": "Workspace",
-      "action": "worldCircuitReleaseKeys",
+      "action": "worldCircuitRefreshDisplay",
       "operationIds": [],
       "status": "gap",
       "availability": "available",
@@ -1352,5 +1336,6 @@
       "availability": "available",
       "reason": "Core full rules timings exist, but this UI controller lifecycle path is not yet timed directly in the native action suite."
     }
-  ]
+  ],
+  "worldCircuitWorkloadId": "generic-wld-controls-v1"
 }

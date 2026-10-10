@@ -102,7 +102,7 @@ function harness(owner, bridge, timeoutMs = 1000) {
   const dying = tcw.client.close(b); const rejected = assert.rejects(dying, {code:'COMPUTATION_OWNER_LOST'});
   tcw.workers.at(-1).onerror({message:'unexpected worker exit'}); await rejected;
 
-  let finishStream, finishCommand, releasedSource, streamCancelled = false;
+  let finishStream, finishCommand, releasedSource, streamCancelled = false, failPixels = false;
   const streamResult = () => ({session:7,stats:[2,...Array(23).fill(0)],resultKind:0,resultCount:0,reserved:0,records:new Uint8Array()});
   const sourceBlob = new Blob([new Uint8Array([7,8,9])]);
   const streamed = harness('worldCircuit', {
@@ -110,7 +110,7 @@ function harness(owner, bridge, timeoutMs = 1000) {
     progress:async () => ({stage:'compile',phase:1,completed:2,total:3}),
     cancelOperation:async () => { streamCancelled=true; finishCommand?.(); },
     command:async (_,words) => { if (words==='wait') await new Promise(resolve => { finishCommand=resolve; }); return {...streamResult(),worldSource:{blob:sourceBlob,size:3,name:'staged.wld',token:11}}; },
-    computerFrame:async () => ({clock:{...streamResult(),resultKind:2},display:{...streamResult(),resultKind:9},displayError:null,hostStagesUs:{commandWallUs:1}}),
+    commandAndReadPixels:async (_,words) => ({command:{...streamResult(),resultKind:JSON.parse(words)[1]},pixels:failPixels?null:{...streamResult(),resultKind:9},readError:failPixels?'Read failed after commit':null,hostStagesUs:{commandWallUs:1}}),
     releaseSource:async token => { releasedSource=token; },
     close:async()=>{},
   });
@@ -128,12 +128,31 @@ function harness(owner, bridge, timeoutMs = 1000) {
     assert.ok(output.hostStagesUs.rpcWallUs >= output.hostStagesUs.rpcQueueUs);
   }
   assert.notEqual(firstOutput.worldSource.token,secondOutput.worldSource.token,'Public output identity cannot alias a native token');
-  const combined=await streamed.client.computerFrame(streamedId,'clock','pixels');
-  assert.equal(combined.clock.session,streamedId);assert.equal(combined.display.session,streamedId);
-  assert.equal(combined.hostStagesUs.commandWallUs,1);assert.ok(combined.hostStagesUs.rpcWallUs>=0);
-  assert.equal(streamed.workers[0].sent.at(-1).method,'computerFrame');
+  for(const kind of [2,3]) {
+    const combined=await streamed.client.commandAndReadPixels(streamedId,JSON.stringify([2,kind]),'pixels');
+    assert.equal(combined.command.session,streamedId);assert.equal(combined.pixels.session,streamedId);
+    assert.equal(combined.command.resultKind,kind);assert.equal(combined.pixels.resultKind,9);
+    assert.equal(combined.hostStagesUs.commandWallUs,1);assert.ok(combined.hostStagesUs.rpcWallUs>=0);
+    assert.equal(streamed.workers[0].sent.at(-1).method,'commandAndReadPixels');
+  }
+  failPixels=true;
+  const committed=await streamed.client.commandAndReadPixels(streamedId,JSON.stringify([2,3]),'pixels');
+  assert.equal(committed.command.session,streamedId);assert.equal(committed.command.resultKind,3);
+  assert.equal(committed.pixels,null);assert.equal(committed.readError,'Read failed after commit');
+  assert.equal(typeof streamed.client.computerFrame,'undefined','The production RPC has no sample-specific entry point');
   await streamed.client.close(streamedId);await streamed.client.releaseSource(firstOutput.worldSource.token);assert.equal(releasedSource,11);
   await streamed.client.dispose();await streamed.client.releaseSource(secondOutput.worldSource.token);
+
+  for(const invalidResult of [
+    {command:{...streamResult(),resultKind:2},pixels:{...streamResult(),resultKind:9},readError:null},
+    {command:{...streamResult(),resultKind:3},pixels:{...streamResult(),resultKind:9,resultCount:1},readError:null},
+    {command:{...streamResult(),resultKind:3},pixels:null,readError:null},
+  ]) {
+    const malformed=harness('worldCircuit',{open:async()=>streamResult(),commandAndReadPixels:async()=>invalidResult});
+    const opened=(await malformed.client.open(new Uint8Array([1]))).session;
+    await assert.rejects(malformed.client.commandAndReadPixels(opened,JSON.stringify([2,3]),'pixels'),{code:'WORKER_INPUT'});
+    await malformed.client.dispose();
+  }
 
   // Missing Worker support must fail; browser entrypoints cannot load heavy WASM.
   const browser = vm.createContext({document:{baseURI:'http://test/'}, TextEncoder, TextDecoder, Uint8Array, setTimeout, clearTimeout});

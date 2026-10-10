@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terraforge/application/workspace.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
-import 'package:terraforge/platform/files.dart';
 import 'package:terraforge/platform/world_circuit_files.dart';
 import 'package:terraforge/ui/computer_display.dart';
 import 'package:terraforge/ui/terra_app.dart';
@@ -13,15 +12,15 @@ import 'package:terraforge/ui/world_circuit_panel.dart';
 
 import '../integration_test/support/profile_controller.dart';
 import '../integration_test/support/profile_recorder.dart';
-import 'support/computer_circuit_backend.dart';
+import 'support/generic_circuit_backend.dart';
 import 'workspace_test.dart' show FakeEngine, FakeFiles;
 
 class _Sources implements WorldCircuitFileGateway {
   @override
   Future<WorldCircuitSource?> pick() async => const WorldCircuitSource.file(
-    path: '/fixture/computer.wld',
-    length: 405983441,
-    name: 'computer.wld',
+    path: '/fixture/generic.wld',
+    length: 2048,
+    name: 'generic.wld',
   );
 
   @override
@@ -32,35 +31,48 @@ class _Sources implements WorldCircuitFileGateway {
   }) async => true;
 }
 
-class _Backend extends ComputerCircuitBackend {
-  int completedClocks = 0;
-  Completer<void>? activeClock;
+class _WideBoundsBackend extends GenericCircuitBackend {
+  @override
+  List<int> get stats => super.stats
+    ..[2] = 1200
+    ..[3] = 1000
+    ..[6] = 40
+    ..[7] = 50
+    ..[8] = 900
+    ..[9] = 850
+    ..[10] = 2
+    ..[11] = 2;
 
   @override
-  Future<WorldCircuitResult> commandWorldCircuit(
-    int session,
-    WorldCircuitCommand command,
-  ) async {
-    final clock = command.words[1] == 2 && command.words[2] == 3194;
-    if (clock) activeClock = holdClock;
-    final result = await super.commandWorldCircuit(session, command);
-    if (clock) {
-      completedClocks++;
-      activeClock = null;
-    }
-    if (command.words[1] == 9 && completedClocks.isOdd) {
-      ByteData.sublistView(result.records).setInt16(12, 18, Endian.little);
-    }
-    return result;
-  }
+  List<(int, int, int, int, int)> get cells => [
+    (40, 850, 135, 1, 0),
+    (900, 50, 144, 1, 0),
+  ];
+}
+
+class _TallBoundsBackend extends GenericCircuitBackend {
+  @override
+  List<int> get stats => super.stats
+    ..[3] = 140000
+    ..[6] = 40
+    ..[7] = 50
+    ..[8] = 400
+    ..[9] = 131200
+    ..[10] = 2
+    ..[11] = 2;
+
+  @override
+  List<(int, int, int, int, int)> get cells => [
+    (40, 131200, 135, 1, 0),
+    (400, 50, 144, 1, 0),
+  ];
 }
 
 class _Workspace extends Workspace {
-  _Workspace(_Backend backend)
+  _Workspace(GenericCircuitBackend backend)
     : super(
         engine: FakeEngine(),
-        files: FakeFiles()
-          ..next = PickedFile('loop.bin', Uint8List.fromList([0x6f, 0, 0, 0])),
+        files: FakeFiles(),
         worldCircuitBackend: backend,
         worldCircuitFiles: _Sources(),
       );
@@ -133,29 +145,24 @@ Future<void> _pumpOperation(
 Future<void> _completeBatch(
   WidgetTester tester,
   Workspace workspace,
-  _Backend backend,
+  GenericCircuitBackend backend,
 ) async {
-  final gate = backend.holdClock!;
+  final gate = backend.holdTicks!;
   await _pumpUntil(
     tester,
-    () => identical(backend.activeClock, gate),
-    'clock accepts held gate',
+    () => identical(backend.activeTicks, gate),
+    'tick batch accepts held gate',
   );
-  // Only wall time crosses into runAsync. Every product future and controlled
-  // gate stays in FakeAsync, including the session's serialized queue.
-  await tester.runAsync(
-    () => Future<void>.delayed(const Duration(milliseconds: 20)),
-  );
-  final before = backend.completedClocks;
+  final before = backend.completedTickBatches;
   var published = false;
   void observe() => published = true;
   workspace.addListener(observe);
   try {
-    backend.holdClock = Completer<void>();
+    backend.holdTicks = Completer<void>();
     gate.complete();
     await _pumpUntil(
       tester,
-      () => backend.completedClocks == before + 1 && published,
+      () => backend.completedTickBatches == before + 1 && published,
       'completed batch publishes',
     );
   } finally {
@@ -166,16 +173,112 @@ Future<void> _completeBatch(
 Future<void> _pause(
   WidgetTester tester,
   Workspace workspace,
-  _Backend backend,
+  GenericCircuitBackend backend,
 ) async {
   final paused = workspace.dispatch('worldCircuitPause');
-  if (!(backend.holdClock?.isCompleted ?? true)) backend.holdClock!.complete();
-  backend.holdClock = null;
+  if (!(backend.holdTicks?.isCompleted ?? true)) backend.holdTicks!.complete();
+  backend.holdTicks = null;
   await _pumpOperation(tester, paused, 'pause and refresh');
   await tester.pumpAndSettle();
 }
 
 void main() {
+  test('wide wire bounds locate a real cell below an empty top-left crop', () async {
+    final backend = _WideBoundsBackend();
+    final workspace = _Workspace(backend);
+    try {
+      await workspace.dispatch('worldCircuitChooseWorld');
+      await workspace.dispatch('worldCircuitImport');
+      expect(workspace.view.error, isEmpty);
+      final state = workspace.worldCircuitView;
+      expect(state['viewport'],
+          {'x': 40, 'y': 595, 'width': 256, 'height': 256});
+      final records = state['records'] as Uint8List;
+      expect(records, hasLength(16));
+      final data = ByteData.sublistView(records);
+      expect(data.getUint32(0, Endian.little), 40);
+      expect(data.getUint32(4, Endian.little), 850);
+      expect(backend.commands.first.words.sublist(2, 6), [40, 50, 1, 801]);
+      expect(backend.commands.every((command) => command.words[1] == 1), isTrue,
+          reason: 'Import locates wiring without operating any input');
+      expect(state['dirty'], isFalse);
+    } finally {
+      await workspace.close();
+      workspace.dispose();
+    }
+  });
+
+  test('a long leftmost column is read in bounded single-column segments', () async {
+    final backend = _TallBoundsBackend();
+    final workspace = _Workspace(backend);
+    try {
+      await workspace.dispatch('worldCircuitChooseWorld');
+      await workspace.dispatch('worldCircuitImport');
+      expect(workspace.view.error, isEmpty);
+      final probes = backend.commands.take(3).map(
+          (command) => command.words.sublist(2, 6)).toList();
+      expect(probes, [
+        [40, 50, 1, 65536],
+        [40, 65586, 1, 65536],
+        [40, 131122, 1, 79],
+      ]);
+      expect(backend.commands, hasLength(4));
+      expect(backend.commands.every((command) =>
+          command.words[1] == 1 &&
+          command.words[4] * command.words[5] <= 65536), isTrue);
+      final state = workspace.worldCircuitView;
+      expect(state['viewport'],
+          {'x': 40, 'y': 130945, 'width': 256, 'height': 256});
+      expect((state['records'] as Uint8List).length, 16);
+      expect(state['dirty'], isFalse);
+    } finally {
+      await workspace.close();
+      workspace.dispose();
+    }
+  });
+
+  test('viewport notifications publish matching records and retain a failed ROI', () async {
+    final backend = GenericCircuitBackend();
+    final workspace = _Workspace(backend);
+    final observed = <Map<String, Object?>>[];
+    void observe() => observed.add(workspace.worldCircuitView);
+    try {
+      await workspace.dispatch('worldCircuitChooseWorld');
+      await workspace.dispatch('worldCircuitImport');
+      workspace.addListener(observe);
+      await workspace.dispatch('worldCircuitViewport',
+          {'x': 42, 'y': 50, 'width': 2, 'height': 3});
+      expect(workspace.view.error, isEmpty);
+      expect(observed, isNotEmpty);
+      for (final state in observed) {
+        final viewport = state['viewport'] as Map;
+        final bytes = state['records'] as Uint8List;
+        final data = ByteData.sublistView(bytes);
+        for (var at = 0; at < bytes.length; at += 16) {
+          final x = data.getUint32(at, Endian.little);
+          final y = data.getUint32(at + 4, Endian.little);
+          expect(x, inInclusiveRange(viewport['x'] as int,
+              (viewport['x'] as int) + (viewport['width'] as int) - 1));
+          expect(y, inInclusiveRange(viewport['y'] as int,
+              (viewport['y'] as int) + (viewport['height'] as int) - 1));
+        }
+      }
+      final before = workspace.worldCircuitView;
+      expect(before['viewport'], {'x': 42, 'y': 50, 'width': 2, 'height': 3});
+      backend.failNextViewport = true;
+      await workspace.dispatch('worldCircuitViewport',
+          {'x': 40, 'y': 50, 'width': 4, 'height': 3});
+      final failed = workspace.worldCircuitView;
+      expect(workspace.view.error, contains('viewport read rejected'));
+      expect(failed['viewport'], before['viewport']);
+      expect(failed['records'], same(before['records']));
+    } finally {
+      workspace.removeListener(observe);
+      await workspace.close();
+      workspace.dispose();
+    }
+  });
+
   for (final size in [const Size(1440, 1000), const Size(390, 844)]) {
     testWidgets('runtime stays inside panel at ${size.width.toInt()}px', (
       tester,
@@ -183,18 +286,19 @@ void main() {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      final backend = _Backend();
+      final backend = GenericCircuitBackend();
       final workspace = _Workspace(backend);
       await workspace.dispatch('worldCircuitChooseWorld');
       await workspace.dispatch('worldCircuitImport');
-      // Pump the session's zero-duration ROM yields without switching the
-      // existing Workspace/session future chain into a different zone.
-      await _pumpOperation(
-        tester,
-        workspace.dispatch('worldCircuitLoadProgram'),
-        'program load',
-      );
-      expect(workspace.worldCircuitView['canRunComputer'], isTrue);
+      expect(workspace.worldCircuitView['open'], isTrue);
+      expect(workspace.worldCircuitView['viewport'],
+          {'x': 40, 'y': 50, 'width': 4, 'height': 3});
+      await workspace.dispatch('worldCircuitReadDisplay',
+          {'x': 40, 'y': 50, 'width': 4, 'height': 3});
+      // Establish a normal dirty state before measuring steady runtime frames.
+      await workspace.dispatch('worldCircuitTrigger',
+          {'x': 40, 'y': 50, 'mask': 1});
+      expect(workspace.worldCircuitView['dirty'], isTrue);
       final proxy = size.width < 1000
           ? ProfiledTerraController(
               workspace,
@@ -222,7 +326,14 @@ void main() {
         size.width < 1000 ? findsOneWidget : findsNothing,
       );
 
-      backend.holdClock = Completer<void>();
+      workspace.viewReads = 0;
+      await workspace.dispatch('worldCircuitTrigger',
+          {'x': 40, 'y': 50, 'mask': 1});
+      await tester.pump();
+      expect(workspace.viewReads, greaterThan(0),
+          reason: 'An explicit input operation refreshes the workspace');
+
+      backend.holdTicks = Completer<void>();
       await workspace.dispatch('worldCircuitToggle');
       await tester.pump();
       final runningScaffold = tester.widget<Scaffold>(find.byType(Scaffold));
@@ -230,27 +341,27 @@ void main() {
       final monitorRect = tester.getRect(find.byType(ComputerDisplay));
       expect(monitorRect.width, greaterThan(0));
       expect(monitorRect.width, lessThanOrEqualTo(size.width));
-      expect(monitorRect.width / monitorRect.height, closeTo(64 / 48, .001));
+      expect(monitorRect.width / monitorRect.height, closeTo(4 / 3, .001));
       var broadEvents = 0;
       workspace.addListener(() => broadEvents++);
-      for (final pulses in [128, 256, 384]) {
+      for (final ticks in [6, 12, 18]) {
         workspace.viewReads = 0;
         workspace.circuitReads = 0;
         await _completeBatch(tester, workspace, backend);
         expect(workspace.viewReads, 0);
         expect(workspace.circuitReads, greaterThan(0));
-        expect(broadEvents, pulses ~/ 128);
+        expect(broadEvents, ticks ~/ 6);
         expect(
           tester.widget<Scaffold>(find.byType(Scaffold)),
           same(runningScaffold),
         );
         expect(tester.state(find.byType(WorldCircuitPanel)), same(panelState));
         expect(tester.getRect(find.byType(ComputerDisplay)), monitorRect);
-        expect(find.textContaining('已执行 $pulses 个物理时钟脉冲'), findsOneWidget);
-        final expected = workspace.worldCircuitView['displayFrames'] as Map;
+        expect(find.textContaining(' · $ticks ticks · '), findsOneWidget);
+        final expected = workspace.worldCircuitView['displayFrame'];
         expect(
           tester.widget<ComputerDisplay>(find.byType(ComputerDisplay)).rgba,
-          same(expected['黑白显示器']),
+          same(expected),
         );
       }
       expect(
@@ -288,17 +399,21 @@ void main() {
         reason: 'No offscreen panel reads or full-shell snapshots',
       );
       await _navigate(tester, '电路实验室');
-      expect(find.textContaining('已执行 640 个物理时钟脉冲'), findsOneWidget);
+      expect(find.textContaining(' · 30 ticks · '), findsOneWidget);
 
-      await _pause(tester, workspace, backend);
       workspace.viewReads = 0;
-      await workspace.dispatch('worldCircuitInput', {'direction': 'invalid'});
+      await _pause(tester, workspace, backend);
+      expect(workspace.viewReads, greaterThan(0));
+      expect(workspace.worldCircuitView['running'], isFalse);
+      workspace.viewReads = 0;
+      await workspace.dispatch('worldCircuitViewport',
+          {'x': -1, 'y': 0, 'width': 1, 'height': 1});
       await tester.pump();
       expect(workspace.viewReads, greaterThan(0));
-      expect(find.textContaining('未知的计算机方向键'), findsWidgets);
+      expect(find.textContaining('x 必须在'), findsWidgets);
       await workspace.dispatch('dismissError');
       await tester.pump();
-      expect(find.textContaining('未知的计算机方向键'), findsNothing);
+      expect(find.textContaining('x 必须在'), findsNothing);
 
       workspace.viewReads = 0;
       await _pumpOperation(
@@ -310,7 +425,7 @@ void main() {
       expect(workspace.viewReads, greaterThan(0));
       expect(workspace.worldCircuitView['dirty'], isFalse);
       expect(find.textContaining('已导出模拟世界 WLD 副本'), findsOneWidget);
-      backend.holdClock = Completer<void>();
+      backend.holdTicks = Completer<void>();
       await workspace.dispatch('worldCircuitToggle');
       await tester.pump();
       workspace.viewReads = 0;
@@ -324,6 +439,7 @@ void main() {
       await _pause(tester, workspace, backend);
 
       final oldIdentity = workspace.worldCircuitView['displayIdentity'];
+      workspace.viewReads = 0;
       await _pumpOperation(
         tester,
         workspace.dispatch('worldCircuitClose', {'discard': true}),
@@ -332,6 +448,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ComputerDisplay), findsNothing);
       expect(workspace.worldCircuitView['open'], isFalse);
+      expect(workspace.viewReads, greaterThan(0));
       backend.holdOpen = Completer<void>();
       workspace.viewReads = 0;
       final importing = workspace.dispatch('worldCircuitImport');
@@ -349,13 +466,17 @@ void main() {
         workspace.worldCircuitView['displayIdentity'],
         isNot(same(oldIdentity)),
       );
+      expect(find.byType(ComputerDisplay), findsNothing);
+      await workspace.dispatch('worldCircuitReadDisplay',
+          {'x': 40, 'y': 50, 'width': 4, 'height': 3});
+      await tester.pumpAndSettle();
       expect(find.byType(ComputerDisplay), findsOneWidget);
 
       await _navigate(tester, '工作台');
       expect(find.byType(WorldCircuitPanel), findsNothing);
       await _navigate(tester, '电路实验室');
       expect(find.byType(WorldCircuitPanel), findsOneWidget);
-      final replacement = _Workspace(_Backend());
+      final replacement = _Workspace(GenericCircuitBackend());
       await tester.pumpWidget(TerraForgeApp(controller: replacement));
       await tester.pumpAndSettle();
       replacement.viewReads = 0;

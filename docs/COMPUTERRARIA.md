@@ -13,53 +13,25 @@ Current Flutter UI, final pure-WLD long soak and repeated clean-CI acceptance
 remain pending. The isolated loading results below do not measure those final
 artifacts; prior companion-format results are historical evidence only.
 
-## Open and run
+## Test fixture, not an application mode
 
-1. Choose the full `.wld` and select **导入完整电路**.
-2. The app verifies the original WLD hash or an exact locally recorded WLD
-   export, plus physical memory/ready-lamp anchors and the native monochrome
-   display rectangle. Filenames do not select a profile.
-3. Choose **载入 Pong 程序**, or load an RV32I flat `.bin` / whitespace-separated
-   hexadecimal-byte `.txt`. The published original ROM is empty. Loading only
-   the world cannot boot a program.
-4. Enable **电路优化** to display Pong in this WLD, then choose **运行物理时钟**.
-   OFF can execute the physical CPU, but its same-TripWire game PixelBox rule
-   does not produce the Pong display. Each accepted batch contains 128 sequential
-   yellow-wire pulses at `(3194,153)`, with switch interaction disabled. The UI yields between
-   batches and keeps at most one operation in flight. A pulse is not necessarily
-   a retired instruction. Ordinary device ticks are a separate mode.
-5. Pause stops new batches; an accepted batch completes. Single-step sends one
-   physical pulse. Reset reopens the original source and clears the loaded ROM
-   program. Close releases the circuit handle and retained images.
+Production has no ROM loader, Pong button, RV32I control, preset screen or
+sample direction-key mapping. File hashes never activate hidden behavior.
+This WLD follows the ordinary generic wiring path. Its empty ROM and missing
+NPC motion are not replaced by implicit test data or clock pulses.
 
-Fixed controls require the pinned original WLD or an exact locally verified
-export. Unknown, evicted or unregistered files remain generic circuit sessions.
-A successful export records the engine-computed WLD hash, verified base layout,
-known ROM image/name and pulse count only after the file is saved. Reimport
-verifies the bytes and resumes saved physical state without resetting.
+Explicit native/Node acceptance and
+`test/support/computerraria/fixture_driver.dart` contain the pinned layout.
+That driver issues physical lamp/trigger/pixel commands through an injected
+serialized executor. It does not interpret RISC-V instructions or produce an
+expected framebuffer. Program bytes are in `test/fixtures/computerraria/`,
+not the Flutter asset bundle. Provenance is fixture-only; production no longer
+records known program identities for exported WLDs.
 
-The version-2 local registry keeps at most eight records and 9 MiB of metadata.
-It contains no whole worlds, source paths or credentials. Old paired records
-cannot establish a WLD-only resume identity. Untracked low-level mutation
-invalidates the known ROM baseline. Partial or cancelled saves remain dirty;
-source aliases, including native symlink/hard-link aliases, remain protected.
-Every export path releases its temporary output lease.
-
-Loading a new program writes only changed physical ROM lamp bits, including
-zeroing an earlier longer program's tail. Physical reset/ready/bus/store-PC
-controls set the machine's start point to address zero. This is essential: the
-Pong ELF entry is 8, but stack initialization occupies address 0. ELF containers
-are explicitly rejected by the app; convert them to a flat image first. Program
-images are limited to 768 KiB. Interrupted program loads remain visibly
-incomplete and cannot run until the original world is reset/reimported.
-
-Keyboard arrows/WASD and on-screen direction buttons use independently calibrated
-physical sensors: UP `(6516,851)` mask 9; DOWN `(6517,866)` mask 5; LEFT
-`(6519,858)` mask 10; RIGHT `(6520,857)` mask 5. Repeated pulses before a CPU read
-retain the same direction bit; the next read clears it. Held keys therefore send
-coalesced actual wire pulses between clock batches. Release stops pulsing, with
-no invented release pulse. Blur/pause/close release held UI inputs. No generic
-simulated key register is substituted for the physical sensors.
+The following CPU/UI timing evidence describes earlier explicitly named
+workloads. Former application buttons and keyboard measurements do not validate
+the new generic interface. Revised app profiles have separate workload/schema
+identities; physical engine fixture checks retain their explicit hashes.
 
 ## 电路优化 switch
 
@@ -78,18 +50,18 @@ standard mode remains available. No missing device data is synthesized.
 
 Changing modes pauses the runner and drains the accepted batch. The change
 itself preserves ROM, RAM, inputs and existing pixels; subsequent pulses follow
-the selected rule. Both modes use the same 128-pulse batch size. The app does
+the selected rule. Fixture tests declare their own pulse batch size. The app does
 not embed the complete WireHead accelerator. Final Native/Node OFF/ON checks
 passed for physical CPU execution and ON's actual 3,072-pixel monochrome Pong
 display. Current UI acceptance remains pending. Historical companion-format
 OFF/ON pixel-equality evidence does not apply to the new rule.
 
-## Actual displays and timing
+## Fixture displays and historical timing
 
 - Monochrome: `(6485,800)`, 64 × 48, actual type-445 frame X 0/18.
 - Queries read the compiler's retained pixel cells, without rescanning the
-  entire WLD. The app rejects missing, duplicate, wrong-type or invalid-frame
-  pixels. It never draws an expected test image or a host-side framebuffer.
+  entire WLD. The fixture requires its known dense screen. Generic production regions
+  accept sparse gaps and reject duplicate, wrong-type or invalid-frame pixels. It never draws an expected test image or a host-side framebuffer.
 - Frames are converted to nearest-neighbor RGBA images. Image decoding permits
   one pending request; replaced/disposed images cannot reappear after close.
 - The unsupported mod-only color screen is absent from the interface. Its
@@ -99,7 +71,7 @@ OFF/ON pixel-equality evidence does not apply to the new rule.
   frame timings. Polling is requested at most about 60 times/second and slows
   with execution. No fixed 5 kHz or target-device frame-rate guarantee is made.
 
-## Source identity and bundled program
+## Source identity and test program
 
 Original source: [Computerraria commit 0379d5b](https://github.com/misprit7/computerraria/tree/0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8).
 The WLD is format 279, 15,200 × 7,200 tiles, SHA-256
@@ -107,7 +79,7 @@ The WLD is format 279, 15,200 × 7,200 tiles, SHA-256
 The original world is fetched only for authorized validation and is not bundled
 in the repository or public report artifacts.
 
-`assets/computer/pong.bin` contains the actual upstream Pong program compiled
+`test/fixtures/computerraria/pong.bin` contains the actual upstream Pong program compiled
 for RV32I, 2,288 bytes, SHA-256
 `d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d`.
 The Pong source is unchanged. Two `cfg` attributes exclude host-only SpriteGrid
@@ -119,7 +91,7 @@ already installed, rebuild using:
 
 ```sh
 sh vendor/computerraria/build-pong.sh
-cmp assets/computer/pong.bin vendor/computerraria/pong-build/output/pong.bin
+cmp test/fixtures/computerraria/pong.bin vendor/computerraria/pong-build/output/pong.bin
 ```
 
 The script uses the existing `rustc`/rustup shim on PATH, or
@@ -187,35 +159,15 @@ import and reload, cancelled partial program loading, physical clock batching,
 pause/close ordering, and actual image widgets. Fake-backend tests validate host
 contracts, not physical CPU execution.
 
-`integration_test/computer_world_profile_test.dart` is a separate opt-in actual
-world target for the single pinned public upstream WLD. It pointer-taps the production panel, imports the real WLD,
-loads bundled Pong into physical lamps, observes changing actual monitor
-frames, records physical clock rate independently of UI/raster timings,
-exports the real WLD into owned temporary files, recreates the Workspace with
-its actual isolated local vault, reimports without reset, compares saved
-pixels/RAM/program state, then pauses/steps/resets/closes and measures memory. The
-current pure-WLD acceptance must distinguish OFF physical CPU/RAM checks from
-ON's changing monochrome Pong display. Historical cross-mode display equality
-from the former companion format does not apply. The deterministic workload
-uses 5,120 physical pulses with input at fixed clock indices, comparing physical
-RAM lamp signatures and mode-appropriate actual display state. An idle
-mode roundtrip must preserve the display and RAM. Framework key-down/up events for all four directions and a pointer hold on a
-direction button measure input-to-physical-sensor acknowledgement and verify
-release. These timings do not claim OS-device or raster presentation latency.
-A separate 30–60 second steady run records throughput; its different-time endpoints are not compared for state equality. It rejects debug
-timing as performance evidence. Source descriptors replace OS file chooser
-interaction; chooser latency is excluded. Example on a configured Linux host:
+The former `computer_world_profile_test.dart` loaded a program through CPU
+buttons and injected direction keys. These features were removed. Retained
+reports are historical and cannot be compared as the same generic workload.
 
-```sh
-COMPUTERRARIA_WLD=/absolute/path/computerraria.wld \
-TERRAFORGE_ENGINE_LIBRARY=/absolute/path/libabc_engine.so \
-TERRA_UI_PROFILE_OUTPUT=build/perf/computer-profile.json \
-flutter drive --profile -d linux \
-  --driver test_driver/ui_profile_driver.dart \
-  --target integration_test/computer_world_profile_test.dart \
-  --dart-define=COMPUTERRARIA_PROFILE_CYCLES=2 \
-  --dart-define=COMPUTERRARIA_PROFILE_SECONDS=30
-```
+Revised opt-in app profiles exercise WLD import, explicit generic controls,
+selected viewport/PixelBoxes, ticks, run/pause, save/reopen, reset and close.
+Source adapters exclude OS file-chooser latency. Framework events do not prove
+OS input-to-presentation latency. Report validity alone does not establish
+calibrated refresh performance, target-device fluency or stable memory.
 
 Browser inputs must use explicit loopback fixture URLs through
 `COMPUTERRARIA_WLD_URL`; it becomes a Blob, not a Dart

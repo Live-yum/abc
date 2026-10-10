@@ -8,12 +8,12 @@ import 'package:terraforge/ui/terra_app.dart';
 import 'package:terraforge/ui/world_circuit_panel.dart';
 
 class _CountingController extends TerraController {
-  int viewReads = 0, pulses = 0;
+  int viewReads = 0, ticks = 0;
   String error = '';
   Map<String, Object?> world = {};
   List<TerraFile> files = [];
   List<Map<String, Object?>> mapping = [];
-  Uint8List frame = Uint8List(64 * 48 * 4);
+  Uint8List frame = Uint8List(4 * 3 * 4)..[47] = 255;
   final Object displayIdentity = Object();
   final actions = <String>[];
   Completer<void>? extraction;
@@ -22,7 +22,7 @@ class _CountingController extends TerraController {
   TerraViewState get view {
     viewReads++;
     return TerraViewState(
-      status: 'snapshot $pulses',
+      status: 'snapshot $ticks',
       error: error,
       world: world,
       files: files,
@@ -30,14 +30,17 @@ class _CountingController extends TerraController {
       result: {
         'worldCircuit': {
           'open': true,
-          'computerVerified': true,
-          'canRunComputer': true,
-          'keyboardVerified': true,
-          'programName': 'Pong.bin',
-          'width': 15200,
-          'height': 7200,
-          'physicalPulses': pulses,
-          'displayFrames': {'黑白显示器': frame},
+          'optimizationSupported': true,
+          'width': 600,
+          'height': 400,
+          'ticks': ticks,
+          'viewport': {'x': 40, 'y': 50, 'width': 4, 'height': 3},
+          'displayRegion': {
+            'name': 'selected pixels',
+            'x': 40, 'y': 50, 'width': 4, 'height': 3,
+          },
+          'displayFrame': frame,
+          'displayPixelCount': 1,
           'displayIdentity': displayIdentity,
         },
       },
@@ -64,7 +67,7 @@ Future<void> _show(WidgetTester tester, _CountingController controller) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _showComputer(WidgetTester tester) async {
+Future<void> _showCircuit(WidgetTester tester) async {
   await tester.tap(find.text('电路实验室').first);
   await tester.pumpAndSettle();
   await tester.tap(find.text('世界电路'));
@@ -82,7 +85,7 @@ Future<void> _finish(
 }
 
 void main() {
-  testWidgets('one snapshot per rebuild updates computer pixels and counters', (
+  testWidgets('one snapshot per rebuild updates selected pixels and tick counters', (
     tester,
   ) async {
     final controller = _CountingController();
@@ -95,12 +98,14 @@ void main() {
       1,
       reason: 'Deferred home and heading layouts share the root snapshot',
     );
-    await _showComputer(tester);
+    await _showCircuit(tester);
 
-    for (final pulses in [128, 256, 384]) {
-      final frame = Uint8List(64 * 48 * 4)..[0] = pulses ~/ 128;
+    for (final ticks in [6, 12, 18]) {
+      final frame = Uint8List(4 * 3 * 4)
+        ..[44] = ticks ~/ 6
+        ..[47] = 255;
       controller
-        ..pulses = pulses
+        ..ticks = ticks
         ..frame = frame
         ..viewReads = 0
         ..publish();
@@ -110,11 +115,11 @@ void main() {
         tester.widget<ComputerDisplay>(find.byType(ComputerDisplay)).rgba,
         same(frame),
       );
-      expect(find.textContaining('已执行 $pulses 个物理时钟脉冲'), findsOneWidget);
-      expect(find.text('snapshot $pulses'), findsOneWidget);
+      expect(find.textContaining(' · $ticks ticks · '), findsOneWidget);
+      expect(find.text('snapshot $ticks'), findsOneWidget);
     }
     await _finish(tester, controller);
-  });
+  }, timeout: const Timeout(Duration(seconds: 30)));
 
   testWidgets('an existing button reads live state before the next rebuild', (
     tester,
@@ -131,14 +136,14 @@ void main() {
     expect(controller.actions, isNot(contains('import')));
     expect(find.text('地图与基本信息'), findsOneWidget);
     await _finish(tester, controller);
-  });
+  }, timeout: const Timeout(Duration(seconds: 30)));
 
   testWidgets('extraction checks live error state after its await', (
     tester,
   ) async {
     final controller = _CountingController();
     await _show(tester, controller);
-    await _showComputer(tester);
+    await _showCircuit(tester);
     final panel = tester.widget<WorldCircuitPanel>(
       find.byType(WorldCircuitPanel),
     );
@@ -159,7 +164,7 @@ void main() {
     expect(find.byType(WorldCircuitPanel), findsNothing);
     expect(find.text('LIVE FUSION CANVAS'), findsOneWidget);
     await _finish(tester, controller);
-  });
+  }, timeout: const Timeout(Duration(seconds: 30)));
 
   testWidgets('search dialog rebuilds read current files', (tester) async {
     final controller = _CountingController();
@@ -181,7 +186,7 @@ void main() {
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
     await _finish(tester, controller);
-  });
+  }, timeout: const Timeout(Duration(seconds: 30)));
 
   testWidgets('lazy mapping rows share their list snapshot and refresh', (
     tester,
@@ -205,5 +210,5 @@ void main() {
     expect(find.text('old-color → old-block'), findsNothing);
     expect(find.text('new-color → new-block'), findsOneWidget);
     await _finish(tester, controller);
-  });
+  }, timeout: const Timeout(Duration(seconds: 30)));
 }

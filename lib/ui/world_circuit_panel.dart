@@ -1,11 +1,8 @@
-import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import '../domain/computerraria_computer.dart';
 import '../engine/world_circuit_backend.dart';
 import 'computer_display.dart';
 import '../diagnostics/host_stage_timings.dart';
@@ -30,7 +27,6 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
   final _y = TextEditingController(text: '0');
   final _width = TextEditingController(text: '48');
   final _height = TextEditingController(text: '32');
-  final _computerFocus = FocusNode(debugLabel: 'physical computer input');
   int _mask = 15;
   bool _performanceExpanded = false;
   Map<String, Object?>? _performanceSnapshot;
@@ -53,91 +49,50 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
 
   int? _selectedX, _selectedY;
   String? _localError;
+  Uint8List? _controlRecords;
+  final List<_CircuitControl> _controls = [];
+  int _controlCount = 0;
+
+  void _readControls(Uint8List records) {
+    if (identical(_controlRecords, records)) return;
+    _controlRecords = records;
+    _controls.clear();
+    _controlCount = 0;
+    final data = ByteData.sublistView(records);
+    for (var offset = 0; offset + 16 <= records.length; offset += 16) {
+      final word = data.getUint32(offset + 8, Endian.little);
+      final type = word & 65535;
+      final frameX = data.getInt16(offset + 12, Endian.little);
+      if ((word & (1 << 16)) == 0 || !_isControl(type, frameX)) continue;
+      _controlCount++;
+      if (_controls.length == 256) continue;
+      _controls.add(_CircuitControl(
+        data.getUint32(offset, Endian.little),
+        data.getUint32(offset + 4, Endian.little), type,
+        data.getInt16(offset + 14, Endian.little),
+      ));
+    }
+  }
+
+  // These are the input tile kinds accepted by the generic engine HitSwitch
+  // path. Multi-tile records remain selectable; the engine normalizes them.
+  bool _isControl(int type, int frameX) => const {
+    132, 135, 136, 144, 314, 411, 423, 428, 440, 441, 442, 468, 476,
+  }.contains(type) || (type == 467 && frameX ~/ 36 == 4);
+
+  Future<void> _moveViewport(int dx, int dy) async {
+    final viewport = widget.state['viewport'];
+    if (viewport is! Map || viewport.isEmpty) return;
+    final width = viewport['width'] as int, height = viewport['height'] as int;
+    final worldWidth = widget.state['width'] as int;
+    final worldHeight = widget.state['height'] as int;
+    await _send('worldCircuitViewport', {
+      'x': ((viewport['x'] as int) + dx * width).clamp(0, worldWidth - width),
+      'y': ((viewport['y'] as int) + dy * height).clamp(0, worldHeight - height),
+      'width': width, 'height': height,
+    });
+  }
   bool get _busy => widget.state['busy'] == true;
-  bool get _inputEnabled =>
-      widget.state['keyboardVerified'] == true &&
-      widget.state['canRunComputer'] == true;
-
-  void _input(String direction, bool pressed) {
-    unawaited(
-      widget.dispatch('worldCircuitInput', {
-        'direction': direction,
-        'pressed': pressed,
-      }),
-    );
-  }
-
-  void _releaseInput() {
-    unawaited(
-      Future<void>.microtask(
-        () => widget.dispatch('worldCircuitReleaseKeys', const {}),
-      ),
-    );
-  }
-
-  KeyEventResult _computerKey(FocusNode node, KeyEvent event) {
-    if (!_inputEnabled) return KeyEventResult.ignored;
-    final key = event.logicalKey;
-    final direction =
-        key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.keyW
-        ? 'up'
-        : key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.keyS
-        ? 'down'
-        : key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyA
-        ? 'left'
-        : key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyD
-        ? 'right'
-        : null;
-    if (direction == null) return KeyEventResult.ignored;
-    if (event is KeyDownEvent) _input(direction, true);
-    if (event is KeyUpEvent) _input(direction, false);
-    return KeyEventResult.handled;
-  }
-
-  Widget _directionButton(String direction, String label, IconData icon) {
-    final held = (widget.state['heldKeys'] as Iterable? ?? const []).contains(
-      direction,
-    );
-    return Semantics(
-      label: '计算机$label',
-      button: true,
-      enabled: _inputEnabled,
-      onTap: !_inputEnabled
-          ? null
-          : () {
-              _computerFocus.requestFocus();
-              _input(direction, true);
-              _input(direction, false);
-            },
-      child: GestureDetector(
-        excludeFromSemantics: true,
-        onTapDown: !_inputEnabled
-            ? null
-            : (_) {
-                _computerFocus.requestFocus();
-                _input(direction, true);
-              },
-        onTapUp: !_inputEnabled ? null : (_) => _input(direction, false),
-        onTapCancel: !_inputEnabled ? null : () => _input(direction, false),
-        child: Container(
-          width: 56,
-          height: 48,
-          decoration: BoxDecoration(
-            color: held
-                ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surface,
-            border: Border.all(color: Theme.of(context).colorScheme.outline),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: _inputEnabled ? null : Theme.of(context).disabledColor,
-          ),
-        ),
-      ),
-    );
-  }
-
   String _progressLabel(String stage) => switch (stage) {
     'hash' => '核验完整文件',
     'open' || 'decode' => '分段读取世界',
@@ -190,7 +145,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         ),
       ) ??
       false;
-  Future<void> _viewport() async {
+  Future<void> _viewport({bool pixels = false}) async {
     final x = int.tryParse(_x.text),
         y = int.tryParse(_y.text),
         w = int.tryParse(_width.text),
@@ -205,14 +160,14 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         y < 0 ||
         w < 1 ||
         h < 1 ||
-        w > 128 ||
-        h > 96 ||
+        w > 256 ||
+        h > 256 ||
         x + w > worldW ||
         y + h > worldH) {
-      setState(() => _localError = '请输入世界范围内的视口；最大 128 × 96 格。');
+      setState(() => _localError = '请输入世界范围内的区域；宽高各不超过 256 格。');
       return;
     }
-    await _send('worldCircuitViewport', {
+    await _send(pixels ? 'worldCircuitReadDisplay' : 'worldCircuitViewport', {
       'x': x,
       'y': y,
       'width': w,
@@ -220,23 +175,36 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
     });
   }
 
+  void _syncViewport() {
+    final viewport = widget.state['viewport'];
+    if (viewport is! Map || viewport.isEmpty) return;
+    _x.text = '${viewport['x']}';
+    _y.text = '${viewport['y']}';
+    _width.text = '${viewport['width']}';
+    _height.text = '${viewport['height']}';
+    _selectedX = null;
+    _selectedY = null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncViewport();
+  }
+
   @override
   void didUpdateWidget(covariant WorldCircuitPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.state['open'] != true && widget.state['open'] == true) {
-      _width.text = math
-          .min(48, widget.state['width'] as int? ?? 48)
-          .toString();
-      _height.text = math
-          .min(32, widget.state['height'] as int? ?? 32)
-          .toString();
+    final previous = oldWidget.state['viewport'] as Map?;
+    final next = widget.state['viewport'] as Map?;
+    if (const ['x', 'y', 'width', 'height']
+        .any((key) => previous?[key] != next?[key])) {
+      _syncViewport();
     }
   }
 
   @override
   void dispose() {
-    _releaseInput();
-    _computerFocus.dispose();
     _x.dispose();
     _y.dispose();
     _width.dispose();
@@ -250,8 +218,6 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         open = s['open'] == true,
         dirty = s['dirty'] == true,
         running = s['running'] == true;
-    final computer = s['computerVerified'] == true;
-    final canRunComputer = s['canRunComputer'] == true;
     final loading = s['importing'] == true;
     final loadFailed =
         s['loadError'] is String && (s['loadError'] as String).isNotEmpty;
@@ -264,13 +230,17 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
     final error = _localError ?? s['error']?.toString();
     final raw = s['records'];
     final records = raw is Uint8List ? raw : Uint8List(0);
+    _readControls(records);
     String? selectedDescription;
+    var selectedControl = false;
     if (_selectedX != null && _selectedY != null) {
       final data = ByteData.sublistView(records);
       for (var i = 0; i + 16 <= records.length; i += 16) {
         if (data.getUint32(i, Endian.little) == _selectedX &&
             data.getUint32(i + 4, Endian.little) == _selectedY) {
           final word = data.getUint32(i + 8, Endian.little);
+          selectedControl = (word & (1 << 16)) != 0 &&
+              _isControl(word & 65535, data.getInt16(i + 12, Endian.little));
           selectedDescription =
               '选中 ($_selectedX, $_selectedY)：类型 ${word & 65535} · 帧 (${data.getInt16(i + 12, Endian.little)}, ${data.getInt16(i + 14, Endian.little)}) · 线色掩码 ${word >> 24} · 标志 ${(word >> 16) & 255}';
           break;
@@ -284,6 +254,11 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         vy = (viewport['y'] as num?)?.toInt() ?? 0;
     final vw = (viewport['width'] as num?)?.toInt() ?? 0,
         vh = (viewport['height'] as num?)?.toInt() ?? 0;
+    final displayRegion = s['displayRegion'] as Map?;
+    final displayFrame = s['displayFrame'];
+    final displayWidth = (displayRegion?['width'] as num?)?.toInt() ?? 0;
+    final displayHeight = (displayRegion?['height'] as num?)?.toInt() ?? 0;
+    final displayPixelCount = (s['displayPixelCount'] as num?)?.toInt() ?? 0;
     Widget coordinate(String label, TextEditingController controller) =>
         SizedBox(
           width: 90,
@@ -304,7 +279,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         ),
         const SizedBox(height: 8),
         const Text(
-          '导入完整 WLD 后运行真实接线。Computerraria 可加载 RV32I 程序，通过 64 × 48 黑白显示器读取实际电路状态。',
+          '导入 WLD 后解析实际接线与设备。选择区域操作开关、压力板或定时器；运行与单步推进世界电路 tick。导入的定时器默认关闭，需要手动启动；不恢复原世界计时相位。',
         ),
         if (!open && s['streamingAvailable'] == true) ...[
           const SizedBox(height: 12),
@@ -347,31 +322,18 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               FilledButton.icon(
                 onPressed: running
                     ? () => _send('worldCircuitPause')
-                    : _busy || (computer && !canRunComputer)
+                    : _busy
                     ? null
                     : () => _send('worldCircuitToggle'),
                 icon: Icon(running ? Icons.pause : Icons.play_arrow),
-                label: Text(
-                  running
-                      ? '暂停'
-                      : computer
-                      ? '运行物理时钟'
-                      : '运行',
-                ),
+                label: Text(running ? '暂停' : '运行'),
               ),
               OutlinedButton(
-                onPressed: _busy || running || (computer && !canRunComputer)
+                onPressed: _busy || running
                     ? null
                     : () => _send('worldCircuitStep'),
-                child: Text(computer ? '单个时钟脉冲' : '单步'),
+                child: const Text('单步 1 tick'),
               ),
-              if (computer)
-                OutlinedButton(
-                  onPressed: _busy || running || !canRunComputer
-                      ? null
-                      : () => _send('worldCircuitStep', {'pulses': 128}),
-                  child: const Text('128 个脉冲'),
-                ),
               OutlinedButton(
                 onPressed: _busy
                     ? null
@@ -418,7 +380,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             Text(
               '${_progressLabel(progress.stage)} · ${progress.completed}${progress.total > 0 ? ' / ${progress.total}' : ''}',
             ),
-          if (s['importing'] == true || s['programIncomplete'] == true)
+          if (s['importing'] == true)
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -451,8 +413,6 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
-        if (s['provenanceWarning'] != null)
-          Text(s['provenanceWarning'] as String),
         if (open) ...[
           SwitchListTile(
             title: const Text('电路优化'),
@@ -468,145 +428,10 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             contentPadding: EdgeInsets.zero,
           ),
           const Text(
-            '关闭时采用原版像素规则。切换会暂停运行，保留当前 ROM 和显示帧；历史显示不会重算，继续运行才按所选规则处理信号。',
+            '关闭时采用原版像素规则。切换会暂停运行，保留当前电路状态和显示帧；历史显示不会重算，继续运行才按所选规则处理信号。',
           ),
           if (s['optimizationSupported'] != true)
             const Text('此世界的像素接线拓扑暂不支持开启；同色跨轴网络尚未支持，请保持关闭。'),
-          if (computer &&
-              s['optimizationSupported'] == true &&
-              s['optimizationEnabled'] != true)
-            const Text(
-              'Computerraria 在原版规则下可能保持黑屏。请先开启电路优化，再载入程序；若程序已运行过，请重置原始世界后按此顺序开始，避免混合显示历史。',
-            ),
-        ],
-        if (open && computer) ...[
-          const SizedBox(height: 12),
-          const Text('已核验：完整 Computerraria WLD、实际存储器坐标及 64 × 48 黑白显示器。'),
-          if (s['restoredFromExport'] == true)
-            const Text('已匹配本机导出的完整 WLD；保留保存时的实际 CPU、ROM 和显示器状态。'),
-          Text(
-            s['programName'] == null
-                ? '原始 ROM 为空。选择从地址 0 启动的 RV32I .bin 或十六进制 .txt。'
-                : 'ROM 程序：${s['programName']}',
-          ),
-          if (s['programIncomplete'] == true)
-            const Text('程序加载未完成；请重置原始世界后重新加载程序。'),
-          if (s['programBaselineKnown'] == false)
-            const Text('底层电路操作改变了未跟踪的状态，请重置后再替换程序或保存可续跑文件。'),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.icon(
-                onPressed:
-                    _busy ||
-                        running ||
-                        s['programIncomplete'] == true ||
-                        s['programBaselineKnown'] == false
-                    ? null
-                    : () => _send('worldCircuitLoadPong'),
-                icon: const Icon(Icons.sports_esports),
-                label: const Text('载入 Pong 程序'),
-              ),
-              FilledButton.tonalIcon(
-                onPressed:
-                    _busy ||
-                        running ||
-                        s['programIncomplete'] == true ||
-                        s['programBaselineKnown'] == false
-                    ? null
-                    : () => _send('worldCircuitLoadProgram'),
-                icon: const Icon(Icons.memory),
-                label: const Text('加载 RV32I 程序'),
-              ),
-              OutlinedButton(
-                onPressed: _busy
-                    ? null
-                    : () => _send('worldCircuitRefreshDisplay'),
-                child: const Text('读取显示器'),
-              ),
-              const Chip(label: Text('黑白 64 × 48')),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Builder(
-            builder: (context) {
-              const region = ComputerrariaComputer.mono;
-              final frames = s['displayFrames'] as Map? ?? const {};
-              final rgba = frames[region.name];
-              return Focus(
-                focusNode: _computerFocus,
-                onKeyEvent: _computerKey,
-                onFocusChange: (focused) {
-                  if (!focused) _releaseInput();
-                },
-                child: GestureDetector(
-                  onTap: _computerFocus.requestFocus,
-                  child: Align(
-                    alignment: Alignment.topLeft,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: math.min(
-                          800,
-                          MediaQuery.sizeOf(context).height *
-                              .65 *
-                              region.width /
-                              region.height,
-                        ),
-                      ),
-                      child: ComputerDisplay(
-                        key: s['displayIdentity'] == null
-                            ? null
-                            : ObjectKey(s['displayIdentity']),
-                        hostStages: widget.hostStages,
-                        rgba: rgba is Uint8List ? rgba : Uint8List(0),
-                        width: region.width,
-                        height: region.height,
-                        label: '${region.name}，显示实际物理像素状态',
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          Text(
-            '已执行 ${s['physicalPulses'] ?? 0} 个物理时钟脉冲 · 当前模式实测 ${((s['clockHz'] as num?) ?? 0).toStringAsFixed(1)} Hz · 显示读取 ${((s['displayHz'] as num?) ?? 0).toStringAsFixed(1)} 次/秒',
-          ),
-          const Text('时钟脉冲不等于 CPU 指令。运行速度取决于设备。'),
-          if (widget.hostStages != null)
-            ExpansionTile(
-              title: const Text('性能明细 / Performance'),
-              subtitle: const Text('主机耗时，非 FPS；暂停后展开读取最近 128 次'),
-              onExpansionChanged: (expanded) => setState(() {
-                _performanceExpanded = expanded;
-                _performanceSnapshot = expanded
-                    ? widget.hostStages!.snapshot()
-                    : null;
-              }),
-              children: [
-                if (_performanceExpanded && running)
-                  const Text('请暂停后重新展开，以免额外布局影响运行测量。'),
-                if (_performanceExpanded &&
-                    !running &&
-                    _performanceSnapshot != null)
-                  ..._performanceDetails(_performanceSnapshot!),
-              ],
-            ),
-          if (s['keyboardVerified'] == true) ...[
-            const Text('点显示器后使用方向键或 WASD；屏幕方向键也可长按。失去焦点或暂停会释放输入。'),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _directionButton('left', '向左', Icons.arrow_back),
-                _directionButton('up', '向上', Icons.arrow_upward),
-                _directionButton('down', '向下', Icons.arrow_downward),
-                _directionButton('right', '向右', Icons.arrow_forward),
-              ],
-            ),
-          ] else
-            const Text('键盘映射待实际传感器校准，当前未启用方向键。'),
         ],
         if (open) ...[
           const SizedBox(height: 12),
@@ -648,7 +473,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             ],
           ),
           if (s['fragments'] is Map) ...[
-            Text('共 ${(s['fragments'] as Map)['total']} 个片段；提取后在融合画布查看与粘贴。'),
+            Text('共 ${(s['fragments'] as Map)['total']} 个片段；点选定位，提取后可在融合画布查看与粘贴。'),
             SizedBox(
               height: 240,
               child: ListView.builder(
@@ -657,6 +482,8 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                   final row =
                       ((s['fragments'] as Map)['items'] as List)[index] as Map;
                   return ListTile(
+                    onTap: _busy ? null : () =>
+                        _send('worldCircuitLocateFragment', {'id': row['id']}),
                     title: Text(
                       '片段 ${row['id']} · ${row['width']} × ${row['height']}',
                     ),
@@ -678,8 +505,27 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               ),
             ),
           ],
+          if (widget.hostStages != null)
+            ExpansionTile(
+              title: const Text('性能明细 / Performance'),
+              subtitle: const Text('主机耗时，非 FPS；暂停后展开读取最近 128 次'),
+              onExpansionChanged: (expanded) => setState(() {
+                _performanceExpanded = expanded;
+                _performanceSnapshot = expanded
+                    ? widget.hostStages!.snapshot()
+                    : null;
+              }),
+              children: [
+                if (_performanceExpanded && running)
+                  const Text('请暂停后重新展开，以免额外布局影响运行测量。'),
+                if (_performanceExpanded &&
+                    !running &&
+                    _performanceSnapshot != null)
+                  ..._performanceDetails(_performanceSnapshot!),
+              ],
+            ),
           Text(
-            '${s['width'] ?? 0} × ${s['height'] ?? 0} 格 · ${s['devices'] ?? 0} 个设备 · ${s['networks'] ?? 0} 个网络 · ${s['ticks'] ?? 0} ticks${dirty ? ' · 有未保存状态' : ''}',
+            '${s['width'] ?? 0} × ${s['height'] ?? 0} 格 · ${s['devices'] ?? 0} 个设备 · ${s['networks'] ?? 0} 个网络 · ${s['ticks'] ?? 0} ticks · ${s['netPulses'] ?? 0} 次线路脉冲${dirty ? ' · 有未保存状态' : ''}',
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -693,10 +539,41 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               coordinate('高度', _height),
               OutlinedButton(
                 onPressed: _busy ? null : _viewport,
-                child: const Text('查看区域'),
+                child: const Text('查看接线'),
+              ),
+              OutlinedButton(
+                onPressed: _busy ? null : () => _viewport(pixels: true),
+                child: const Text('读取区域像素'),
               ),
             ],
           ),
+          if (vw > 0 && vh > 0) ...[
+            Text('当前接线视口：($vx, $vy) · $vw × $vh 格；可移动查看世界的其他区域。'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: _busy || vx == 0 ? null : () => _moveViewport(-1, 0),
+                  child: const Text('左移视口'),
+                ),
+                OutlinedButton(
+                  onPressed: _busy || vx + vw >= (s['width'] as int? ?? 0)
+                      ? null : () => _moveViewport(1, 0),
+                  child: const Text('右移视口'),
+                ),
+                OutlinedButton(
+                  onPressed: _busy || vy == 0 ? null : () => _moveViewport(0, -1),
+                  child: const Text('上移视口'),
+                ),
+                OutlinedButton(
+                  onPressed: _busy || vy + vh >= (s['height'] as int? ?? 0)
+                      ? null : () => _moveViewport(0, 1),
+                  child: const Text('下移视口'),
+                ),
+              ],
+            ),
+          ],
           Wrap(
             spacing: 8,
             children: [
@@ -731,9 +608,9 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                 return Align(
                   alignment: Alignment.topLeft,
                   child: Semantics(
-                    label: '实际世界电路视口，点击格子触发开关',
+                    label: '实际世界电路视口，点击选择设备或线路',
                     child: GestureDetector(
-                      onTapUp: _busy || _mask == 0
+                      onTapUp: _busy
                           ? null
                           : (details) {
                               final x =
@@ -752,16 +629,13 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                                   _selectedX = x;
                                   _selectedY = y;
                                 });
-                                _send('worldCircuitTrigger', {
-                                  'x': x,
-                                  'y': y,
-                                  'mask': _mask,
-                                });
                               }
                             },
                       child: CustomPaint(
                         size: size,
-                        painter: _CircuitPainter(records, vx, vy, vw, vh),
+                        painter: _CircuitPainter(records, vx, vy, vw, vh,
+                          selectedX: _selectedX, selectedY: _selectedY,
+                          selectionColor: Theme.of(context).colorScheme.primary),
                       ),
                     ),
                   ),
@@ -774,18 +648,116 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               child: Text('选择区域以读取真实电路记录。'),
             ),
           const SizedBox(height: 8),
+          Text('当前视口发现 $_controlCount 个可操作输入格；点选后操作。'),
+          if (_controls.isNotEmpty)
+            SizedBox(
+              height: math.min(192, _controls.length * 64).toDouble(),
+              child: ListView.builder(
+                itemCount: _controls.length,
+                itemBuilder: (context, index) {
+                  final control = _controls[index];
+                  return ListTile(
+                    dense: true,
+                    selected: control.x == _selectedX && control.y == _selectedY,
+                    title: Text(control.label),
+                    subtitle: Text('坐标 ${control.x}, ${control.y} · 类型 ${control.type}'),
+                    onTap: _busy ? null : () => setState(() {
+                      _selectedX = control.x;
+                      _selectedY = control.y;
+                    }),
+                  );
+                },
+              ),
+            ),
+          if (_controlCount > _controls.length)
+            const Text('列表显示前 256 个输入格；缩小接线视口可查看其他装置。'),
+          if (_controlCount == 0)
+            const Text('当前视口没有可操作输入，可移动视口或定位其他片段；点击线路仍可发送脉冲。'),
           if (selectedDescription != null) Text(selectedDescription),
+          if (_selectedX != null && _selectedY != null)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.tonal(
+                  onPressed: _busy || _mask == 0 || !selectedControl ? null : () =>
+                      _send('worldCircuitTrigger', {
+                        'x': _selectedX, 'y': _selectedY, 'mask': _mask,
+                      }),
+                  child: const Text('操作所选设备'),
+                ),
+                OutlinedButton(
+                  onPressed: _busy || _mask == 0 ? null : () =>
+                      _send('worldCircuitTrigger', {
+                        'x': _selectedX, 'y': _selectedY, 'mask': _mask,
+                        'direct': true,
+                      }),
+                  child: const Text('发送线路脉冲'),
+                ),
+              ],
+            ),
           const Text('深色格为空白；方块编号显示于较大格子。红／蓝／绿／黄线为实际接线，白框表示制动器。'),
+          if (displayRegion != null && displayWidth > 0 && displayHeight > 0 &&
+              displayFrame is Uint8List) ...[
+            const SizedBox(height: 12),
+            Text('像素区域：${displayRegion['x']}, ${displayRegion['y']} · '
+                '$displayWidth × $displayHeight 格'),
+            if (displayPixelCount == 0)
+              const Text('选区无原版像素装置。')
+            else ...[
+              Align(
+                alignment: Alignment.topLeft,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: math.min(800,
+                    MediaQuery.sizeOf(context).height * .65 *
+                        displayWidth / displayHeight)),
+                  child: ComputerDisplay(
+                    key: s['displayIdentity'] == null ? null : ObjectKey(s['displayIdentity']),
+                    rgba: displayFrame,
+                    width: displayWidth,
+                    height: displayHeight,
+                    label: '所选区域实际像素盒状态',
+                    hostStages: widget.hostStages,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                ),
+              ),
+              Text('实际像素盒 $displayPixelCount 个；主题底色为空位，黑色为关闭，白色为点亮。'),
+            ],
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton(
+                onPressed: _busy ? null : () => _send('worldCircuitRefreshDisplay'),
+                child: const Text('刷新像素区域'),
+              ),
+            ),
+          ],
         ],
       ],
     );
   }
 }
 
+class _CircuitControl {
+  final int x, y, type, frameY;
+  const _CircuitControl(this.x, this.y, this.type, this.frameY);
+  String get label => switch (type) {
+    132 => '控制杆',
+    135 => '压力板',
+    136 => '开关',
+    144 => '定时器（${frameY == 0 ? '关闭' : '已启动'}）',
+    _ => '可操作输入',
+  };
+}
+
 class _CircuitPainter extends CustomPainter {
   final Uint8List bytes;
   final int x, y, width, height;
-  _CircuitPainter(this.bytes, this.x, this.y, this.width, this.height);
+  final int? selectedX, selectedY;
+  final Color selectionColor;
+  _CircuitPainter(this.bytes, this.x, this.y, this.width, this.height, {
+    this.selectedX, this.selectedY, required this.selectionColor,
+  });
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(
@@ -866,6 +838,17 @@ class _CircuitPainter extends CustomPainter {
         text.paint(canvas, rect.topLeft + const Offset(2, 2));
       }
     }
+    if (selectedX != null && selectedY != null &&
+        selectedX! >= x && selectedX! < x + width &&
+        selectedY! >= y && selectedY! < y + height) {
+      canvas.drawRect(
+        Rect.fromLTWH((selectedX! - x) * sx, (selectedY! - y) * sy, sx, sy)
+            .deflate(math.min(1, math.min(sx, sy) / 4)),
+        Paint()..color = selectionColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.min(2, math.min(sx, sy) / 2),
+      );
+    }
   }
 
   @override
@@ -874,5 +857,7 @@ class _CircuitPainter extends CustomPainter {
       old.x != x ||
       old.y != y ||
       old.width != width ||
-      old.height != height;
+      old.height != height ||
+      old.selectedX != selectedX || old.selectedY != selectedY ||
+      old.selectionColor != selectionColor;
 }

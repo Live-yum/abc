@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:terraforge/domain/computerraria_computer.dart';
+import 'computerraria/layout.dart';
 import 'package:terraforge/engine/engine.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 

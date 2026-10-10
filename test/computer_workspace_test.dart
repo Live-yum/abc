@@ -7,7 +7,7 @@ import 'package:terraforge/engine/world_circuit_backend.dart';
 import 'package:terraforge/platform/files.dart';
 import 'package:terraforge/platform/world_circuit_files.dart';
 
-import 'support/computer_circuit_backend.dart';
+import 'support/generic_world_circuit_backend.dart';
 import 'workspace_test.dart' show FakeEngine, FakeFiles;
 import 'vault_history_test.dart' show MemoryVault;
 
@@ -23,7 +23,7 @@ class _Sources implements WorldCircuitFileGateway {
   Future<WorldCircuitSource?> pick() async => pending == null
       ? WorldCircuitSource.file(
           path: derived ? '/output/copy.wld' : '/fixture/p.wld',
-          length: 405983441,
+          length: 1365,
           name: 'p.wld',
           token: inputToken,
         )
@@ -43,7 +43,7 @@ class _Sources implements WorldCircuitFileGateway {
   }
 }
 
-class _LeaseBackend extends ComputerCircuitBackend {
+class _LeaseBackend extends GenericWorldCircuitBackend {
   int releaseFailures = 0;
   bool byteMode = false;
   Completer<void>? holdClose;
@@ -95,15 +95,11 @@ class _LeaseBackend extends ComputerCircuitBackend {
 }
 
 void main() {
-  test('fully saved WLD persists across Workspace recreation and resumes without CPU reset', () async {
-    final backend = ComputerCircuitBackend(),
+  test('fully saved generic WLD persists across Workspace recreation and reopens ordinary ticks without a reset', () async {
+    final backend = GenericWorldCircuitBackend(),
         vault = MemoryVault(),
         sources = _Sources();
-    final files = FakeFiles()
-      ..next = PickedFile(
-        'long.bin',
-        Uint8List.fromList([1, 0, 0, 0, 1, 0, 0, 0]),
-      );
+    final files = FakeFiles();
     var workspace = Workspace(
       engine: FakeEngine(),
       files: files,
@@ -113,14 +109,13 @@ void main() {
     );
     await workspace.dispatch('worldCircuitChooseWorld');
     await workspace.dispatch('worldCircuitImport');
-    await workspace.dispatch('worldCircuitLoadProgram');
-    await workspace.dispatch('worldCircuitStep', {'pulses': 128});
+    await workspace.dispatch('worldCircuitStep', {});
     await workspace.dispatch('worldCircuitSave');
     expect(workspace.view.error, isEmpty);
     expect((workspace.view.result['worldCircuit'] as Map)['dirty'], isFalse);
     expect(sources.saves, ['p_circuit.wld']);
     expect(backend.released, ['wld']);
-    expect(vault.records.length, 1);
+    expect(vault.records, isEmpty);
     await workspace.close();
     workspace.dispose();
     sources.derived = true;
@@ -135,15 +130,14 @@ void main() {
     await workspace.dispatch('worldCircuitChooseWorld');
     await workspace.dispatch('worldCircuitImport');
     final state = workspace.view.result['worldCircuit'] as Map;
-    expect(state['restoredFromExport'], isTrue);
-    expect(state['programName'], 'long.bin');
-    expect(state['physicalPulses'], 128);
-    expect(state['canRunComputer'], isTrue);
+    expect(state['open'], isTrue);
+    expect(state.containsKey('programName'), isFalse);
+    expect(state['ticks'], 1);
     expect(backend.commands.where((c) => c.mutates), isEmpty);
     await workspace.dispatch('worldCircuitStep');
     expect(
-      (workspace.view.result['worldCircuit'] as Map)['physicalPulses'],
-      129,
+      (workspace.view.result['worldCircuit'] as Map)['ticks'],
+      2,
     );
     await workspace.close();
     workspace.dispose();
@@ -152,7 +146,7 @@ void main() {
   test(
     'workspace close cancels pending import and shares one teardown',
     () async {
-      final backend = ComputerCircuitBackend()..holdOpen = Completer<void>();
+      final backend = GenericWorldCircuitBackend()..holdOpen = Completer<void>();
       final workspace = Workspace(
         engine: FakeEngine(),
         files: FakeFiles(),
@@ -181,14 +175,13 @@ void main() {
     test(
       'WLD export retains dirty session and releases output: $scenario',
       () async {
-        final backend = ComputerCircuitBackend();
+        final backend = GenericWorldCircuitBackend();
         final vault = MemoryVault();
         final sources = _Sources()
           ..saveResults = scenario == 'cancel-wld'
               ? [false]
               : [StateError('disk full')];
-        final files = FakeFiles()
-          ..next = PickedFile('p.bin', Uint8List.fromList([1, 0, 0, 0]));
+        final files = FakeFiles();
         final workspace = Workspace(
           engine: FakeEngine(),
           files: files,
@@ -198,12 +191,12 @@ void main() {
         );
         await workspace.dispatch('worldCircuitChooseWorld');
         await workspace.dispatch('worldCircuitImport');
-        await workspace.dispatch('worldCircuitLoadProgram');
+        await workspace.dispatch('worldCircuitStep');
         await workspace.dispatch('worldCircuitSave');
         final state = workspace.view.result['worldCircuit'] as Map;
         expect(state['open'], isTrue);
         expect(state['dirty'], isTrue);
-        expect(state['programName'], 'p.bin');
+        expect(state['ticks'], 1);
         expect(backend.released.toSet(), {'wld'});
         expect(vault.records, isEmpty);
         expect(backend.closes, 0);
@@ -442,7 +435,7 @@ void main() {
       expect(workspace.view.error, isEmpty);
       expect(backend.opens, 2);
       expect(
-        (workspace.view.result['worldCircuit'] as Map)['computerVerified'],
+        (workspace.view.result['worldCircuit'] as Map)['open'],
         isTrue,
       );
       await workspace.close();
@@ -453,7 +446,7 @@ void main() {
   test(
     'cancelled opening cannot adopt a late result; same source can reopen',
     () async {
-      final backend = ComputerCircuitBackend()..holdOpen = Completer<void>();
+      final backend = GenericWorldCircuitBackend()..holdOpen = Completer<void>();
       final workspace = Workspace(
         engine: FakeEngine(),
         files: FakeFiles(),
@@ -474,7 +467,7 @@ void main() {
       backend.holdOpen = null;
       await workspace.dispatch('worldCircuitImport');
       expect(
-        (workspace.view.result['worldCircuit'] as Map)['computerVerified'],
+        (workspace.view.result['worldCircuit'] as Map)['open'],
         isTrue,
       );
       await workspace.close();
@@ -483,27 +476,24 @@ void main() {
     },
   );
 
-  test('WLD reset clears program and keeps empty viewport safe', () async {
-    final backend = ComputerCircuitBackend(),
-        sources = _Sources(),
-        files = FakeFiles();
-    final workspace = Workspace(
-      engine: FakeEngine(),
-      files: files,
-      worldCircuitBackend: backend,
-      worldCircuitFiles: sources,
-    );
+  test('WLD reset restores original ticks and clears selected display', () async {
+    final backend = GenericWorldCircuitBackend();
+    final workspace = Workspace(engine: FakeEngine(), files: FakeFiles(),
+        worldCircuitBackend: backend, worldCircuitFiles: _Sources());
     Map state() => workspace.view.result['worldCircuit'] as Map;
     await workspace.dispatch('worldCircuitChooseWorld');
     await workspace.dispatch('worldCircuitImport');
-    files.next = PickedFile('p.bin', Uint8List.fromList([1, 0, 0, 0]));
-    await workspace.dispatch('worldCircuitLoadProgram');
-    expect(state()['canRunComputer'], isTrue);
+    await workspace.dispatch('worldCircuitStep');
+    expect(state()['ticks'], 1);
+    expect(state()['dirty'], isTrue);
     await workspace.dispatch('worldCircuitReset');
     expect(workspace.view.error, isEmpty);
-    expect(state()['canRunComputer'], isFalse);
-    expect(state()['programName'], isNull);
-    expect(state()['keyboardVerified'], isTrue);
+    expect(state()['ticks'], 0);
+    expect(state()['dirty'], isFalse);
+    expect(state()['displayRegion'], isNull);
+    expect(state().containsKey('programName'), isFalse);
+    expect(backend.opens, 2);
+    expect(backend.closes, 1);
     await workspace.close();
     workspace.dispose();
   });

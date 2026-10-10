@@ -36,6 +36,7 @@ class ComputerDisplay extends StatefulWidget {
   final ComputerPixelDecoder decodePixels;
   final int width, height;
   final String label;
+  final Color backgroundColor;
   const ComputerDisplay({
     super.key,
     required this.rgba,
@@ -43,6 +44,7 @@ class ComputerDisplay extends StatefulWidget {
     required this.height,
     required this.label,
     this.hostStages,
+    this.backgroundColor = Colors.black,
     this.decodePixels = _decodePixels,
   });
 
@@ -140,7 +142,7 @@ class _ComputerDisplayState extends State<ComputerDisplay> {
             ? widget.width / widget.height
             : 16 / 9,
         child: ColoredBox(
-          color: Colors.black,
+          color: widget.backgroundColor,
           child: RawImage(
             image: _image,
             fit: BoxFit.fill,

@@ -23,7 +23,7 @@ LOCAL_CLOUD_DISPATCHES = {
 # Exact actions occurring inside these audited production pointer/key workflows.
 # The recorded duration remains the ENTIRE macro; it is never divided among
 # its actions or relabelled as direct dispatcher duration.
-COMPUTER_WORKFLOW_ACTIONS = {
+LEGACY_COMPUTER_WORKFLOW_ACTIONS = {
     'computer.choose-world': ('worldCircuitChooseWorld',),
     'computer.reselect-exported-world': ('worldCircuitChooseWorld',),
     'computer.cancel-import': ('worldCircuitImport', 'worldCircuitCancel'),
@@ -50,14 +50,34 @@ COMPUTER_WORKFLOW_ACTIONS = {
 }
 
 
+GENERIC_WORKLOAD = 'generic-wld-controls-v1'
+COMPUTER_WORKFLOW_ACTIONS = {
+    'circuit.choose-world': ('worldCircuitChooseWorld',),
+    'circuit.cancel-import': ('worldCircuitImport', 'worldCircuitCancel'),
+    'circuit.import': ('worldCircuitImport',),
+    'circuit.select-display': ('worldCircuitViewport', 'worldCircuitReadDisplay'),
+    'circuit.trigger': ('worldCircuitTrigger',),
+    'circuit.single-tick': ('worldCircuitStep',),
+    'circuit.run-pause': ('worldCircuitToggle', 'worldCircuitPause'),
+    'circuit.save': ('worldCircuitSave',),
+    'circuit.close-exported': ('worldCircuitClose',),
+    'circuit.reselect-exported-world': ('worldCircuitChooseWorld',),
+    'circuit.reimport': ('worldCircuitImport',),
+    'circuit.reset-original': ('worldCircuitReset',),
+    'circuit.close': ('worldCircuitClose',),
+    'circuit.enable-optimization': ('worldCircuitOptimization',),
+}
+
+
 def read_reports(root):
     reports, failures = [], []
     for path in sorted(Path(root).rglob('*.json')):
+        report = None
         try:
             report = json.loads(path.read_text())
             if not isinstance(report, dict):
                 continue
-            if (report.get('schema') == 2 and report.get('inputFormat') == 'wld-only'
+            if (report.get('schema') in (2, 'abc.generic-world-profile.v1') and report.get('inputFormat') == 'wld-only'
                     and report.get('buildMode') == 'profile'):
                 execution_path = path.with_suffix('.execution.json')
                 if not execution_path.is_file():
@@ -67,9 +87,11 @@ def read_reports(root):
                 validate_computer_profile(report, commit, report['cycles'])
                 execution = validate_computer_execution(
                     execution_path, path, 'computerraria-ui', commit)
-                report = {**report, 'suite': 'computerraria-ui',
+                generic = report.get('schema') == 'abc.generic-world-profile.v1'
+                report = {**report, 'suite': 'generic-world-ui' if generic else 'computerraria-ui',
+                    'profileSchema': report['schema'],
                     'schema': 'abc.performance.v1', 'runId': execution['runId'],
-                    'tier': 'public-complete-computerraria',
+                    'tier': 'generic-wld-stress-fixture' if generic else 'public-complete-computerraria',
                     'fixtures': [report['fixture']]}
                 reports.append((str(path), report))
                 continue
@@ -83,7 +105,9 @@ def read_reports(root):
                 validate_core(report)
             reports.append((str(path), report))
         except (ValueError, AssertionError, KeyError, TypeError, OSError) as error:
-            failures.append({'report': str(path), 'reason': str(error)})
+            failures.append({'report': str(path), 'reason': str(error),
+                             'reportedStatus': report.get('status') if isinstance(report, dict) else None,
+                             'reportedFailure': report.get('failure') if isinstance(report, dict) else None})
     return reports, failures
 
 
@@ -108,6 +132,7 @@ def evidence_row(path, report, operation, kind, **extra):
         'category': kind, 'controller': None, 'action': None,
         'operation': operation['id'], 'variant': operation.get('variant', {}),
         'suite': report['suite'], 'runtime': runtime,
+        'workloadId': report.get('workloadId', 'legacy-computerraria-ui' if report['suite'] == 'computerraria-ui' else None),
         'buildMode': report.get('buildMode'), 'tier': report.get('tier'),
         'fixture': operation.get('fixture', 'public-synthetic profile scenario'),
         'phase': operation.get('phase', 'warm'),
@@ -134,16 +159,20 @@ def build_coverage(inventory, reports, rejected):
         for operation in action['operationIds']:
             declarations.setdefault(operation, []).append(action)
     for path, report in reports:
-        is_ui = report['suite'] in ('flutter-ui', 'computerraria-ui')
+        is_ui = report['suite'] in ('flutter-ui', 'computerraria-ui', 'generic-world-ui')
+        historical = (report['suite'] == 'computerraria-ui' and
+                      inventory.get('worldCircuitWorkloadId') == GENERIC_WORKLOAD)
         for operation in report['operations']:
-            if report['suite'] == 'computerraria-ui':
+            if report['suite'] in ('computerraria-ui', 'generic-world-ui'):
                 macro = operation['id'].rsplit('.', 1)[0]
-                for name in COMPUTER_WORKFLOW_ACTIONS.get(macro, ()):
+                mapping = COMPUTER_WORKFLOW_ACTIONS if report['suite'] == 'generic-world-ui' else LEGACY_COMPUTER_WORKFLOW_ACTIONS
+                for name in mapping.get(macro, ()):
                     key = ('Workspace', name)
                     if key not in actions:
                         continue
-                    profile_workflow.add(key)
-                    rows.append(evidence_row(path, report, operation, 'controller-profile-workflow',
+                    if not historical:
+                        profile_workflow.add(key)
+                    rows.append(evidence_row(path, report, operation, 'historical-profile-workflow' if historical else 'controller-profile-workflow',
                         controller=key[0], action=key[1],
                         measurementScope='Contains this exact action in a verified full-world UI workflow; duration is the whole macro, not isolated dispatch latency'))
             explicit = (operation.get('controller'), operation.get('action'))
@@ -190,8 +219,9 @@ def build_coverage(inventory, reports, rejected):
                                              gap='Controller identity not uniquely mapped to inventory'))
                     continue
                 key = candidates[0]
-                direct_profile.add(key)
-                rows.append(evidence_row(path, report, operation, 'controller-profile',
+                if not historical:
+                    direct_profile.add(key)
+                rows.append(evidence_row(path, report, operation, 'historical-profile-dispatch' if historical else 'controller-profile',
                                          controller=key[0], action=key[1],
                                          frameScopes=sorted({sample['macroScope'] for sample in
                                                              operation.get('samples', [])

@@ -43,6 +43,35 @@ REQUIRED_SOURCES = {
 }
 
 
+RELOCATED_REQUIRED_SOURCES = (REQUIRED_SOURCES - {
+    'lib/domain/computerraria_computer.dart', 'assets/computer/pong.bin',
+}) | {'test/support/computerraria/layout.dart', 'test/fixtures/computerraria/pong.bin'}
+GENERIC_REQUIRED_SOURCES = (REQUIRED_SOURCES - {
+    'lib/domain/computerraria_computer.dart', 'assets/computer/pong.bin',
+}) | {'lib/domain/circuit_display.dart', 'lib/engine/world_circuit_session.dart',
+      'lib/engine/world_circuit_backend.dart', 'integration_test/support/generic_circuit_profile.dart'}
+GENERIC_SCHEMA = 'abc.generic-world-memory.v1'
+GENERIC_WORKLOAD = 'generic-wld-controls-v1'
+
+
+def validate_generic_region(region, width, height):
+    integer(width, 'world width', 1)
+    integer(height, 'world height', 1)
+    for key in ('x', 'y', 'width', 'height'):
+        integer(region[key], 'display region ' + key, 1 if key in ('width', 'height') else 0)
+    require(region['width'] * region['height'] <= 65536 and
+            region['x'] + region['width'] <= width and region['y'] + region['height'] <= height,
+            'display region exceeds world or bounded pixel area')
+
+
+def validate_generic_trigger(trigger, width, height):
+    integer(trigger['x'], 'trigger x')
+    integer(trigger['y'], 'trigger y')
+    require(trigger['x'] < width and trigger['y'] < height and
+            type(trigger['mask']) is int and 1 <= trigger['mask'] <= 15 and
+            type(trigger['direct']) is bool, 'invalid generic trigger parameters')
+
+
 def require(condition, message):
     if not condition:
         raise ValueError(message)
@@ -146,6 +175,10 @@ def summarize_points(points):
 class Validator:
     def __init__(self, report, raw_directory, build, expected_commit, build_sha256):
         self.report, self.root, self.build = report, Path(raw_directory), build
+        self.generic = report.get('schema') == GENERIC_SCHEMA
+        fixture = report.get('fixture', {})
+        self.world_sha = fixture.get('wldSha256') if self.generic else WLD_SHA
+        self.world_bytes = fixture.get('wldBytes') if self.generic else WLD_BYTES
         self.expected_commit, self.build_sha256 = expected_commit, build_sha256
         self.errors, self.warnings, self.files = [], [], []
         self.rss_sampling_warnings = []
@@ -184,12 +217,17 @@ class Validator:
                 'build source does not match expected commit')
         require(source['dirty'] is False, 'build source is dirty or unknown')
         files = build['sourceFilesSha256']
-        require(isinstance(files, dict) and REQUIRED_SOURCES <= set(files), 'required source hashes missing')
+        required = GENERIC_REQUIRED_SOURCES if self.generic else REQUIRED_SOURCES
+        require(isinstance(files, dict) and (required <= set(files) or
+                (not self.generic and RELOCATED_REQUIRED_SOURCES <= set(files))),
+                'required source hashes missing')
         for path, value in files.items():
             require(isinstance(path, str) and not Path(path).is_absolute() and '..' not in Path(path).parts,
                     'source manifest contains an unsafe path')
             sha(value)
-        require(files['assets/computer/pong.bin'] == PONG_SHA, 'build Pong source hash differs')
+        if not self.generic:
+            pong_path = 'assets/computer/pong.bin' if REQUIRED_SOURCES <= set(files) else 'test/fixtures/computerraria/pong.bin'
+            require(files[pong_path] == PONG_SHA, 'build Pong source hash differs')
         tree = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         require(tree == build['sourceTreeSha256'], 'source tree digest mismatch')
         require(build['cmake']['CMAKE_BUILD_TYPE'] == 'Profile', 'actual CMake build is not Profile')
@@ -221,19 +259,28 @@ class Validator:
 
     def validate_header(self):
         report = self.report
-        require(report['schema'] == 'abc.computer-memory-diagnostic.v1', 'unknown report schema')
+        require(report['schema'] in ('abc.computer-memory-diagnostic.v1', GENERIC_SCHEMA), 'unknown report schema')
         require(report['status'] == 'observed' and report.get('failure') is None
                 and report.get('failureStack') is None, 'failed or partial run cannot pass')
         integer(report['hostPid'], 'host PID', 1)
         require(report['buildMode'] == 'profile' and report['inputFormat'] == 'wld-only'
                 and report['circuitAbi'] == 2, 'real profile WLD ABI 2 required')
         require(report['plannedCycles'] == report['completedCycles'] == 8, 'exactly eight complete cycles required')
-        require(report['physicalPulsesPerCycle'] == 4096 and report['excludedWarmupCycles'] == 0,
-                'fixed 32 x 128 pulses and no excluded warmup required')
         fixture = report['fixture']
-        require(fixture['wldBytes'] == WLD_BYTES and fixture['wldSha256'] == WLD_SHA
-                and fixture['pongSha256'] == PONG_SHA, 'pinned full fixture bytes/hashes differ')
-        require(fixture['sourceRevision'] == SOURCE_REVISION, 'pinned upstream source revision differs')
+        if self.generic:
+            require(report.get('workloadId') == GENERIC_WORKLOAD, 'wrong generic memory workload')
+            require(report.get('ticksPerCycle') == 32 and report['excludedWarmupCycles'] == 0,
+                    'fixed 32 single ticks with no excluded warmup required')
+            require('physicalPulsesPerCycle' not in report and 'pongSha256' not in fixture,
+                    'generic memory cannot inherit the CPU workload')
+            integer(fixture['wldBytes'], 'world bytes', 1)
+            sha(fixture['wldSha256'])
+        else:
+            require(report['physicalPulsesPerCycle'] == 4096 and report['excludedWarmupCycles'] == 0,
+                    'fixed 32 x 128 pulses and no excluded warmup required')
+            require(fixture['wldBytes'] == WLD_BYTES and fixture['wldSha256'] == WLD_SHA
+                    and fixture['pongSha256'] == PONG_SHA, 'pinned full fixture bytes/hashes differ')
+            require(fixture['sourceRevision'] == SOURCE_REVISION, 'pinned upstream source revision differs')
         require(self.root.is_dir() and report['raw']['directory'] == self.root.name,
                 'raw directory is missing or belongs to a different run')
         drain = report['drainPolicy']
@@ -298,14 +345,27 @@ class Validator:
         scenario = 'reset-original' if cycle // 2 % 2 == 0 else 'save-reopen'
         require(row['mode'] == mode and row['scenario'] == scenario, 'OFF/ON pair-matched workload differs')
         require(row['status'] == 'completed', 'cycle did not complete')
-        for name in ('physicalPulseDelta', 'nativeClockDelta', 'modelPhysicalPulseDelta'):
-            require(integer(row[name], name) == 4096, 'real fixed pulse evidence differs')
-        require(row['pulseBatchCount'] == 32 and row['pulseBatchSize'] == 128, 'fixed pulse batch shape differs')
-        for name in ('optimizationEnabledDuringPulse', 'nativeOptimizationEnabledDuringPulse',
-                     'nativeWireHeadPixelRulesDuringPulse'):
-            require(row[name] is bool(cycle % 2), 'model/native pulse mode differs')
-        require(row['programName'] == 'Pong (upstream RV32I).bin', 'wrong program')
-        sha(row['pausedMonoSha256'])
+        if self.generic:
+            for name in ('tickDelta', 'nativeTickDelta', 'modelTickDelta'):
+                require(integer(row[name], name) == 32, 'fixed generic tick evidence differs')
+            require(row['tickBatchCount'] == 32 and row['tickBatchSize'] == 1, 'generic tick batch shape differs')
+            for name in ('optimizationEnabledDuringTicks', 'nativeOptimizationEnabledDuringTicks',
+                         'nativeWireHeadPixelRulesDuringTicks'):
+                require(row[name] is bool(cycle % 2), 'model/native tick mode differs')
+            require('programName' not in row and 'physicalPulseDelta' not in row,
+                    'generic memory contains CPU program/pulse evidence')
+            validate_generic_region(row['displayRegion'], row['worldWidth'], row['worldHeight'])
+            validate_generic_trigger(row['trigger'], row['worldWidth'], row['worldHeight'])
+            sha(row['pausedPixelSha256'])
+        else:
+            for name in ('physicalPulseDelta', 'nativeClockDelta', 'modelPhysicalPulseDelta'):
+                require(integer(row[name], name) == 4096, 'real fixed pulse evidence differs')
+            require(row['pulseBatchCount'] == 32 and row['pulseBatchSize'] == 128, 'fixed pulse batch shape differs')
+            for name in ('optimizationEnabledDuringPulse', 'nativeOptimizationEnabledDuringPulse',
+                         'nativeWireHeadPixelRulesDuringPulse'):
+                require(row[name] is bool(cycle % 2), 'model/native pulse mode differs')
+            require(row['programName'] == 'Pong (upstream RV32I).bin', 'wrong program')
+            sha(row['pausedMonoSha256'])
         if cycle == 0:
             require(row['cancelledImportObserved'] is True, 'first-cycle cancellation evidence missing')
             require(row['cancelRequestedAfterNativeOpenStarted'] is True, 'native import was not observed before cancellation')
@@ -315,7 +375,8 @@ class Validator:
             require(row['resetRestoredOriginal'] is True, 'reset did not restore original')
         else:
             sha(row['savedWldSha256'])
-            require(row['reopenPreservedPausedState'] is True, 'saved reopen did not preserve paused state')
+            preserved = 'reopenPreservedSelectedPixels' if self.generic else 'reopenPreservedPausedState'
+            require(row[preserved] is True, 'saved reopen did not preserve paused state')
         active = None
         active_cancelled = False
         opened = closed = cancelled = cancelled_ready = cancelled_closed = 0
@@ -349,10 +410,10 @@ class Validator:
                             'unexpected failed native open')
                     continue
                 require(event['outcome'] == 'ready' and event['circuitAbi'] == 2, 'native open never reached ABI 2 ready')
-                expected_hash = row['savedWldSha256'] if opened == 1 and scenario == 'save-reopen' else WLD_SHA
+                expected_hash = row['savedWldSha256'] if opened == 1 and scenario == 'save-reopen' else self.world_sha
                 require(event['sourceSha256'] == expected_hash, 'native source hash differs')
-                if expected_hash == WLD_SHA:
-                    require(event['sourceBytes'] == WLD_BYTES, 'native open is not full pinned WLD')
+                if expected_hash == self.world_sha:
+                    require(event['sourceBytes'] == self.world_bytes, 'native open is not the full declared WLD')
                 active = integer(event['session'], 'native session', 1)
                 active_cancelled = is_cancel_attempt
                 if is_cancel_attempt:
@@ -502,6 +563,8 @@ class Validator:
                 self.late_boundaries[f'{index}:{boundary["cycle"]}:{boundary["phase"]}'] += 1
 
     def validate_records(self):
+        if self.generic:
+            return self.validate_generic_records()
         require(not self.records['failureDiagnostic'], 'failure diagnostics were recorded')
         windows, dispatches = self.records['window'], self.records['dispatch']
         expected_windows = Counter()
@@ -564,6 +627,64 @@ class Validator:
                     'raw display trace and cycle display summary differ')
             require(evidence['pausedMonoSha256'] == rows[-1]['monoSha256'], 'paused viewport differs from final pulse batch')
             require(not cycle % 2 or (distinct > 1 and lit > 0), 'ON workload lacks real changing/lit display evidence')
+
+    def validate_generic_records(self):
+        require(not self.records['failureDiagnostic'], 'failure diagnostics were recorded')
+        windows, dispatches = self.records['window'], self.records['dispatch']
+        expected_windows, expected_dispatches = Counter(), Counter()
+        for cycle in range(8):
+            mode = 'optimized' if cycle % 2 else 'standard'
+            actions = ['worldCircuitChooseWorld', 'worldCircuitImport',
+                       'worldCircuitViewport', 'worldCircuitReadDisplay', 'worldCircuitTrigger',
+                       *(['worldCircuitStep'] * 32), 'worldCircuitPause', 'worldCircuitClose']
+            if cycle == 0:
+                actions.append('worldCircuitChooseWorld')
+            if cycle % 2:
+                actions.append('worldCircuitOptimization')
+            actions += (['worldCircuitReset', 'worldCircuitViewport', 'worldCircuitReadDisplay'] if cycle // 2 % 2 == 0 else
+                        ['worldCircuitSave', 'worldCircuitClose', 'worldCircuitChooseWorld',
+                         'worldCircuitImport', 'worldCircuitViewport', 'worldCircuitReadDisplay'])
+            expected_windows.update((cycle, f'{action}.{mode}') for action in actions)
+            expected_dispatches.update((cycle, action, f'{action}.{mode}') for action in actions)
+        expected_dispatches.update({(0, 'worldCircuitImport', None): 1, (0, 'worldCircuitCancel', None): 1})
+        require(Counter((w['cycle'], w['id']) for w in windows) == expected_windows,
+                'missing/duplicate generic action windows')
+        require(Counter((d['cycle'], d['action'], d['macroScope']) for d in dispatches) == expected_dispatches,
+                'missing/duplicate/unexpected generic controller dispatches')
+        previous_end = -1
+        for window in windows:
+            start, end = integer(window['startUs'], 'window start'), integer(window['endUs'], 'window end')
+            require(previous_end <= start <= end, 'generic window timing overlaps or moved backwards')
+            previous_end = end
+            require(window['success'] is True and window['warmup'] is False, 'failed/excluded generic window')
+            for name in ('rssBeforeBytes', 'rssAfterBytes'):
+                integer(window[name], name, 1)
+        for dispatch in dispatches:
+            require(dispatch['completion'] == 'returned' and dispatch['warmup'] is False, 'failed/excluded generic dispatch')
+            require(dispatch['variant']['profileMode'] == ('optimized' if dispatch['cycle'] % 2 else 'standard'),
+                    'generic dispatch mode differs')
+            finite(dispatch['durationMs'], 'dispatch duration')
+        trace = self.records['viewportSnapshot']
+        require([(row['cycle'], row['batch']) for row in trace] ==
+                [(cycle, batch) for cycle in range(8) for batch in range(32)],
+                'missing/duplicated/reordered generic pixel tick trace')
+        for cycle in range(8):
+            rows = trace[cycle * 32:(cycle + 1) * 32]
+            evidence = self.report['cycles'][cycle]
+            region = evidence['displayRegion']
+            area = region['width'] * region['height']
+            for batch, row in enumerate(rows):
+                require(row['mode'] == ('optimized' if cycle % 2 else 'standard'), 'pixel trace mode differs')
+                for name in ('ticks', 'nativeTickDelta', 'modelTickDelta'):
+                    require(integer(row[name], name) == batch + 1, 'generic native/model tick mismatch')
+                sha(row['pixelSha256'])
+                require(integer(row['litPixels'], 'lit pixels') <= area, 'pixel count exceeds selected region')
+            distinct, lit = len({row['pixelSha256'] for row in rows}), max(row['litPixels'] for row in rows)
+            require(evidence['distinctPixelStates'] == distinct and evidence['maximumLitPixels'] == lit,
+                    'generic pixel trace and cycle summary differ')
+            require(evidence['pausedPixelSha256'] == rows[-1]['pixelSha256'], 'paused selected pixels differ from final tick')
+            # A generic circuit may have zero PixelBoxes or a static display.
+            # Successful command completion is not proof of animation or fluency.
 
     def validate_os(self):
         os_report = self.report['raw']['os']
@@ -734,7 +855,10 @@ class Validator:
         points = self.guard('point summary', lambda: summarize_points(self.report.get('memoryPoints', [])))
         if self.duplicate_count:
             self.warnings.append('Repeated engine frameNumber values were retained; received sequence is the record identity.')
-        return {'schema': 'abc.computer-memory-validation.v1',
+        return {'schema': 'abc.generic-world-memory-validation.v1' if self.generic else 'abc.computer-memory-validation.v1',
+                'workloadId': GENERIC_WORKLOAD if self.generic else 'legacy-computerraria-memory-v1',
+                'historicalComparability': 'same-schema-and-workload-only',
+                'targetDeviceFluencyStatus': 'not-established',
                 'status': 'validated-bounded-observation' if not self.errors else 'failed',
                 'evidenceValid': not self.errors, 'plateauEstablished': False,
                 'reportedStatus': self.report.get('status'), 'reportedFailure': self.report.get('failure'),

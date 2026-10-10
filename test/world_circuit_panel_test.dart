@@ -1,259 +1,297 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:terraforge/ui/computer_display.dart';
 import 'package:terraforge/ui/world_circuit_panel.dart';
 
-import '../integration_test/support/computer_profile_interaction.dart';
+Uint8List _switchRecord(int x, int y, {int type = 135, int frameY = 0}) {
+  final bytes = Uint8List(16), data = ByteData(16);
+  data.setUint32(0, x, Endian.little);
+  data.setUint32(4, y, Endian.little);
+  data.setUint32(8, type | (1 << 16) | (1 << 24), Endian.little);
+  data.setInt16(14, frameY, Endian.little);
+  bytes.setAll(0, data.buffer.asUint8List());
+  return bytes;
+}
+
+Map<String, Object?> _state() => {
+  'open': true,
+  'busy': false,
+  'dirty': false,
+  'optimizationSupported': true,
+  'width': 600,
+  'height': 400,
+  'records': _switchRecord(40, 50),
+  'viewport': {'x': 40, 'y': 50, 'width': 4, 'height': 3},
+};
+
+Widget _panel(
+  Map<String, Object?> state,
+  List<(String, Map<String, Object?>)> calls,
+) => MaterialApp(
+  home: Scaffold(
+    body: SingleChildScrollView(
+      child: WorldCircuitPanel(
+        state: state,
+        dispatch: (action, args) async {
+          calls.add((action, args));
+        },
+      ),
+    ),
+  ),
+);
+
+Future<void> _reveal(WidgetTester tester, Finder target) async {
+  await tester.ensureVisible(target, alignment: .5);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _finish(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox());
+  await tester.pump();
+  expect(tester.takeException(), isNull);
+}
 
 void main() {
-  for (final size in [
-    const Size(1440, 1000),
-    const Size(1280, 508),
-    const Size(800, 508),
-  ]) {
-    testWidgets(
-      'real monitor tap routes explicit physical key edges at $size',
-      (tester) async {
-        tester.view.physicalSize = size;
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final previousFatal = WidgetController.hitTestWarningShouldBeFatal;
-        WidgetController.hitTestWarningShouldBeFatal = true;
-        addTearDown(() {
-          WidgetController.hitTestWarningShouldBeFatal = previousFatal;
+  for (final size in [const Size(1440, 1000), const Size(390, 844)]) {
+    testWidgets('generic selection and sparse pixels fit at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final previousFatal = WidgetController.hitTestWarningShouldBeFatal;
+      WidgetController.hitTestWarningShouldBeFatal = true;
+      addTearDown(() {
+        WidgetController.hitTestWarningShouldBeFatal = previousFatal;
+      });
+      final calls = <(String, Map<String, Object?>)>[];
+      final frame = Uint8List(4 * 3 * 4)..[47] = 255;
+      final state = _state()
+        ..addAll({
+          'displayRegion': {
+            'name': 'selected pixels',
+            'x': 40, 'y': 50, 'width': 4, 'height': 3,
+          },
+          'displayFrame': frame,
+          'displayPixelCount': 1,
+          'displayIdentity': Object(),
         });
-        final calls = <(String, Map<String, Object?>)>[];
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    SizedBox(height: size.height),
-                    WorldCircuitPanel(
-                      state: {
-                        'open': true,
-                        'computerVerified': true,
-                        'canRunComputer': true,
-                        'optimizationSupported': true,
-                        'keyboardVerified': true,
-                        'programName': 'p.bin',
-                        'width': 15200,
-                        'height': 7200,
-                      },
-                      dispatch: (action, args) async {
-                        calls.add((action, args));
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-        final screen = findComputerProfileMonitor('黑白显示器，显示实际物理像素状态');
-        expect(screen.hitTestable(), findsNothing);
-        expect(Focus.of(tester.element(screen)).hasFocus, isFalse);
-        await focusComputerProfileMonitor(tester, screen);
-        const keys = [
-          ('up', LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp),
-          ('down', LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown),
-          ('left', LogicalKeyboardKey.arrowLeft, PhysicalKeyboardKey.arrowLeft),
-          (
-            'right',
-            LogicalKeyboardKey.arrowRight,
-            PhysicalKeyboardKey.arrowRight,
-          ),
-        ];
-        for (final key in keys) {
-          await tester.sendKeyDownEvent(key.$2, physicalKey: key.$3);
-          await tester.sendKeyUpEvent(key.$2, physicalKey: key.$3);
-        }
-        expect(
-          calls.where((e) => e.$1 == 'worldCircuitInput').map((e) => e.$2),
-          [
-            for (final key in keys) ...[
-              {'direction': key.$1, 'pressed': true},
-              {'direction': key.$1, 'pressed': false},
-            ],
-          ],
-        );
-        await tester.sendKeyDownEvent(
-          LogicalKeyboardKey.arrowUp,
-          physicalKey: PhysicalKeyboardKey.arrowUp,
-        );
-        final coordinate = find.byType(TextField).first;
-        await revealComputerProfileTarget(tester, coordinate);
-        await tester.tap(coordinate);
-        await tester.pump();
-        expect(Focus.of(tester.element(screen)).hasFocus, isFalse);
-        expect(calls.any((e) => e.$1 == 'worldCircuitReleaseKeys'), isTrue);
-        await tester.sendKeyUpEvent(
-          LogicalKeyboardKey.arrowUp,
-          physicalKey: PhysicalKeyboardKey.arrowUp,
-        );
-        calls.clear();
-        await tester.sendKeyDownEvent(
-          LogicalKeyboardKey.arrowDown,
-          physicalKey: PhysicalKeyboardKey.arrowDown,
-        );
-        await tester.sendKeyUpEvent(
-          LogicalKeyboardKey.arrowDown,
-          physicalKey: PhysicalKeyboardKey.arrowDown,
-        );
-        expect(calls.where((e) => e.$1 == 'worldCircuitInput'), isEmpty);
-        await tester.pumpWidget(const SizedBox());
-        await tester.pump();
-        expect(calls.any((e) => e.$1 == 'worldCircuitReleaseKeys'), isTrue);
-        expect(tester.takeException(), isNull);
-      },
-    );
+      await tester.pumpWidget(_panel(state, calls));
+      await tester.pumpAndSettle();
+      final target = find.bySemanticsLabel('实际世界电路视口，点击选择设备或线路');
+      await _reveal(tester, target);
+      final viewportRect = tester.getRect(target);
+      expect(viewportRect.width, lessThanOrEqualTo(size.width));
+      await tester.tapAt(Offset(
+        viewportRect.left + viewportRect.width / 8,
+        viewportRect.top + viewportRect.height / 6,
+      ));
+      await tester.pump();
+      expect(calls, isEmpty, reason: 'Selecting a cell does not trigger wiring');
+      expect(find.textContaining('选中 (40, 50)'), findsOneWidget);
+      await _reveal(tester, find.text('操作所选设备'));
+      await tester.tap(find.text('操作所选设备'));
+      await tester.pump();
+      expect(calls.last.$1, 'worldCircuitTrigger');
+      expect(calls.last.$2, {'x': 40, 'y': 50, 'mask': 15});
+      await _reveal(tester, find.text('发送线路脉冲'));
+      await tester.tap(find.text('发送线路脉冲'));
+      await tester.pump();
+      expect(calls.last.$1, 'worldCircuitTrigger');
+      expect(calls.last.$2, {
+        'x': 40, 'y': 50, 'mask': 15, 'direct': true,
+      });
+
+      final display = find.byType(ComputerDisplay);
+      await _reveal(tester, display);
+      final displayRect = tester.getRect(display);
+      expect(displayRect.width, greaterThan(0));
+      expect(displayRect.width, lessThanOrEqualTo(size.width));
+      expect(displayRect.width / displayRect.height, closeTo(4 / 3, .001));
+      expect(tester.widget<ComputerDisplay>(display).rgba, same(frame));
+      expect(find.textContaining('实际像素盒 1 个'), findsOneWidget);
+      await _reveal(tester, find.text('刷新像素区域'));
+      await tester.tap(find.text('刷新像素区域'));
+      await tester.pump();
+      expect(calls.last.$1, 'worldCircuitRefreshDisplay');
+      await _finish(tester);
+    }, timeout: const Timeout(Duration(seconds: 30)));
   }
 
-  testWidgets(
-    'physical computer controls show actual frames and allow pause while engine busy',
-    (tester) async {
-      final calls = <String>[];
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: WorldCircuitPanel(
-                state: {
-                  'open': true,
-                  'busy': true,
-                  'running': true,
-                  'computerVerified': true,
-                  'canRunComputer': true,
-                  'optimizationSupported': true,
-                  'programName': 'Pong.bin',
-                  'width': 15200,
-                  'height': 7200,
-                  'displayFrames': {'黑白显示器': Uint8List(64 * 48 * 4)},
-                },
-                dispatch: (action, args) async {
-                  calls.add(action);
-                },
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.tap(find.text('暂停'));
-      await tester.pump();
-      expect(calls, ['worldCircuitPause']);
-      expect(find.text('载入 Pong 程序'), findsOneWidget);
-      expect(find.textContaining('键盘映射待实际传感器校准'), findsOneWidget);
-      expect(find.bySemanticsLabel('黑白显示器，显示实际物理像素状态'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-      await tester.pump();
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  for (final supported in [false, true]) {
-    testWidgets(
-      'pixel mode explains semantics and topology support: $supported',
-      (tester) async {
-        final calls = <(String, Map<String, Object?>)>[];
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: SingleChildScrollView(
-                child: WorldCircuitPanel(
-                  state: {
-                    'open': true,
-                    'computerVerified': true,
-                    'optimizationSupported': supported,
-                    'optimizationEnabled': false,
-                    'width': 15200,
-                    'height': 7200,
-                  },
-                  dispatch: (action, args) async => calls.add((action, args)),
-                ),
-              ),
-            ),
-          ),
-        );
-        expect(find.textContaining('后续运行结果可能不同'), findsOneWidget);
-        expect(find.textContaining('历史显示不会重算'), findsOneWidget);
-        final toggle = tester.widget<SwitchListTile>(
-          find.byType(SwitchListTile),
-        );
-        expect(toggle.value, isFalse);
-        if (supported) {
-          expect(toggle.onChanged, isNotNull);
-          expect(find.textContaining('原版规则下可能保持黑屏'), findsOneWidget);
-          expect(find.textContaining('请先开启电路优化，再载入程序'), findsOneWidget);
-          await tester.ensureVisible(find.byType(SwitchListTile));
-          await tester.tap(find.byType(SwitchListTile));
-          await tester.pump();
-          expect(calls.single.$1, 'worldCircuitOptimization');
-          expect(calls.single.$2, {'enabled': true});
-        } else {
-          expect(toggle.onChanged, isNull);
-          expect(find.textContaining('同色跨轴网络尚未支持'), findsOneWidget);
-          expect(calls, isEmpty);
-        }
-        await tester.pumpWidget(const SizedBox());
-        await tester.pump();
-        expect(tester.takeException(), isNull);
-      },
-    );
-  }
-
-  testWidgets('real circuit viewport renders and dispatches tile coordinates', (
+  testWidgets('generic controls pause even while the engine is busy', (
     tester,
   ) async {
-    final bytes = Uint8List(16), data = ByteData(16);
-    data.setUint32(0, 2, Endian.little);
-    data.setUint32(4, 10, Endian.little);
-    data.setUint32(8, 144 | (1 << 16) | (1 << 24), Endian.little);
-    bytes.setAll(0, data.buffer.asUint8List());
-    final calls = <String>[], args = <Map<String, Object?>>[];
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: WorldCircuitPanel(
-              state: {
-                'open': true,
-                'busy': false,
-                'dirty': true,
-                'width': 7,
-                'height': 32,
-                'records': bytes,
-                'viewport': {'x': 2, 'y': 10, 'width': 1, 'height': 1},
-              },
-              dispatch: (name, values) async {
-                calls.add(name);
-                args.add(values);
-              },
-            ),
-          ),
-        ),
-      ),
+    final calls = <(String, Map<String, Object?>)>[];
+    await tester.pumpWidget(_panel(
+      _state()..addAll({'busy': true, 'running': true}), calls,
+    ));
+    await tester.tap(find.text('暂停'));
+    await tester.pump();
+    expect(calls.single.$1, 'worldCircuitPause');
+    final step = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, '单步 1 tick'),
     );
-    await tester.tap(find.text('单步'));
+    expect(step.onPressed, isNull);
+    await _finish(tester);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  for (final supported in [false, true]) {
+    testWidgets('pixel mode explains current topology support: $supported', (
+      tester,
+    ) async {
+      final calls = <(String, Map<String, Object?>)>[];
+      await tester.pumpWidget(_panel(
+        _state()..['optimizationSupported'] = supported, calls,
+      ));
+      expect(find.textContaining('后续运行结果可能不同'), findsOneWidget);
+      expect(find.textContaining('现有像素不会重算'), findsOneWidget);
+      final toggle = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+      expect(toggle.value, isFalse);
+      if (supported) {
+        expect(toggle.onChanged, isNotNull);
+        await _reveal(tester, find.byType(SwitchListTile));
+        await tester.tap(find.byType(SwitchListTile));
+        await tester.pump();
+        expect(calls.single.$1, 'worldCircuitOptimization');
+        expect(calls.single.$2, {'enabled': true});
+      } else {
+        expect(toggle.onChanged, isNull);
+        expect(find.textContaining('同色跨轴网络尚未支持'), findsOneWidget);
+        expect(calls, isEmpty);
+      }
+      await _finish(tester);
+    }, timeout: const Timeout(Duration(seconds: 30)));
+  }
+
+  testWidgets('region inputs dispatch explicit rectangles and reject overflow', (
+    tester,
+  ) async {
+    final calls = <(String, Map<String, Object?>)>[];
+    await tester.pumpWidget(_panel(_state(), calls));
+    for (final entry in ['100', '75', '6', '4'].asMap().entries) {
+      final field = find.byType(TextField).at(entry.key);
+      await _reveal(tester, field);
+      await tester.enterText(field, entry.value);
+    }
+    await _reveal(tester, find.text('读取区域像素'));
+    await tester.tap(find.text('读取区域像素'));
     await tester.pump();
-    expect(calls.last, 'worldCircuitStep');
-    final target = find.bySemanticsLabel('实际世界电路视口，点击格子触发开关');
-    await tester.ensureVisible(target);
-    await tester.tap(target);
+    expect(calls.single.$1, 'worldCircuitReadDisplay');
+    expect(calls.single.$2, {'x': 100, 'y': 75, 'width': 6, 'height': 4});
+    await _reveal(tester, find.text('查看接线'));
+    await tester.tap(find.text('查看接线'));
     await tester.pump();
-    expect(calls.last, 'worldCircuitTrigger');
-    expect(args.last, {'x': 2, 'y': 10, 'mask': 15});
-    await tester.ensureVisible(find.text('关闭'));
+    expect(calls.last.$1, 'worldCircuitViewport');
+    expect(calls.last.$2, calls.first.$2);
+    final field = find.byType(TextField).first;
+    await _reveal(tester, field);
+    await tester.enterText(field, '599');
+    await _reveal(tester, find.text('读取区域像素'));
+    await tester.tap(find.text('读取区域像素'));
+    await tester.pump();
+    expect(calls, hasLength(2));
+    expect(find.textContaining('请输入世界范围内的区域'), findsOneWidget);
+    await _finish(tester);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  testWidgets('new view synchronizes coordinates and empty pixel region is clear', (
+    tester,
+  ) async {
+    final calls = <(String, Map<String, Object?>)>[];
+    await tester.pumpWidget(_panel(_state(), calls));
+    final next = _state()
+      ..['viewport'] = {'x': 100, 'y': 75, 'width': 6, 'height': 4}
+      ..['records'] = _switchRecord(100, 75)
+      ..['displayRegion'] = {
+        'name': 'empty pixels', 'x': 100, 'y': 75, 'width': 6, 'height': 4,
+      }
+      ..['displayFrame'] = Uint8List(6 * 4 * 4)
+      ..['displayPixelCount'] = 0;
+    await tester.pumpWidget(_panel(next, calls));
+    expect(
+      tester.widgetList<TextField>(find.byType(TextField))
+          .map((field) => field.controller!.text),
+      ['100', '75', '6', '4'],
+    );
+    expect(find.text('选区无原版像素装置。'), findsOneWidget);
+    expect(find.byType(ComputerDisplay), findsNothing);
+    await _finish(tester);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  testWidgets('discovered timer selection requires an explicit operation', (
+    tester,
+  ) async {
+    final calls = <(String, Map<String, Object?>)>[];
+    final state = _state()..['records'] = _switchRecord(42, 50, type: 144);
+    await tester.pumpWidget(_panel(state, calls));
+    expect(find.textContaining('导入的定时器默认关闭'), findsOneWidget);
+    expect(find.textContaining('当前视口发现 1 个可操作输入格'), findsOneWidget);
+    final timer = find.text('定时器（关闭）');
+    await _reveal(tester, timer);
+    await tester.tap(timer);
+    await tester.pump();
+    expect(calls, isEmpty);
+    expect(find.textContaining('选中 (42, 50)'), findsOneWidget);
+    await _reveal(tester, find.text('操作所选设备'));
+    await tester.tap(find.text('操作所选设备'));
+    await tester.pump();
+    expect(calls.single.$1, 'worldCircuitTrigger');
+    expect(calls.single.$2, {'x': 42, 'y': 50, 'mask': 15});
+    final started = Map<String, Object?>.of(state)
+      ..['records'] = _switchRecord(42, 50, type: 144, frameY: 18);
+    await tester.pumpWidget(_panel(started, calls));
+    expect(find.text('定时器（已启动）'), findsOneWidget);
+    await _finish(tester);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  testWidgets('viewport navigation moves by the displayed rectangle', (
+    tester,
+  ) async {
+    final calls = <(String, Map<String, Object?>)>[];
+    await tester.pumpWidget(_panel(_state(), calls));
+    for (final move in [
+      ('左移视口', 36, 50),
+      ('右移视口', 44, 50),
+      ('上移视口', 40, 47),
+      ('下移视口', 40, 53),
+    ]) {
+      await _reveal(tester, find.text(move.$1));
+      await tester.tap(find.text(move.$1));
+      await tester.pump();
+      expect(calls.last.$1, 'worldCircuitViewport');
+      expect(calls.last.$2,
+          {'x': move.$2, 'y': move.$3, 'width': 4, 'height': 3});
+    }
+    final edge = _state()
+      ..['viewport'] = {'x': 0, 'y': 0, 'width': 4, 'height': 3};
+    await tester.pumpWidget(_panel(edge, calls));
+    for (final label in ['左移视口', '上移视口']) {
+      final button = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, label),
+      );
+      expect(button.onPressed, isNull);
+    }
+    await _finish(tester);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  testWidgets('single tick and dirty close retain their explicit actions', (
+    tester,
+  ) async {
+    final calls = <(String, Map<String, Object?>)>[];
+    await tester.pumpWidget(_panel(_state()..['dirty'] = true, calls));
+    await tester.tap(find.text('单步 1 tick'));
+    await tester.pump();
+    expect(calls.last.$1, 'worldCircuitStep');
+    await _reveal(tester, find.text('关闭'));
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
     expect(find.text('当前模拟尚未保存，仍要关闭并丢弃？'), findsOneWidget);
     await tester.tap(find.text('继续'));
     await tester.pumpAndSettle();
-    expect(calls.last, 'worldCircuitClose');
-    expect(args.last, {'discard': true});
-    expect(tester.takeException(), isNull);
-  });
+    expect(calls.last.$1, 'worldCircuitClose');
+    expect(calls.last.$2, {'discard': true});
+    await _finish(tester);
+  }, timeout: const Timeout(Duration(seconds: 30)));
 }

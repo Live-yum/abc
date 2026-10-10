@@ -1,5 +1,11 @@
 # Limit circuit updates to the active editor
 
+This is historical evidence for the former sample-specific CPU interface.
+The generic-WLD revision removes those controls and changes the workload.
+Notification isolation requires fresh generic tests; these timing pairs do
+not establish the revised application's performance.
+
+
 The physical computer clock used to notify the entire application shell for every published runtime batch. The shell rebuilt its complete workspace view, including unrelated editor state. This change gives the shell a separate workspace-change channel and listens to routine circuit updates only inside the circuit editor. Ordinary state changes, first dirty transitions, errors, pause, save, close and controller replacement still notify the shell. Existing broad controller listeners keep receiving updates.
 
 The desktop and mobile application use the same components, theme and controller contract. This change does not alter their visual design, circuit simulation strategy or default optimization setting.

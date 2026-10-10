@@ -3,8 +3,8 @@
 This path uses the authorized vendored TerraWasm circuit-world compiler, wiring VM,
 mechanical scheduler and WLD encoder. It is independent of the small component
 sandbox. Full original world files and game artwork are not distributed.
-See [the complete Computerraria workflow](COMPUTERRARIA.md) for large source
-import, profile verification, physical program loading and actual monitors.
+Computerraria is a [test-only physical computer fixture](COMPUTERRARIA.md).
+Its program loader and known layout are not production features.
 
 ## Supported contract
 
@@ -15,16 +15,30 @@ import, profile verification, physical program loading and actual monitors.
 - Compile complete-world electrical connectivity; query bounded viewports and
   optional wall layer; trigger ordinary wire pulses or actual HitSwitch behavior;
   read/write engine-supported lamps; advance actual 60 Hz mechanical ticks.
-- Ordinary UI run sends six simulation ticks per 100 ms when idle. A verified
-  Computerraria session instead sends bounded physical clock pulses after a
-  program is loaded; device ticks cannot substitute for its CPU clock. It intentionally slows
-  under load rather than dropping native simulation steps or faking device state.
-  Each run batch refreshes the last accepted viewport inside the same serialized
-  operation. Pause stops future tick requests; an already accepted atomic command completes.
+- Import compiles actual wiring and locates a real wire cell for the initial
+  view. Controls are selected from real cells in the current viewport; large
+  regions use bounded pages. This is not a global device catalogue.
+- UI run requests six mechanical ticks every 100 ms when idle, for every world.
+  Busy execution slows simulation instead of dropping steps. There is no
+  sample-specific clock driver. Each completed batch refreshes the accepted
+  viewport and selected PixelBox region. Pause stops future requests; accepted
+  commands drain before close/reset.
+- PixelBox regions are explicit rectangles of at most 65,536 cells. Actual
+  unlit devices are black, lit devices white, and absent cells transparent.
+  A region need not be dense, 64 by 48, or part of a computer.
+- Imported timers start OFF in the current engine. WLD does not restore the
+  mechanical scheduling queue or elapsed phase. Select and operate a real timer
+  before advancing ticks. Import never silently presses switches, loads a
+  program, creates missing display state, or starts NPC clocks.
+- NPC/player movement, automatic pressure-plate collisions and full game
+  physics are not simulated. A pressure-plate action is explicit interaction.
+  Mod-only devices and data absent from WLD are not reconstructed.
 - Reset closes the session and reopens a private copy of the original input.
 - Save returns a separate candidate WLD. Application must validate/reopen and
   adopt this candidate using its usual undo/save flow. No original file is changed.
-- Failed commands are cancelled; VM transactional rollback is engine-owned.
+- A mutation and its later read are distinct: an accepted mutation remains dirty
+  if pixel reading fails. The application surfaces the error without replaying
+  it. VM transactional rollback is engine-owned.
 - Engine capability restrictions and device support are authoritative. This is
   not a guarantee that every Terraria or mod mechanism is simulated. Unsupported
   commands/versions remain explicit errors; there is no approximate fallback.
@@ -65,4 +79,4 @@ Run native proof with `native/world_circuit_smoke.dart`; run Web proof with
 legacy rejection, future read-only rejection, fragment objects,
 every device family are not established by the small synthetic fixture. Full-world
 CPU/display evidence and profile acceptance are tracked separately in
-[the computer workflow](COMPUTERRARIA.md). Do not present them as tested parity.
+[the test-only computer fixture](COMPUTERRARIA.md). Do not present them as tested parity.

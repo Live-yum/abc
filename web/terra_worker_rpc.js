@@ -8,7 +8,7 @@
   const MAX_RESPONSE_BYTES = 160 * MiB, DEFAULT_TIMEOUT = 120000;
   const METHODS = Object.freeze({
     document: ['open', 'createPlayer', 'projectPlayer', 'inspect', 'mutate', 'save', 'preview', 'generateMap', 'close'],
-    worldCircuit: ['open', 'openSource', 'command', 'computerFrame', 'close', 'releaseSource', 'cleanup', 'progress', 'cancelOperation'],
+    worldCircuit: ['open', 'openSource', 'command', 'commandAndReadPixels', 'close', 'releaseSource', 'cleanup', 'progress', 'cancelOperation'],
     circuit: ['propagate'],
   });
   const fail = (code, message) => Object.assign(new Error(message), {code});
@@ -34,7 +34,7 @@
   function validate(owner, method, args) {
     if (!Object.hasOwn(METHODS, owner) || !METHODS[owner].includes(method)) invalid('Unknown worker method');
     if (!Array.isArray(args)) invalid('Worker arguments must be an array');
-    const counts = owner === 'document' ? {open:2, createPlayer:1, projectPlayer:1, inspect:1, mutate:3, save:1, preview:1, generateMap:2, close:1} : owner === 'worldCircuit' ? {open:1, openSource:1, command:3, computerFrame:3, close:1, releaseSource:1, cleanup:0, progress:0, cancelOperation:0} : {propagate:6};
+    const counts = owner === 'document' ? {open:2, createPlayer:1, projectPlayer:1, inspect:1, mutate:3, save:1, preview:1, generateMap:2, close:1} : owner === 'worldCircuit' ? {open:1, openSource:1, command:3, commandAndReadPixels:3, close:1, releaseSource:1, cleanup:0, progress:0, cancelOperation:0} : {propagate:6};
     if (args.length !== counts[method]) invalid('Invalid worker argument count');
     let size = 64;
     if (owner === 'document') {
@@ -57,7 +57,7 @@
       else if (!isControl(owner, method) && method !== 'cleanup') {
         handle(args[0]);
         if (method === 'command') size += string(args[1], 1024) + string(args[2], 4 * MiB);
-        if (method === 'computerFrame') size += string(args[1], 1024) + string(args[2], 1024);
+        if (method === 'commandAndReadPixels') size += string(args[1], 1024) + string(args[2], 1024);
       }
     } else {
       const [width,height,json,x,y,colour] = args;
@@ -86,14 +86,14 @@
       else if (value != null) invalid('Invalid document completion response');
     } else if (owner === 'circuit') string(value, 4 * MiB);
     else if (['close','releaseSource','cleanup','cancelOperation'].includes(method)) { if (value != null) invalid('Invalid circuit completion response'); }
-    else if (method === 'computerFrame') {
-      if (!value || typeof value !== 'object') invalid('Invalid computer frame');
-      validateResult(owner, 'command', value.clock);
-      if (value.clock.resultKind !== 2) invalid('Invalid computer clock result');
-      if (value.display != null) {
-        validateResult(owner, 'command', value.display);
-        if (value.display.resultKind !== 9 || value.display.session !== value.clock.session || value.displayError != null) invalid('Invalid computer display result');
-      } else if (typeof value.displayError !== 'string' || !value.displayError.length || value.displayError.length > 2048) invalid('Missing computer display result');
+    else if (method === 'commandAndReadPixels') {
+      if (!value || typeof value !== 'object') invalid('Invalid circuit batch');
+      validateResult(owner, 'command', value.command);
+      if (![2,3].includes(value.command.resultKind)) invalid('Invalid circuit batch command result');
+      if (value.pixels != null) {
+        validateResult(owner, 'command', value.pixels);
+        if (value.pixels.resultKind !== 9 || value.pixels.session !== value.command.session || value.readError != null || value.pixels.resultCount > 65536 || !(value.pixels.records instanceof Uint8Array) || value.pixels.records.byteLength !== value.pixels.resultCount * 16) invalid('Invalid circuit pixel result');
+      } else if (typeof value.readError !== 'string' || !value.readError.length || value.readError.length > 2048) invalid('Missing circuit pixel result');
     }
     else if (method === 'progress') {
       if (!value || typeof value !== 'object' || typeof value.stage !== 'string' || value.stage.length > 32 || ['phase','completed','total'].some(k => !Number.isSafeInteger(value[k]) || value[k] < 0)) invalid('Invalid circuit progress');
@@ -204,9 +204,10 @@
               handles.set(publicHandle, {native, generation, closing:false});
               model[owner === 'document' ? 'handle' : 'session'] = publicHandle;
               value = owner === 'document' ? JSON.stringify(model) : model;
-            } else if (owner === 'worldCircuit' && request.method === 'computerFrame') {
-              for (const part of [value.clock, value.display]) if (part) {
-                if (part.session !== request.args[0]) invalid('Mismatched computer frame');
+            } else if (owner === 'worldCircuit' && request.method === 'commandAndReadPixels') {
+              if (value.command.resultKind !== JSON.parse(request.args[1])[1]) invalid('Mismatched circuit batch command');
+              for (const part of [value.command, value.pixels]) if (part) {
+                if (part.session !== request.args[0]) invalid('Mismatched circuit batch');
                 part.session = request.publicHandle;
               }
             } else if (owner === 'worldCircuit' && request.method === 'command') {
@@ -218,7 +219,7 @@
             }
             if (request.method === 'releaseSource') sources.delete(request.publicSource);
             if (request.method === 'close') handles.delete(request.publicHandle);
-            if (owner === 'worldCircuit' && ['command','computerFrame'].includes(request.method)) {
+            if (owner === 'worldCircuit' && ['command','commandAndReadPixels'].includes(request.method)) {
               value.hostStagesUs = {...value.hostStagesUs, rpcWallUs:(now() - request.queuedAt) * 1000, rpcQueueUs:(request.sentAt - request.queuedAt) * 1000};
             }
             request.resolve(value);
@@ -276,7 +277,7 @@
         if (owner === 'worldCircuit' && method === 'releaseSource') {
           publicSource = args[0]; const entry = sources.get(publicSource); if (!entry || entry.generation !== generation) return Promise.resolve(); args[0] = entry.native;
         }
-        if ((owner === 'document' && !['open','createPlayer','projectPlayer'].includes(method)) || (owner === 'worldCircuit' && ['command','computerFrame','close'].includes(method))) {
+        if ((owner === 'document' && !['open','createPlayer','projectPlayer'].includes(method)) || (owner === 'worldCircuit' && ['command','commandAndReadPixels','close'].includes(method))) {
           publicHandle = args[0]; const entry = handles.get(publicHandle);
           if (!entry || entry.generation !== generation || (entry.closing && method !== 'close')) {
             // Cleanup after a lost owner must not prevent an explicit reopen.

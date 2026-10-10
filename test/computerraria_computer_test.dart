@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:terraforge/domain/computerraria_computer.dart';
+import 'support/computerraria/layout.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 
 void main() {

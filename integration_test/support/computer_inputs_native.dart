@@ -22,7 +22,7 @@ Future<WorldCircuitSource> computerInput() async {
       'This profile accepts only the pinned public Computerraria WLD.',
     );
   }
-  // The production owner verifies the complete WLD SHA-256 before fixed-layout
-  // controls become available; no complete world bytes enter the UI isolate.
+  // The generic owner reports the complete source SHA. The harness verifies
+  // this public input identity; production has no fixture-specific controls.
   return result;
 }
