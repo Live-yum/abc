@@ -37,7 +37,10 @@ class _CountingController extends TerraController {
           'viewport': {'x': 40, 'y': 50, 'width': 4, 'height': 3},
           'displayRegion': {
             'name': 'selected pixels',
-            'x': 40, 'y': 50, 'width': 4, 'height': 3,
+            'x': 40,
+            'y': 50,
+            'width': 4,
+            'height': 3,
           },
           'displayFrame': frame,
           'displayPixelCount': 1,
@@ -85,41 +88,43 @@ Future<void> _finish(
 }
 
 void main() {
-  testWidgets('one snapshot per rebuild updates selected pixels and tick counters', (
-    tester,
-  ) async {
-    final controller = _CountingController();
-    await _show(tester, controller);
-    controller.viewReads = 0;
-    controller.publish();
-    await tester.pump();
-    expect(
-      controller.viewReads,
-      1,
-      reason: 'Deferred home and heading layouts share the root snapshot',
-    );
-    await _showCircuit(tester);
-
-    for (final ticks in [6, 12, 18]) {
-      final frame = Uint8List(4 * 3 * 4)
-        ..[44] = ticks ~/ 6
-        ..[47] = 255;
-      controller
-        ..ticks = ticks
-        ..frame = frame
-        ..viewReads = 0
-        ..publish();
+  testWidgets(
+    'one snapshot per rebuild updates selected pixels and tick counters',
+    (tester) async {
+      final controller = _CountingController();
+      await _show(tester, controller);
+      controller.viewReads = 0;
+      controller.publish();
       await tester.pump();
-      expect(controller.viewReads, 1);
       expect(
-        tester.widget<ComputerDisplay>(find.byType(ComputerDisplay)).rgba,
-        same(frame),
+        controller.viewReads,
+        1,
+        reason: 'Deferred home and heading layouts share the root snapshot',
       );
-      expect(find.textContaining(' · $ticks ticks · '), findsOneWidget);
-      expect(find.text('snapshot $ticks'), findsOneWidget);
-    }
-    await _finish(tester, controller);
-  }, timeout: const Timeout(Duration(seconds: 30)));
+      await _showCircuit(tester);
+
+      for (final ticks in [6, 12, 18]) {
+        final frame = Uint8List(4 * 3 * 4)
+          ..[44] = ticks ~/ 6
+          ..[47] = 255;
+        controller
+          ..ticks = ticks
+          ..frame = frame
+          ..viewReads = 0
+          ..publish();
+        await tester.pump();
+        expect(controller.viewReads, 1);
+        expect(
+          tester.widget<ComputerDisplay>(find.byType(ComputerDisplay)).rgba,
+          same(frame),
+        );
+        expect(find.textContaining(' · $ticks ticks · '), findsOneWidget);
+        expect(find.text('snapshot $ticks'), findsOneWidget);
+      }
+      await _finish(tester, controller);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 
   testWidgets('an existing button reads live state before the next rebuild', (
     tester,

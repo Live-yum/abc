@@ -7,14 +7,25 @@ import '../engine/world_circuit_backend.dart';
 class CircuitDisplayRegion {
   final String name;
   final int x, y, width, height;
-  const CircuitDisplayRegion(this.name, this.x, this.y, this.width, this.height);
+  const CircuitDisplayRegion(
+    this.name,
+    this.x,
+    this.y,
+    this.width,
+    this.height,
+  );
 
   WorldCircuitCommand get command =>
       WorldCircuitCommand.pixels(x, y, width, height);
 
   void validate() {
-    if (x < 0 || y < 0 || width < 1 || height < 1 ||
-        width > 65536 || height > 65536 || width * height > 65536) {
+    if (x < 0 ||
+        y < 0 ||
+        width < 1 ||
+        height < 1 ||
+        width > 65536 ||
+        height > 65536 ||
+        width * height > 65536) {
       throw const FormatException('像素选区须为有效世界矩形，最多 65536 格。');
     }
     WorldCircuitCommand.pixels(x, y, width, height);
@@ -22,7 +33,8 @@ class CircuitDisplayRegion {
 
   Uint8List decode(WorldCircuitResult response) {
     validate();
-    if (response.resultKind != 9 || response.records.length % 16 != 0 ||
+    if (response.resultKind != 9 ||
+        response.records.length % 16 != 0 ||
         response.records.length ~/ 16 > width * height) {
       throw const FormatException('像素选区返回了无效的稀疏记录。');
     }
@@ -35,8 +47,13 @@ class CircuitDisplayRegion {
       final tile = data.getUint32(at + 8, Endian.little) & 65535;
       final frameX = data.getInt16(at + 12, Endian.little);
       final frameY = data.getInt16(at + 14, Endian.little);
-      if (px < 0 || py < 0 || px >= width || py >= height || tile != 445 ||
-          (frameX != 0 && frameX != 18) || frameY != 0) {
+      if (px < 0 ||
+          py < 0 ||
+          px >= width ||
+          py >= height ||
+          tile != 445 ||
+          (frameX != 0 && frameX != 18) ||
+          frameY != 0) {
         throw const FormatException('选区包含无效或不支持的原版 PixelBox 状态。');
       }
       final index = py * width + px;

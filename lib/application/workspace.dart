@@ -353,13 +353,15 @@ class Workspace extends TerraController {
     'importing': _circuitImporting,
     'cancelling': _circuitCancelling,
     'streamed': _worldCircuit?.streamed ?? false,
-    'displayRegion': _worldCircuit?.displayRegion == null ? null : {
-      'name': _worldCircuit!.displayRegion!.name,
-      'x': _worldCircuit!.displayRegion!.x,
-      'y': _worldCircuit!.displayRegion!.y,
-      'width': _worldCircuit!.displayRegion!.width,
-      'height': _worldCircuit!.displayRegion!.height,
-    },
+    'displayRegion': _worldCircuit?.displayRegion == null
+        ? null
+        : {
+            'name': _worldCircuit!.displayRegion!.name,
+            'x': _worldCircuit!.displayRegion!.x,
+            'y': _worldCircuit!.displayRegion!.y,
+            'width': _worldCircuit!.displayRegion!.width,
+            'height': _worldCircuit!.displayRegion!.height,
+          },
     'displayFrame': _worldCircuit?.displayFrame,
     'displayPixelCount': _worldCircuit?.displayPixelCount ?? 0,
     'displayIdentity': _worldCircuit?.displayIdentity,
@@ -2369,7 +2371,8 @@ class Workspace extends TerraController {
     }
     final records = _worldCircuit?.result?.records;
     if (_pendingCircuitViewport == null &&
-        records != null && _worldCircuit?.result?.resultKind == 1) {
+        records != null &&
+        _worldCircuit?.result?.resultKind == 1) {
       _worldCircuitRecords = records;
     }
     _publishListeners(
@@ -2475,7 +2478,10 @@ class Workspace extends TerraController {
 
   Future<void> _locateInitialCircuitViewport() async {
     final session = _worldCircuit, result = session?.result;
-    if (session == null || result == null || result.width < 1 || result.height < 1) {
+    if (session == null ||
+        result == null ||
+        result.width < 1 ||
+        result.height < 1) {
       throw const EngineException('世界电路没有有效尺寸。');
     }
     _worldFragments = null;
@@ -2483,8 +2489,11 @@ class Workspace extends TerraController {
     _worldCircuitRecords = Uint8List(0);
     final stats = result.stats;
     final minX = stats[6], minY = stats[7], maxX = stats[8], maxY = stats[9];
-    if (stats[10] > 0 && minX <= maxX && minY <= maxY &&
-        maxX < result.width && maxY < result.height) {
+    if (stats[10] > 0 &&
+        minX <= maxX &&
+        minY <= maxY &&
+        maxX < result.width &&
+        maxY < result.height) {
       final width = maxX - minX + 1, height = maxY - minY + 1;
       if (width <= 256 && height <= 256) {
         await _viewCircuitBounds(minX, minY, width, height);
@@ -2506,9 +2515,15 @@ class Workspace extends TerraController {
             WorldCircuitCommand.viewport(minX, top, 1, count),
           );
           if (generation != _circuitImportGeneration ||
-              !identical(_worldCircuit, session)) return;
+              !identical(_worldCircuit, session)) {
+            return;
+          }
           final data = ByteData.sublistView(column.records);
-          for (var offset = 0; offset + 16 <= column.records.length; offset += 16) {
+          for (
+            var offset = 0;
+            offset + 16 <= column.records.length;
+            offset += 16
+          ) {
             if ((data.getUint32(offset + 8, Endian.little) >> 24) != 0) {
               anchorY = data.getUint32(offset + 4, Endian.little);
               found = true;
@@ -2518,26 +2533,35 @@ class Workspace extends TerraController {
         }
         if (!found) throw const EngineException('实际接线边界与记录不一致，请重新导入。');
       } finally {
-        if (identical(_pendingCircuitViewport, probe)) _pendingCircuitViewport = null;
+        if (identical(_pendingCircuitViewport, probe)) {
+          _pendingCircuitViewport = null;
+        }
       }
       final viewHeight = height < 256 ? height : 256;
       final viewY = (anchorY - viewHeight ~/ 2)
-          .clamp(minY, maxY - viewHeight + 1).toInt();
+          .clamp(minY, maxY - viewHeight + 1)
+          .toInt();
       await _viewCircuitBounds(minX, viewY, width, viewHeight);
       return;
     }
     // A supported world without wiring is still a valid imported WLD.
     final width = result.width < 48 ? result.width : 48;
     final height = result.height < 32 ? result.height : 32;
-    await _viewCircuitBounds(stats[4] - width ~/ 2, stats[5] - height ~/ 2,
-        width, height);
+    await _viewCircuitBounds(
+      stats[4] - width ~/ 2,
+      stats[5] - height ~/ 2,
+      width,
+      height,
+    );
   }
 
   Future<void> _viewCircuitBounds(int x, int y, int width, int height) async {
     final result = _worldCircuit?.result;
     if (result == null) throw const EngineException('世界电路尚未就绪。');
     final w = width.clamp(1, result.width < 256 ? result.width : 256).toInt();
-    final h = height.clamp(1, result.height < 256 ? result.height : 256).toInt();
+    final h = height
+        .clamp(1, result.height < 256 ? result.height : 256)
+        .toInt();
     await _viewWorldCircuit({
       'x': x.clamp(0, result.width - w).toInt(),
       'y': y.clamp(0, result.height - h).toInt(),
@@ -2552,7 +2576,12 @@ class Workspace extends TerraController {
       throw const EngineException('片段不在当前列表，请重新读取。');
     }
     final fragment = fragments.first;
-    await _viewCircuitBounds(fragment.x, fragment.y, fragment.width, fragment.height);
+    await _viewCircuitBounds(
+      fragment.x,
+      fragment.y,
+      fragment.width,
+      fragment.height,
+    );
     _status = fragment.width > 256 || fragment.height > 256
         ? '片段 $id 大于单个视口，当前显示其左上区域；可移动视口查看其余接线。'
         : '已定位片段 $id 的实际电路区域。';
@@ -2567,7 +2596,9 @@ class Workspace extends TerraController {
     final y = _bounded(args, 'y', 0, result.height - 1);
     final width = _bounded(args, 'width', 1, 256);
     final height = _bounded(args, 'height', 1, 256);
-    await session.readDisplay(CircuitDisplayRegion('选区像素', x, y, width, height));
+    await session.readDisplay(
+      CircuitDisplayRegion('选区像素', x, y, width, height),
+    );
     _status = '已读取所选区域内的实际像素盒；运行时随电路状态刷新。';
   }
 
@@ -2643,7 +2674,9 @@ class Workspace extends TerraController {
     final requested = {'x': x, 'y': y, 'width': w, 'height': h};
     _pendingCircuitViewport = requested;
     try {
-      final reply = await session.command(WorldCircuitCommand.viewport(x, y, w, h));
+      final reply = await session.command(
+        WorldCircuitCommand.viewport(x, y, w, h),
+      );
       if (generation == _circuitImportGeneration &&
           identical(_worldCircuit, session)) {
         // Publish the rectangle and its records together. Intermediate busy,

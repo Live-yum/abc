@@ -9,7 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:terraforge/application/workspace.dart';
+
 import 'support/generic_circuit_profile.dart';
+
 import 'package:terraforge/engine/native_engine.dart' as core;
 import 'package:terraforge/engine/world_circuit_backend.dart';
 import 'package:terraforge/engine/world_circuit_factory.dart'
@@ -124,7 +126,9 @@ class _ObservedBackend
 
   @override
   Future<WorldCircuitBatchResult> commandAndReadPixels(
-    int id, WorldCircuitCommand command, WorldCircuitCommand pixels,
+    int id,
+    WorldCircuitCommand command,
+    WorldCircuitCommand pixels,
   ) async {
     if (inner is WorldCircuitBatchBackend) {
       final frame = await (inner as WorldCircuitBatchBackend)
@@ -134,8 +138,10 @@ class _ObservedBackend
       return frame;
     }
     final result = await commandWorldCircuit(id, command);
-    return WorldCircuitBatchResult(command: result,
-        pixels: await commandWorldCircuit(id, pixels));
+    return WorldCircuitBatchResult(
+      command: result,
+      pixels: await commandWorldCircuit(id, pixels),
+    );
   }
 
   @override
@@ -227,7 +233,7 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
       theme: terraTheme(),
       home: Scaffold(
         body: ListenableBuilder(
-          listenable: workspace.worldCircuitUpdates,
+          listenable: workspace.worldCircuitChanges,
           builder: (context, child) => SingleChildScrollView(
             child: WorldCircuitPanel(
               state: Map<String, Object?>.from(state()),
@@ -323,8 +329,11 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
       await action('worldCircuitViewport', selection.displayRegion);
       await action('worldCircuitReadDisplay', selection.displayRegion);
     }
+
     await selectDisplay();
-    final originalPixelSha = sha256.convert(state()['displayFrame'] as Uint8List).toString();
+    final originalPixelSha = sha256
+        .convert(state()['displayFrame'] as Uint8List)
+        .toString();
     final originalTicks = state()['ticks'] as int;
     if (optimized) {
       await action('worldCircuitOptimization', {'enabled': true});
@@ -337,7 +346,12 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
     for (var batch = 0; batch < 32; batch++) {
       await action('worldCircuitStep');
       final frame = state()['displayFrame'] as Uint8List;
-      expect(frame.length, selection.displayRegion['width']! * selection.displayRegion['height']! * 4);
+      expect(
+        frame.length,
+        selection.displayRegion['width']! *
+            selection.displayRegion['height']! *
+            4,
+      );
       var lit = 0;
       for (var at = 0; at < frame.length; at += 4) {
         if (frame[at] != 0 || frame[at + 1] != 0 || frame[at + 2] != 0) {
@@ -350,10 +364,14 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
       final digest = sha256.convert(frame).toString();
       distinctPixelStates.add(digest);
       journal.recorder.viewportSnapshots.add({
-        'cycle': cycle, 'mode': mode, 'batch': batch, 'ticks': batch + 1,
+        'cycle': cycle,
+        'mode': mode,
+        'batch': batch,
+        'ticks': batch + 1,
         'nativeTickDelta': backend.nativeTicks - ticksBefore,
         'modelTickDelta': (state()['ticks'] as int) - modelBefore,
-        'pixelSha256': digest, 'litPixels': lit,
+        'pixelSha256': digest,
+        'litPixels': lit,
       });
     }
     await action('worldCircuitPause');
@@ -364,16 +382,22 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
     expect(backend.latest!.circuitOptimizationEnabled, optimized);
     expect(backend.latest!.wireHeadPixelRulesEnabled, optimized);
     evidence.addAll({
-      'tickDelta': 32, 'tickBatchCount': 32, 'tickBatchSize': 1,
+      'tickDelta': 32,
+      'tickBatchCount': 32,
+      'tickBatchSize': 1,
       'distinctPixelStates': distinctPixelStates.length,
       'maximumLitPixels': maximumLitPixels,
       'nativeTickDelta': backend.nativeTicks - ticksBefore,
       'modelTickDelta': (state()['ticks'] as int) - modelBefore,
       'optimizationEnabledDuringTicks': optimized,
-      'nativeOptimizationEnabledDuringTicks': backend.latest!.circuitOptimizationEnabled,
-      'nativeWireHeadPixelRulesDuringTicks': backend.latest!.wireHeadPixelRulesEnabled,
+      'nativeOptimizationEnabledDuringTicks':
+          backend.latest!.circuitOptimizationEnabled,
+      'nativeWireHeadPixelRulesDuringTicks':
+          backend.latest!.wireHeadPixelRulesEnabled,
     });
-    final displayDigest = sha256.convert(state()['displayFrame'] as Uint8List).toString();
+    final displayDigest = sha256
+        .convert(state()['displayFrame'] as Uint8List)
+        .toString();
     evidence['pausedPixelSha256'] = displayDigest;
     evidence['hostStages'] = workspace.hostStages.snapshot();
     if (scenario == 'reset-original') {
@@ -381,7 +405,10 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
       expect(state()['ticks'], originalTicks);
       expect(state()['optimizationEnabled'], isFalse);
       await selectDisplay();
-      expect(sha256.convert(state()['displayFrame'] as Uint8List).toString(), originalPixelSha);
+      expect(
+        sha256.convert(state()['displayFrame'] as Uint8List).toString(),
+        originalPixelSha,
+      );
       evidence['resetRestoredOriginal'] = true;
     } else {
       await action('worldCircuitSave');
@@ -394,7 +421,13 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
       await os.request('point', 'cycle-$cycle.export-close');
       files.reopenSaved = true;
       workspace = newWorkspace();
-      controller = ProfiledTerraController(workspace, journal.recorder, cycle, false, profileMode: mode);
+      controller = ProfiledTerraController(
+        workspace,
+        journal.recorder,
+        cycle,
+        false,
+        profileMode: mode,
+      );
       disposed = false;
       await mount();
       await action('worldCircuitChooseWorld');
@@ -403,7 +436,10 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
       expect(events.last['sourceSha256'], files.saved!.sha256);
       expect(backend.nativeTicks, beforeReopen);
       await selectDisplay();
-      expect(sha256.convert(state()['displayFrame'] as Uint8List).toString(), displayDigest);
+      expect(
+        sha256.convert(state()['displayFrame'] as Uint8List).toString(),
+        displayDigest,
+      );
       evidence['reopenPreservedSelectedPixels'] = true;
     }
     await action('worldCircuitClose', {'discard': true});

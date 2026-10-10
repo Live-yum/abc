@@ -35,6 +35,8 @@ class GenericCircuitSelection {
         {'x': x, 'y': y, 'mask': mask, 'direct': true},
       );
     }
-    throw StateError('No actual wired cell in the initial viewport; action unmeasured');
+    throw StateError(
+      'No actual wired cell in the initial viewport; action unmeasured',
+    );
   }
 }

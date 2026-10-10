@@ -181,7 +181,8 @@ class WorldCircuitSession extends ChangeNotifier {
   }
 
   Future<WorldCircuitResult> _observedCommand(
-    int id, WorldCircuitCommand command,
+    int id,
+    WorldCircuitCommand command,
   ) async {
     final stage = 'command.${command.words[1]}';
     final watch = Stopwatch()..start();
@@ -194,12 +195,16 @@ class WorldCircuitSession extends ChangeNotifier {
     }
   }
 
-  Uint8List _decodeDisplay(CircuitDisplayRegion region, WorldCircuitResult reply) =>
-      hostStages.measure('display.rgbaDecode', () => region.decode(reply));
+  Uint8List _decodeDisplay(
+    CircuitDisplayRegion region,
+    WorldCircuitResult reply,
+  ) => hostStages.measure('display.rgbaDecode', () => region.decode(reply));
 
   void _acceptDisplay(Uint8List pixels) {
-    final unchanged = hostStages.measure('display.listEquals',
-        () => listEquals(pixels, displayFrame));
+    final unchanged = hostStages.measure(
+      'display.listEquals',
+      () => listEquals(pixels, displayFrame),
+    );
     if (!unchanged) displayFrame = pixels;
   }
 
@@ -230,8 +235,11 @@ class WorldCircuitSession extends ChangeNotifier {
     final reply = await _observedCommand(active.session, region.command);
     final pixels = _decodeDisplay(region, reply);
     final previous = displayRegion;
-    if (previous == null || previous.x != region.x || previous.y != region.y ||
-        previous.width != region.width || previous.height != region.height) {
+    if (previous == null ||
+        previous.x != region.x ||
+        previous.y != region.y ||
+        previous.width != region.width ||
+        previous.height != region.height) {
       displayIdentity = Object();
     }
     displayRegion = region;
@@ -256,8 +264,10 @@ class WorldCircuitSession extends ChangeNotifier {
       if (enabled && !optimizationSupported) {
         throw StateError('当前像素接线拓扑不支持此模式；同色跨轴网络暂不支持，请保持电路优化关闭。');
       }
-      final next = await _observedCommand(active.session,
-          WorldCircuitCommand.optimization(enabled));
+      final next = await _observedCommand(
+        active.session,
+        WorldCircuitCommand.optimization(enabled),
+      );
       if (next.circuitOptimizationEnabled != enabled ||
           next.wireHeadPixelRulesEnabled != enabled ||
           (enabled && !next.circuitOptimizationSupported)) {
@@ -275,21 +285,27 @@ class WorldCircuitSession extends ChangeNotifier {
     });
   }
 
-  Future<WorldCircuitResult> _applyCommand(WorldCircuitCommand command,
-      {bool refreshViewport = false}) async {
+  Future<WorldCircuitResult> _applyCommand(
+    WorldCircuitCommand command, {
+    bool refreshViewport = false,
+  }) async {
     final active = result;
     if (active == null) throw StateError('Open the circuit first');
     final region = displayRegion;
     final transport = backend;
     WorldCircuitResult next;
     WorldCircuitBatchResult? batch;
-    if (refreshViewport && region != null &&
+    if (refreshViewport &&
+        region != null &&
         transport is WorldCircuitBatchBackend &&
         (command.words[1] == 2 || command.words[1] == 3)) {
       final watch = Stopwatch()..start();
       try {
-        batch = await transport.commandAndReadPixels(active.session, command,
-            region.command);
+        batch = await transport.commandAndReadPixels(
+          active.session,
+          command,
+          region.command,
+        );
       } finally {
         hostStages.record('runtime.batch', watch.elapsedMicroseconds);
       }
@@ -312,9 +328,14 @@ class WorldCircuitSession extends ChangeNotifier {
       hostStages.recordBridge('runtime.batch', batch.hostStagesUs);
     }
     if (command.words[1] == 1) {
-      _viewport = WorldCircuitCommand.viewport(command.words[2], command.words[3],
-          command.words[4], command.words[5], stride: command.words[6],
-          walls: (command.words[12] & 2) != 0);
+      _viewport = WorldCircuitCommand.viewport(
+        command.words[2],
+        command.words[3],
+        command.words[4],
+        command.words[5],
+        stride: command.words[6],
+        walls: (command.words[12] & 2) != 0,
+      );
     }
     if (refreshViewport && _viewport != null) {
       result = await _observedCommand(active.session, _viewport!);
@@ -324,21 +345,27 @@ class WorldCircuitSession extends ChangeNotifier {
     return query ? next : result!;
   }
 
-  Future<WorldCircuitResult> command(WorldCircuitCommand command,
-      {bool refreshViewport = false}) => _serial(() =>
-          _applyCommand(command, refreshViewport: refreshViewport));
+  Future<WorldCircuitResult> command(
+    WorldCircuitCommand command, {
+    bool refreshViewport = false,
+  }) => _serial(() => _applyCommand(command, refreshViewport: refreshViewport));
 
   /// Publish a completed generic running batch and its selected views together.
   Future<WorldCircuitResult> runtimeCommand(WorldCircuitCommand command) async {
     final generation = _runGeneration;
     try {
-      return await _serial(() => _applyCommand(command, refreshViewport: true),
-          notifyState: false, pollProgress: false);
+      return await _serial(
+        () => _applyCommand(command, refreshViewport: true),
+        notifyState: false,
+        pollProgress: false,
+      );
     } finally {
       // Errors are first published while busy; also publish their settled state.
       if (!_closed && !_closing) {
-        _publishListeners(runtimeFrame:
-            error == null && generation == _runGeneration && running);
+        _publishListeners(
+          runtimeFrame:
+              error == null && generation == _runGeneration && running,
+        );
       }
     }
   }
@@ -414,10 +441,18 @@ class WorldCircuitSession extends ChangeNotifier {
     _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (busy || !running || _runtimePending) return;
       _runtimePending = true;
-      unawaited(runtimeCommand(WorldCircuitCommand.ticks(6)).then<void>((_) {},
-          onError: (Object failure, StackTrace stack) {
-            // The serialized operation retains the error and pauses.
-          }).whenComplete(() { _runtimePending = false; }));
+      unawaited(
+        runtimeCommand(WorldCircuitCommand.ticks(6))
+            .then<void>(
+              (_) {},
+              onError: (Object failure, StackTrace stack) {
+                // The serialized operation retains the error and pauses.
+              },
+            )
+            .whenComplete(() {
+              _runtimePending = false;
+            }),
+      );
     });
     notifyListeners();
   }
@@ -437,8 +472,12 @@ class WorldCircuitSession extends ChangeNotifier {
       await _stopProgressPolling();
       final active = result;
       if (active != null) {
-        try { await backend.closeWorldCircuit(active.session); }
-        catch (_) { _closing = true; rethrow; }
+        try {
+          await backend.closeWorldCircuit(active.session);
+        } catch (_) {
+          _closing = true;
+          rethrow;
+        }
       }
       result = null;
       progress = null;

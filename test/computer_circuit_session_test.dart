@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 import 'package:terraforge/engine/world_circuit_session.dart';
+
 import 'support/computerraria/provenance.dart';
 
 import 'support/computer_circuit_backend.dart';
@@ -22,7 +23,9 @@ void main() {
       final backend = ComputerCircuitBackend();
       final session = WorldCircuitSession.fromSource(backend, source);
       await session.open();
-      final driver = ComputerrariaFixtureDriver((command) => session.command(command));
+      final driver = ComputerrariaFixtureDriver(
+        (command) => session.command(command),
+      );
       await driver.verifyFixture(session.result!);
       await driver.loadProgram('p.bin', Uint8List.fromList([1, 0, 0, 0]));
       backend.commands.clear();
@@ -41,14 +44,19 @@ void main() {
       ..digest = ComputerCircuitBackend.savedWldSha;
     final session = WorldCircuitSession.fromSource(backend, source);
     await session.open();
-      final driver = ComputerrariaFixtureDriver((command) => session.command(command));
+    final driver = ComputerrariaFixtureDriver(
+      (command) => session.command(command),
+    );
     final provenance = ComputerProvenanceRecord(
       wldSha256: backend.digest,
       programName: 'long.bin',
       programImage: Uint8List.fromList([1, 0, 0, 0, 1, 0, 0, 0]),
       physicalPulses: 5120,
     );
-    expect(await driver.verifyFixture(session.result!, provenance: provenance), isTrue);
+    expect(
+      await driver.verifyFixture(session.result!, provenance: provenance),
+      isTrue,
+    );
     expect(backend.commands.where((c) => c.mutates), isEmpty);
     expect(driver.programName, 'long.bin');
     expect(driver.physicalPulses, 5120);
@@ -71,9 +79,12 @@ void main() {
         ..digest = ComputerCircuitBackend.savedWldSha;
       final session = WorldCircuitSession.fromSource(backend, source);
       await session.open();
-      final driver = ComputerrariaFixtureDriver((command) => session.command(command));
+      final driver = ComputerrariaFixtureDriver(
+        (command) => session.command(command),
+      );
       expect(
-        await driver.verifyFixture(session.result!,
+        await driver.verifyFixture(
+          session.result!,
           provenance: ComputerProvenanceRecord(
             wldSha256: 'b' * 64,
             programName: null,
@@ -92,7 +103,9 @@ void main() {
     final backend = ComputerCircuitBackend();
     final session = WorldCircuitSession.fromSource(backend, source);
     await session.open();
-      final driver = ComputerrariaFixtureDriver((command) => session.command(command));
+    final driver = ComputerrariaFixtureDriver(
+      (command) => session.command(command),
+    );
     await driver.verifyFixture(session.result!);
     await driver.loadProgram('p.bin', Uint8List.fromList([1, 0, 0, 0]));
     expect(session.optimizationEnabled, isFalse);
@@ -139,7 +152,9 @@ void main() {
           ..rejectOptimization = refusal == 'engine refusal';
         final session = WorldCircuitSession.fromSource(backend, source);
         await session.open();
-      final driver = ComputerrariaFixtureDriver((command) => session.command(command));
+        final driver = ComputerrariaFixtureDriver(
+          (command) => session.command(command),
+        );
         await driver.verifyFixture(session.result!);
         await driver.loadProgram('p.bin', Uint8List.fromList([1, 0, 0, 0]));
         session.markSaved();
@@ -178,7 +193,9 @@ void main() {
       final backend = ComputerCircuitBackend();
       final session = WorldCircuitSession.fromSource(backend, source);
       await session.open();
-      final driver = ComputerrariaFixtureDriver((command) => session.command(command));
+      final driver = ComputerrariaFixtureDriver(
+        (command) => session.command(command),
+      );
       await driver.verifyFixture(session.result!);
       await driver.loadProgram('p.bin', Uint8List.fromList([1, 0, 0, 0]));
       for (var i = 0; i < 100; i++) {
@@ -224,7 +241,9 @@ void main() {
     final backend = ComputerCircuitBackend()..digest = 'other';
     final session = WorldCircuitSession.fromSource(backend, source);
     await session.open();
-      final driver = ComputerrariaFixtureDriver((command) => session.command(command));
+    final driver = ComputerrariaFixtureDriver(
+      (command) => session.command(command),
+    );
     expect(await driver.verifyFixture(session.result!), isFalse);
     expect(backend.commands, isEmpty);
     await session.command(WorldCircuitCommand.ticks(1));
@@ -240,7 +259,9 @@ void main() {
       final backend = ComputerCircuitBackend();
       final session = WorldCircuitSession.fromSource(backend, source);
       await session.open();
-      final driver = ComputerrariaFixtureDriver((command) => session.command(command));
+      final driver = ComputerrariaFixtureDriver(
+        (command) => session.command(command),
+      );
       expect(await driver.verifyFixture(session.result!), isTrue);
       expect(driver.canRun, isFalse);
       await expectLater(driver.step(), throwsStateError);
@@ -272,7 +293,9 @@ void main() {
       final backend = ComputerCircuitBackend()..holdWrite = Completer<void>();
       final session = WorldCircuitSession.fromSource(backend, source);
       await session.open();
-      final driver = ComputerrariaFixtureDriver((command) => session.command(command));
+      final driver = ComputerrariaFixtureDriver(
+        (command) => session.command(command),
+      );
       await driver.verifyFixture(session.result!);
       final load = driver.loadProgram(
         'p.bin',
@@ -289,32 +312,48 @@ void main() {
       expect(driver.programIncomplete, isTrue);
       expect(driver.canRun, isFalse);
       expect(driver.programName, isNull);
-      await expectLater(driver.verifyFixture(session.result!), throwsStateError);
+      await expectLater(
+        driver.verifyFixture(session.result!),
+        throwsStateError,
+      );
       await expectLater(driver.step(), throwsStateError);
       await session.close();
       session.dispose();
     },
   );
 
-  test('generic close drains the accepted command before owner teardown', () async {
-    final backend = ComputerCircuitBackend()..holdClock = Completer<void>();
-    final session = WorldCircuitSession.fromSource(backend, source);
-    await session.open();
-    final driver = ComputerrariaFixtureDriver((command) => session.command(command));
-    await driver.verifyFixture(session.result!);
-    // Use the ordinary command API directly: closing must drain the already
-    // accepted operation, without creating a second fixture read after close.
-    final pending = session.command(WorldCircuitCommand.trigger(3194, 153, mask: 8, pulses: 1, hitSwitch: false));
-    while (!backend.commands.any((c) => c.words[1] == 2)) {
-      await Future<void>.delayed(Duration.zero);
-    }
-    final closing = session.close();
-    expect(backend.closes, 0);
-    backend.holdClock!.complete();
-    await pending;
-    await closing;
-    expect(backend.commands.where((c) => c.words[1] == 2).length, 1);
-    expect(backend.closes, 1);
-    session.dispose();
-  });
+  test(
+    'generic close drains the accepted command before owner teardown',
+    () async {
+      final backend = ComputerCircuitBackend()..holdClock = Completer<void>();
+      final session = WorldCircuitSession.fromSource(backend, source);
+      await session.open();
+      final driver = ComputerrariaFixtureDriver(
+        (command) => session.command(command),
+      );
+      await driver.verifyFixture(session.result!);
+      // Use the ordinary command API directly: closing must drain the already
+      // accepted operation, without creating a second fixture read after close.
+      final pending = session.command(
+        WorldCircuitCommand.trigger(
+          3194,
+          153,
+          mask: 8,
+          pulses: 1,
+          hitSwitch: false,
+        ),
+      );
+      while (!backend.commands.any((c) => c.words[1] == 2)) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      final closing = session.close();
+      expect(backend.closes, 0);
+      backend.holdClock!.complete();
+      await pending;
+      await closing;
+      expect(backend.commands.where((c) => c.words[1] == 2).length, 1);
+      expect(backend.closes, 1);
+      session.dispose();
+    },
+  );
 }

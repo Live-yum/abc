@@ -66,19 +66,36 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
       if ((word & (1 << 16)) == 0 || !_isControl(type, frameX)) continue;
       _controlCount++;
       if (_controls.length == 256) continue;
-      _controls.add(_CircuitControl(
-        data.getUint32(offset, Endian.little),
-        data.getUint32(offset + 4, Endian.little), type,
-        data.getInt16(offset + 14, Endian.little),
-      ));
+      _controls.add(
+        _CircuitControl(
+          data.getUint32(offset, Endian.little),
+          data.getUint32(offset + 4, Endian.little),
+          type,
+          data.getInt16(offset + 14, Endian.little),
+        ),
+      );
     }
   }
 
   // These are the input tile kinds accepted by the generic engine HitSwitch
   // path. Multi-tile records remain selectable; the engine normalizes them.
-  bool _isControl(int type, int frameX) => const {
-    132, 135, 136, 144, 314, 411, 423, 428, 440, 441, 442, 468, 476,
-  }.contains(type) || (type == 467 && frameX ~/ 36 == 4);
+  bool _isControl(int type, int frameX) =>
+      const {
+        132,
+        135,
+        136,
+        144,
+        314,
+        411,
+        423,
+        428,
+        440,
+        441,
+        442,
+        468,
+        476,
+      }.contains(type) ||
+      (type == 467 && frameX ~/ 36 == 4);
 
   Future<void> _moveViewport(int dx, int dy) async {
     final viewport = widget.state['viewport'];
@@ -88,10 +105,15 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
     final worldHeight = widget.state['height'] as int;
     await _send('worldCircuitViewport', {
       'x': ((viewport['x'] as int) + dx * width).clamp(0, worldWidth - width),
-      'y': ((viewport['y'] as int) + dy * height).clamp(0, worldHeight - height),
-      'width': width, 'height': height,
+      'y': ((viewport['y'] as int) + dy * height).clamp(
+        0,
+        worldHeight - height,
+      ),
+      'width': width,
+      'height': height,
     });
   }
+
   bool get _busy => widget.state['busy'] == true;
   String _progressLabel(String stage) => switch (stage) {
     'hash' => '核验完整文件',
@@ -197,8 +219,12 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
     super.didUpdateWidget(oldWidget);
     final previous = oldWidget.state['viewport'] as Map?;
     final next = widget.state['viewport'] as Map?;
-    if (const ['x', 'y', 'width', 'height']
-        .any((key) => previous?[key] != next?[key])) {
+    if (const [
+      'x',
+      'y',
+      'width',
+      'height',
+    ].any((key) => previous?[key] != next?[key])) {
       _syncViewport();
     }
   }
@@ -239,7 +265,8 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         if (data.getUint32(i, Endian.little) == _selectedX &&
             data.getUint32(i + 4, Endian.little) == _selectedY) {
           final word = data.getUint32(i + 8, Endian.little);
-          selectedControl = (word & (1 << 16)) != 0 &&
+          selectedControl =
+              (word & (1 << 16)) != 0 &&
               _isControl(word & 65535, data.getInt16(i + 12, Endian.little));
           selectedDescription =
               '选中 ($_selectedX, $_selectedY)：类型 ${word & 65535} · 帧 (${data.getInt16(i + 12, Endian.little)}, ${data.getInt16(i + 14, Endian.little)}) · 线色掩码 ${word >> 24} · 标志 ${(word >> 16) & 255}';
@@ -473,7 +500,9 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             ],
           ),
           if (s['fragments'] is Map) ...[
-            Text('共 ${(s['fragments'] as Map)['total']} 个片段；点选定位，提取后可在融合画布查看与粘贴。'),
+            Text(
+              '共 ${(s['fragments'] as Map)['total']} 个片段；点选定位，提取后可在融合画布查看与粘贴。',
+            ),
             SizedBox(
               height: 240,
               child: ListView.builder(
@@ -482,8 +511,11 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                   final row =
                       ((s['fragments'] as Map)['items'] as List)[index] as Map;
                   return ListTile(
-                    onTap: _busy ? null : () =>
-                        _send('worldCircuitLocateFragment', {'id': row['id']}),
+                    onTap: _busy
+                        ? null
+                        : () => _send('worldCircuitLocateFragment', {
+                            'id': row['id'],
+                          }),
                     title: Text(
                       '片段 ${row['id']} · ${row['width']} × ${row['height']}',
                     ),
@@ -554,21 +586,27 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               runSpacing: 8,
               children: [
                 OutlinedButton(
-                  onPressed: _busy || vx == 0 ? null : () => _moveViewport(-1, 0),
+                  onPressed: _busy || vx == 0
+                      ? null
+                      : () => _moveViewport(-1, 0),
                   child: const Text('左移视口'),
                 ),
                 OutlinedButton(
                   onPressed: _busy || vx + vw >= (s['width'] as int? ?? 0)
-                      ? null : () => _moveViewport(1, 0),
+                      ? null
+                      : () => _moveViewport(1, 0),
                   child: const Text('右移视口'),
                 ),
                 OutlinedButton(
-                  onPressed: _busy || vy == 0 ? null : () => _moveViewport(0, -1),
+                  onPressed: _busy || vy == 0
+                      ? null
+                      : () => _moveViewport(0, -1),
                   child: const Text('上移视口'),
                 ),
                 OutlinedButton(
                   onPressed: _busy || vy + vh >= (s['height'] as int? ?? 0)
-                      ? null : () => _moveViewport(0, 1),
+                      ? null
+                      : () => _moveViewport(0, 1),
                   child: const Text('下移视口'),
                 ),
               ],
@@ -633,9 +671,16 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                             },
                       child: CustomPaint(
                         size: size,
-                        painter: _CircuitPainter(records, vx, vy, vw, vh,
-                          selectedX: _selectedX, selectedY: _selectedY,
-                          selectionColor: Theme.of(context).colorScheme.primary),
+                        painter: _CircuitPainter(
+                          records,
+                          vx,
+                          vy,
+                          vw,
+                          vh,
+                          selectedX: _selectedX,
+                          selectedY: _selectedY,
+                          selectionColor: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                     ),
                   ),
@@ -658,13 +703,18 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
                   final control = _controls[index];
                   return ListTile(
                     dense: true,
-                    selected: control.x == _selectedX && control.y == _selectedY,
+                    selected:
+                        control.x == _selectedX && control.y == _selectedY,
                     title: Text(control.label),
-                    subtitle: Text('坐标 ${control.x}, ${control.y} · 类型 ${control.type}'),
-                    onTap: _busy ? null : () => setState(() {
-                      _selectedX = control.x;
-                      _selectedY = control.y;
-                    }),
+                    subtitle: Text(
+                      '坐标 ${control.x}, ${control.y} · 类型 ${control.type}',
+                    ),
+                    onTap: _busy
+                        ? null
+                        : () => setState(() {
+                            _selectedX = control.x;
+                            _selectedY = control.y;
+                          }),
                   );
                 },
               ),
@@ -680,45 +730,65 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
               runSpacing: 8,
               children: [
                 FilledButton.tonal(
-                  onPressed: _busy || _mask == 0 || !selectedControl ? null : () =>
-                      _send('worldCircuitTrigger', {
-                        'x': _selectedX, 'y': _selectedY, 'mask': _mask,
-                      }),
+                  onPressed: _busy || _mask == 0 || !selectedControl
+                      ? null
+                      : () => _send('worldCircuitTrigger', {
+                          'x': _selectedX,
+                          'y': _selectedY,
+                          'mask': _mask,
+                        }),
                   child: const Text('操作所选设备'),
                 ),
                 OutlinedButton(
-                  onPressed: _busy || _mask == 0 ? null : () =>
-                      _send('worldCircuitTrigger', {
-                        'x': _selectedX, 'y': _selectedY, 'mask': _mask,
-                        'direct': true,
-                      }),
+                  onPressed: _busy || _mask == 0
+                      ? null
+                      : () => _send('worldCircuitTrigger', {
+                          'x': _selectedX,
+                          'y': _selectedY,
+                          'mask': _mask,
+                          'direct': true,
+                        }),
                   child: const Text('发送线路脉冲'),
                 ),
               ],
             ),
           const Text('深色格为空白；方块编号显示于较大格子。红／蓝／绿／黄线为实际接线，白框表示制动器。'),
-          if (displayRegion != null && displayWidth > 0 && displayHeight > 0 &&
+          if (displayRegion != null &&
+              displayWidth > 0 &&
+              displayHeight > 0 &&
               displayFrame is Uint8List) ...[
             const SizedBox(height: 12),
-            Text('像素区域：${displayRegion['x']}, ${displayRegion['y']} · '
-                '$displayWidth × $displayHeight 格'),
+            Text(
+              '像素区域：${displayRegion['x']}, ${displayRegion['y']} · '
+              '$displayWidth × $displayHeight 格',
+            ),
             if (displayPixelCount == 0)
               const Text('选区无原版像素装置。')
             else ...[
               Align(
                 alignment: Alignment.topLeft,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: math.min(800,
-                    MediaQuery.sizeOf(context).height * .65 *
-                        displayWidth / displayHeight)),
+                  constraints: BoxConstraints(
+                    maxWidth: math.min(
+                      800,
+                      MediaQuery.sizeOf(context).height *
+                          .65 *
+                          displayWidth /
+                          displayHeight,
+                    ),
+                  ),
                   child: ComputerDisplay(
-                    key: s['displayIdentity'] == null ? null : ObjectKey(s['displayIdentity']),
+                    key: s['displayIdentity'] == null
+                        ? null
+                        : ObjectKey(s['displayIdentity']),
                     rgba: displayFrame,
                     width: displayWidth,
                     height: displayHeight,
                     label: '所选区域实际像素盒状态',
                     hostStages: widget.hostStages,
-                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
                   ),
                 ),
               ),
@@ -727,7 +797,9 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton(
-                onPressed: _busy ? null : () => _send('worldCircuitRefreshDisplay'),
+                onPressed: _busy
+                    ? null
+                    : () => _send('worldCircuitRefreshDisplay'),
                 child: const Text('刷新像素区域'),
               ),
             ),
@@ -755,8 +827,15 @@ class _CircuitPainter extends CustomPainter {
   final int x, y, width, height;
   final int? selectedX, selectedY;
   final Color selectionColor;
-  _CircuitPainter(this.bytes, this.x, this.y, this.width, this.height, {
-    this.selectedX, this.selectedY, required this.selectionColor,
+  _CircuitPainter(
+    this.bytes,
+    this.x,
+    this.y,
+    this.width,
+    this.height, {
+    this.selectedX,
+    this.selectedY,
+    required this.selectionColor,
   });
   @override
   void paint(Canvas canvas, Size size) {
@@ -838,13 +917,21 @@ class _CircuitPainter extends CustomPainter {
         text.paint(canvas, rect.topLeft + const Offset(2, 2));
       }
     }
-    if (selectedX != null && selectedY != null &&
-        selectedX! >= x && selectedX! < x + width &&
-        selectedY! >= y && selectedY! < y + height) {
+    if (selectedX != null &&
+        selectedY != null &&
+        selectedX! >= x &&
+        selectedX! < x + width &&
+        selectedY! >= y &&
+        selectedY! < y + height) {
       canvas.drawRect(
-        Rect.fromLTWH((selectedX! - x) * sx, (selectedY! - y) * sy, sx, sy)
-            .deflate(math.min(1, math.min(sx, sy) / 4)),
-        Paint()..color = selectionColor
+        Rect.fromLTWH(
+          (selectedX! - x) * sx,
+          (selectedY! - y) * sy,
+          sx,
+          sy,
+        ).deflate(math.min(1, math.min(sx, sy) / 4)),
+        Paint()
+          ..color = selectionColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = math.min(2, math.min(sx, sy) / 2),
       );
@@ -858,6 +945,7 @@ class _CircuitPainter extends CustomPainter {
       old.y != y ||
       old.width != width ||
       old.height != height ||
-      old.selectedX != selectedX || old.selectedY != selectedY ||
+      old.selectedX != selectedX ||
+      old.selectedY != selectedY ||
       old.selectionColor != selectionColor;
 }

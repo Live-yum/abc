@@ -68,16 +68,23 @@ class _DisplayBackend implements WorldCircuitSourceBackend {
   }
 
   @override
-  Future<void> closeWorldCircuit(int id) async { closes++; }
+  Future<void> closeWorldCircuit(int id) async {
+    closes++;
+  }
+
   @override
-  Future<void> cancelWorldCircuitOperation() async { cancels++; }
+  Future<void> cancelWorldCircuitOperation() async {
+    cancels++;
+  }
+
   @override
   Future<WorldCircuitProgress?> worldCircuitProgress() async => null;
   @override
   Future<void> releaseWorldCircuitSource(WorldCircuitSource source) async {}
 }
 
-class _BatchBackend extends _DisplayBackend implements WorldCircuitBatchBackend {
+class _BatchBackend extends _DisplayBackend
+    implements WorldCircuitBatchBackend {
   int batches = 0;
   @override
   Future<WorldCircuitBatchResult> commandAndReadPixels(
@@ -93,7 +100,10 @@ class _BatchBackend extends _DisplayBackend implements WorldCircuitBatchBackend 
         pixels: await commandWorldCircuit(id, pixels),
       );
     } catch (error) {
-      return WorldCircuitBatchResult(command: result, readError: error.toString());
+      return WorldCircuitBatchResult(
+        command: result,
+        readError: error.toString(),
+      );
     }
   }
 }
@@ -147,7 +157,9 @@ Future<WorldCircuitSession> _open(_DisplayBackend backend) async {
   final session = WorldCircuitSession.fromSource(
     backend,
     const WorldCircuitSource.file(
-      path: '/fixture/wiring.wld', length: 1000, name: 'wiring.wld',
+      path: '/fixture/wiring.wld',
+      length: 1000,
+      name: 'wiring.wld',
     ),
   );
   await session.open();
@@ -167,7 +179,8 @@ Future<void> _until(bool Function() ready) async {
 }
 
 Future<void> _oneRuntimeBatch(
-  WorldCircuitSession session, _DisplayBackend backend,
+  WorldCircuitSession session,
+  _DisplayBackend backend,
 ) async {
   backend.holdMutation = Completer<void>();
   session.run();
@@ -179,44 +192,59 @@ Future<void> _oneRuntimeBatch(
 }
 
 void main() {
-  test('event owner keeps generic tick batches and queued triggers ordered', () async {
-    final backend = _EventOwnerBackend();
-    final session = await _open(backend);
-    final inputs = <Future<WorldCircuitResult>>[];
-    backend.onReply = (ordinal) {
-      if (ordinal == 1) inputs.add(session.command(WorldCircuitCommand.trigger(17, 29)));
-      if (ordinal == 2) {
-        inputs.add(session.command(WorldCircuitCommand.trigger(19, 31)));
-        inputs.add(session.command(WorldCircuitCommand.trigger(21, 33)));
-      }
-      if (ordinal == 3) session.pause();
-    };
-    session.run();
-    await _until(() => !session.running && !session.busy);
-    await Future.wait(inputs);
-    expect(backend.batches, 3);
-    expect(backend.maximumActiveBatches, 1);
-    expect(backend.ticks, 18);
-    expect(backend.commands.map((c) => (c.words[1], c.words[2])), [
-      (3, 0), (9, 37), (2, 17), (3, 0), (9, 37),
-      (2, 19), (2, 21), (3, 0), (9, 37),
-    ]);
-    await session.close();
-    session.dispose();
-  });
+  test(
+    'event owner keeps generic tick batches and queued triggers ordered',
+    () async {
+      final backend = _EventOwnerBackend();
+      final session = await _open(backend);
+      final inputs = <Future<WorldCircuitResult>>[];
+      backend.onReply = (ordinal) {
+        if (ordinal == 1) {
+          inputs.add(session.command(WorldCircuitCommand.trigger(17, 29)));
+        }
+        if (ordinal == 2) {
+          inputs.add(session.command(WorldCircuitCommand.trigger(19, 31)));
+          inputs.add(session.command(WorldCircuitCommand.trigger(21, 33)));
+        }
+        if (ordinal == 3) session.pause();
+      };
+      session.run();
+      await _until(() => !session.running && !session.busy);
+      await Future.wait(inputs);
+      expect(backend.batches, 3);
+      expect(backend.maximumActiveBatches, 1);
+      expect(backend.ticks, 18);
+      expect(backend.commands.map((c) => (c.words[1], c.words[2])), [
+        (3, 0),
+        (9, 37),
+        (2, 17),
+        (3, 0),
+        (9, 37),
+        (2, 19),
+        (2, 21),
+        (3, 0),
+        (9, 37),
+      ]);
+      await session.close();
+      session.dispose();
+    },
+  );
 
-  test('immediate owner yields to a queued pause without a batch burst', () async {
-    final backend = _ImmediateGuardBackend();
-    final session = await _open(backend);
-    backend.pauseAfterFirst = session.pause;
-    session.run();
-    await _until(() => !session.running && !session.busy);
-    expect(backend.batches, 1);
-    expect(backend.ticks, 6);
-    expect(session.error, isNull);
-    await session.close();
-    session.dispose();
-  });
+  test(
+    'immediate owner yields to a queued pause without a batch burst',
+    () async {
+      final backend = _ImmediateGuardBackend();
+      final session = await _open(backend);
+      backend.pauseAfterFirst = session.pause;
+      session.run();
+      await _until(() => !session.running && !session.busy);
+      expect(backend.batches, 1);
+      expect(backend.ticks, 6);
+      expect(session.error, isNull);
+      await session.close();
+      session.dispose();
+    },
+  );
 
   test('pause and restart never overlap a draining owner batch', () async {
     final backend = _EventOwnerBackend()
@@ -242,36 +270,41 @@ void main() {
   });
 
   for (final operation in ['display', 'mode']) {
-    test('pause invalidates runtime waiting for an earlier $operation', () async {
-      final backend = _EventOwnerBackend();
-      final session = await _open(backend);
-      backend.holdPixels = Completer<void>();
-      final selecting = operation == 'display'
-          ? session.refreshDisplay() : session.setOptimization(true);
-      await _until(() => session.busy);
-      session.run();
-      await Future<void>.delayed(const Duration(milliseconds: 110));
-      expect(backend.batches, 0);
-      session.pause();
-      backend.holdPixels!.complete();
-      await selecting;
-      await Future<void>.delayed(Duration.zero);
-      expect(backend.batches, 0);
-      expect(session.optimizationEnabled, operation == 'mode');
-      backend.holdPixels = null;
-      backend.onReply = (_) => session.pause();
-      session.run();
-      await _until(() => !session.running && !session.busy);
-      expect(backend.batches, 1);
-      expect(backend.commands.last.words, _region.command.words);
-      await session.close();
-      session.dispose();
-    });
+    test(
+      'pause invalidates runtime waiting for an earlier $operation',
+      () async {
+        final backend = _EventOwnerBackend();
+        final session = await _open(backend);
+        backend.holdPixels = Completer<void>();
+        final selecting = operation == 'display'
+            ? session.refreshDisplay()
+            : session.setOptimization(true);
+        await _until(() => session.busy);
+        session.run();
+        await Future<void>.delayed(const Duration(milliseconds: 110));
+        expect(backend.batches, 0);
+        session.pause();
+        backend.holdPixels!.complete();
+        await selecting;
+        await Future<void>.delayed(Duration.zero);
+        expect(backend.batches, 0);
+        expect(session.optimizationEnabled, operation == 'mode');
+        backend.holdPixels = null;
+        backend.onReply = (_) => session.pause();
+        session.run();
+        await _until(() => !session.running && !session.busy);
+        expect(backend.batches, 1);
+        expect(backend.commands.last.words, _region.command.words);
+        await session.close();
+        session.dispose();
+      },
+    );
   }
 
   for (final ending in ['close', 'cancel', 'read-error']) {
     test('no later ticks are scheduled after $ending', () async {
-      final backend = _EventOwnerBackend()..responseHolds[1] = Completer<void>();
+      final backend = _EventOwnerBackend()
+        ..responseHolds[1] = Completer<void>();
       final session = await _open(backend);
       backend.failPixels = ending == 'read-error';
       session.run();
@@ -297,83 +330,106 @@ void main() {
 
   for (final batched in [false, true]) {
     for (final optimized in [false, true]) {
-      test('selected pixels follow generic ticks: batch=$batched mode=$optimized', () async {
-        final backend = batched ? _BatchBackend() : _DisplayBackend();
-        final session = await _open(backend);
-        await session.setOptimization(optimized);
-        backend.commands.clear();
-        await session.command(WorldCircuitCommand.trigger(17, 29, mask: 4));
-        await _oneRuntimeBatch(session, backend);
-        expect(backend.commands.map((c) => c.words[1]), [2, 3, 9]);
-        expect(backend.commands[0].words[2], 17);
-        expect(backend.commands[1].words, WorldCircuitCommand.ticks(6).words);
-        expect(backend.commands[2].words, _region.command.words);
-        expect(backend.ticks, 6);
-        expect(session.optimizationEnabled, optimized);
-        expect(session.dirty, isTrue);
-        expect(session.displayPixelCount, 1);
-        if (backend is _BatchBackend) expect(backend.batches, 1);
-        await session.close();
-        session.dispose();
-      });
+      test(
+        'selected pixels follow generic ticks: batch=$batched mode=$optimized',
+        () async {
+          final backend = batched ? _BatchBackend() : _DisplayBackend();
+          final session = await _open(backend);
+          await session.setOptimization(optimized);
+          backend.commands.clear();
+          await session.command(WorldCircuitCommand.trigger(17, 29, mask: 4));
+          await _oneRuntimeBatch(session, backend);
+          expect(backend.commands.map((c) => c.words[1]), [2, 3, 9]);
+          expect(backend.commands[0].words[2], 17);
+          expect(backend.commands[1].words, WorldCircuitCommand.ticks(6).words);
+          expect(backend.commands[2].words, _region.command.words);
+          expect(backend.ticks, 6);
+          expect(session.optimizationEnabled, optimized);
+          expect(session.dirty, isTrue);
+          expect(session.displayPixelCount, 1);
+          if (backend is _BatchBackend) expect(backend.batches, 1);
+          await session.close();
+          session.dispose();
+        },
+      );
     }
 
-    for (final mutation in [WorldCircuitCommand.ticks(6), WorldCircuitCommand.trigger(43, 52, mask: 2)]) {
-      test('accepted kind ${mutation.words[1]} survives read failure: batch=$batched', () async {
-        final backend = batched ? _BatchBackend() : _DisplayBackend();
-        final session = await _open(backend);
-        backend.failPixels = true;
-        await expectLater(session.command(mutation, refreshViewport: true), throwsStateError);
-        expect(session.result!.resultKind, mutation.words[1]);
-        expect(session.dirty, isTrue);
-        expect(session.running, isFalse);
-        expect(session.error.toString(), contains('pixel read failed'));
-        expect(backend.commands.where((c) => c.mutates).length, 1);
-        await session.close();
-        session.dispose();
-      });
+    for (final mutation in [
+      WorldCircuitCommand.ticks(6),
+      WorldCircuitCommand.trigger(43, 52, mask: 2),
+    ]) {
+      test(
+        'accepted kind ${mutation.words[1]} survives read failure: batch=$batched',
+        () async {
+          final backend = batched ? _BatchBackend() : _DisplayBackend();
+          final session = await _open(backend);
+          backend.failPixels = true;
+          await expectLater(
+            session.command(mutation, refreshViewport: true),
+            throwsStateError,
+          );
+          expect(session.result!.resultKind, mutation.words[1]);
+          expect(session.dirty, isTrue);
+          expect(session.running, isFalse);
+          expect(session.error.toString(), contains('pixel read failed'));
+          expect(backend.commands.where((c) => c.mutates).length, 1);
+          await session.close();
+          session.dispose();
+        },
+      );
     }
   }
 
-  test('an imported world runs without a program or selected PixelBox region', () async {
-    final backend = _BatchBackend();
-    final session = WorldCircuitSession(backend, Uint8List.fromList([1]));
-    await session.open();
-    await _oneRuntimeBatch(session, backend);
-    expect(backend.commands.map((c) => c.words[1]), [3]);
-    expect(backend.batches, 0);
-    expect(backend.ticks, 6);
-    expect(session.displayRegion, isNull);
-    expect(session.displayFrame, isNull);
-    expect(session.dirty, isTrue);
-    await session.close();
-    session.dispose();
-  });
+  test(
+    'an imported world runs without a program or selected PixelBox region',
+    () async {
+      final backend = _BatchBackend();
+      final session = WorldCircuitSession(backend, Uint8List.fromList([1]));
+      await session.open();
+      await _oneRuntimeBatch(session, backend);
+      expect(backend.commands.map((c) => c.words[1]), [3]);
+      expect(backend.batches, 0);
+      expect(backend.ticks, 6);
+      expect(session.displayRegion, isNull);
+      expect(session.displayFrame, isNull);
+      expect(session.dirty, isTrue);
+      await session.close();
+      session.dispose();
+    },
+  );
 
-  test('refresh preserves the previous frame until the fresh read completes', () async {
-    final backend = _BatchBackend();
-    final session = await _open(backend);
-    final previous = session.displayFrame;
-    backend.frame++;
-    backend.holdPixels = Completer<void>();
-    final refreshing = session.refreshDisplay();
-    await _until(() => backend.commands.isNotEmpty);
-    expect(session.displayFrame, same(previous));
-    backend.holdPixels!.complete();
-    await refreshing;
-    backend.holdPixels = null;
-    expect(session.displayFrame, isNot(same(previous)));
-    expect(session.displayFrame!.length, _region.width * _region.height * 4);
-    expect(session.displayFrame!.sublist(0, 4), [0, 0, 0, 0]);
-    expect(session.displayFrame!.sublist(session.displayFrame!.length - 4), [255, 255, 255, 255]);
-    backend.commands.clear();
-    session.pause();
-    await session.refreshDisplay();
-    expect(backend.commands.map((c) => c.words[1]), [9]);
-    backend.commands.clear();
-    await session.command(WorldCircuitCommand.save());
-    expect(backend.commands.map((c) => c.words[1]), [6]);
-    await session.close();
-    session.dispose();
-  });
+  test(
+    'refresh preserves the previous frame until the fresh read completes',
+    () async {
+      final backend = _BatchBackend();
+      final session = await _open(backend);
+      final previous = session.displayFrame;
+      backend.frame++;
+      backend.holdPixels = Completer<void>();
+      final refreshing = session.refreshDisplay();
+      await _until(() => backend.commands.isNotEmpty);
+      expect(session.displayFrame, same(previous));
+      backend.holdPixels!.complete();
+      await refreshing;
+      backend.holdPixels = null;
+      expect(session.displayFrame, isNot(same(previous)));
+      expect(session.displayFrame!.length, _region.width * _region.height * 4);
+      expect(session.displayFrame!.sublist(0, 4), [0, 0, 0, 0]);
+      expect(session.displayFrame!.sublist(session.displayFrame!.length - 4), [
+        255,
+        255,
+        255,
+        255,
+      ]);
+      backend.commands.clear();
+      session.pause();
+      await session.refreshDisplay();
+      expect(backend.commands.map((c) => c.words[1]), [9]);
+      backend.commands.clear();
+      await session.command(WorldCircuitCommand.save());
+      expect(backend.commands.map((c) => c.words[1]), [6]);
+      await session.close();
+      session.dispose();
+    },
+  );
 }

@@ -95,7 +95,7 @@ class _LeaseBackend extends GenericWorldCircuitBackend {
 }
 
 void main() {
-  test('fully saved generic WLD persists across Workspace recreation and reopens ordinary ticks without a reset', () async {
+  test('saved WLD reopens in a new generic owner without implicit ticks or programs', () async {
     final backend = GenericWorldCircuitBackend(),
         vault = MemoryVault(),
         sources = _Sources();
@@ -132,13 +132,10 @@ void main() {
     final state = workspace.view.result['worldCircuit'] as Map;
     expect(state['open'], isTrue);
     expect(state.containsKey('programName'), isFalse);
-    expect(state['ticks'], 1);
+    expect(state['ticks'], 0);
     expect(backend.commands.where((c) => c.mutates), isEmpty);
     await workspace.dispatch('worldCircuitStep');
-    expect(
-      (workspace.view.result['worldCircuit'] as Map)['ticks'],
-      2,
-    );
+    expect((workspace.view.result['worldCircuit'] as Map)['ticks'], 1);
     await workspace.close();
     workspace.dispose();
   });
@@ -146,7 +143,8 @@ void main() {
   test(
     'workspace close cancels pending import and shares one teardown',
     () async {
-      final backend = GenericWorldCircuitBackend()..holdOpen = Completer<void>();
+      final backend = GenericWorldCircuitBackend()
+        ..holdOpen = Completer<void>();
       final workspace = Workspace(
         engine: FakeEngine(),
         files: FakeFiles(),
@@ -434,10 +432,7 @@ void main() {
       await workspace.dispatch('worldCircuitImport');
       expect(workspace.view.error, isEmpty);
       expect(backend.opens, 2);
-      expect(
-        (workspace.view.result['worldCircuit'] as Map)['open'],
-        isTrue,
-      );
+      expect((workspace.view.result['worldCircuit'] as Map)['open'], isTrue);
       await workspace.close();
       workspace.dispose();
     },
@@ -446,7 +441,8 @@ void main() {
   test(
     'cancelled opening cannot adopt a late result; same source can reopen',
     () async {
-      final backend = GenericWorldCircuitBackend()..holdOpen = Completer<void>();
+      final backend = GenericWorldCircuitBackend()
+        ..holdOpen = Completer<void>();
       final workspace = Workspace(
         engine: FakeEngine(),
         files: FakeFiles(),
@@ -466,35 +462,39 @@ void main() {
       expect(backend.commands, isEmpty);
       backend.holdOpen = null;
       await workspace.dispatch('worldCircuitImport');
-      expect(
-        (workspace.view.result['worldCircuit'] as Map)['open'],
-        isTrue,
-      );
+      expect((workspace.view.result['worldCircuit'] as Map)['open'], isTrue);
       await workspace.close();
       workspace.dispose();
       expect(backend.closes, 2);
     },
   );
 
-  test('WLD reset restores original ticks and clears selected display', () async {
-    final backend = GenericWorldCircuitBackend();
-    final workspace = Workspace(engine: FakeEngine(), files: FakeFiles(),
-        worldCircuitBackend: backend, worldCircuitFiles: _Sources());
-    Map state() => workspace.view.result['worldCircuit'] as Map;
-    await workspace.dispatch('worldCircuitChooseWorld');
-    await workspace.dispatch('worldCircuitImport');
-    await workspace.dispatch('worldCircuitStep');
-    expect(state()['ticks'], 1);
-    expect(state()['dirty'], isTrue);
-    await workspace.dispatch('worldCircuitReset');
-    expect(workspace.view.error, isEmpty);
-    expect(state()['ticks'], 0);
-    expect(state()['dirty'], isFalse);
-    expect(state()['displayRegion'], isNull);
-    expect(state().containsKey('programName'), isFalse);
-    expect(backend.opens, 2);
-    expect(backend.closes, 1);
-    await workspace.close();
-    workspace.dispose();
-  });
+  test(
+    'WLD reset restores original ticks and clears selected display',
+    () async {
+      final backend = GenericWorldCircuitBackend();
+      final workspace = Workspace(
+        engine: FakeEngine(),
+        files: FakeFiles(),
+        worldCircuitBackend: backend,
+        worldCircuitFiles: _Sources(),
+      );
+      Map state() => workspace.view.result['worldCircuit'] as Map;
+      await workspace.dispatch('worldCircuitChooseWorld');
+      await workspace.dispatch('worldCircuitImport');
+      await workspace.dispatch('worldCircuitStep');
+      expect(state()['ticks'], 1);
+      expect(state()['dirty'], isTrue);
+      await workspace.dispatch('worldCircuitReset');
+      expect(workspace.view.error, isEmpty);
+      expect(state()['ticks'], 0);
+      expect(state()['dirty'], isFalse);
+      expect(state()['displayRegion'], isNull);
+      expect(state().containsKey('programName'), isFalse);
+      expect(backend.opens, 2);
+      expect(backend.closes, 1);
+      await workspace.close();
+      workspace.dispose();
+    },
+  );
 }

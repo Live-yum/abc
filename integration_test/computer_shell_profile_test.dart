@@ -10,7 +10,9 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:terraforge/application/workspace.dart';
+
 import 'support/generic_circuit_profile.dart';
+
 import 'package:terraforge/engine/native_engine.dart' as core;
 import 'package:terraforge/engine/world_circuit_backend.dart';
 import 'package:terraforge/engine/world_circuit_factory.dart'
@@ -20,6 +22,7 @@ import 'package:terraforge/platform/world_circuit_files.dart';
 import 'package:terraforge/ui/terra_app.dart';
 
 import 'support/computer_inputs_native.dart' as inputs;
+
 import 'package:terraforge/ui/computer_display.dart';
 
 class _Files implements FileGateway {
@@ -115,7 +118,9 @@ class _ObservedBackend
 
   @override
   Future<WorldCircuitBatchResult> commandAndReadPixels(
-    int id, WorldCircuitCommand command, WorldCircuitCommand pixels,
+    int id,
+    WorldCircuitCommand command,
+    WorldCircuitCommand pixels,
   ) async {
     if (inner is WorldCircuitBatchBackend) {
       final frame = await (inner as WorldCircuitBatchBackend)
@@ -125,8 +130,10 @@ class _ObservedBackend
       return frame;
     }
     final result = await commandWorldCircuit(id, command);
-    return WorldCircuitBatchResult(command: result,
-        pixels: await commandWorldCircuit(id, pixels));
+    return WorldCircuitBatchResult(
+      command: result,
+      pixels: await commandWorldCircuit(id, pixels),
+    );
   }
 
   @override
@@ -184,7 +191,11 @@ void main() {
     );
     final source = await inputs.computerInput();
     final engine = core.createTerraEngine();
-    final backend = _ObservedBackend(circuit_factory.createWorldCircuitBackend(engine)! as WorldCircuitSourceBackend, []);
+    final backend = _ObservedBackend(
+      circuit_factory.createWorldCircuitBackend(engine)!
+          as WorldCircuitSourceBackend,
+      [],
+    );
     final workspace = _Workspace(
       engine: engine,
       files: _Files(),
@@ -302,10 +313,17 @@ void main() {
       final fixed = state();
       final fixedPixels = fixed['displayFrame'] as Uint8List;
       expect((fixed['ticks'] as int) - ticksBefore, 32);
-      expect(fixedPixels.length, selection.displayRegion['width']! * selection.displayRegion['height']! * 4);
+      expect(
+        fixedPixels.length,
+        selection.displayRegion['width']! *
+            selection.displayRegion['height']! *
+            4,
+      );
       report['fixedCheckpoint'] = {
-        'ticks': 32, 'displayRegion': selection.displayRegion,
-        'trigger': selection.trigger, 'pixelSha256': sha256.convert(fixedPixels).toString(),
+        'ticks': 32,
+        'displayRegion': selection.displayRegion,
+        'trigger': selection.trigger,
+        'pixelSha256': sha256.convert(fixedPixels).toString(),
         'pixelBytes': fixedPixels.length,
       };
       final monitor = find.byType(ComputerDisplay);
@@ -343,7 +361,11 @@ void main() {
           final eventStart = Timeline.now;
           await workspace.dispatch('worldCircuitTrigger', selection.trigger);
           await workspace.dispatch('worldCircuitToggle');
-          interactions.add({'event': 'direct-trigger-and-resume', 'startUs': eventStart, 'endUs': Timeline.now});
+          interactions.add({
+            'event': 'direct-trigger-and-resume',
+            'startUs': eventStart,
+            'endUs': Timeline.now,
+          });
         }
         final remainingUs = start + 30000000 - Timeline.now;
         if (remainingUs > 0) {
@@ -366,10 +388,7 @@ void main() {
       SchedulerBinding.instance.removeTimingsCallback(receive);
       final after = state();
       expect(after['running'], isFalse);
-      expect(
-        after['ticks'] as int,
-        greaterThan(before['ticks'] as int),
-      );
+      expect(after['ticks'] as int, greaterThan(before['ticks'] as int));
       expect(droppedFrames, 0);
       final selected = frames.where((frame) {
         final at = frame.timestampInMicroseconds(FramePhase.vsyncStart);

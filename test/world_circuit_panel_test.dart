@@ -43,7 +43,7 @@ Widget _panel(
 );
 
 Future<void> _reveal(WidgetTester tester, Finder target) async {
-  await tester.ensureVisible(target, alignment: .5);
+  await Scrollable.ensureVisible(tester.element(target), alignment: .5);
   await tester.pumpAndSettle();
 }
 
@@ -72,7 +72,10 @@ void main() {
         ..addAll({
           'displayRegion': {
             'name': 'selected pixels',
-            'x': 40, 'y': 50, 'width': 4, 'height': 3,
+            'x': 40,
+            'y': 50,
+            'width': 4,
+            'height': 3,
           },
           'displayFrame': frame,
           'displayPixelCount': 1,
@@ -84,12 +87,18 @@ void main() {
       await _reveal(tester, target);
       final viewportRect = tester.getRect(target);
       expect(viewportRect.width, lessThanOrEqualTo(size.width));
-      await tester.tapAt(Offset(
-        viewportRect.left + viewportRect.width / 8,
-        viewportRect.top + viewportRect.height / 6,
-      ));
+      await tester.tapAt(
+        Offset(
+          viewportRect.left + viewportRect.width / 8,
+          viewportRect.top + viewportRect.height / 6,
+        ),
+      );
       await tester.pump();
-      expect(calls, isEmpty, reason: 'Selecting a cell does not trigger wiring');
+      expect(
+        calls,
+        isEmpty,
+        reason: 'Selecting a cell does not trigger wiring',
+      );
       expect(find.textContaining('选中 (40, 50)'), findsOneWidget);
       await _reveal(tester, find.text('操作所选设备'));
       await tester.tap(find.text('操作所选设备'));
@@ -100,9 +109,7 @@ void main() {
       await tester.tap(find.text('发送线路脉冲'));
       await tester.pump();
       expect(calls.last.$1, 'worldCircuitTrigger');
-      expect(calls.last.$2, {
-        'x': 40, 'y': 50, 'mask': 15, 'direct': true,
-      });
+      expect(calls.last.$2, {'x': 40, 'y': 50, 'mask': 15, 'direct': true});
 
       final display = find.byType(ComputerDisplay);
       await _reveal(tester, display);
@@ -124,9 +131,9 @@ void main() {
     tester,
   ) async {
     final calls = <(String, Map<String, Object?>)>[];
-    await tester.pumpWidget(_panel(
-      _state()..addAll({'busy': true, 'running': true}), calls,
-    ));
+    await tester.pumpWidget(
+      _panel(_state()..addAll({'busy': true, 'running': true}), calls),
+    );
     await tester.tap(find.text('暂停'));
     await tester.pump();
     expect(calls.single.$1, 'worldCircuitPause');
@@ -142,9 +149,9 @@ void main() {
       tester,
     ) async {
       final calls = <(String, Map<String, Object?>)>[];
-      await tester.pumpWidget(_panel(
-        _state()..['optimizationSupported'] = supported, calls,
-      ));
+      await tester.pumpWidget(
+        _panel(_state()..['optimizationSupported'] = supported, calls),
+      );
       expect(find.textContaining('后续运行结果可能不同'), findsOneWidget);
       expect(find.textContaining('现有像素不会重算'), findsOneWidget);
       final toggle = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
@@ -165,60 +172,69 @@ void main() {
     }, timeout: const Timeout(Duration(seconds: 30)));
   }
 
-  testWidgets('region inputs dispatch explicit rectangles and reject overflow', (
-    tester,
-  ) async {
-    final calls = <(String, Map<String, Object?>)>[];
-    await tester.pumpWidget(_panel(_state(), calls));
-    for (final entry in ['100', '75', '6', '4'].asMap().entries) {
-      final field = find.byType(TextField).at(entry.key);
-      await _reveal(tester, field);
-      await tester.enterText(field, entry.value);
-    }
-    await _reveal(tester, find.text('读取区域像素'));
-    await tester.tap(find.text('读取区域像素'));
-    await tester.pump();
-    expect(calls.single.$1, 'worldCircuitReadDisplay');
-    expect(calls.single.$2, {'x': 100, 'y': 75, 'width': 6, 'height': 4});
-    await _reveal(tester, find.text('查看接线'));
-    await tester.tap(find.text('查看接线'));
-    await tester.pump();
-    expect(calls.last.$1, 'worldCircuitViewport');
-    expect(calls.last.$2, calls.first.$2);
-    final field = find.byType(TextField).first;
-    await _reveal(tester, field);
-    await tester.enterText(field, '599');
-    await _reveal(tester, find.text('读取区域像素'));
-    await tester.tap(find.text('读取区域像素'));
-    await tester.pump();
-    expect(calls, hasLength(2));
-    expect(find.textContaining('请输入世界范围内的区域'), findsOneWidget);
-    await _finish(tester);
-  }, timeout: const Timeout(Duration(seconds: 30)));
-
-  testWidgets('new view synchronizes coordinates and empty pixel region is clear', (
-    tester,
-  ) async {
-    final calls = <(String, Map<String, Object?>)>[];
-    await tester.pumpWidget(_panel(_state(), calls));
-    final next = _state()
-      ..['viewport'] = {'x': 100, 'y': 75, 'width': 6, 'height': 4}
-      ..['records'] = _switchRecord(100, 75)
-      ..['displayRegion'] = {
-        'name': 'empty pixels', 'x': 100, 'y': 75, 'width': 6, 'height': 4,
+  testWidgets(
+    'region inputs dispatch explicit rectangles and reject overflow',
+    (tester) async {
+      final calls = <(String, Map<String, Object?>)>[];
+      await tester.pumpWidget(_panel(_state(), calls));
+      for (final entry in ['100', '75', '6', '4'].asMap().entries) {
+        final field = find.byType(TextField).at(entry.key);
+        await _reveal(tester, field);
+        await tester.enterText(field, entry.value);
       }
-      ..['displayFrame'] = Uint8List(6 * 4 * 4)
-      ..['displayPixelCount'] = 0;
-    await tester.pumpWidget(_panel(next, calls));
-    expect(
-      tester.widgetList<TextField>(find.byType(TextField))
-          .map((field) => field.controller!.text),
-      ['100', '75', '6', '4'],
-    );
-    expect(find.text('选区无原版像素装置。'), findsOneWidget);
-    expect(find.byType(ComputerDisplay), findsNothing);
-    await _finish(tester);
-  }, timeout: const Timeout(Duration(seconds: 30)));
+      await _reveal(tester, find.text('读取区域像素'));
+      await tester.tap(find.text('读取区域像素'));
+      await tester.pump();
+      expect(calls.single.$1, 'worldCircuitReadDisplay');
+      expect(calls.single.$2, {'x': 100, 'y': 75, 'width': 6, 'height': 4});
+      await _reveal(tester, find.text('查看接线'));
+      await tester.tap(find.text('查看接线'));
+      await tester.pump();
+      expect(calls.last.$1, 'worldCircuitViewport');
+      expect(calls.last.$2, calls.first.$2);
+      final field = find.byType(TextField).first;
+      await _reveal(tester, field);
+      await tester.enterText(field, '599');
+      await _reveal(tester, find.text('读取区域像素'));
+      await tester.tap(find.text('读取区域像素'));
+      await tester.pump();
+      expect(calls, hasLength(2));
+      expect(find.textContaining('请输入世界范围内的区域'), findsOneWidget);
+      await _finish(tester);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    'new view synchronizes coordinates and empty pixel region is clear',
+    (tester) async {
+      final calls = <(String, Map<String, Object?>)>[];
+      await tester.pumpWidget(_panel(_state(), calls));
+      final next = _state()
+        ..['viewport'] = {'x': 100, 'y': 75, 'width': 6, 'height': 4}
+        ..['records'] = _switchRecord(100, 75)
+        ..['displayRegion'] = {
+          'name': 'empty pixels',
+          'x': 100,
+          'y': 75,
+          'width': 6,
+          'height': 4,
+        }
+        ..['displayFrame'] = Uint8List(6 * 4 * 4)
+        ..['displayPixelCount'] = 0;
+      await tester.pumpWidget(_panel(next, calls));
+      expect(
+        tester
+            .widgetList<TextField>(find.byType(TextField))
+            .map((field) => field.controller!.text),
+        ['100', '75', '6', '4'],
+      );
+      expect(find.text('选区无原版像素装置。'), findsOneWidget);
+      expect(find.byType(ComputerDisplay), findsNothing);
+      await _finish(tester);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 
   testWidgets('discovered timer selection requires an explicit operation', (
     tester,
@@ -261,8 +277,12 @@ void main() {
       await tester.tap(find.text(move.$1));
       await tester.pump();
       expect(calls.last.$1, 'worldCircuitViewport');
-      expect(calls.last.$2,
-          {'x': move.$2, 'y': move.$3, 'width': 4, 'height': 3});
+      expect(calls.last.$2, {
+        'x': move.$2,
+        'y': move.$3,
+        'width': 4,
+        'height': 3,
+      });
     }
     final edge = _state()
       ..['viewport'] = {'x': 0, 'y': 0, 'width': 4, 'height': 3};

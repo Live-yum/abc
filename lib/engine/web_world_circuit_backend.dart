@@ -128,13 +128,13 @@ class WebWorldCircuitBackend
       throw const FormatException('Invalid circuit command and pixels batch');
     }
     return (await _bridge
-              .commandAndReadPixels(
-                session.toJS,
-                jsonEncode(command.words).toJS,
-                jsonEncode(pixels.words).toJS,
-              )
-              .toDart)
-          .convert();
+            .commandAndReadPixels(
+              session.toJS,
+              jsonEncode(command.words).toJS,
+              jsonEncode(pixels.words).toJS,
+            )
+            .toDart)
+        .convert();
   }
 
   @override

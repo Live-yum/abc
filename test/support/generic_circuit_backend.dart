@@ -29,17 +29,21 @@ class GenericCircuitBackend implements WorldCircuitSourceBackend {
     ..[20] = netPulses;
 
   @override
-  Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async =>
-      _open();
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async => _open();
 
   @override
   Future<WorldCircuitResult> openWorldCircuitSource(
     WorldCircuitSource world, {
     void Function(WorldCircuitProgress)? onProgress,
   }) async {
-    onProgress?.call(const WorldCircuitProgress(
-      stage: 'compile', phase: 1, completed: 1, total: 2,
-    ));
+    onProgress?.call(
+      const WorldCircuitProgress(
+        stage: 'compile',
+        phase: 1,
+        completed: 1,
+        total: 2,
+      ),
+    );
     await holdOpen?.future;
     return _open();
   }
@@ -64,18 +68,27 @@ class GenericCircuitBackend implements WorldCircuitSourceBackend {
     final x = command.words[2], y = command.words[3];
     final width = command.words[4], height = command.words[5];
     final pixelsOnly = command.words[1] == 9;
-    final selected = cells.where((cell) =>
-        cell.$1 >= x && cell.$1 < x + width &&
-        cell.$2 >= y && cell.$2 < y + height &&
-        (!pixelsOnly || cell.$3 == 445)).toList();
+    final selected = cells
+        .where(
+          (cell) =>
+              cell.$1 >= x &&
+              cell.$1 < x + width &&
+              cell.$2 >= y &&
+              cell.$2 < y + height &&
+              (!pixelsOnly || cell.$3 == 445),
+        )
+        .toList();
     final bytes = Uint8List(selected.length * 16);
     final data = ByteData.sublistView(bytes);
     for (var i = 0; i < selected.length; i++) {
       final cell = selected[i], at = i * 16;
       data.setUint32(at, cell.$1, Endian.little);
       data.setUint32(at + 4, cell.$2, Endian.little);
-      data.setUint32(at + 8,
-          cell.$3 | (cell.$4 << 16) | (1 << 24), Endian.little);
+      data.setUint32(
+        at + 8,
+        cell.$3 | (cell.$4 << 16) | (1 << 24),
+        Endian.little,
+      );
       data.setInt16(at + 12, cell.$5, Endian.little);
     }
     return bytes;

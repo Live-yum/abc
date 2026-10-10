@@ -15,13 +15,16 @@ class _HeldBackend implements WorldCircuitBackend {
     stats[18] = ticks;
     return WorldCircuitResult(1, stats, Uint8List(0));
   }
+
   @override
-  Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async => snapshot();
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async =>
+      snapshot();
   @override
   Future<void> closeWorldCircuit(int session) async {}
   @override
   Future<WorldCircuitResult> commandWorldCircuit(
-    int session, WorldCircuitCommand command,
+    int session,
+    WorldCircuitCommand command,
   ) async {
     if (command.words[1] == 3) {
       final gate = holdClock;
@@ -135,11 +138,7 @@ void main() {
         // The completed serial operation is idle when it publishes. A 1 ms
         // pump can also launch the next held batch, so idle must be observed
         // synchronously at publication instead of after the pump returns.
-        expect(
-          publicationPulses,
-          everyElement(before + 6),
-          reason: describe(),
-        );
+        expect(publicationPulses, everyElement(before + 6), reason: describe());
         expect(publicationBusy, everyElement(isFalse), reason: describe());
       } finally {
         session.removeListener(observePublication);

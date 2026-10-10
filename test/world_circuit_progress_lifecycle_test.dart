@@ -6,7 +6,6 @@ import 'package:terraforge/domain/circuit_display.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 import 'package:terraforge/engine/world_circuit_session.dart';
 
-
 const _source = WorldCircuitSource.file(
   path: '/fixture/wiring.wld',
   length: 1000,
@@ -44,9 +43,14 @@ class _SourceBackend implements WorldCircuitSourceBackend {
     Uint8List(0),
     resultKind: kind,
     reserved: kind == 6 ? 0 : 4,
-    worldSource: kind == 6 ? const WorldCircuitSource.file(
-      path: '/output/copy.wld', length: 100, name: 'copy.wld', token: 'wld',
-    ) : null,
+    worldSource: kind == 6
+        ? const WorldCircuitSource.file(
+            path: '/output/copy.wld',
+            length: 100,
+            name: 'copy.wld',
+            token: 'wld',
+          )
+        : null,
   );
 
   @override
@@ -65,16 +69,23 @@ class _SourceBackend implements WorldCircuitSourceBackend {
 
   @override
   Future<WorldCircuitResult> commandWorldCircuit(
-    int session, WorldCircuitCommand command,
+    int session,
+    WorldCircuitCommand command,
   ) async {
     commands.add(command);
     return reply(session, kind: command.words[1]);
   }
 
   @override
-  Future<void> closeWorldCircuit(int session) async { closes++; }
+  Future<void> closeWorldCircuit(int session) async {
+    closes++;
+  }
+
   @override
-  Future<void> cancelWorldCircuitOperation() async { cancels++; }
+  Future<void> cancelWorldCircuitOperation() async {
+    cancels++;
+  }
+
   @override
   Future<WorldCircuitProgress?> worldCircuitProgress() async => null;
   @override
@@ -169,7 +180,8 @@ void main() {
         backend.holdProgress = Completer<WorldCircuitProgress?>();
         backend.holdClose = Completer<void>();
         final stepping = session.command(
-          WorldCircuitCommand.ticks(6), refreshViewport: true,
+          WorldCircuitCommand.ticks(6),
+          refreshViewport: true,
         );
         await tester.pump(const Duration(milliseconds: 1));
         await tester.pump(const Duration(milliseconds: 250));
@@ -247,7 +259,8 @@ void main() {
       session.addListener(() => published.add(session.progress?.stage));
 
       final stepping = session.command(
-        WorldCircuitCommand.ticks(6), refreshViewport: true,
+        WorldCircuitCommand.ticks(6),
+        refreshViewport: true,
       );
       await tester.pump(const Duration(milliseconds: 1));
       expect(backend.batches, 1);

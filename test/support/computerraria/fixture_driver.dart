@@ -32,7 +32,7 @@ class ComputerrariaFixtureDriver {
   Future<T> _serial<T>(Future<T> Function(int generation) body) {
     final generation = _generation;
     final next = _queue.then((_) => body(generation));
-    _queue = next.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _queue = next.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return next;
   }
 
@@ -69,19 +69,28 @@ class ComputerrariaFixtureDriver {
       return true;
     }
     final original = opened.sourceSha256 == ComputerrariaComputer.sourceSha256;
-    final restored = provenance != null && provenance.matches(opened.sourceSha256 ?? '');
-    if ((!original && !restored) || opened.width != 15200 || opened.height != 7200) {
+    final restored =
+        provenance != null && provenance.matches(opened.sourceSha256 ?? '');
+    if ((!original && !restored) ||
+        opened.width != 15200 ||
+        opened.height != 7200) {
       return false;
     }
     _session = opened.session;
-    ComputerrariaComputer.isReady(await _command(generation, ComputerrariaComputer.ready()));
+    ComputerrariaComputer.isReady(
+      await _command(generation, ComputerrariaComputer.ready()),
+    );
     final points = <int>[];
     for (final address in [0, ComputerrariaComputer.romBytes - 4]) {
       final (x, y) = ComputerrariaComputer.romLamp(address, 0);
       points.addAll([x, y, 0, 0]);
     }
     for (final mirror in [0, 1]) {
-      final (x, y) = ComputerrariaComputer.ramLamp(0x100000, 31, mirror: mirror);
+      final (x, y) = ComputerrariaComputer.ramLamp(
+        0x100000,
+        31,
+        mirror: mirror,
+      );
       points.addAll([x, y, 0, 0]);
     }
     await _lamps(generation, points);
@@ -96,7 +105,10 @@ class ComputerrariaFixtureDriver {
   });
 
   Future<Uint8List> _lamps(int generation, List<int> points) async {
-    final result = await _command(generation, WorldCircuitCommand.lamps(points));
+    final result = await _command(
+      generation,
+      WorldCircuitCommand.lamps(points),
+    );
     if (result.records.length != points.length * 4) {
       throw const FormatException('Incomplete fixture lamp records');
     }
@@ -116,7 +128,15 @@ class ComputerrariaFixtureDriver {
 
   Future<void> _readMonitor(int generation) async {
     final region = ComputerrariaComputer.mono;
-    final result = await _command(generation, WorldCircuitCommand.pixels(region.x, region.y, region.width, region.height));
+    final result = await _command(
+      generation,
+      WorldCircuitCommand.pixels(
+        region.x,
+        region.y,
+        region.width,
+        region.height,
+      ),
+    );
     pixels = region.decode(result);
   }
 
@@ -124,12 +144,16 @@ class ComputerrariaFixtureDriver {
 
   Future<void> _reset(int generation) async {
     for (var i = 0; i < 3; i++) {
-      if (ComputerrariaComputer.isReady(await _command(generation, ComputerrariaComputer.ready()))) {
+      if (ComputerrariaComputer.isReady(
+        await _command(generation, ComputerrariaComputer.ready()),
+      )) {
         break;
       }
       await _command(generation, ComputerrariaComputer.clock());
     }
-    if (!ComputerrariaComputer.isReady(await _command(generation, ComputerrariaComputer.ready()))) {
+    if (!ComputerrariaComputer.isReady(
+      await _command(generation, ComputerrariaComputer.ready()),
+    )) {
       await _command(generation, ComputerrariaComputer.resetSignal());
     }
     for (final command in ComputerrariaComputer.resetBus) {
@@ -145,8 +169,14 @@ class ComputerrariaFixtureDriver {
       }
       programIncomplete = true;
       await _reset(generation);
-      for (final records in ComputerrariaComputer.programWrites(_program, image)) {
-        await _command(generation, WorldCircuitCommand.lamps(records, write: true));
+      for (final records in ComputerrariaComputer.programWrites(
+        _program,
+        image,
+      )) {
+        await _command(
+          generation,
+          WorldCircuitCommand.lamps(records, write: true),
+        );
       }
       await _reset(generation);
       await _readMonitor(generation);
@@ -178,7 +208,10 @@ class ComputerrariaFixtureDriver {
 
   void setKey(String direction, bool pressed) {
     ComputerrariaComputer.key(direction);
-    if (!pressed) { _held.remove(direction); return; }
+    if (!pressed) {
+      _held.remove(direction);
+      return;
+    }
     if (!canRun) {
       throw StateError('Load the fixture ROM first');
     }
@@ -187,14 +220,25 @@ class ComputerrariaFixtureDriver {
     }
   }
 
-  void releaseKeys() { _held.clear(); _pending.clear(); }
-  void cancel() { _generation++; releaseKeys(); }
+  void releaseKeys() {
+    _held.clear();
+    _pending.clear();
+  }
+
+  void cancel() {
+    _generation++;
+    releaseKeys();
+  }
 
   ComputerProvenanceRecord savedProvenance(String sha256) {
     if (!verified || programIncomplete) {
       throw StateError('Incomplete fixture state');
     }
-    return ComputerProvenanceRecord(wldSha256: sha256, programName: programName,
-        programImage: _program, physicalPulses: physicalPulses);
+    return ComputerProvenanceRecord(
+      wldSha256: sha256,
+      programName: programName,
+      programImage: _program,
+      physicalPulses: physicalPulses,
+    );
   }
 }

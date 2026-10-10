@@ -183,101 +183,146 @@ Future<void> _pause(
 }
 
 void main() {
-  test('wide wire bounds locate a real cell below an empty top-left crop', () async {
-    final backend = _WideBoundsBackend();
-    final workspace = _Workspace(backend);
-    try {
-      await workspace.dispatch('worldCircuitChooseWorld');
-      await workspace.dispatch('worldCircuitImport');
-      expect(workspace.view.error, isEmpty);
-      final state = workspace.worldCircuitView;
-      expect(state['viewport'],
-          {'x': 40, 'y': 595, 'width': 256, 'height': 256});
-      final records = state['records'] as Uint8List;
-      expect(records, hasLength(16));
-      final data = ByteData.sublistView(records);
-      expect(data.getUint32(0, Endian.little), 40);
-      expect(data.getUint32(4, Endian.little), 850);
-      expect(backend.commands.first.words.sublist(2, 6), [40, 50, 1, 801]);
-      expect(backend.commands.every((command) => command.words[1] == 1), isTrue,
-          reason: 'Import locates wiring without operating any input');
-      expect(state['dirty'], isFalse);
-    } finally {
-      await workspace.close();
-      workspace.dispose();
-    }
-  });
-
-  test('a long leftmost column is read in bounded single-column segments', () async {
-    final backend = _TallBoundsBackend();
-    final workspace = _Workspace(backend);
-    try {
-      await workspace.dispatch('worldCircuitChooseWorld');
-      await workspace.dispatch('worldCircuitImport');
-      expect(workspace.view.error, isEmpty);
-      final probes = backend.commands.take(3).map(
-          (command) => command.words.sublist(2, 6)).toList();
-      expect(probes, [
-        [40, 50, 1, 65536],
-        [40, 65586, 1, 65536],
-        [40, 131122, 1, 79],
-      ]);
-      expect(backend.commands, hasLength(4));
-      expect(backend.commands.every((command) =>
-          command.words[1] == 1 &&
-          command.words[4] * command.words[5] <= 65536), isTrue);
-      final state = workspace.worldCircuitView;
-      expect(state['viewport'],
-          {'x': 40, 'y': 130945, 'width': 256, 'height': 256});
-      expect((state['records'] as Uint8List).length, 16);
-      expect(state['dirty'], isFalse);
-    } finally {
-      await workspace.close();
-      workspace.dispose();
-    }
-  });
-
-  test('viewport notifications publish matching records and retain a failed ROI', () async {
-    final backend = GenericCircuitBackend();
-    final workspace = _Workspace(backend);
-    final observed = <Map<String, Object?>>[];
-    void observe() => observed.add(workspace.worldCircuitView);
-    try {
-      await workspace.dispatch('worldCircuitChooseWorld');
-      await workspace.dispatch('worldCircuitImport');
-      workspace.addListener(observe);
-      await workspace.dispatch('worldCircuitViewport',
-          {'x': 42, 'y': 50, 'width': 2, 'height': 3});
-      expect(workspace.view.error, isEmpty);
-      expect(observed, isNotEmpty);
-      for (final state in observed) {
-        final viewport = state['viewport'] as Map;
-        final bytes = state['records'] as Uint8List;
-        final data = ByteData.sublistView(bytes);
-        for (var at = 0; at < bytes.length; at += 16) {
-          final x = data.getUint32(at, Endian.little);
-          final y = data.getUint32(at + 4, Endian.little);
-          expect(x, inInclusiveRange(viewport['x'] as int,
-              (viewport['x'] as int) + (viewport['width'] as int) - 1));
-          expect(y, inInclusiveRange(viewport['y'] as int,
-              (viewport['y'] as int) + (viewport['height'] as int) - 1));
-        }
+  test(
+    'wide wire bounds locate a real cell below an empty top-left crop',
+    () async {
+      final backend = _WideBoundsBackend();
+      final workspace = _Workspace(backend);
+      try {
+        await workspace.dispatch('worldCircuitChooseWorld');
+        await workspace.dispatch('worldCircuitImport');
+        expect(workspace.view.error, isEmpty);
+        final state = workspace.worldCircuitView;
+        expect(state['viewport'], {
+          'x': 40,
+          'y': 595,
+          'width': 256,
+          'height': 256,
+        });
+        final records = state['records'] as Uint8List;
+        expect(records, hasLength(16));
+        final data = ByteData.sublistView(records);
+        expect(data.getUint32(0, Endian.little), 40);
+        expect(data.getUint32(4, Endian.little), 850);
+        expect(backend.commands.first.words.sublist(2, 6), [40, 50, 1, 801]);
+        expect(
+          backend.commands.every((command) => command.words[1] == 1),
+          isTrue,
+          reason: 'Import locates wiring without operating any input',
+        );
+        expect(state['dirty'], isFalse);
+      } finally {
+        await workspace.close();
+        workspace.dispose();
       }
-      final before = workspace.worldCircuitView;
-      expect(before['viewport'], {'x': 42, 'y': 50, 'width': 2, 'height': 3});
-      backend.failNextViewport = true;
-      await workspace.dispatch('worldCircuitViewport',
-          {'x': 40, 'y': 50, 'width': 4, 'height': 3});
-      final failed = workspace.worldCircuitView;
-      expect(workspace.view.error, contains('viewport read rejected'));
-      expect(failed['viewport'], before['viewport']);
-      expect(failed['records'], same(before['records']));
-    } finally {
-      workspace.removeListener(observe);
-      await workspace.close();
-      workspace.dispose();
-    }
-  });
+    },
+  );
+
+  test(
+    'a long leftmost column is read in bounded single-column segments',
+    () async {
+      final backend = _TallBoundsBackend();
+      final workspace = _Workspace(backend);
+      try {
+        await workspace.dispatch('worldCircuitChooseWorld');
+        await workspace.dispatch('worldCircuitImport');
+        expect(workspace.view.error, isEmpty);
+        final probes = backend.commands
+            .take(3)
+            .map((command) => command.words.sublist(2, 6))
+            .toList();
+        expect(probes, [
+          [40, 50, 1, 65536],
+          [40, 65586, 1, 65536],
+          [40, 131122, 1, 79],
+        ]);
+        expect(backend.commands, hasLength(4));
+        expect(
+          backend.commands.every(
+            (command) =>
+                command.words[1] == 1 &&
+                command.words[4] * command.words[5] <= 65536,
+          ),
+          isTrue,
+        );
+        final state = workspace.worldCircuitView;
+        expect(state['viewport'], {
+          'x': 40,
+          'y': 130945,
+          'width': 256,
+          'height': 256,
+        });
+        expect((state['records'] as Uint8List).length, 16);
+        expect(state['dirty'], isFalse);
+      } finally {
+        await workspace.close();
+        workspace.dispose();
+      }
+    },
+  );
+
+  test(
+    'viewport notifications publish matching records and retain a failed ROI',
+    () async {
+      final backend = GenericCircuitBackend();
+      final workspace = _Workspace(backend);
+      final observed = <Map<String, Object?>>[];
+      void observe() => observed.add(workspace.worldCircuitView);
+      try {
+        await workspace.dispatch('worldCircuitChooseWorld');
+        await workspace.dispatch('worldCircuitImport');
+        workspace.addListener(observe);
+        await workspace.dispatch('worldCircuitViewport', {
+          'x': 42,
+          'y': 50,
+          'width': 2,
+          'height': 3,
+        });
+        expect(workspace.view.error, isEmpty);
+        expect(observed, isNotEmpty);
+        for (final state in observed) {
+          final viewport = state['viewport'] as Map;
+          final bytes = state['records'] as Uint8List;
+          final data = ByteData.sublistView(bytes);
+          for (var at = 0; at < bytes.length; at += 16) {
+            final x = data.getUint32(at, Endian.little);
+            final y = data.getUint32(at + 4, Endian.little);
+            expect(
+              x,
+              inInclusiveRange(
+                viewport['x'] as int,
+                (viewport['x'] as int) + (viewport['width'] as int) - 1,
+              ),
+            );
+            expect(
+              y,
+              inInclusiveRange(
+                viewport['y'] as int,
+                (viewport['y'] as int) + (viewport['height'] as int) - 1,
+              ),
+            );
+          }
+        }
+        final before = workspace.worldCircuitView;
+        expect(before['viewport'], {'x': 42, 'y': 50, 'width': 2, 'height': 3});
+        backend.failNextViewport = true;
+        await workspace.dispatch('worldCircuitViewport', {
+          'x': 40,
+          'y': 50,
+          'width': 4,
+          'height': 3,
+        });
+        final failed = workspace.worldCircuitView;
+        expect(workspace.view.error, contains('viewport read rejected'));
+        expect(failed['viewport'], before['viewport']);
+        expect(failed['records'], same(before['records']));
+      } finally {
+        workspace.removeListener(observe);
+        await workspace.close();
+        workspace.dispose();
+      }
+    },
+  );
 
   for (final size in [const Size(1440, 1000), const Size(390, 844)]) {
     testWidgets('runtime stays inside panel at ${size.width.toInt()}px', (
@@ -291,13 +336,24 @@ void main() {
       await workspace.dispatch('worldCircuitChooseWorld');
       await workspace.dispatch('worldCircuitImport');
       expect(workspace.worldCircuitView['open'], isTrue);
-      expect(workspace.worldCircuitView['viewport'],
-          {'x': 40, 'y': 50, 'width': 4, 'height': 3});
-      await workspace.dispatch('worldCircuitReadDisplay',
-          {'x': 40, 'y': 50, 'width': 4, 'height': 3});
+      expect(workspace.worldCircuitView['viewport'], {
+        'x': 40,
+        'y': 50,
+        'width': 4,
+        'height': 3,
+      });
+      await workspace.dispatch('worldCircuitReadDisplay', {
+        'x': 40,
+        'y': 50,
+        'width': 4,
+        'height': 3,
+      });
       // Establish a normal dirty state before measuring steady runtime frames.
-      await workspace.dispatch('worldCircuitTrigger',
-          {'x': 40, 'y': 50, 'mask': 1});
+      await workspace.dispatch('worldCircuitTrigger', {
+        'x': 40,
+        'y': 50,
+        'mask': 1,
+      });
       expect(workspace.worldCircuitView['dirty'], isTrue);
       final proxy = size.width < 1000
           ? ProfiledTerraController(
@@ -327,11 +383,17 @@ void main() {
       );
 
       workspace.viewReads = 0;
-      await workspace.dispatch('worldCircuitTrigger',
-          {'x': 40, 'y': 50, 'mask': 1});
+      await workspace.dispatch('worldCircuitTrigger', {
+        'x': 40,
+        'y': 50,
+        'mask': 1,
+      });
       await tester.pump();
-      expect(workspace.viewReads, greaterThan(0),
-          reason: 'An explicit input operation refreshes the workspace');
+      expect(
+        workspace.viewReads,
+        greaterThan(0),
+        reason: 'An explicit input operation refreshes the workspace',
+      );
 
       backend.holdTicks = Completer<void>();
       await workspace.dispatch('worldCircuitToggle');
@@ -406,8 +468,12 @@ void main() {
       expect(workspace.viewReads, greaterThan(0));
       expect(workspace.worldCircuitView['running'], isFalse);
       workspace.viewReads = 0;
-      await workspace.dispatch('worldCircuitViewport',
-          {'x': -1, 'y': 0, 'width': 1, 'height': 1});
+      await workspace.dispatch('worldCircuitViewport', {
+        'x': -1,
+        'y': 0,
+        'width': 1,
+        'height': 1,
+      });
       await tester.pump();
       expect(workspace.viewReads, greaterThan(0));
       expect(find.textContaining('x 必须在'), findsWidgets);
@@ -467,8 +533,12 @@ void main() {
         isNot(same(oldIdentity)),
       );
       expect(find.byType(ComputerDisplay), findsNothing);
-      await workspace.dispatch('worldCircuitReadDisplay',
-          {'x': 40, 'y': 50, 'width': 4, 'height': 3});
+      await workspace.dispatch('worldCircuitReadDisplay', {
+        'x': 40,
+        'y': 50,
+        'width': 4,
+        'height': 3,
+      });
       await tester.pumpAndSettle();
       expect(find.byType(ComputerDisplay), findsOneWidget);
 

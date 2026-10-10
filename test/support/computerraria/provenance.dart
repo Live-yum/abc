@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart' as crypto;
 
 import 'package:terraforge/platform/vault.dart';
+
 import 'layout.dart';
 
 const _maxSafeInteger = 9007199254740991;
