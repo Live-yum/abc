@@ -1,0 +1,41 @@
+name: Extract fixed full-shell formatted sources
+
+on:
+  push:
+    branches: [codex/inspect-shell-sources-c938c936]
+    paths:
+      - .github/workflows/inspect-shell-sources.yml
+      - .github/scripts/extract_shell_sources.py
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: inspect-shell-sources-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    if: github.repository == 'Live-yum/abc' && github.ref == 'refs/heads/codex/inspect-shell-sources-c938c936'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify exact archive and copy three original source members
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/extract_shell_sources.py "$RUNNER_TEMP/shell-sources-small"
+      - name: Preserve original formatted sources and metadata
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: shell-sources-11654654263-${{ github.sha }}
+          path: ${{ runner.temp }}/shell-sources-small/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
+
