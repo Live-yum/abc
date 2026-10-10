@@ -34,7 +34,7 @@ void main() {
         expect((stages[key] as Map)['count'], 1);
       }
       expect((stages['display.rgbaDecode'] as Map)['count'], 1);
-      expect((stages['display.listEquals'] as Map)['count'], 1);
+      expect((stages['display.frameIdentity'] as Map)['count'], 1);
       await session.close();
       session.dispose();
     },

@@ -201,12 +201,32 @@ class ComputerDisplayRegion {
     this.height,
   );
 
-  Uint8List decode(WorldCircuitResult response) {
+  /// Reuse only an unchanged frame from the same monitor. Published pixels are
+  /// never written again; a changed frame gets its own allocation. The optional
+  /// allocator lets ownership tests count RGBA buffers independently of reads.
+  /// It must return fresh, nonoverlapping storage of the requested length.
+  Uint8List decode(
+    WorldCircuitResult response, {
+    Uint8List? previous,
+    ComputerDisplayRegion? previousRegion,
+    Uint8List Function(int)? allocateRgba,
+  }) {
     if (response.resultKind != 9 ||
         response.records.length != width * height * 16) {
       throw const FormatException('显示器像素数量与已核验布局不匹配。');
     }
-    final out = Uint8List(width * height * 4), seen = Uint8List(width * height);
+    final length = width * height * 4;
+    final reusable =
+        previous != null &&
+        previous.length == length &&
+        previousRegion?.name == name &&
+        previousRegion?.x == x &&
+        previousRegion?.y == y &&
+        previousRegion?.width == width &&
+        previousRegion?.height == height;
+    final allocate = allocateRgba ?? Uint8List.new;
+    Uint8List? out = reusable ? null : allocate(length);
+    final seen = Uint8List(width * height);
     final d = ByteData.sublistView(response.records);
     for (var at = 0; at < response.records.length; at += 16) {
       final px = d.getUint32(at, Endian.little) - x;
@@ -229,12 +249,24 @@ class ComputerDisplayRegion {
       final index = py * width + px;
       if (seen[index] != 0) throw const FormatException('显示器像素重复。');
       seen[index] = 1;
-      final rgb = fx == 18 ? 0xffffff : 0;
-      out[index * 4] = (rgb >> 16) & 255;
-      out[index * 4 + 1] = (rgb >> 8) & 255;
-      out[index * 4 + 2] = rgb & 255;
-      out[index * 4 + 3] = 255;
+      final channel = fx == 18 ? 255 : 0, pixel = index * 4;
+      if (out == null) {
+        final prior = previous!;
+        if (prior[pixel] == channel &&
+            prior[pixel + 1] == channel &&
+            prior[pixel + 2] == channel &&
+            prior[pixel + 3] == 255) {
+          continue;
+        }
+        // Input records may arrive in any order. Copy the whole prior frame so
+        // that already checked pixels remain correct after the first change.
+        out = allocate(length)..setAll(0, prior);
+      }
+      out[pixel] = channel;
+      out[pixel + 1] = channel;
+      out[pixel + 2] = channel;
+      out[pixel + 3] = 255;
     }
-    return out;
+    return out ?? previous!;
   }
 }

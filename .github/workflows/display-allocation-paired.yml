@@ -1,0 +1,92 @@
+name: Display allocation paired diagnostic
+
+on:
+  push:
+    branches: [codex/display-allocation-paired-cf36]
+  workflow_dispatch:
+
+env:
+  CI: 'true'
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: display-allocation-paired-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  display-allocation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: ./.github/actions/setup-flutter
+      - run: flutter pub get --enforce-lockfile
+      - name: Static checks for the candidate
+        run: |
+          dart format lib/domain/computerraria_computer.dart lib/engine/world_circuit_session.dart test/computer_circuit_session_test.dart test/computer_display_reuse_test.dart test/support/computer_display_frames.dart tool/perf/computer_display_reuse_ab.dart
+      - name: Record the exact formatted source that will execute
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, stat, subprocess
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          entries = []
+          for name in sorted(filter(None, paths)):
+              path = pathlib.Path(name)
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              entries.append({'path': name, 'bytes': len(data), 'mode': oct(stat.S_IMODE(path.stat().st_mode)), 'sha256': hashlib.sha256(data).hexdigest()})
+          manifest = {'schema': 1, 'stage': 'after-format-before-analysis-tests-and-AOT', 'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip(), 'parentCommit': subprocess.check_output(['git', 'rev-parse', 'HEAD^']).decode().strip(), 'files': entries}
+          pathlib.Path(os.environ['RUNNER_TEMP'], 'display-reuse-source-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+          git diff --binary > "$RUNNER_TEMP/display-reuse-format.patch"
+          tar -czf "$RUNNER_TEMP/display-reuse-formatted-sources.tar.gz" lib/domain/computerraria_computer.dart lib/engine/world_circuit_session.dart test/computer_circuit_session_test.dart test/computer_display_reuse_test.dart test/support/computer_display_frames.dart tool/perf/computer_display_reuse_ab.dart .github/workflows/display-allocation-paired.yml
+      - name: Analyze formatted source
+        run: |
+          flutter analyze --no-pub
+      - name: Focused display and lifecycle contracts
+        run: flutter test --no-pub --concurrency=1 test/computerraria_computer_test.dart test/computer_display_reuse_test.dart test/computer_circuit_session_test.dart test/computer_runtime_batch_test.dart test/computer_display_test.dart
+      - name: Bounded pure Dart synthetic A/B
+        run: |
+          dart compile exe tool/perf/computer_display_reuse_ab.dart -o "$RUNNER_TEMP/display-reuse-ab"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, platform, subprocess
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          binary = root / 'display-reuse-ab'
+          source_manifest = root / 'display-reuse-source-manifest.json'
+          dart = subprocess.run(['dart', '--version'], check=True, capture_output=True, text=True)
+          metadata = {
+              'schema': 1,
+              'stage': 'after-AOT-compile-before-execution',
+              'aotBinaryBytes': binary.stat().st_size,
+              'aotBinarySha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
+              'sourceManifestSha256': hashlib.sha256(source_manifest.read_bytes()).hexdigest(),
+              'dartVersion': (dart.stdout + dart.stderr).strip(),
+              'uname': subprocess.check_output(['uname', '-a'], text=True).strip(),
+              'cpu': json.loads(subprocess.check_output(['lscpu', '--json'], text=True)),
+              'os': platform.platform(),
+              'ci': os.environ.get('CI'),
+              'flutterSuppressAnalytics': os.environ.get('FLUTTER_SUPPRESS_ANALYTICS'),
+          }
+          (root / 'display-reuse-environment.json').write_text(json.dumps(metadata, indent=2) + '\n')
+          PY
+          "$RUNNER_TEMP/display-reuse-ab" > "$RUNNER_TEMP/display-reuse-ab.json"
+      - name: Preserve raw synthetic measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: display-reuse-ab-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/display-reuse-ab.json
+            ${{ runner.temp }}/display-reuse-source-manifest.json
+            ${{ runner.temp }}/display-reuse-formatted-sources.tar.gz
+            ${{ runner.temp }}/display-reuse-format.patch
+            ${{ runner.temp }}/display-reuse-environment.json
+          if-no-files-found: warn
+          retention-days: 14

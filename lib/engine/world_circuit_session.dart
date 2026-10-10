@@ -35,6 +35,7 @@ class WorldCircuitSession extends ChangeNotifier {
   Uint8List _program = Uint8List(0);
   Uint8List get programImage => Uint8List.fromList(_program);
   final Map<String, Uint8List> displayFrames = {};
+  final Map<String, ComputerDisplayRegion> _displayFrameRegions = {};
   Object displayIdentity = Object();
   final Stopwatch _runWatch = Stopwatch();
   int physicalPulses = 0, displayedFrames = 0, _lastDisplayMicros = 0;
@@ -297,13 +298,18 @@ class WorldCircuitSession extends ChangeNotifier {
   ) {
     final rgba = hostStages.measure(
       'display.rgbaDecode',
-      () => region.decode(response),
+      () => region.decode(
+        response,
+        previous: displayFrames[region.name],
+        previousRegion: _displayFrameRegions[region.name],
+      ),
     );
     final unchanged = hostStages.measure(
-      'display.listEquals',
-      () => listEquals(displayFrames[region.name], rgba),
+      'display.frameIdentity',
+      () => identical(displayFrames[region.name], rgba),
     );
     if (!unchanged) displayFrames[region.name] = rgba;
+    _displayFrameRegions[region.name] = region;
   }
 
   Future<void> _refreshDisplay(int id, ComputerDisplayRegion region) async {
@@ -790,6 +796,7 @@ class WorldCircuitSession extends ChangeNotifier {
       programName = null;
       _program = Uint8List(0);
       displayFrames.clear();
+      _displayFrameRegions.clear();
       displayIdentity = Object();
       physicalPulses = 0;
       displayedFrames = 0;
@@ -848,6 +855,7 @@ class WorldCircuitSession extends ChangeNotifier {
     _fragments.clear();
     _indexedGeometry = null;
     displayFrames.clear();
+    _displayFrameRegions.clear();
     _closed = true;
   }
 
