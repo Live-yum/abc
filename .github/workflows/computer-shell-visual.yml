@@ -1,0 +1,58 @@
+name: Static shell visual evidence / fixed A-B
+
+on:
+  push:
+    branches: [codex/ui-shell-visual-c938]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: computer-shell-visual-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  visual:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-flutter
+      - name: Install the distro PNG decoder
+        run: sudo apt-get update && sudo apt-get install -y python3-pil
+      - name: Prepare dependencies and archive the normalized test
+        run: |
+          flutter pub get --enforce-lockfile
+          dart format test/computer_shell_visual_test.dart
+          mkdir -p build/computer-shell-visual
+          cp test/computer_shell_visual_test.dart build/computer-shell-visual/
+          cp tool/perf/computer_shell_visual.py tool/perf/computer_shell_visual_test.py build/computer-shell-visual/
+          cp .github/workflows/computer-shell-visual.yml build/computer-shell-visual/
+          git diff --binary > build/computer-shell-visual/format.patch
+      - name: Analyze the screenshot test
+        run: flutter analyze --no-pub test/computer_shell_visual_test.dart
+      - name: Verify exact decoded pixel comparison
+        run: /usr/bin/python3 -m unittest discover -s tool/perf -p 'computer_shell_visual_test.py'
+      - name: Generate four observations and compare A-B pixels
+        timeout-minutes: 12
+        run: /usr/bin/python3 tool/perf/computer_shell_visual.py "$RUNNER_TEMP/shell-visual-results"
+      - name: Upload actual screenshots, comparison and generation logs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: static-shell-visual-${{ github.sha }}
+          path: |
+            build/computer-shell-visual/
+            ${{ runner.temp }}/shell-visual-results/*.png
+            ${{ runner.temp }}/shell-visual-results/*.json
+            ${{ runner.temp }}/shell-visual-results/*.log
+          if-no-files-found: error
+          retention-days: 30
