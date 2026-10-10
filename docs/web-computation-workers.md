@@ -60,6 +60,12 @@ cancelling a command invokes native rollback and retains a usable session,
 while cancelling import closes its partial native and scratch owners. The
 existing owner-wide `cancel()` retains its worker-termination behavior.
 
+The optional `commandAndReadPixels` transport validates a generic trigger/tick
+and bounded PixelBox query before running both in one owner queue slot. It has
+no fixed coordinates, dimensions or sample identity. A read failure preserves
+its successful mutation receipt and never replays the command. This ordering
+is not rollback atomicity. Every world uses the same six-tick/100 ms runner.
+
 Circuit optimization defaults OFF. Command 10 switches only at an idle boundary.
 ON selects generation-stamp device deduplication and the documented WireHead-style
 ordinary PixelBox gate-wave pairing policy; future display behavior may differ.
@@ -67,7 +73,7 @@ The host requires both `circuitWorldOptimization: 1` and
 `circuitWorldWireHeadPixels: 1`. READY bit 1 reports ON, bit 2 topology eligibility,
 and bit 3 the selected pixel policy; bit 0 is zero. An unsupported same-color
 cross-axis topology rejects ON explicitly. Switching itself preserves the native
-session, source, ROM/RAM and existing pixels. See [the two rule paths](COMPUTERRARIA.md).
+session, source, lamp states and existing pixels. See [the two rule paths](COMPUTERRARIA.md).
 
 The client allocates monotonically increasing public handles and maps them to
 the current worker's native handles. Close immediately rejects new operations

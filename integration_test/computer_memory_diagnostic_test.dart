@@ -9,7 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:terraforge/application/workspace.dart';
-import 'package:terraforge/domain/computerraria_computer.dart';
+
+import 'support/generic_circuit_profile.dart';
+
 import 'package:terraforge/engine/native_engine.dart' as core;
 import 'package:terraforge/engine/world_circuit_backend.dart';
 import 'package:terraforge/engine/world_circuit_factory.dart'
@@ -60,12 +62,12 @@ class _ObservedBackend
   final List<Map<String, Object?>> events;
   WorldCircuitResult? latest;
   int? session;
-  int physicalClocks = 0;
+  int nativeTicks = 0;
   @override
-  bool get completesComputerBatchFromExternalEvent =>
+  bool get completesCircuitBatchFromExternalEvent =>
       inner is WorldCircuitExternalOwnerBackend &&
       (inner as WorldCircuitExternalOwnerBackend)
-          .completesComputerBatchFromExternalEvent;
+          .completesCircuitBatchFromExternalEvent;
 
   @override
   Future<WorldCircuitResult> openWorldCircuitSource(
@@ -106,11 +108,9 @@ class _ObservedBackend
   Future<WorldCircuitResult> openWorldCircuit(Uint8List world) =>
       throw StateError('Only WLD source handles are permitted');
 
-  void _observeClock(WorldCircuitCommand command) {
-    if (command.words[1] == 2 &&
-        command.words[2] == 3194 &&
-        command.words[3] == 153) {
-      physicalClocks += command.words[8];
+  void _observeTick(WorldCircuitCommand command) {
+    if (command.words[1] == 3) {
+      nativeTicks += command.words[8];
     }
   }
 
@@ -120,27 +120,27 @@ class _ObservedBackend
     WorldCircuitCommand command,
   ) async {
     latest = await inner.commandWorldCircuit(id, command);
-    _observeClock(command);
+    _observeTick(command);
     return latest!;
   }
 
   @override
-  Future<WorldCircuitComputerFrame> clockAndReadDisplay(
+  Future<WorldCircuitBatchResult> commandAndReadPixels(
     int id,
-    WorldCircuitCommand clock,
+    WorldCircuitCommand command,
     WorldCircuitCommand pixels,
   ) async {
-    if (inner is WorldCircuitComputerBackend) {
-      final frame = await (inner as WorldCircuitComputerBackend)
-          .clockAndReadDisplay(id, clock, pixels);
-      latest = frame.clock;
-      _observeClock(clock);
+    if (inner is WorldCircuitBatchBackend) {
+      final frame = await (inner as WorldCircuitBatchBackend)
+          .commandAndReadPixels(id, command, pixels);
+      latest = frame.command;
+      _observeTick(command);
       return frame;
     }
-    final clockResult = await commandWorldCircuit(id, clock);
-    return WorldCircuitComputerFrame(
-      clock: clockResult,
-      display: await commandWorldCircuit(id, pixels),
+    final result = await commandWorldCircuit(id, command);
+    return WorldCircuitBatchResult(
+      command: result,
+      pixels: await commandWorldCircuit(id, pixels),
     );
   }
 
@@ -222,7 +222,7 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
     false,
     profileMode: mode,
   );
-  Map state() => workspace.view.result['worldCircuit'] as Map;
+  Map state() => workspace.worldCircuitView;
   void check() {
     expect(workspace.view.error, isEmpty);
     expect(state()['error'], isNull);
@@ -233,7 +233,7 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
       theme: terraTheme(),
       home: Scaffold(
         body: ListenableBuilder(
-          listenable: workspace,
+          listenable: workspace.worldCircuitChanges,
           builder: (context, child) => SingleChildScrollView(
             child: WorldCircuitPanel(
               state: Map<String, Object?>.from(state()),
@@ -268,13 +268,10 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
     journal.boundary('$kind-start', cycle);
     await os.request('point', 'cycle-$cycle.$kind-start');
     await action(operation);
-    expect(state()['computerVerified'], isTrue);
-    expect(state()['keyboardVerified'], isTrue);
+    expect(state()['open'], isTrue);
     expect(backend.latest!.stats[0], 2);
-    expect(
-      (state()['displayFrames'] as Map)[ComputerrariaComputer.mono.name],
-      hasLength(64 * 48 * 4),
-    );
+    expect(state()['width'], greaterThan(0));
+    expect(state()['height'], greaterThan(0));
     journal.boundary('$kind-ready', cycle);
     await os.request('point', 'cycle-$cycle.$kind-ready');
   }
@@ -321,79 +318,99 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
       await action('worldCircuitChooseWorld');
     }
     await load('initial-import', 'worldCircuitImport');
-    expect(state()['programName'], isNull);
+    expect(events.last['sourceSha256'], publicCircuitFixtureSha256);
     expect(state()['optimizationEnabled'], isFalse);
-    if (optimized) await action('worldCircuitOptimization', {'enabled': true});
-    await action('worldCircuitLoadPong');
-    expect(state()['programName'], 'Pong (upstream RV32I).bin');
-    expect(state()['canRunComputer'], isTrue);
-    final clocksBefore = backend.physicalClocks;
-    final pulsesBefore = state()['physicalPulses'] as int;
-    final distinctMonoStates = <String>{};
+    final selection = GenericCircuitSelection.fromState(state());
+    evidence['worldWidth'] = state()['width'];
+    evidence['worldHeight'] = state()['height'];
+    evidence['displayRegion'] = selection.displayRegion;
+    evidence['trigger'] = selection.trigger;
+    Future<void> selectDisplay() async {
+      await action('worldCircuitViewport', selection.displayRegion);
+      await action('worldCircuitReadDisplay', selection.displayRegion);
+    }
+
+    await selectDisplay();
+    final originalPixelSha = sha256
+        .convert(state()['displayFrame'] as Uint8List)
+        .toString();
+    final originalTicks = state()['ticks'] as int;
+    if (optimized) {
+      await action('worldCircuitOptimization', {'enabled': true});
+    }
+    await action('worldCircuitTrigger', selection.trigger);
+    final ticksBefore = backend.nativeTicks;
+    final modelBefore = state()['ticks'] as int;
+    final distinctPixelStates = <String>{};
     var maximumLitPixels = 0;
     for (var batch = 0; batch < 32; batch++) {
-      await action('worldCircuitStep', {'pulses': 128});
-      final frame =
-          (state()['displayFrames'] as Map)[ComputerrariaComputer.mono.name]
-              as Uint8List;
-      expect(frame.length, 64 * 48 * 4);
+      await action('worldCircuitStep');
+      final frame = state()['displayFrame'] as Uint8List;
+      expect(
+        frame.length,
+        selection.displayRegion['width']! *
+            selection.displayRegion['height']! *
+            4,
+      );
       var lit = 0;
       for (var at = 0; at < frame.length; at += 4) {
-        if (frame[at] != 0 || frame[at + 1] != 0 || frame[at + 2] != 0) lit++;
+        if (frame[at] != 0 || frame[at + 1] != 0 || frame[at + 2] != 0) {
+          lit++;
+        }
       }
-      if (lit > maximumLitPixels) maximumLitPixels = lit;
+      if (lit > maximumLitPixels) {
+        maximumLitPixels = lit;
+      }
       final digest = sha256.convert(frame).toString();
-      distinctMonoStates.add(digest);
+      distinctPixelStates.add(digest);
       journal.recorder.viewportSnapshots.add({
         'cycle': cycle,
         'mode': mode,
         'batch': batch,
-        'physicalPulses': (batch + 1) * 128,
-        'nativeClockDelta': backend.physicalClocks - clocksBefore,
-        'modelPhysicalPulseDelta':
-            (state()['physicalPulses'] as int) - pulsesBefore,
-        'monoSha256': digest,
-        'monoLitPixels': lit,
+        'ticks': batch + 1,
+        'nativeTickDelta': backend.nativeTicks - ticksBefore,
+        'modelTickDelta': (state()['ticks'] as int) - modelBefore,
+        'pixelSha256': digest,
+        'litPixels': lit,
       });
     }
     await action('worldCircuitPause');
     expect(state()['running'], isFalse);
-    expect(backend.physicalClocks - clocksBefore, 4096);
-    expect((state()['physicalPulses'] as int) - pulsesBefore, 4096);
+    expect(backend.nativeTicks - ticksBefore, 32);
+    expect((state()['ticks'] as int) - modelBefore, 32);
     expect(state()['optimizationEnabled'], optimized);
     expect(backend.latest!.circuitOptimizationEnabled, optimized);
     expect(backend.latest!.wireHeadPixelRulesEnabled, optimized);
-    if (optimized) {
-      expect(distinctMonoStates.length, greaterThan(1));
-      expect(maximumLitPixels, greaterThan(0));
-    }
-    evidence['physicalPulseDelta'] = 4096;
-    evidence['pulseBatchCount'] = 32;
-    evidence['pulseBatchSize'] = 128;
-    evidence['distinctMonoStates'] = distinctMonoStates.length;
-    evidence['maximumLitPixels'] = maximumLitPixels;
-    evidence['nativeClockDelta'] = backend.physicalClocks - clocksBefore;
-    evidence['modelPhysicalPulseDelta'] =
-        (state()['physicalPulses'] as int) - pulsesBefore;
-    evidence['programName'] = state()['programName'];
-    evidence['optimizationEnabledDuringPulse'] = optimized;
-    evidence['nativeOptimizationEnabledDuringPulse'] =
-        backend.latest!.circuitOptimizationEnabled;
-    evidence['nativeWireHeadPixelRulesDuringPulse'] =
-        backend.latest!.wireHeadPixelRulesEnabled;
-    final mono =
-        (state()['displayFrames'] as Map)[ComputerrariaComputer.mono.name]
-            as Uint8List;
-    final displayDigest = sha256.convert(mono).toString();
-    evidence['pausedMonoSha256'] = displayDigest;
+    evidence.addAll({
+      'tickDelta': 32,
+      'tickBatchCount': 32,
+      'tickBatchSize': 1,
+      'distinctPixelStates': distinctPixelStates.length,
+      'maximumLitPixels': maximumLitPixels,
+      'nativeTickDelta': backend.nativeTicks - ticksBefore,
+      'modelTickDelta': (state()['ticks'] as int) - modelBefore,
+      'optimizationEnabledDuringTicks': optimized,
+      'nativeOptimizationEnabledDuringTicks':
+          backend.latest!.circuitOptimizationEnabled,
+      'nativeWireHeadPixelRulesDuringTicks':
+          backend.latest!.wireHeadPixelRulesEnabled,
+    });
+    final displayDigest = sha256
+        .convert(state()['displayFrame'] as Uint8List)
+        .toString();
+    evidence['pausedPixelSha256'] = displayDigest;
+    evidence['hostStages'] = workspace.hostStages.snapshot();
     if (scenario == 'reset-original') {
       await load('reset-original', 'worldCircuitReset');
-      expect(state()['programName'], isNull);
-      expect(state()['physicalPulses'], 0);
-      expect(state()['canRunComputer'], isFalse);
+      expect(state()['ticks'], originalTicks);
+      expect(state()['optimizationEnabled'], isFalse);
+      await selectDisplay();
+      expect(
+        sha256.convert(state()['displayFrame'] as Uint8List).toString(),
+        originalPixelSha,
+      );
       evidence['resetRestoredOriginal'] = true;
     } else {
-      final savedPulses = state()['physicalPulses'];
       await action('worldCircuitSave');
       expect(files.saved?.sha256, isNotNull);
       evidence['savedWldSha256'] = files.saved!.sha256;
@@ -414,29 +431,25 @@ Future<_ObservedBackend> runComputerMemoryDiagnosticCycle({
       disposed = false;
       await mount();
       await action('worldCircuitChooseWorld');
-      final beforeReopen = backend.physicalClocks;
+      final beforeReopen = backend.nativeTicks;
       await load('saved-reopen', 'worldCircuitImport');
-      expect(state()['restoredFromExport'], isTrue);
-      expect(state()['programName'], evidence['programName']);
-      expect(state()['physicalPulses'], savedPulses);
-      expect(backend.physicalClocks, beforeReopen);
+      expect(events.last['sourceSha256'], files.saved!.sha256);
+      expect(backend.nativeTicks, beforeReopen);
+      await selectDisplay();
       expect(
-        sha256
-            .convert(
-              (state()['displayFrames'] as Map)[ComputerrariaComputer.mono.name]
-                  as Uint8List,
-            )
-            .toString(),
+        sha256.convert(state()['displayFrame'] as Uint8List).toString(),
         displayDigest,
       );
-      evidence['reopenPreservedPausedState'] = true;
+      evidence['reopenPreservedSelectedPixels'] = true;
     }
     await action('worldCircuitClose', {'discard': true});
     expect(state()['open'], isFalse);
     expect(backend.session, isNull);
     evidence['status'] = 'completed';
   } finally {
-    if (!disposed) await closeWorkspace();
+    if (!disposed) {
+      await closeWorkspace();
+    }
     await storage.close();
     journal.boundary('cycle-disposed', cycle);
   }
@@ -560,7 +573,8 @@ void main() {
         failure = '$failure; finalization: $error';
       }
       final report = <String, dynamic>{
-        'schema': 'abc.computer-memory-diagnostic.v1',
+        'schema': 'abc.generic-world-memory.v1',
+        'workloadId': genericCircuitWorkloadId,
         'status': status,
         'hostPid': pid,
         'buildMode': 'profile',
@@ -570,13 +584,12 @@ void main() {
         'completedCycles': cycles
             .where((row) => row['status'] == 'completed')
             .length,
-        'physicalPulsesPerCycle': 4096,
+        'ticksPerCycle': 32,
         'excludedWarmupCycles': 0,
         'fixture': {
           'sourceRevision': '0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8',
           'wldBytes': source.length,
-          'wldSha256': ComputerrariaComputer.sourceSha256,
-          'pongSha256': 'd2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d',
+          'wldSha256': publicCircuitFixtureSha256,
         },
         'runtime': {
           ...memory.runtimeMetadata(),
@@ -618,7 +631,7 @@ void main() {
         'failureStack': failureStack,
         'limits': [
           'Eight logical cycles, alternating OFF/ON four each; reset and saved reopen each add a native open. No excluded first/cancelled lifecycle.',
-          'New harness only; never splice into old performance or memory baselines. No device FPS claim.',
+          'Generic controls workload; never compare directly with legacy CPU-program performance or memory baselines. No device FPS claim.',
           'OS and VM reads bracket requested GC but are not atomic. RSS/PSS/USS and VM heap are overlapping views, not additive buckets.',
           'Retained/released differences also include elapsed drain, GC and sampler work; they do not uniquely identify native allocation ownership.',
           'All received FrameTiming fields are saved; the fixed tail deadline cannot guarantee receipt of timings still buffered by the engine.',

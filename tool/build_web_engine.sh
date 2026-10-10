@@ -28,7 +28,7 @@ python3 - "$OUTPUT" "$REVISION" "$SOURCE" <<'PY'
 import hashlib,json,pathlib,sys
 root=pathlib.Path(sys.argv[1])
 source=pathlib.Path(sys.argv[3])
-result={'sourceCommit':sys.argv[2],'emscripten':'5.0.7','localPatches':['64-bit-pointer-safety','persistent-allocation-lifetime','native-zlib-bridge','abc-host-integration','full-world-pixels-v5-sparse-lamp-checkpoints'],'artifacts':{}}
+result={'sourceCommit':sys.argv[2],'emscripten':'5.0.7','localPatches':['64-bit-pointer-safety','persistent-allocation-lifetime','native-zlib-bridge','abc-host-integration','full-world-pixels-v6-wired-light-footprints'],'artifacts':{}}
 source_manifest=source/'SOURCE_MANIFEST.json'
 if source_manifest.is_file():
     result['sourceManifestSha256']=hashlib.sha256(source_manifest.read_bytes()).hexdigest()

@@ -5,14 +5,14 @@ import 'package:terraforge/application/workspace.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 import 'package:terraforge/platform/world_circuit_files.dart';
 
-import 'support/computer_circuit_backend.dart';
+import 'support/generic_world_circuit_backend.dart';
 import 'workspace_test.dart' show FakeEngine, FakeFiles;
 
 const _loading = WorldCircuitProgress(
   stage: 'compile',
   phase: 2,
-  completed: 6448,
-  total: 15200,
+  completed: 16,
+  total: 40,
   diagnostics: {
     'nativeActiveBytes': 2 * 1048576,
     'nativePeakBytes': 3 * 1048576,
@@ -22,9 +22,9 @@ const _loading = WorldCircuitProgress(
 
 class _Sources implements WorldCircuitFileGateway {
   WorldCircuitSource? next = const WorldCircuitSource.file(
-    path: '/fixture/computer.wld',
-    length: 405983441,
-    name: 'computer.wld',
+    path: '/fixture/ordinary.wld',
+    length: 1365,
+    name: 'ordinary.wld',
   );
 
   @override
@@ -38,7 +38,7 @@ class _Sources implements WorldCircuitFileGateway {
   }) async => throw UnsupportedError('No export in these tests');
 }
 
-class _LoadBackend extends ComputerCircuitBackend
+class _LoadBackend extends GenericWorldCircuitBackend
     implements WorldCircuitIdleCleanupBackend {
   WorldCircuitProgress? nextProgress = _loading;
   bool failOpen = true;
@@ -122,7 +122,7 @@ void main() {
         stage: 'compile',
         phase: 2,
         completed: -1,
-        total: 15200,
+        total: 40,
       ),
       const WorldCircuitProgress(
         stage: 'error',

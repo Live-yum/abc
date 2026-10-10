@@ -1,29 +1,34 @@
 {
   "schema": 1,
-  "id": "full-world-pixels-v5-sparse-lamp-checkpoints",
+  "id": "full-world-pixels-v6-wired-light-footprints",
   "baseSourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
-  "baseDistributedManifestSha256": "9b55c8ad55a4ce8ad848c58e8c9ec80fb78285405f6a7cccc44c8c95b74dbb7a",
+  "baseDistributedManifestSha256": "a74ae0de4b2a94300d7d0b639261845e8c6a6d2e18638cc38441b948696d46ad",
   "supersedes": {
-    "id": "full-world-pixels-v4-wld-host-hashing",
-    "manifestSha256": "a7331e085e0fd5714788974701d853727296ee0cb7e9d64d9a3929efc355aa7e",
-    "distributedManifestSha256": "ff15c09cdcb2cf204a9aa8abcc721d219d5e4639e42837c709b73211c43e5c21",
+    "id": "full-world-pixels-v5-sparse-lamp-checkpoints",
+    "manifestSha256": "9c42b79a26dae81ecdc245b3c05ac3bad31772b16b573c61b2250cfe735c1f23",
+    "distributedManifestSha256": "a74ae0de4b2a94300d7d0b639261845e8c6a6d2e18638cc38441b948696d46ad",
     "prior": {
-      "id": "full-world-pixels-v3-wld-only",
-      "manifestSha256": "a5bb31a966d8625f16ae095c90d5d1ee0b90da5bc81e34dc481842af0cc76a48",
-      "distributedManifestSha256": "a51b6c058eb3709a5bd958c7fbde79e0d3a239b6b787a74eb4a7fa7e3749e399",
+      "id": "full-world-pixels-v4-wld-host-hashing",
+      "manifestSha256": "a7331e085e0fd5714788974701d853727296ee0cb7e9d64d9a3929efc355aa7e",
+      "distributedManifestSha256": "ff15c09cdcb2cf204a9aa8abcc721d219d5e4639e42837c709b73211c43e5c21",
       "prior": {
-        "id": "full-world-pixels-v2-wld-only",
-        "manifestSha256": "6cffadaaa4efd8bac51b0ba381baef2281e47caf559a7f20ef3425c8be8e05cf",
-        "distributedManifestSha256": "f76b42b4434ca53cda9e489d04dd5ddb34395ff99a8b0bace15f8d809d48153e",
+        "id": "full-world-pixels-v3-wld-only",
+        "manifestSha256": "a5bb31a966d8625f16ae095c90d5d1ee0b90da5bc81e34dc481842af0cc76a48",
+        "distributedManifestSha256": "a51b6c058eb3709a5bd958c7fbde79e0d3a239b6b787a74eb4a7fa7e3749e399",
         "prior": {
-          "id": "full-world-pixels-v1",
-          "manifestSha256": "ee3bb706e7f4cd9437faaa61247182bc5943957b0a93c63dcc21082fb2efa824",
-          "distributedManifestSha256": "539e4369e9517bad5c1d2337241c51d37150eef983376c069b48947783c1cd7c"
+          "id": "full-world-pixels-v2-wld-only",
+          "manifestSha256": "6cffadaaa4efd8bac51b0ba381baef2281e47caf559a7f20ef3425c8be8e05cf",
+          "distributedManifestSha256": "f76b42b4434ca53cda9e489d04dd5ddb34395ff99a8b0bace15f8d809d48153e",
+          "prior": {
+            "id": "full-world-pixels-v1",
+            "manifestSha256": "ee3bb706e7f4cd9437faaa61247182bc5943957b0a93c63dcc21082fb2efa824",
+            "distributedManifestSha256": "539e4369e9517bad5c1d2337241c51d37150eef983376c069b48947783c1cd7c"
+          }
         }
       }
     }
   },
-  "reviewedPurpose": "Cumulative pure-WLD circuit-world ABI 2 with four-argument begin, bounded retained-pixel query and no sidecar parser/session/source/save or custom color mapping. Default OFF retains vanilla per-TripWire type-445 horizontal/vertical crossing XOR. ON combines device generation dedup with WireHead-style per-pixel different-colour connected-group pair parity at each shared physical gate-wave boundary; incompatible same-colour dual-axis topology rejects ON with TCW_UNSUPPORTED without mutation. This is a restricted pixel rule, not a full WireHead topology emulator or its multi-pixel dictionary-overwrite behavior. Idle switching preserves frames, ROM/RAM, input and RNG. Shared physical gate-wave VM execution remains unchanged. Cold-load compilation enumerates wired/gate rows in original order, uses inline paged DSU accessors and bounds-checked tile reads without duplicate checks; every input tile record remains decoded and validated and temporary row indexes are freed after compilation. Export the four existing incremental SHA-256 functions in the WLD Web profile for bounded native hashing by the host; the existing C hash implementation is byte-identical to the frozen v3 source. Sparse READ_LAMPS queries restore existing 64-column checkpoints only at complete-column boundaries when the next requested point has a later checkpoint, preserve original point order/duplicates, and yield immediately after each restore. Compilation, source validation, viewport, write, trigger, simulation and save semantics are unchanged.",
+  "reviewedPurpose": "Cumulative pure-WLD circuit-world ABI 2 with four-argument begin, bounded retained-pixel query and no sidecar parser/session/source/save or custom color mapping. Default OFF retains vanilla per-TripWire type-445 horizontal/vertical crossing XOR. ON combines device generation dedup with WireHead-style per-pixel different-colour connected-group pair parity at each shared physical gate-wave boundary; incompatible same-colour dual-axis topology rejects ON with TCW_UNSUPPORTED without mutation. This is a restricted pixel rule, not a full WireHead topology emulator or its multi-pixel dictionary-overwrite behavior. Idle switching preserves frames, ROM/RAM, input and RNG. Shared physical gate-wave VM execution remains unchanged. Cold-load compilation enumerates wired/gate rows in original order, uses inline paged DSU accessors and bounds-checked tile reads without duplicate checks; every input tile record remains decoded and validated and temporary row indexes are freed after compilation. Export the four existing incremental SHA-256 functions in the WLD Web profile for bounded native hashing by the host; the existing C hash implementation is byte-identical to the frozen v3 source. Sparse READ_LAMPS queries restore existing 64-column checkpoints only at complete-column boundaries when the next requested point has a later checkpoint, preserve original point order/duplicates, and yield immediately after each restore. Compilation, source validation, viewport, write, trigger, simulation and save semantics are unchanged. Add independently implemented ordinary type-42 hanging lantern and type-93 standing lamp wire responses. Retain only connected light footprints and required unwired siblings, deduplicate each complete footprint per wire colour and TripWire, preserve style frames, and project all mutated members into queries and candidate WLD saves. Unsupported malformed or directional pre-actuated footprints fail transactionally instead of approximating source behavior. No new traversal ordering or timer semantics are introduced.",
   "runtimeContract": {
     "circuitWorldAbiVersion": 2,
     "circuitWorldWireHeadPixels": 1,
@@ -47,6 +52,17 @@
       "license": "MIT",
       "attribution": "Copyright (c) 2023 Xander Naumenko",
       "distribution": "Rule adaptation and permission notices only; no mod or game runtime bundled."
+    },
+    {
+      "repository": "https://github.com/Live-yum/TerrariaDecompiledSource",
+      "commit": "8255d34616c780af12079425ac92a0a7aed87d71",
+      "reviewedFiles": [
+        "Terraria/Wiring.cs",
+        "Terraria.IO/WorldFile.cs"
+      ],
+      "license": "No redistribution license grant found; Re-Logic copyright retained by source owner.",
+      "distribution": "Behavioral oracle and independent tests only; decompiled source is not included.",
+      "scope": "Ordinary hanging-lantern and standing-lamp footprint, frame, colour, SkipWire and save behavior; see docs/TERRARIA_SOURCE_PARITY.md for exact line references and remaining gaps."
     }
   ],
   "attributionFiles": [
@@ -68,8 +84,8 @@
   ],
   "patch": {
     "path": "native/patches/full-world-pixels.patch",
-    "sha256": "466734396d82ac88e0dd8b4ef71b8756c414ccb1ab8c1378bd1049f86e59b498",
-    "bytes": 82990
+    "sha256": "05e0eb774337d7df5cc2f759cb40a5ddd0b4104f67157cdfc81a5c7148a974a8",
+    "bytes": 90606
   },
   "files": [
     {
@@ -111,15 +127,15 @@
       "path": "src/terra_circuit_compile.c",
       "beforeSha256": "898ac2650b453e830011debf95dd35d463a4e296fc076e4e12400cc5da2e14cb",
       "beforeBytes": 22785,
-      "afterSha256": "0952d1dc46dabadde739c858ec7c05fb1802b5548ed4b862774e402e64a83233",
-      "afterBytes": 26672
+      "afterSha256": "c392fadf25e71fba1cc02c32a92a9e35392b989b2e0490524da46a190c3ef430",
+      "afterBytes": 26704
     },
     {
       "path": "src/terra_circuit_devices.c",
       "beforeSha256": "4b584e668f1c20492974d84d2e523de82c5875482fec77f005d377f550e66174",
       "beforeBytes": 15719,
-      "afterSha256": "4a1955f40f5f92e1718f7cd1c4003f5956056a067026a2d2b4230d3877e9964e",
-      "afterBytes": 18670
+      "afterSha256": "8b89343a5104f9eccd452a758e901dec0849a7b73d0252dcf66fc3ed0aa74aef",
+      "afterBytes": 21936
     },
     {
       "path": "src/terra_circuit_fragments.inc",
@@ -139,22 +155,22 @@
       "path": "src/terra_circuit_rules.c",
       "beforeSha256": "00d0232156f2a24c5b1e7033433ce0edccceaf813bf98aa12cb44f39c4847e56",
       "beforeBytes": 13513,
-      "afterSha256": "35277f86b3c91afdbc3537fa7b19ffd8c0b83a47545c1ae3e78f05a6fa832829",
-      "afterBytes": 13374
+      "afterSha256": "7c5f0847885894ac507e74afa095e59807f1ee1d70de26594b7437e00d14096a",
+      "afterBytes": 13538
     },
     {
       "path": "src/terra_circuit_world.c",
       "beforeSha256": "af78e5cf1e7884d97a16a516390d7ffbf1786a66a928509ab0402bdbbc112cfd",
       "beforeBytes": 19491,
-      "afterSha256": "21ec49bf23773d62bf4d0515340b0250c2e395d5c3f685103053fee03531ae76",
-      "afterBytes": 18842
+      "afterSha256": "11b48ed97105aeaa0bdf9845d1ea07d0d4bf12000f2baa281c8ad01484ad9799",
+      "afterBytes": 18919
     },
     {
       "path": "src/terra_circuit_world_internal.h",
       "beforeSha256": "2d982d3f755a6100515322fd8a26cf9acb1fe20a1c86f459abdc2a9b6265d452",
       "beforeBytes": 9555,
-      "afterSha256": "d85f28f916e568608a309ba335941e52717503781a3fb3bc4c0fd5f04f9e8044",
-      "afterBytes": 9371
+      "afterSha256": "2cccc1fcf05c73dd8523826cf7933e9842787010ab73fce71a7c00f556e6bd95",
+      "afterBytes": 9413
     },
     {
       "path": "src/terra_wld.c",

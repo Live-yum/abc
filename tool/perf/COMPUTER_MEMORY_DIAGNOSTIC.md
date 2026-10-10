@@ -8,7 +8,7 @@ baseline, or run a device FPS benchmark. No older report is concatenated with it
 
 Invoke exactly once in the existing public Computerraria UI CI job, after the
 original three-process profile bundle has been archived. Reuse that job's pinned
-Flutter SDK, public WLD, bundled original Pong, build dependencies and Xvfb. No
+Flutter SDK, public WLD, build dependencies and Xvfb. No
 new service, credential or permission is needed.
 
 ```sh
@@ -19,19 +19,22 @@ xvfb-run -a -s '-screen 0 1440x1000x24' \
 
 The runner requires a clean committed checkout, matching `ABC_PERF_COMMIT`,
 `COMPUTERRARIA_WLD`, and an observed `TERRA_PERF_RENDERER`. The test accepts only
-the 405,983,441-byte public WLD; the production import verifies its full SHA-256
-and physical computer anchors. It loads `assets/computer/pong.bin` using the
-unchanged production command and integrity check. TWLD and full-world UI byte
-buffers are excluded.
+the 405,983,441-byte public WLD as a stress input. The harness checks the full
+source SHA reported by the generic owner. Production has no CPU identity gate,
+program loader or bundled ROM. Whole-world UI byte buffers are excluded.
 
-One application process performs eight logical cycles, with optimization
-OFF/ON/OFF/ON/OFF/ON/OFF/ON. Each starts from the original WLD, loads Pong,
-executes exactly 4,096 real physical pulses in 32 awaited batches of 128 through
-the existing native circuit owner, renders between batches, pauses, performs its
-predefined lifecycle operation, and closes/disposes. This fixed budget reaches
-Pong's display work: ON must show nonempty and changing monitor pixels; OFF keeps
-its existing game-rule black-screen allowance. All 32 decoded monitor hashes and
-lit-pixel counts are recorded as raw trace rows and released with their chunks.
+Current schema `abc.generic-world-memory.v1` uses workload identity
+`generic-wld-controls-v1`. One application process performs eight logical cycles,
+with optimization OFF/ON/OFF/ON/OFF/ON/OFF/ON. Each starts from the original WLD,
+selects a real wired cell from the application's initial viewport, explicitly
+selects an in-world PixelBox ROI at most 32 by 32, triggers that cell's actual
+wire mask, and executes 32 awaited one-tick operations. It renders between ticks,
+pauses, performs its predefined lifecycle operation and closes/disposes. Every
+selected pixel hash and lit-pixel count is retained in the raw trace. Sparse or
+empty PixelBox regions are valid; neither mode must animate or light a display.
+This workload is distinct from the historical 4,096-pulse CPU/Pong diagnostic;
+legacy reports retain their own schema and validity checks and cannot be used as
+a direct latency or retention baseline for these operations.
 Cycles 0/1 and 4/5 reset to the original WLD; cycles 2/3 and 6/7 save, close,
 dispose, and reopen their streamed exports before final close. The first cycle
 also records one cancelled initial import before its first complete import.
@@ -128,15 +131,13 @@ or decreasing series alone does not establish a plateau or prove leak freedom.
 Only the observed eight-cycle window is described. This Linux experiment does
 not resolve the separate browser Error 9 or measure browser OS loading peaks.
 
-Lightweight checks, without launching Flutter or opening a real WLD:
+Lightweight Python checks, without launching Flutter or opening a real WLD.
+Dart format, analysis and execution are verified by the official CI workflow:
 
 ```sh
 python3 -m unittest discover -s tool/perf -p 'computer_memory_checks_test.py'
 python3 -m py_compile tool/perf/computer_memory_run.py tool/perf/computer_memory_validate.py
 bash -n tool/perf/computer_memory_diagnostic.sh
-dart format --output=none --set-exit-if-changed \
-  integration_test/computer_memory_diagnostic_test.dart \
-  integration_test/support/computer_memory_journal.dart
 ```
 
 ### Sequential ProcessInfo RSS observations

@@ -102,7 +102,7 @@ function harness(owner, bridge, timeoutMs = 1000) {
   const dying = tcw.client.close(b); const rejected = assert.rejects(dying, {code:'COMPUTATION_OWNER_LOST'});
   tcw.workers.at(-1).onerror({message:'unexpected worker exit'}); await rejected;
 
-  let finishStream, finishCommand, releasedSource, streamCancelled = false;
+  let finishStream, finishCommand, releasedSource, streamCancelled = false, failPixels = false;
   const streamResult = () => ({session:7,stats:[2,...Array(23).fill(0)],resultKind:0,resultCount:0,reserved:0,records:new Uint8Array()});
   const sourceBlob = new Blob([new Uint8Array([7,8,9])]);
   const streamed = harness('worldCircuit', {
@@ -110,7 +110,7 @@ function harness(owner, bridge, timeoutMs = 1000) {
     progress:async () => ({stage:'compile',phase:1,completed:2,total:3}),
     cancelOperation:async () => { streamCancelled=true; finishCommand?.(); },
     command:async (_,words) => { if (words==='wait') await new Promise(resolve => { finishCommand=resolve; }); return {...streamResult(),worldSource:{blob:sourceBlob,size:3,name:'staged.wld',token:11}}; },
-    computerFrame:async () => ({clock:{...streamResult(),resultKind:2},display:{...streamResult(),resultKind:9},displayError:null,hostStagesUs:{commandWallUs:1}}),
+    commandAndReadPixels:async (_,words) => ({command:{...streamResult(),resultKind:JSON.parse(words)[1]},pixels:failPixels?null:{...streamResult(),resultKind:9},readError:failPixels?'Read failed after commit':null,hostStagesUs:{commandWallUs:1}}),
     releaseSource:async token => { releasedSource=token; },
     close:async()=>{},
   });
@@ -128,12 +128,58 @@ function harness(owner, bridge, timeoutMs = 1000) {
     assert.ok(output.hostStagesUs.rpcWallUs >= output.hostStagesUs.rpcQueueUs);
   }
   assert.notEqual(firstOutput.worldSource.token,secondOutput.worldSource.token,'Public output identity cannot alias a native token');
-  const combined=await streamed.client.computerFrame(streamedId,'clock','pixels');
-  assert.equal(combined.clock.session,streamedId);assert.equal(combined.display.session,streamedId);
-  assert.equal(combined.hostStagesUs.commandWallUs,1);assert.ok(combined.hostStagesUs.rpcWallUs>=0);
-  assert.equal(streamed.workers[0].sent.at(-1).method,'computerFrame');
+  for(const kind of [2,3]) {
+    const combined=await streamed.client.commandAndReadPixels(streamedId,JSON.stringify([2,kind]),'pixels');
+    assert.equal(combined.command.session,streamedId);assert.equal(combined.pixels.session,streamedId);
+    assert.equal(combined.command.resultKind,kind);assert.equal(combined.pixels.resultKind,9);
+    assert.equal(combined.hostStagesUs.commandWallUs,1);assert.ok(combined.hostStagesUs.rpcWallUs>=0);
+    assert.equal(streamed.workers[0].sent.at(-1).method,'commandAndReadPixels');
+  }
+  failPixels=true;
+  const committed=await streamed.client.commandAndReadPixels(streamedId,JSON.stringify([2,3]),'pixels');
+  assert.equal(committed.command.session,streamedId);assert.equal(committed.command.resultKind,3);
+  assert.equal(committed.pixels,null);assert.equal(committed.readError,'Read failed after commit');
+  assert.equal(typeof streamed.client.computerFrame,'undefined','The production RPC has no sample-specific entry point');
   await streamed.client.close(streamedId);await streamed.client.releaseSource(firstOutput.worldSource.token);assert.equal(releasedSource,11);
   await streamed.client.dispose();await streamed.client.releaseSource(secondOutput.worldSource.token);
+
+  // TCW_PIXELS reports the cell count on RESULT events. Its final READY
+  // result_count is zero even when the owned records buffer is nonempty.
+  for(const kind of [2,3]) for(const cells of [0,1,3072,65536]) {
+    const records=new Uint8Array(cells*16);if(records.length)records[0]=37;
+    const nativeBatch={command:{...streamResult(),resultKind:kind},pixels:{...streamResult(),resultKind:9,records},readError:null};
+    const actualAbi=harness('worldCircuit',{open:async()=>streamResult(),commandAndReadPixels:async()=>nativeBatch});
+    const opened=(await actualAbi.client.open(new Uint8Array([1]))).session;
+    const received=await actualAbi.client.commandAndReadPixels(opened,JSON.stringify([2,kind]),'pixels');
+    assert.equal(received.command.session,opened);assert.equal(received.pixels.session,opened);
+    assert.equal(received.pixels.resultCount,0,'READY count is not the sparse records count');
+    assert.equal(received.pixels.records.byteLength,cells*16);
+    if(cells)assert.equal(received.pixels.records[0],37,'Transferred pixel bytes survive both RPC validations');
+    assert.equal(records.byteLength,0,'The host transfers its owned pixel output');
+    await actualAbi.client.dispose();
+  }
+  for(const invalidResult of [
+    {command:{...streamResult(),resultKind:2},pixels:{...streamResult(),resultKind:9},readError:null},
+    ...[
+      {records:new Uint8Array(15)},
+      {records:new Uint8Array(17)},
+      {records:new Uint8Array(65536*16+16)},
+      {records:null},
+      {records:Array(16).fill(0)},
+      {records:new Uint8Array(16),resultCount:-1},
+      {records:new Uint8Array(16),resultCount:65537},
+      {records:new Uint8Array(16),resultCount:NaN},
+      {records:new Uint8Array(16),resultKind:1},
+      {records:new Uint8Array(16),session:8},
+    ].map(fields=>({command:{...streamResult(),resultKind:3},pixels:{...streamResult(),resultKind:9,...fields},readError:null})),
+    {command:{...streamResult(),resultKind:3},pixels:{...streamResult(),resultKind:9,records:new Uint8Array(16)},readError:'Unexpected simultaneous error'},
+    {command:{...streamResult(),resultKind:3},pixels:null,readError:null},
+  ]) {
+    const malformed=harness('worldCircuit',{open:async()=>streamResult(),commandAndReadPixels:async()=>invalidResult});
+    const opened=(await malformed.client.open(new Uint8Array([1]))).session;
+    await assert.rejects(malformed.client.commandAndReadPixels(opened,JSON.stringify([2,3]),'pixels'),{code:'WORKER_INPUT'});
+    await malformed.client.dispose();
+  }
 
   // Missing Worker support must fail; browser entrypoints cannot load heavy WASM.
   const browser = vm.createContext({document:{baseURI:'http://test/'}, TextEncoder, TextDecoder, Uint8Array, setTimeout, clearTimeout});

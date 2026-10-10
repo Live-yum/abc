@@ -29,7 +29,7 @@ static uint32_t join(CxWorld* w,uint32_t a,uint32_t b){
     if(w->phase!=CX_TOPOLOGY){if(a!=b)cx_fail(w,TCW_FORMAT,"wire network replay does not match its compiled union graph");return a;}
     a=root(w,a);b=root(w,b);if(a>b){uint32_t t=a;a=b;b=t;}compile_set_word(&w->parents,b,a);return a;
 }
-static int important_tile(const TxTile* t){return t->active&&(t->type==419u||t->type==420u||t->type==424u||t->type==445u||t->actuator||t->type==132u||t->type==135u||t->type==136u||t->type==144u||t->type==33u||t->type==4u||t->type==429u||t->type==423u);}
+static int important_tile(const TxTile* t){return t->active&&(t->type==419u||t->type==420u||t->type==424u||t->type==445u||t->actuator||t->type==132u||t->type==135u||t->type==136u||t->type==144u||t->type==33u||cx_wired_light_height(t->type)||t->type==4u||t->type==429u||t->type==423u);}
 static int standard(const CxWorld* w,uint32_t y){
     if(!(y>=2u&&w->column[y].active&&w->column[y].type==420u&&w->column[y].frame_x==36&&
         w->column[y-1].active&&w->column[y-1].type==419u&&w->column[y-1].frame_x!=36&&

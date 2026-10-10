@@ -45,10 +45,10 @@ def main():
     if computer["source_commit"] != "0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8":
         raise ValueError("Unexpected Computerraria source revision")
     verify_sha_records(computer_root, computer["files"])
-    pong = read_file(ROOT, "assets/computer/pong.bin")
+    pong = read_file(ROOT, "test/fixtures/computerraria/pong.bin")
     if len(pong) != 2288 or sha256(pong) != "d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d":
         raise ValueError("Bundled Pong program identity mismatch")
-    if read_file(ROOT, "assets/computer/LICENSE") != read_file(computer_root, "LICENSE"):
+    if read_file(ROOT, "test/fixtures/computerraria/LICENSE") != read_file(computer_root, "LICENSE"):
         raise ValueError("Bundled Pong MIT notice differs from its source")
 
     # These two allowlisted WLD assets must be exact original synthetic output,

@@ -2,15 +2,14 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:terraforge/domain/circuit_display.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 import 'package:terraforge/engine/world_circuit_session.dart';
 
-import 'support/computer_circuit_backend.dart';
-
 const _source = WorldCircuitSource.file(
-  path: '/fixture/computer.wld',
-  length: 405983441,
-  name: 'computer.wld',
+  path: '/fixture/wiring.wld',
+  length: 1000,
+  name: 'wiring.wld',
 );
 
 const _ready = WorldCircuitProgress(
@@ -26,8 +25,77 @@ const _hash = WorldCircuitProgress(
   total: 2,
 );
 
-class _LifecycleBackend extends ComputerCircuitBackend
-    implements WorldCircuitComputerBackend, WorldCircuitIdleCleanupBackend {
+const _region = CircuitDisplayRegion('Selected wiring', 37, 19, 23, 11);
+
+/// Generic source ownership fake. No program loading or sample layout is needed.
+class _SourceBackend implements WorldCircuitSourceBackend {
+  int opens = 0, closes = 0, cancels = 0;
+  Completer<void>? holdOpen;
+  final commands = <WorldCircuitCommand>[];
+  final released = <String?>[];
+
+  WorldCircuitResult reply(int id, {int kind = 0}) => WorldCircuitResult(
+    id,
+    List<int>.filled(24, 0)
+      ..[0] = 2
+      ..[2] = 180
+      ..[3] = 140,
+    Uint8List(0),
+    resultKind: kind,
+    reserved: kind == 6 ? 0 : 4,
+    worldSource: kind == 6
+        ? const WorldCircuitSource.file(
+            path: '/output/copy.wld',
+            length: 100,
+            name: 'copy.wld',
+            token: 'wld',
+          )
+        : null,
+  );
+
+  @override
+  Future<WorldCircuitResult> openWorldCircuit(Uint8List bytes) async =>
+      reply(++opens);
+
+  @override
+  Future<WorldCircuitResult> openWorldCircuitSource(
+    WorldCircuitSource world, {
+    void Function(WorldCircuitProgress)? onProgress,
+  }) async {
+    final id = ++opens;
+    await holdOpen?.future;
+    return reply(id);
+  }
+
+  @override
+  Future<WorldCircuitResult> commandWorldCircuit(
+    int session,
+    WorldCircuitCommand command,
+  ) async {
+    commands.add(command);
+    return reply(session, kind: command.words[1]);
+  }
+
+  @override
+  Future<void> closeWorldCircuit(int session) async {
+    closes++;
+  }
+
+  @override
+  Future<void> cancelWorldCircuitOperation() async {
+    cancels++;
+  }
+
+  @override
+  Future<WorldCircuitProgress?> worldCircuitProgress() async => null;
+  @override
+  Future<void> releaseWorldCircuitSource(WorldCircuitSource source) async {
+    released.add(source.token);
+  }
+}
+
+class _LifecycleBackend extends _SourceBackend
+    implements WorldCircuitBatchBackend, WorldCircuitIdleCleanupBackend {
   final events = <String>[];
   final progressActiveAtClose = <int>[];
   Completer<void>? holdBatch, holdClose;
@@ -51,17 +119,17 @@ class _LifecycleBackend extends ComputerCircuitBackend
   }
 
   @override
-  Future<WorldCircuitComputerFrame> clockAndReadDisplay(
+  Future<WorldCircuitBatchResult> commandAndReadPixels(
     int session,
-    WorldCircuitCommand clock,
+    WorldCircuitCommand command,
     WorldCircuitCommand pixels,
   ) async {
     batches++;
     events.add('batch:$session');
     await holdBatch?.future;
-    return WorldCircuitComputerFrame(
-      clock: await commandWorldCircuit(session, clock),
-      display: await commandWorldCircuit(session, pixels),
+    return WorldCircuitBatchResult(
+      command: await commandWorldCircuit(session, command),
+      pixels: await commandWorldCircuit(session, pixels),
     );
   }
 
@@ -105,14 +173,16 @@ void main() {
         final backend = _LifecycleBackend();
         final session = WorldCircuitSession.fromSource(backend, _source);
         await session.open();
-        await session.verifyComputer();
-        await session.loadProgram('zero.bin', Uint8List(4));
+        await session.readDisplay(_region);
         final saved = await session.command(WorldCircuitCommand.save());
         expect(saved.worldSource, isNotNull);
         backend.holdBatch = Completer<void>();
         backend.holdProgress = Completer<WorldCircuitProgress?>();
         backend.holdClose = Completer<void>();
-        session.run();
+        final stepping = session.command(
+          WorldCircuitCommand.ticks(6),
+          refreshViewport: true,
+        );
         await tester.pump(const Duration(milliseconds: 1));
         await tester.pump(const Duration(milliseconds: 250));
         expect(backend.activePolls, 1);
@@ -132,6 +202,7 @@ void main() {
         if (duringProgress) await session.cancelOperation();
         backend.holdProgress!.complete(_ready);
         await tester.pump();
+        await stepping;
         expect(backend.closeAttempts, 1);
         expect(backend.opens, 1);
         if (!duringProgress) await session.cancelOperation();
@@ -146,10 +217,10 @@ void main() {
         );
         expect(session.result, isNull);
         expect(session.progress, isNull);
-        expect(session.computerVerified, isFalse);
-        expect(session.canRunComputer, isFalse);
-        expect(session.programName, isNull);
-        expect(session.displayFrames, isEmpty);
+        expect(session.running, isFalse);
+        expect(session.displayRegion, isNull);
+        expect(session.displayFrame, isNull);
+        expect(session.displayPixelCount, 0);
         expect(session.dirty, isFalse);
         expect(session.source, same(_source));
         expect(
@@ -178,9 +249,7 @@ void main() {
       final backend = _LifecycleBackend();
       final session = WorldCircuitSession.fromSource(backend, _source);
       await session.open();
-      await session.verifyComputer();
-      // An all-zero image needs no asynchronous ROM write timer.
-      await session.loadProgram('zero.bin', Uint8List(4));
+      await session.readDisplay(_region);
       backend.events.clear();
       backend.holdBatch = Completer<void>();
       backend.holdProgress = Completer<WorldCircuitProgress?>();
@@ -189,7 +258,10 @@ void main() {
       final published = <String?>[];
       session.addListener(() => published.add(session.progress?.stage));
 
-      session.run();
+      final stepping = session.command(
+        WorldCircuitCommand.ticks(6),
+        refreshViewport: true,
+      );
       await tester.pump(const Duration(milliseconds: 1));
       expect(backend.batches, 1);
       await tester.pump(const Duration(milliseconds: 250));
@@ -207,6 +279,7 @@ void main() {
 
       backend.holdProgress!.complete(_ready);
       await tester.pump();
+      await stepping;
       expect(backend.progressActiveAtClose, [0]);
       expect(backend.opens, 1);
       expect(published, isNot(contains('ready')));

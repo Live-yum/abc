@@ -53,8 +53,8 @@ Synthetic test fixtures are generated locally by the project scripts.
 - Upstream: [misprit7/computerraria](https://github.com/misprit7/computerraria),
   commit `0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8`, MIT,
   Copyright (c) 2023 Xander Naumenko. Full permission notice is retained in
-  `vendor/computerraria/LICENSE` and `assets/computer/LICENSE`.
-- `assets/computer/pong.bin` is the 2,288-byte RV32I ROM program, SHA-256
+  `vendor/computerraria/LICENSE` and `test/fixtures/computerraria/LICENSE`.
+- `test/fixtures/computerraria/pong.bin` is the 2,288-byte RV32I ROM program, SHA-256
   `d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d`.
   The unchanged Pong source, driver sources, two host-only cfg guards, build
   script and per-file provenance are in `vendor/computerraria`.
