@@ -35,6 +35,11 @@ pressure plates, and mod-only mechanisms are not established by the new tests.
 A readable tile or a discovered wire is not evidence that every effect of that
 device is simulated.
 
+The generic circuit viewport still colors ordinary tiles by type. The new
+42/93 state and saved-frame contracts do not add game-style light emission or
+a dedicated lit/unlit lamp appearance to that overview. PixelBox rendering
+and dedicated game-light rendering are separate features.
+
 ## Known timer registration-order difference
 
 The source visits a wire network with a FIFO queue and registers timers when
@@ -101,7 +106,9 @@ Additional checks cover every member, unwired siblings, all four wire colors,
 repeated pulses, footprint seed skipping, disconnected same-color inputs,
 nonzero styles, cancellation after mutation, independent save/reopen, immutable
 source hashes, and malformed-footprint rollback after an earlier valid light
-has already changed. These are source-behavior tests with independent input
+has already changed. Eight additional timer-driven exception/cancellation cases
+cover both families in both modes and verify rollback of light state, timer
+progress, and cooldown before a successful retry. These are source-behavior tests with independent input
 encoding; read-back alone is not a game-compatibility certification.
 
 ```sh
@@ -132,6 +139,11 @@ workflow flags. This avoids mixing Python-host allocator noise into sanitizer
 claims about the C contract.
 
 Native Release fixture tests and the original device-epoch and PixelBox C
-contracts passed during this audit. Flutter UI/device performance and full
-game-world parity are separate acceptance work; no Flutter SDK was available
-in the audit environment.
+contracts passed during this audit. The first official diagnostic run
+[38057554463](https://github.com/Live-yum/abc/actions/runs/38057554463), pinned to
+`11f669da12788e556e3057b6bd9b3ca6db1c1947`, also passed the three
+ASan/UBSan C contracts and the rebuilt Web artifact’s 36 fixture/mode cases.
+The eight timer-driven rollback cases were added after that run and passed
+locally; they still require validation on the final PR head.
+Flutter UI/device performance and full game-world parity remain separate
+acceptance work. SDK-dependent checks run in official CI.
