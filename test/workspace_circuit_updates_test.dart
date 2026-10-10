@@ -130,7 +130,13 @@ void main() {
       final workspace = _Workspace(backend);
       await workspace.dispatch('worldCircuitChooseWorld');
       await workspace.dispatch('worldCircuitImport');
-      await workspace.dispatch('worldCircuitLoadProgram');
+      // No widgets are mounted yet. Loading yields between ROM batches, so
+      // its zero-duration timers need a real async zone rather than FakeAsync.
+      await tester.runAsync(
+        () => workspace
+            .dispatch('worldCircuitLoadProgram')
+            .timeout(const Duration(seconds: 10)),
+      );
       expect(workspace.worldCircuitView['canRunComputer'], isTrue);
       final proxy = size.width < 1000
           ? ProfiledTerraController(
@@ -279,6 +285,6 @@ void main() {
       await replacement.close();
       replacement.dispose();
       expect(tester.takeException(), isNull);
-    });
+    }, timeout: const Timeout(Duration(seconds: 60)));
   }
 }

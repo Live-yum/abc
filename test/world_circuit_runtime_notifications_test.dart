@@ -18,7 +18,14 @@ void main() {
     );
     await session.open();
     await session.verifyComputer();
-    await session.loadProgram('loop.bin', Uint8List.fromList([0x6f, 0, 0, 0]));
+    // Program loading yields with a zero-duration timer between ROM batches.
+    // Drive this setup outside FakeAsync before testing the controlled pump.
+    await tester.runAsync(
+      () => session
+          .loadProgram('loop.bin', Uint8List.fromList([0x6f, 0, 0, 0]))
+          .timeout(const Duration(seconds: 10)),
+    );
+    expect(session.canRunComputer, isTrue);
     session.markSaved();
     final reasons = <bool>[];
     session.addListener(() => reasons.add(session.isRuntimeFramePublication));
@@ -71,5 +78,5 @@ void main() {
     expect(reasons, isNotEmpty);
     expect(reasons, everyElement(isFalse));
     session.dispose();
-  });
+  }, timeout: const Timeout(Duration(seconds: 60)));
 }
