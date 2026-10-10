@@ -109,8 +109,60 @@ def trigger(engine, mask=1, count=1, **kwargs):
     return engine.command(2,**fields)
 
 
+def timer_rollback_case(library, path, tile, optimized, malformed):
+    """Timer outputs share the whole-command light/cooldown/tick rollback."""
+    height = 2 if tile == 42 else 3
+    cells = {(x,10):(0,0,0,1,0,0) for x in range(3,10)}
+    cells[3,10] = (144,0,0,1,0,0)
+    for x in (6,9):
+        for row in range(height):
+            cells[x,10+row] = (tile,0,row*18,int(row==0),0,0)
+    if malformed: del cells[9,10+height-1]
+    write_world(path,cells)
+    engine = Engine(library,path)
+    engine.command(10,mask=optimized)
+    trigger(engine,flags=1)  # Enable the timer without pulsing its output.
+    before = viewport(engine,3,10,7,height)
+    assert before[0][3] >> 16 == 18
+    if malformed:
+        try:
+            engine.command(3,count=60,budget=1)
+            raise AssertionError('malformed timer output was accepted')
+        except AssertionError as error:
+            assert error.args == (-7,), error
+        assert viewport(engine,3,10,7,height) == before
+        assert engine.stats()[18:20] == [0,0]
+        # The failed command must restore registration and cooldown as well as
+        # the valid earlier light, so the same next timer boundary fails again.
+        engine.command(3,count=59,budget=1)
+        assert viewport(engine,3,10,7,height) == before
+        try:
+            engine.command(3,count=1,budget=1)
+            raise AssertionError('restored timer missed its next boundary')
+        except AssertionError as error:
+            assert error.args == (-7,), error
+        assert engine.stats()[18:20] == [59,0]
+        engine.command(6,source_id=3)
+    else:
+        pulse_before = engine.stats()[20]
+        assert engine.begin(3,count=120) >= 0
+        for _ in range(10000):
+            event,pointer = engine.step(1)
+            engine.handle(event,pointer,bytearray())
+            if engine.stats()[20] > pulse_before: break
+        else: raise AssertionError('timer never reached light mutation')
+        assert engine.lib.abc_world_circuit_cancel(engine.circuit) == 0
+        assert viewport(engine,3,10,7,height) == before
+        assert engine.stats()[18:20] == [0,0]
+        for expected in (18,0):
+            engine.command(3,count=60,budget=1)
+            assert [r[3]&65535 for r in viewport(engine,6,10,1,height)] == [expected]*height
+    engine.close()
+
+
 def suite(library):
     checked = []
+    timer_rollback_cases = 0
     with tempfile.TemporaryDirectory(prefix='wired-light-contract-') as directory:
         root = Path(directory)
         for tile in (42,93):
@@ -196,6 +248,10 @@ def suite(library):
             trigger(engine)
             frames(engine,height,18)
             engine.close()
+            for optimized in (0,1):
+                for malformed in (False,True):
+                    timer_rollback_case(library,root/'timer.wld',tile,optimized,malformed)
+                    timer_rollback_cases += 1
         # Decorative worlds must not retain thousands of mutable light cells.
         plain = root/'empty.wld';dense = root/'unwired.wld'
         write_world(plain,{},width=128,height=128)
@@ -208,6 +264,7 @@ def suite(library):
         assert viewport(engine,6,10,1,2)[0][3] == 0
         engine.close()
     return dict(status='passed',matrix=checked,
+                timer_rollback_cases=timer_rollback_cases,
                 unwired_16384_cells_retained_growth=unwired_bytes-empty_bytes,
                 additional=['every footprint member','unwired sibling','style preservation',
                             'disconnected same-colour nets','five malformed rollback cases per family',

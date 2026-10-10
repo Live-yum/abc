@@ -62,7 +62,9 @@ Future<({Uint8List rgba, Uint8List? png})> _raster(
   try {
     final image = await picture.toImage(size.width.ceil(), size.height.ceil());
     try {
-      final rgba = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+      final rgba = (await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
       final png = capturePng
           ? await image.toByteData(format: ui.ImageByteFormat.png)
           : null;
@@ -208,7 +210,8 @@ void main() {
           expect(
             differences,
             0,
-            reason: '$name/$phase first differing RGBA byte: $firstDifference; '
+            reason:
+                '$name/$phase first differing RGBA byte: $firstDifference; '
                 'candidate=$actualHash, c61=$expectedHash',
           );
           // All cases contain visible non-background wires/blocks. An empty
@@ -245,7 +248,8 @@ void main() {
                 'referenceRgbaSha256': expectedHash,
                 'differingRgbaBytes': differences,
                 'paintedPixels': paintedPixels,
-                'method': 'Rasterize the actual painter obtained from the visible '
+                'method':
+                    'Rasterize the actual painter obtained from the visible '
                     'shared-theme panel at its responsive layout size; compare '
                     'every RGBA byte against the unchanged c61 painter.',
                 'notMeasured': ['device frame rate', 'RSS', 'native heap'],

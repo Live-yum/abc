@@ -174,6 +174,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
         widget.state['open'] == true &&
         identical(identity, widget.state['displayIdentity']);
   }
+
   Future<void> _viewport({bool pixels = false}) async {
     final x = int.tryParse(_x.text),
         y = int.tryParse(_y.text),
@@ -857,8 +858,7 @@ class _CircuitPainter extends CustomPainter {
     final data = ByteData.sublistView(bytes),
         sx = size.width / width,
         sy = size.height / height;
-    final wirePaint = Paint()
-      ..strokeWidth = math.max(1, math.min(sx, sy) / 12);
+    final wirePaint = Paint()..strokeWidth = math.max(1, math.min(sx, sy) / 12);
     for (var offset = 0; offset + 16 <= bytes.length; offset += 16) {
       final cx = data.getUint32(offset, Endian.little) - x,
           cy = data.getUint32(offset + 4, Endian.little) - y;

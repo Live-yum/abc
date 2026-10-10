@@ -77,15 +77,16 @@ void main() {
       await tester.pump();
       final retainedPanel = tester.state(find.byType(WorldCircuitPanel));
       await requestConfirmation();
-      viewState.value = {
-        ...viewState.value,
-        'displayIdentity': Object(),
-      };
+      viewState.value = {...viewState.value, 'displayIdentity': Object()};
       await tester.pump();
       expect(tester.state(find.byType(WorldCircuitPanel)), same(retainedPanel));
       await tester.tap(find.text('继续'));
       await tester.pumpAndSettle();
-      expect(calls, isEmpty, reason: 'A replaced session cannot use old consent.');
+      expect(
+        calls,
+        isEmpty,
+        reason: 'A replaced session cannot use old consent.',
+      );
       expect(tester.takeException(), isNull);
 
       await requestConfirmation();
@@ -125,4 +126,3 @@ void main() {
     });
   }
 }
-
