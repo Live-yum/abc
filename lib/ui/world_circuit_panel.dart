@@ -539,6 +539,7 @@ class _WorldCircuitPanelState extends State<WorldCircuitPanel> {
           ],
           if (widget.hostStages != null)
             ExpansionTile(
+              key: const PageStorageKey('world-circuit-performance'),
               title: const Text('性能明细 / Performance'),
               subtitle: const Text('主机耗时，非 FPS；暂停后展开读取最近 128 次'),
               onExpansionChanged: (expanded) => setState(() {

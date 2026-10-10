@@ -143,9 +143,36 @@ function harness(owner, bridge, timeoutMs = 1000) {
   await streamed.client.close(streamedId);await streamed.client.releaseSource(firstOutput.worldSource.token);assert.equal(releasedSource,11);
   await streamed.client.dispose();await streamed.client.releaseSource(secondOutput.worldSource.token);
 
+  // TCW_PIXELS reports the cell count on RESULT events. Its final READY
+  // result_count is zero even when the owned records buffer is nonempty.
+  for(const kind of [2,3]) for(const cells of [0,1,3072,65536]) {
+    const records=new Uint8Array(cells*16);if(records.length)records[0]=37;
+    const nativeBatch={command:{...streamResult(),resultKind:kind},pixels:{...streamResult(),resultKind:9,records},readError:null};
+    const actualAbi=harness('worldCircuit',{open:async()=>streamResult(),commandAndReadPixels:async()=>nativeBatch});
+    const opened=(await actualAbi.client.open(new Uint8Array([1]))).session;
+    const received=await actualAbi.client.commandAndReadPixels(opened,JSON.stringify([2,kind]),'pixels');
+    assert.equal(received.command.session,opened);assert.equal(received.pixels.session,opened);
+    assert.equal(received.pixels.resultCount,0,'READY count is not the sparse records count');
+    assert.equal(received.pixels.records.byteLength,cells*16);
+    if(cells)assert.equal(received.pixels.records[0],37,'Transferred pixel bytes survive both RPC validations');
+    assert.equal(records.byteLength,0,'The host transfers its owned pixel output');
+    await actualAbi.client.dispose();
+  }
   for(const invalidResult of [
     {command:{...streamResult(),resultKind:2},pixels:{...streamResult(),resultKind:9},readError:null},
-    {command:{...streamResult(),resultKind:3},pixels:{...streamResult(),resultKind:9,resultCount:1},readError:null},
+    ...[
+      {records:new Uint8Array(15)},
+      {records:new Uint8Array(17)},
+      {records:new Uint8Array(65536*16+16)},
+      {records:null},
+      {records:Array(16).fill(0)},
+      {records:new Uint8Array(16),resultCount:-1},
+      {records:new Uint8Array(16),resultCount:65537},
+      {records:new Uint8Array(16),resultCount:NaN},
+      {records:new Uint8Array(16),resultKind:1},
+      {records:new Uint8Array(16),session:8},
+    ].map(fields=>({command:{...streamResult(),resultKind:3},pixels:{...streamResult(),resultKind:9,...fields},readError:null})),
+    {command:{...streamResult(),resultKind:3},pixels:{...streamResult(),resultKind:9,records:new Uint8Array(16)},readError:'Unexpected simultaneous error'},
     {command:{...streamResult(),resultKind:3},pixels:null,readError:null},
   ]) {
     const malformed=harness('worldCircuit',{open:async()=>streamResult(),commandAndReadPixels:async()=>invalidResult});

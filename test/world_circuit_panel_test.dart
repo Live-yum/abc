@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:terraforge/diagnostics/host_stage_timings.dart';
 import 'package:terraforge/ui/computer_display.dart';
 import 'package:terraforge/ui/world_circuit_panel.dart';
 
@@ -54,6 +55,100 @@ Future<void> _finish(WidgetTester tester) async {
 }
 
 void main() {
+  for (final size in [const Size(1440, 1000), const Size(390, 844)]) {
+    testWidgets(
+      'performance expansion preserves the circuit scroll state at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final bucket = PageStorageBucket();
+        final controller = ScrollController();
+        final restoredController = ScrollController();
+        final timings = HostStageTimings();
+        const scrollKey = PageStorageKey('circuit');
+        final scroll = find.byKey(scrollKey);
+        final performance = find.byType(ExpansionTile);
+
+        Widget app({required bool open, required ScrollController scroll}) =>
+            MaterialApp(
+              home: Scaffold(
+                body: PageStorage(
+                  bucket: bucket,
+                  child: SingleChildScrollView(
+                    key: scrollKey,
+                    controller: scroll,
+                    child: Column(
+                      children: [
+                        WorldCircuitPanel(
+                          state: _state()..['open'] = open,
+                          hostStages: timings,
+                          dispatch: (action, args) async {},
+                        ),
+                        const SizedBox(height: 2400),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+
+        try {
+          await tester.pumpWidget(app(open: false, scroll: controller));
+          expect(performance, findsNothing);
+          // Save a real ScrollPosition double before the open panel mounts.
+          await tester.drag(scroll, const Offset(0, -180));
+          await tester.pumpAndSettle();
+          final priorOffset = bucket.readState(tester.element(scroll));
+          expect(priorOffset, isA<double>());
+          expect(priorOffset, greaterThan(0));
+          expect(controller.offset, priorOffset);
+
+          await tester.pumpWidget(app(open: true, scroll: controller));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(performance, findsOneWidget);
+          expect(controller.offset, priorOffset);
+          await _reveal(tester, find.text('性能明细 / Performance'));
+          final savedOffset = bucket.readState(tester.element(scroll));
+          expect(savedOffset, isA<double>());
+          expect(controller.offset, savedOffset);
+
+          for (final expanded in [true, false]) {
+            await tester.tap(find.text('性能明细 / Performance'));
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+            expect(
+              bucket.readState(tester.element(performance)),
+              expanded,
+            );
+            expect(bucket.readState(tester.element(scroll)), isA<double>());
+            expect(bucket.readState(tester.element(scroll)), savedOffset);
+            expect(controller.offset, savedOffset);
+          }
+
+          controller.jumpTo(controller.offset + 180);
+          await tester.pumpAndSettle();
+          final restorationOffset = bucket.readState(tester.element(scroll));
+          expect(restorationOffset, isA<double>());
+          expect(restorationOffset, greaterThan(0));
+          expect(controller.offset, restorationOffset);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpWidget(app(open: true, scroll: restoredController));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(restoredController.offset, restorationOffset);
+          expect(bucket.readState(tester.element(scroll)), restorationOffset);
+        } finally {
+          await tester.pumpWidget(const SizedBox());
+          controller.dispose();
+          restoredController.dispose();
+        }
+      },
+      timeout: const Timeout(Duration(seconds: 30)),
+    );
+  }
+
   for (final size in [const Size(1440, 1000), const Size(390, 844)]) {
     testWidgets('generic selection and sparse pixels fit at $size', (
       tester,

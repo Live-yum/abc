@@ -92,7 +92,9 @@
       if (![2,3].includes(value.command.resultKind)) invalid('Invalid circuit batch command result');
       if (value.pixels != null) {
         validateResult(owner, 'command', value.pixels);
-        if (value.pixels.resultKind !== 9 || value.pixels.session !== value.command.session || value.readError != null || value.pixels.resultCount > 65536 || !(value.pixels.records instanceof Uint8Array) || value.pixels.records.byteLength !== value.pixels.resultCount * 16) invalid('Invalid circuit pixel result');
+        // PIXELS carries its count on RESULT events; READY.result_count is
+        // not the cell count. Bound the owned records buffer independently.
+        if (value.pixels.resultKind !== 9 || value.pixels.session !== value.command.session || value.readError != null || value.pixels.resultCount > 65536 || !(value.pixels.records instanceof Uint8Array) || value.pixels.records.byteLength % 16 !== 0 || value.pixels.records.byteLength > 65536 * 16) invalid('Invalid circuit pixel result');
       } else if (typeof value.readError !== 'string' || !value.readError.length || value.readError.length > 2048) invalid('Missing circuit pixel result');
     }
     else if (method === 'progress') {
