@@ -12,6 +12,11 @@ import '../diagnostics/host_stage_timings.dart';
 class WorldCircuitSession extends ChangeNotifier {
   final WorldCircuitBackend backend;
   final HostStageTimings hostStages;
+  bool _publishingRuntimeFrame = false, _lastPublishedDirty = false;
+
+  /// Valid only during a synchronous listener call. Broad observers still
+  /// receive runtime frames; shells may avoid rebuilding for these updates.
+  bool get isRuntimeFramePublication => _publishingRuntimeFrame;
   final Uint8List? _original;
   final WorldCircuitSource? source;
   WorldCircuitResult? result;
@@ -278,8 +283,20 @@ class WorldCircuitSession extends ChangeNotifier {
   }
 
   @override
-  void notifyListeners() =>
+  void notifyListeners() => _publishListeners();
+
+  void _publishListeners({bool runtimeFrame = false}) {
+    final previous = _publishingRuntimeFrame;
+    // Dirty may first change in a throttled batch that did not publish. Compare
+    // with the last publication, not just the beginning of this batch.
+    _publishingRuntimeFrame = runtimeFrame && dirty == _lastPublishedDirty;
+    _lastPublishedDirty = dirty;
+    try {
       hostStages.measure('session.publishListeners', super.notifyListeners);
+    } finally {
+      _publishingRuntimeFrame = previous;
+    }
+  }
 
   WorldCircuitCommand _displayQuery(ComputerDisplayRegion region) =>
       WorldCircuitCommand.pixels(
@@ -603,7 +620,9 @@ class WorldCircuitSession extends ChangeNotifier {
           publishFrame = true;
         }
       }, notifyState: false);
-      if (publishFrame && !_closed && !_closing) notifyListeners();
+      if (publishFrame && !_closed && !_closing) {
+        _publishListeners(runtimeFrame: _computerRunCurrent(generation));
+      }
     } catch (_) {
       pause();
     } finally {

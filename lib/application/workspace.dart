@@ -6,7 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
-import 'package:flutter/foundation.dart' show compute;
+import 'package:flutter/foundation.dart' show ChangeNotifier, Listenable, compute;
 import 'package:flutter/services.dart' show rootBundle;
 
 import '../domain/image_import.dart';
@@ -57,6 +57,11 @@ import '../platform/resource_store.dart';
 import '../ui/terra_contract.dart';
 
 class Workspace extends TerraController {
+  final ChangeNotifier _workspaceChanges = ChangeNotifier();
+  @override
+  Listenable get workspaceChanges => _workspaceChanges;
+  @override
+  Listenable get worldCircuitChanges => this;
   CircuitRulesWorkspace? _rules;
   CircuitRulesWorkspace get _rulesWorkspace {
     if (_rules != null) return _rules!;
@@ -341,6 +346,75 @@ class Workspace extends TerraController {
   String _status = '选择存档，或从空白画布开始。', _error = '', _activeCanvas = 'pixel';
   Map<String, Object?> _result = {};
   @override
+  Map<String, Object?> get worldCircuitView => {
+    'open': _worldCircuit?.result != null,
+    'streamingAvailable': worldCircuitBackend is WorldCircuitSourceBackend,
+    'sourceName': _circuitSource?.name,
+    'sourceBytes': _circuitSource?.length,
+    'importing': _circuitImporting,
+    'cancelling': _circuitCancelling,
+    'streamed': _worldCircuit?.streamed ?? false,
+    'computerVerified': _worldCircuit?.computerVerified ?? false,
+    'canRunComputer': _worldCircuit?.canRunComputer ?? false,
+    'programName': _worldCircuit?.programName,
+    'programIncomplete': _worldCircuit?.programIncomplete ?? false,
+    'programBaselineKnown': _worldCircuit?.programBaselineKnown ?? true,
+    'restoredFromExport': _worldCircuit?.restoredFromExport ?? false,
+    'provenanceWarning':
+        _computerProvenanceLoaded && !_computerProvenance.available
+        ? '本地计算机续跑记录无法核验；派生文件暂按通用世界载入。'
+        : null,
+    'physicalPulses': _worldCircuit?.physicalPulses ?? 0,
+    'clockHz': _worldCircuit?.physicalClockHz ?? 0,
+    'displayHz': _worldCircuit?.displayPollHz ?? 0,
+    'displayedFrames': _worldCircuit?.displayedFrames ?? 0,
+    'displayFrames': _worldCircuit?.displayFrames ?? const {},
+    'displayIdentity': _worldCircuit?.displayIdentity,
+    'progress': _worldCircuit?.progress,
+    'loadProgress': _circuitLoadProgress,
+    'loadError': _circuitLoadError,
+    'keyboardVerified': _worldCircuit?.computerVerified ?? false,
+    'heldKeys': _worldCircuit?.heldKeys.toList() ?? const <String>[],
+    'busy': _busy || (_worldCircuit?.busy ?? false),
+    'running': _worldCircuit?.running ?? false,
+    'optimizationEnabled': _worldCircuit?.optimizationEnabled ?? false,
+    'optimizationSupported': _worldCircuit?.optimizationSupported ?? false,
+    'wireHeadPixelRulesEnabled':
+        _worldCircuit?.wireHeadPixelRulesEnabled ?? false,
+    'dirty': _worldCircuit?.dirty ?? false,
+    'error': _worldCircuit?.error?.toString() ?? _circuitLoadError,
+    'width': _worldCircuit?.result?.width,
+    'height': _worldCircuit?.result?.height,
+    'ticks': _worldCircuit?.result?.ticks ?? 0,
+    'devices': _worldCircuit?.result?.devices ?? 0,
+    'networks': _worldCircuit?.result?.networks ?? 0,
+    'records': _worldCircuitRecords,
+    'viewport': _circuitViewport,
+    if (_worldFragments != null)
+      'fragments': {
+        'offset': _worldFragments!.offset,
+        'total': _worldFragments!.total,
+        'hasMore': _worldFragments!.hasMore,
+        'items': [
+          for (final f in _worldFragments!.fragments)
+            {
+              'id': f.id,
+              'x': f.x,
+              'y': f.y,
+              'width': f.width,
+              'height': f.height,
+              'cells': f.cells,
+              'wireCells': f.wireCells,
+              'canStamp': f.canStamp,
+              'complete': f.completeFootprint,
+              'modded': f.isModded,
+              'missingSupport': f.missingSupport,
+            },
+        ],
+      },
+  };
+
+  @override
   TerraViewState get view => hostStages.measure(
     'workspace.view',
     () => TerraViewState(
@@ -496,75 +570,7 @@ class Workspace extends TerraController {
             'y': _placementWorldY,
             'stale': !_placementIsCurrent,
           },
-        'worldCircuit': {
-          'open': _worldCircuit?.result != null,
-          'streamingAvailable':
-              worldCircuitBackend is WorldCircuitSourceBackend,
-          'sourceName': _circuitSource?.name,
-          'sourceBytes': _circuitSource?.length,
-          'importing': _circuitImporting,
-          'cancelling': _circuitCancelling,
-          'streamed': _worldCircuit?.streamed ?? false,
-          'computerVerified': _worldCircuit?.computerVerified ?? false,
-          'canRunComputer': _worldCircuit?.canRunComputer ?? false,
-          'programName': _worldCircuit?.programName,
-          'programIncomplete': _worldCircuit?.programIncomplete ?? false,
-          'programBaselineKnown': _worldCircuit?.programBaselineKnown ?? true,
-          'restoredFromExport': _worldCircuit?.restoredFromExport ?? false,
-          'provenanceWarning':
-              _computerProvenanceLoaded && !_computerProvenance.available
-              ? '本地计算机续跑记录无法核验；派生文件暂按通用世界载入。'
-              : null,
-          'physicalPulses': _worldCircuit?.physicalPulses ?? 0,
-          'clockHz': _worldCircuit?.physicalClockHz ?? 0,
-          'displayHz': _worldCircuit?.displayPollHz ?? 0,
-          'displayedFrames': _worldCircuit?.displayedFrames ?? 0,
-          'displayFrames': _worldCircuit?.displayFrames ?? const {},
-          'displayIdentity': _worldCircuit?.displayIdentity,
-          'progress': _worldCircuit?.progress,
-          'loadProgress': _circuitLoadProgress,
-          'loadError': _circuitLoadError,
-          'keyboardVerified': _worldCircuit?.computerVerified ?? false,
-          'heldKeys': _worldCircuit?.heldKeys.toList() ?? const <String>[],
-          'busy': _busy || (_worldCircuit?.busy ?? false),
-          'running': _worldCircuit?.running ?? false,
-          'optimizationEnabled': _worldCircuit?.optimizationEnabled ?? false,
-          'optimizationSupported':
-              _worldCircuit?.optimizationSupported ?? false,
-          'wireHeadPixelRulesEnabled':
-              _worldCircuit?.wireHeadPixelRulesEnabled ?? false,
-          'dirty': _worldCircuit?.dirty ?? false,
-          'error': _worldCircuit?.error?.toString() ?? _circuitLoadError,
-          'width': _worldCircuit?.result?.width,
-          'height': _worldCircuit?.result?.height,
-          'ticks': _worldCircuit?.result?.ticks ?? 0,
-          'devices': _worldCircuit?.result?.devices ?? 0,
-          'networks': _worldCircuit?.result?.networks ?? 0,
-          'records': _worldCircuitRecords,
-          'viewport': _circuitViewport,
-          if (_worldFragments != null)
-            'fragments': {
-              'offset': _worldFragments!.offset,
-              'total': _worldFragments!.total,
-              'hasMore': _worldFragments!.hasMore,
-              'items': [
-                for (final f in _worldFragments!.fragments)
-                  {
-                    'id': f.id,
-                    'x': f.x,
-                    'y': f.y,
-                    'width': f.width,
-                    'height': f.height,
-                    'cells': f.cells,
-                    'wireCells': f.wireCells,
-                    'canStamp': f.canStamp,
-                    'complete': f.completeFootprint,
-                    'modded': f.isModded,
-                    'missingSupport': f.missingSupport,
-                  },
-              ],
-            },
-        },
+        'worldCircuit': worldCircuitView,
         'history': _vaultEntries.values
             .where((e) => !_isInternalPreference(e))
             .map(
@@ -2428,7 +2434,9 @@ class Workspace extends TerraController {
         (_worldCircuit?.result?.resultKind ?? 0) != 9) {
       _worldCircuitRecords = records;
     }
-    notifyListeners();
+    _publishListeners(
+      includeWorkspace: _worldCircuit?.isRuntimeFramePublication != true,
+    );
   }
 
   void _clearCircuitLoadDiagnostics() {
@@ -2831,10 +2839,14 @@ class Workspace extends TerraController {
   }
 
   @override
-  void notifyListeners() {
-    if (!_disposed) {
-      hostStages.measure('workspace.publishListeners', super.notifyListeners);
-    }
+  void notifyListeners() => _publishListeners(includeWorkspace: true);
+
+  void _publishListeners({required bool includeWorkspace}) {
+    if (_disposed) return;
+    hostStages.measure('workspace.publishListeners', () {
+      super.notifyListeners();
+      if (includeWorkspace && !_disposed) _workspaceChanges.notifyListeners();
+    });
   }
 
   @override
@@ -2847,6 +2859,7 @@ class Workspace extends TerraController {
     _stopCircuit();
     _rules?.removeListener(notifyListeners);
     _rules?.dispose();
+    _workspaceChanges.dispose();
     super.dispose();
   }
 

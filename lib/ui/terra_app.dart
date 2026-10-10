@@ -221,21 +221,21 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
   @override
   void initState() {
     super.initState();
-    widget.controller.addListener(_refresh);
+    widget.controller.workspaceChanges.addListener(_refresh);
   }
 
   @override
   void didUpdateWidget(covariant TerraWorkspace old) {
     super.didUpdateWidget(old);
     if (old.controller != widget.controller) {
-      old.controller.removeListener(_refresh);
-      widget.controller.addListener(_refresh);
+      old.controller.workspaceChanges.removeListener(_refresh);
+      widget.controller.workspaceChanges.addListener(_refresh);
     }
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_refresh);
+    widget.controller.workspaceChanges.removeListener(_refresh);
     super.dispose();
   }
 
@@ -1588,6 +1588,31 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
       ]),
     ),
   );
+  Widget _worldCircuitPanel() {
+    Widget panel(Map<String, Object?> state) => WorldCircuitPanel(
+      hostStages: widget.controller.hostStages,
+      state: state,
+      dispatch: (a, b) async {
+        await act(a, b);
+        if (a == 'worldCircuitExtract' && v.error.isEmpty && mounted) {
+          go('fusion');
+        }
+      },
+    );
+    final changes = widget.controller.worldCircuitChanges;
+    if (changes == null) {
+      return panel(
+        Map<String, Object?>.from(
+          v.result['worldCircuit'] as Map? ?? const {},
+        ),
+      );
+    }
+    return ListenableBuilder(
+      listenable: changes,
+      builder: (context, child) => panel(widget.controller.worldCircuitView),
+    );
+  }
+
   Widget _editor(String kind) {
     final data = v.canvases[kind];
     final circuit = kind == 'circuit', fusion = kind == 'fusion';
@@ -1606,18 +1631,7 @@ class _TerraWorkspaceState extends State<TerraWorkspace> {
     if (circuit && (tabs['circuit'] ?? 0) == 2) {
       return stack([
         tabBar('circuit', ['电路沙盒', '信号观察', '世界电路', '完整电路工坊']),
-        WorldCircuitPanel(
-          hostStages: widget.controller.hostStages,
-          state: Map<String, Object?>.from(
-            v.result['worldCircuit'] as Map? ?? const {},
-          ),
-          dispatch: (a, b) async {
-            await act(a, b);
-            if (a == 'worldCircuitExtract' && v.error.isEmpty && mounted) {
-              go('fusion');
-            }
-          },
-        ),
+        _worldCircuitPanel(),
       ]);
     }
     return stack([

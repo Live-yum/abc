@@ -1,5 +1,7 @@
 import 'dart:developer';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:terraforge/ui/terra_contract.dart';
 
 import 'profile_recorder.dart';
@@ -24,6 +26,12 @@ class ProfiledTerraController extends TerraController {
 
   @override
   TerraViewState get view => delegate.view;
+  @override
+  Listenable get workspaceChanges => delegate.workspaceChanges;
+  @override
+  Listenable? get worldCircuitChanges => delegate.worldCircuitChanges;
+  @override
+  Map<String, Object?> get worldCircuitView => delegate.worldCircuitView;
 
   @override
   Future<void> dispatch(
