@@ -1,0 +1,448 @@
+// Correctness only. The CI runner replaces these three import placeholders
+// with file: URIs and uses the baseline package configuration on both targets.
+import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart';
+
+import '__BASELINE_MAP_URI__' as baseline;
+import '__CANDIDATE_MAP_URI__' as candidate;
+import '__FIXTURE_URI__' as repository;
+
+const _widths = <int>[
+  1, 2, 3, 63, 64, 65, 127, 128, 129, 255,
+  256, 257, 959, 960, 961, 1023, 1024, 1025, 2047, 2048,
+];
+const _dimensions = <(int, int)>[
+  (1, 1), (3, 2), (63, 65), (64, 64), (65, 67), (129, 131),
+  (257, 259), (511, 3), (512, 3), (513, 3), (959, 3), (960, 3),
+  (961, 3), (1023, 3), (1024, 3), (1025, 3), (2047, 3),
+  (2048, 3), (2049, 3), (32768, 1), (1, 32768),
+  (3, 2047), (3, 2048), (3, 2049), (67, 4097),
+];
+
+// These cases have exact independently specified dimensions and rational
+// nearest-floor coordinates. Avoid asserting exact-rational dimensions for
+// every floating-point scale: the unchanged renderer can ceil a value just
+// above an integer (for example, 129 / (129 / 63) can exceed 63).
+const _sampling = <_Sampling>[
+  _Sampling('integer', 8, 4, 4, 2, 1, 4, 2),
+  _Sampling('fractional', 7, 5, 3, 7, 3, 3, 3),
+  _Sampling('fractional-ceil-height', 10, 7, 3, 10, 3, 3, 3),
+  _Sampling('height-below-limit', 3, 2047, 2048, 1, 1, 3, 2047),
+  _Sampling('height-at-limit', 3, 2048, 2048, 1, 1, 3, 2048),
+  _Sampling('height-above-limit', 3, 2049, 2048, 2049, 2048, 3, 2048),
+  _Sampling('height-fractional', 67, 4097, 2048, 4097, 2048, 34, 2048),
+  _Sampling('width-above-limit', 2049, 3, 2048, 2049, 2048, 2048, 3),
+  _Sampling('largest-source-x', 32768, 1, 2048, 16, 1, 2048, 1),
+  _Sampling('largest-source-y', 1, 32768, 2048, 16, 1, 1, 2048),
+];
+
+const _expectedFixtureCount = 74;
+const _expectedRasterComparisons = 1488;
+const _expectedSourceCellChecks = 30720;
+const _expectedExceptionChecks = 888;
+
+var _rasterComparisons = 0;
+var _comparedRgbaBytes = 0;
+var _expectedPixelChecks = 0;
+var _sourceCellChecks = 0;
+var _exceptionChecks = 0;
+var _independentBufferChecks = 0;
+var _exactSamplingComparisons = 0;
+final _records = <Map<String, Object?>>[];
+
+class _Cell {
+  final int option, light, color;
+  final int? kind;
+  const _Cell(this.option, this.light, this.color, this.kind);
+  bool get empty => kind == null ? option == 0 : kind == 0;
+}
+
+class _Fixture {
+  final String name;
+  final bool chunked;
+  final int width, height;
+  final Uint8List bytes;
+  final _Cell Function(int, int) cell;
+  const _Fixture(
+    this.name, this.chunked, this.width, this.height, this.bytes, this.cell,
+  );
+}
+
+class _Sampling {
+  final String name;
+  final int width, height, maxWidth, numerator, denominator;
+  final int outputWidth, outputHeight;
+  const _Sampling(
+    this.name, this.width, this.height, this.maxWidth,
+    this.numerator, this.denominator, this.outputWidth, this.outputHeight,
+  );
+}
+
+Never _fail(String message) => throw StateError(message);
+
+void _require(bool condition, String label) {
+  if (!condition) _fail(label);
+}
+
+void _equalBytes(List<int> a, List<int> b, String label) {
+  _require(a.length == b.length, '$label: byte lengths ${a.length}/${b.length}');
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) _fail('$label: byte $i ${a[i]} != ${b[i]}');
+  }
+}
+
+// Decoder-accepted synthetic records. Option 65535 stresses the stored uint16
+// representation; this does not claim that the fixture has a game palette
+// entry at that index. Legacy kinds without options always encode option zero.
+Uint8List _encode(
+  bool chunked, int width, int height, _Cell Function(int, int) cell,
+) {
+  final out = BytesBuilder();
+  void u32(int n) => out.add(
+    (ByteData(4)..setUint32(0, n, Endian.little)).buffer.asUint8List(),
+  );
+  void u16(int n) => out.add(
+    (ByteData(2)..setUint16(0, n, Endian.little)).buffer.asUint8List(),
+  );
+  u32(chunked ? 33083 : 319);
+  out.add(utf8.encode('relogic'));
+  out.addByte(1);
+  u32(7);
+  u32(1);
+  u32(0);
+  final name = utf8.encode('Repository thumbnail correctness fixture');
+  out.addByte(name.length);
+  out.add(name);
+  u32(17);
+  u32(height);
+  u32(width);
+  for (final n in [2, 2, 4, 256, 256, 256]) {
+    u16(n);
+  }
+  out.add([1, 0, 2]);
+  if (chunked) {
+    for (var cy = 0; cy < height; cy += 64) {
+      for (var cx = 0; cx < width; cx += 64) {
+        final raw = ByteData(16384);
+        for (var y = 0; y < 64; y++) {
+          for (var x = 0; x < 64; x++) {
+            final sx = cx + x, sy = cy + y;
+            var value = 0xabcdef12; // Nonzero out-of-world chunk padding.
+            if (sx < width && sy < height) {
+              final c = cell(sx, sy);
+              value = c.option | (c.light << 16) | (c.color << 24);
+            }
+            raw.setUint32((y * 64 + x) * 4, value, Endian.little);
+          }
+        }
+        final compressed = const ZLibEncoder().encodeBytes(
+          raw.buffer.asUint8List(),
+        );
+        u32(compressed.length);
+        out.add(compressed);
+      }
+    }
+  } else {
+    final raw = BytesBuilder();
+    for (var y = 0; y < height; y++) {
+      for (var x = 0; x < width; x++) {
+        final c = cell(x, y), kind = c.kind!;
+        final hasOption = kind == 1 || kind == 2 || kind == 7;
+        final extra = (c.color << 1) | (kind == 8 ? 64 : 0);
+        raw.addByte(
+          ((kind == 8 ? 3 : kind) << 1) |
+          (extra == 0 ? 0 : 1) | 32 |
+          (hasOption && c.option > 255 ? 16 : 0),
+        );
+        if (extra != 0) raw.addByte(extra);
+        if (hasOption) {
+          raw.addByte(c.option & 255);
+          if (c.option > 255) raw.addByte(c.option >> 8);
+        }
+        raw.addByte(c.light);
+      }
+    }
+    final compressed = const ZLibEncoder().encodeBytes(raw.takeBytes());
+    out.add(Uint8List.sublistView(compressed, 2, compressed.length - 4));
+  }
+  return out.takeBytes();
+}
+
+_Fixture _states(bool chunked) {
+  const width = 256;
+  final height = chunked ? 6 : 54;
+  _Cell cell(int x, int y) {
+    if (chunked) return _Cell([0, 1, 65535][y % 3], x, y < 3 ? 0 : 31, null);
+    final kind = y % 9;
+    final option = kind == 1 || kind == 2 || kind == 7
+        ? [0, 1, 65535][(y ~/ 9) % 3] : 0;
+    return _Cell(option, x, y < 27 ? 0 : 31, kind);
+  }
+  return _Fixture(
+    'all-light-bytes/$chunked', chunked, width, height,
+    _encode(chunked, width, height, cell), cell,
+  );
+}
+
+_Fixture _pattern(bool chunked, int width, int height, String name) {
+  _Cell cell(int x, int y) {
+    final light = (x * 37 + y * 73 + ((x ~/ 251) ^ (y ~/ 241))) & 255;
+    final color = (x + y) % 32;
+    if (chunked) {
+      return _Cell([0, 1, 65535][(x + 3 * y) % 3], light, color, null);
+    }
+    final kind = (x + 3 * y) % 9;
+    final option = kind == 1 || kind == 2 || kind == 7
+        ? [0, 1, 65535][(x + y) % 3] : 0;
+    return _Cell(option, light, color, kind);
+  }
+  return _Fixture(
+    '$name/$chunked/${width}x$height', chunked, width, height,
+    _encode(chunked, width, height, cell), cell,
+  );
+}
+
+_Fixture _repositoryFixture(bool chunked) {
+  _Cell cell(int x, int y) {
+    if (chunked) return _Cell(1 + (x ~/ 13) % 4, y % 256, x % 32, null);
+    final kind = y % 9;
+    return _Cell(
+      kind == 1 || kind == 2 || kind == 7 ? y % 2 : 0,
+      (x + y) % 256, y % 32, kind,
+    );
+  }
+  return _Fixture(
+    'repository-rle-or-chunks/$chunked', chunked, 130, 70,
+    repository.syntheticMap(chunked: chunked, width: 130, height: 70), cell,
+  );
+}
+
+void _verifyCell(
+  int option, int light, int color, int? kind, _Cell expected, String label,
+) {
+  _require(
+    option == expected.option && light == expected.light &&
+    color == expected.color && kind == expected.kind,
+    '$label: decoded source differs from the fixture specification',
+  );
+  _sourceCellChecks++;
+}
+
+void _expectedRaster(
+  _Fixture fixture, int maxWidth, int width, int height, Uint8List rgba,
+  String label, bool edited, _Sampling? exact,
+) {
+  // The broad sweep intentionally follows the renderer's double scale/ceil
+  // contract. Exact sampling cases below replace it with rational arithmetic.
+  final scale = math.max(
+    1.0, math.max(fixture.width / maxWidth, fixture.height / 2048),
+  );
+  final expectedWidth = exact?.outputWidth ?? (fixture.width / scale).ceil();
+  final expectedHeight = exact?.outputHeight ?? (fixture.height / scale).ceil();
+  _require(width == expectedWidth && height == expectedHeight, '$label: expected dimensions');
+  _require(rgba.length == width * height * 4, '$label: packed RGBA length');
+  for (var y = 0; y < height; y++) {
+    final sy = math.min(
+      fixture.height - 1,
+      exact == null ? (y * scale).floor() : y * exact.numerator ~/ exact.denominator,
+    );
+    for (var x = 0; x < width; x++) {
+      final sx = math.min(
+        fixture.width - 1,
+        exact == null ? (x * scale).floor() : x * exact.numerator ~/ exact.denominator,
+      );
+      final c = fixture.cell(sx, sy);
+      final changed = edited && sx < math.min(fixture.width, 64) &&
+          sy < math.min(fixture.height, 64);
+      final light = c.empty ? 0 : changed ? 177 : c.light;
+      final offset = (y * width + x) * 4;
+      if (rgba[offset] != light || rgba[offset + 1] != light ||
+          rgba[offset + 2] != light || rgba[offset + 3] != 255) {
+        _fail('$label: pixel $x/$y from $sx/$sy expected [$light,$light,$light,255]');
+      }
+      _expectedPixelChecks++;
+    }
+  }
+}
+
+void _expectRange(void Function() action, String label) {
+  var raised = false;
+  try {
+    action();
+  } on RangeError {
+    raised = true;
+  }
+  _require(raised, '$label: expected RangeError');
+  _exceptionChecks++;
+}
+
+void _expectClosed(void Function() action, String label) {
+  var raised = false;
+  try {
+    action();
+  } on StateError {
+    raised = true;
+  }
+  _require(raised, '$label: expected StateError');
+  _exceptionChecks++;
+}
+
+void _check(
+  _Fixture fixture, List<int> widths, {
+  bool verifySource = false, bool edits = false, _Sampling? exact,
+}) {
+  final a = baseline.TerrariaMapSession.decode(fixture.bytes);
+  final b = candidate.TerrariaMapSession.decode(fixture.bytes);
+  var edited = false;
+  _require(a.width == fixture.width && b.width == fixture.width &&
+      a.height == fixture.height && b.height == fixture.height &&
+      a.chunked == fixture.chunked && b.chunked == fixture.chunked,
+      '${fixture.name}: decoded dimensions/format');
+  (Uint8List, Uint8List) render(int maxWidth, String phase, {_Sampling? sampling}) {
+    final aOwned = a.ownedBytes, bOwned = b.ownedBytes;
+    final ar = a.renderExplorationRgba(maxWidth: maxWidth);
+    final br = b.renderExplorationRgba(maxWidth: maxWidth);
+    final label = '${fixture.name}/$phase/$maxWidth';
+    _require(ar.width == br.width && ar.height == br.height, '$label: dimensions differ');
+    _equalBytes(ar.rgba, br.rgba, '$label: full RGBA');
+    _expectedRaster(fixture, maxWidth, ar.width, ar.height, ar.rgba, '$label/baseline', edited, sampling);
+    _expectedRaster(fixture, maxWidth, br.width, br.height, br.rgba, '$label/candidate', edited, sampling);
+    _require(a.ownedBytes == aOwned && b.ownedBytes == bOwned, '$label: retained buffers changed');
+    _rasterComparisons++;
+    _comparedRgbaBytes += ar.rgba.length;
+    if (sampling != null) _exactSamplingComparisons++;
+    return (ar.rgba, br.rgba);
+  }
+  void renders(String phase) {
+    for (final maxWidth in widths) {
+      render(maxWidth, phase, sampling: exact);
+    }
+  }
+  renders('original');
+  if (verifySource) {
+    for (var y = 0; y < fixture.height; y++) {
+      for (var x = 0; x < fixture.width; x++) {
+        final expected = fixture.cell(x, y);
+        final ac = a.cellAt(x, y), bc = b.cellAt(x, y);
+        _verifyCell(ac.option, ac.light, ac.color, ac.legacyKind, expected, '${fixture.name}/baseline/$x/$y');
+        _verifyCell(bc.option, bc.light, bc.color, bc.legacyKind, expected, '${fixture.name}/candidate/$x/$y');
+      }
+    }
+  }
+  _equalBytes(a.exportBytes(), fixture.bytes, '${fixture.name}: baseline original export');
+  _equalBytes(b.exportBytes(), fixture.bytes, '${fixture.name}: candidate original export');
+  if (edits) {
+    final w = math.min(fixture.width, 64), h = math.min(fixture.height, 64);
+    var expectedChanges = 0;
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        final c = fixture.cell(x, y);
+        if (c.light != 177 || c.color != 12) expectedChanges++;
+      }
+    }
+    _require(a.editRect(0, 0, w, h, light: 177, color: 12) == expectedChanges, '${fixture.name}: baseline edit count');
+    _require(b.editRect(0, 0, w, h, light: 177, color: 12) == expectedChanges, '${fixture.name}: candidate edit count');
+    edited = true;
+    renders('edited');
+    final editedExport = a.exportBytes();
+    _equalBytes(editedExport, b.exportBytes(), '${fixture.name}: edited export');
+    a.undo();
+    b.undo();
+    edited = false;
+    renders('undo');
+    _equalBytes(a.exportBytes(), fixture.bytes, '${fixture.name}: baseline undo export');
+    _equalBytes(b.exportBytes(), fixture.bytes, '${fixture.name}: candidate undo export');
+    a.redo();
+    b.redo();
+    edited = true;
+    renders('redo');
+    _equalBytes(a.exportBytes(), editedExport, '${fixture.name}: baseline redo export');
+    _equalBytes(b.exportBytes(), editedExport, '${fixture.name}: candidate redo export');
+  }
+  final first = render(65, 'buffer-before-mutation');
+  final savedA = Uint8List.fromList(first.$1), savedB = Uint8List.fromList(first.$2);
+  first.$1.fillRange(0, first.$1.length, 0);
+  first.$2.fillRange(0, first.$2.length, 0);
+  final second = render(65, 'buffer-after-mutation');
+  _equalBytes(savedA, second.$1, '${fixture.name}: baseline independent raster');
+  _equalBytes(savedB, second.$2, '${fixture.name}: candidate independent raster');
+  _independentBufferChecks += 2;
+  for (final invalid in [-1, 0, 2049]) {
+    _expectRange(() { a.renderExplorationRgba(maxWidth: invalid); }, '${fixture.name}/baseline/$invalid');
+    _expectRange(() { b.renderExplorationRgba(maxWidth: invalid); }, '${fixture.name}/candidate/$invalid');
+  }
+  a.close();
+  b.close();
+  _require(a.ownedBytes == 0 && b.ownedBytes == 0 && a.isClosed && b.isClosed,
+      '${fixture.name}: closed state/buffers');
+  // Check both normal closed rendering and closed-before-invalid precedence.
+  for (final maxWidth in [1024, 0, 2049]) {
+    _expectClosed(() { a.renderExplorationRgba(maxWidth: maxWidth); }, '${fixture.name}/baseline/closed/$maxWidth');
+    _expectClosed(() { b.renderExplorationRgba(maxWidth: maxWidth); }, '${fixture.name}/candidate/closed/$maxWidth');
+  }
+  _records.add({
+    'name': fixture.name,
+    'sha256': sha256.convert(fixture.bytes).toString(),
+    'width': fixture.width,
+    'height': fixture.height,
+    'maxWidths': widths,
+    'editUndoRedo': edits,
+    'allSourceCellsVerified': verifySource,
+    'exactRationalSampling': exact != null,
+  });
+}
+
+void _run() {
+  for (final chunked in [false, true]) {
+    _check(_states(chunked), _widths, verifySource: true, edits: true);
+    _check(_repositoryFixture(chunked), _widths, edits: true);
+    for (final dimensions in _dimensions) {
+      _check(_pattern(chunked, dimensions.$1, dimensions.$2, 'boundary'), _widths);
+    }
+    for (final sampling in _sampling) {
+      _check(
+        _pattern(chunked, sampling.width, sampling.height, 'sampling-${sampling.name}'),
+        [sampling.maxWidth], exact: sampling,
+      );
+    }
+  }
+  _require(_records.length == _expectedFixtureCount, 'finite fixture count');
+  _require(_rasterComparisons == _expectedRasterComparisons, 'finite raster comparison count');
+  _require(_sourceCellChecks == _expectedSourceCellChecks, 'finite source cell check count');
+  _require(_exceptionChecks == _expectedExceptionChecks, 'finite exception check count');
+  _require(_independentBufferChecks == 148, 'finite independent buffer check count');
+  _require(_exactSamplingComparisons == 20, 'finite exact sampling comparison count');
+}
+
+void main() {
+  Object? failure;
+  try {
+    _run();
+  } catch (error) {
+    failure = error;
+  }
+  // Exactly one stdout JSON object; failure also exits nonzero by rethrowing.
+  // No stopwatch, timed sample, performance claim, platform label, or I/O API.
+  print(jsonEncode({
+    'schema': 'map-thumbnail-correctness-v1',
+    'status': failure == null ? 'passed' : 'failed',
+    if (failure != null) 'error': failure.toString(),
+    'expectedFixtureCount': _expectedFixtureCount,
+    'fixtureCount': _records.length,
+    'expectedRasterComparisons': _expectedRasterComparisons,
+    'rasterComparisons': _rasterComparisons,
+    'comparedRgbaBytes': _comparedRgbaBytes,
+    'expectedPixelChecks': _expectedPixelChecks,
+    'sourceCellChecks': _sourceCellChecks,
+    'exceptionChecks': _exceptionChecks,
+    'independentBufferChecks': _independentBufferChecks,
+    'exactSamplingComparisons': _exactSamplingComparisons,
+    'fixtures': _records,
+    'scope': 'Finite synthetic MAP fixtures only; full baseline/candidate RGBA equality plus independent fixture-derived grayscale/alpha checks. Does not exhaust all dimensions, cell combinations, widths, or game files.',
+  }));
+  if (failure != null) throw failure;
+}

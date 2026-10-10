@@ -1,0 +1,130 @@
+{
+  "schema": "abc.map-thumbnail-contract.v1",
+  "baseCommit": "cf36cd2bf1d447a887d3ea4d19611020368de22c",
+  "baseTree": "9ff4ca286afa3e545901c498de167ee0c5dfc61d",
+  "branch": "codex/map-render-paired-cf36",
+  "candidatePath": "lib/domain/terraria_map.dart",
+  "candidateSha256": "b64bf06a266f24f7b18523599889e4220184fd7cb4914d9a84952bc89984e8f3",
+  "patchSha256": "a87445027c3bc233ac6080934b5ac12134e4dc65e5e69220f4fe5aa9cd45fc5c",
+  "frozenFiles": {
+    ".flutter-version": "af7ad6b385523c1c98977a15b50c53b1fd4f35b1c5d85513600a03ba3284f6b1",
+    ".github/actions/setup-flutter/action.yml": "c385d4a7395973ba7ec4aa537d1f941ef2313bec5ea71bbebbdd619893827380",
+    "pubspec.lock": "9cd23f6f2914d3420f3419a759af3f754e5173481aa029c8e519c5354d411135",
+    "lib/domain/terraria_map.dart": "f0cb6a52aee5e2bbb1c09ebd53606eee1dc30abaab21c98a4d51204846a5755e",
+    "tool/perf/compare.py": "66905a3f148366c84cada1e3fe61aa6ddc22ca6f0c781aaad8d0979dc9a68d75",
+    "tool/perf/run_ci_suite.py": "33258516eb3a1c207a8dcd1ba6867ab611e992d52cffa33dab103c5514768315",
+    "tool/perf/map_actions.dart": "c6f1985d973c98c679d2465ea08f149affbdfc32c006a175bf91a7b3d9bbdb81",
+    "tool/perf/map_actions_web.dart": "ecacb63355b538b63529e50d0177d45a4dd9e895e0030b6613ca21ee9aa40aa6",
+    "tool/perf/map_perf_core.dart": "5f26211531a5d0cbd57a5532dbf4b12e8cc14224f47f599f9b42ab07981e6c6f",
+    "tool/perf/map_fixture.dart": "b432203595dd3f7adf960922e17bfee54476a5073422d0e5fd101fbc6851af84",
+    "tool/perf/map_metadata.dart": "f0b73107f3aa87722ef894c07663d312791aae37eebcbe59281910dca516105e",
+    "tool/perf/map_report_metadata.cjs": "23e1a1192663cd982a8c8a3c8d073ff84d2dd7f5121a7a117e3c94537aa2080c",
+    "tool/perf/run_map_web.cjs": "973c895b81120404c9d21bbb30d2936d8298772ce69a8e1a044edfe6451643ad",
+    "tool/perf/write_map_fixture.dart": "16880c921b5312e5fcb06fcb87551c9fc6bc6e42c896b70b5ef6dd31bbd66fa0"
+  },
+  "order": [
+    "B",
+    "A",
+    "A",
+    "B",
+    "B",
+    "A"
+  ],
+  "runtimes": [
+    "aot",
+    "dart2js"
+  ],
+  "memoryFixtures": [
+    "legacy",
+    "chunk"
+  ],
+  "cycles": 26,
+  "frozenProcessTimeoutSeconds": 180,
+  "memoryProcessTimeoutSeconds": 40,
+  "oracleTimeoutSeconds": 240,
+  "buildCommandTimeoutSeconds": 180,
+  "runnerBudgetSeconds": 1440,
+  "cleanupReserveSeconds": 30,
+  "osSampleIntervalMs": 10,
+  "baselineQuietMs": 500,
+  "releasedQuietMs": 1500,
+  "quietSampleIntervalMs": 100,
+  "releasedSummaryStartOffsetMs": 1000,
+  "fixtures": {
+    "legacy": {
+      "width": 4200,
+      "height": 1200,
+      "maxWidth": 960,
+      "outputWidth": 960,
+      "outputHeight": 275,
+      "rgbaBytes": 1056000
+    },
+    "chunk": {
+      "width": 512,
+      "height": 256,
+      "maxWidth": 960,
+      "outputWidth": 512,
+      "outputHeight": 256,
+      "rgbaBytes": 524288
+    }
+  },
+  "acceptance": "Diagnostic evidence only. Preserve original comparator regression outcomes, report absolute milliseconds and memory deltas, and require review before adoption. Historical identical-program MAP shifts are not attributed to this renderer change.",
+  "formatting": "A frozen product never formatted. B renderer format before derived commit; actual post-format source/patch archived and hashed. New observer/oracle format only in official CI; observer hashes must match A/B.",
+  "oracleExpected": {
+    "schema": "map-thumbnail-correctness-v1",
+    "expectedFixtureCount": 74,
+    "fixtureCount": 74,
+    "expectedRasterComparisons": 1488,
+    "rasterComparisons": 1488,
+    "sourceCellChecks": 30720,
+    "exceptionChecks": 888,
+    "independentBufferChecks": 148,
+    "exactSamplingComparisons": 20
+  },
+  "frozenFixtures": {
+    "aot": [
+      {
+        "id": "synthetic-map-legacy319",
+        "kind": "map",
+        "provenance": "repository-authored",
+        "bytes": 27460,
+        "sha256": "8a11f8580eb1440710351557e4b3cb85193575a1a2d9bf5bfc2b2743115f17c0"
+      },
+      {
+        "id": "synthetic-map-chunk315",
+        "kind": "map",
+        "provenance": "repository-authored",
+        "bytes": 327446,
+        "sha256": "cf9f0e3a4b17ba74d5f5dd9dfe4026ff191071e1fe0031bf8cb742252426058e"
+      }
+    ],
+    "dart2js": [
+      {
+        "id": "synthetic-map-legacy319",
+        "kind": "map",
+        "provenance": "repository-authored",
+        "bytes": 27460,
+        "sha256": "8a11f8580eb1440710351557e4b3cb85193575a1a2d9bf5bfc2b2743115f17c0"
+      },
+      {
+        "id": "synthetic-map-chunk315",
+        "kind": "map",
+        "provenance": "repository-authored",
+        "bytes": 247492,
+        "sha256": "eb4ff3486393b52cf5f461fa90dcaf8a114d6e10802faf210de73b5049ef48d3"
+      },
+      {
+        "id": "local-map-1",
+        "kind": "map",
+        "provenance": "repository-authored",
+        "bytes": 27460,
+        "sha256": "8a11f8580eb1440710351557e4b3cb85193575a1a2d9bf5bfc2b2743115f17c0"
+      }
+    ]
+  },
+  "toolchainPins": {
+    "flutter": "3.47.6",
+    "dart": "3.13.5",
+    "node": "22.23.3"
+  }
+}

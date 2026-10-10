@@ -1,0 +1,64 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:terraforge/domain/terraria_map.dart';
+import '__FIXTURE_URI__';
+import 'observer_native.dart'
+    if (dart.library.js_interop) 'observer_web.dart' as platform;
+
+final clock = Stopwatch()..start();
+void emit(String stage, Map<String, Object?> value) {
+  print(jsonEncode({
+    'schema': 'abc.map-thumbnail-memory-event.v1',
+    'stage': stage,
+    'epochMs': DateTime.now().millisecondsSinceEpoch,
+    'elapsedUs': clock.elapsedMicroseconds,
+    ...value,
+  }));
+}
+
+Future<void> quiet(String phase, int milliseconds) async {
+  // Fixed observations, no forced GC and no wait-until-good loop.
+  for (var offset = 0; offset <= milliseconds; offset += 100) {
+    if (offset != 0) await Future<void>.delayed(const Duration(milliseconds: 100));
+    emit(phase, {'nominalOffsetMs': offset, ...platform.memory()});
+  }
+}
+
+Future<void> main(List<String> args) async {
+  final fixture = platform.fixture(args);
+  if (!{'legacy', 'chunk'}.contains(fixture)) {
+    throw ArgumentError('Expected legacy or chunk');
+  }
+  final input = fixture == 'legacy'
+      ? syntheticMap(chunked: false, width: 4200, height: 1200)
+      : syntheticMap(width: 512, height: 256);
+  final sourceHash = sha256.convert(input).toString();
+  emit('fixture-ready', {'fixture': fixture, 'sourceBytes': input.length,
+    'sourceSha256': sourceHash});
+  await quiet('baseline-quiet', 500);
+  TerrariaMapSession? session = TerrariaMapSession.decode(input);
+  emit('decoded', {'width': session.width, 'height': session.height,
+    'ownedBytes': session.ownedBytes, ...platform.memory()});
+  TerrariaMapRaster? raster;
+  emit('render-start', {});
+  for (var cycle = 0; cycle < 26; cycle++) {
+    raster = session.renderExplorationRgba(maxWidth: 960);
+    emit('render-cycle', {'cycle': cycle, 'width': raster.width,
+      'height': raster.height, 'rgbaBytes': raster.rgba.length,
+      ...platform.memory()});
+  }
+  final rasterHash = sha256.convert(raster!.rgba).toString();
+  emit('render-end', {'outputSha256': rasterHash, ...platform.memory()});
+  final preserved = sha256.convert(session.exportBytes()).toString() == sourceHash;
+  if (!preserved) throw StateError('Render changed source bytes');
+  session.close();
+  if (session.ownedBytes != 0) throw StateError('Close retained owned buffers');
+  session = null;
+  raster = null;
+  emit('closed', {'ownedBytes': 0, 'sourcePreserved': preserved,
+    ...platform.memory()});
+  await quiet('released-quiet', 1500);
+  emit('complete', {'status': 'passed', 'fixture': fixture,
+    'sourceSha256': sourceHash, 'outputSha256': rasterHash,
+    'cycles': 26, 'sourcePreserved': preserved, 'ownedBytes': 0});
+}

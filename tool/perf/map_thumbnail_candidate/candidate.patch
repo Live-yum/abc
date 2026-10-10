@@ -1,0 +1,24 @@
+--- a/lib/domain/terraria_map.dart
++++ b/lib/domain/terraria_map.dart
+@@ -348,14 +348,18 @@
+     final scale = math.max(1.0, math.max(width / maxWidth, height / 2048));
+     final w = (width / scale).ceil(), h = (height / scale).ceil();
+     final rgba = Uint8List(w * h * 4);
++    final sourceXs = Uint16List(w);
++    for (var x = 0; x < w; x++) {
++      sourceXs[x] = math.min(width - 1, (x * scale).floor());
++    }
+     for (var y = 0; y < h; y++) {
+       final sy = math.min(height - 1, (y * scale).floor());
++      final sourceRow = sy * width, outputRow = y * w * 4;
+       for (var x = 0; x < w; x++) {
+-        final sx = math.min(width - 1, (x * scale).floor()),
+-            i = sy * width + sx;
++        final i = sourceRow + sourceXs[x];
+         final value = _cells[i];
+         final empty = chunked ? value & 65535 == 0 : _kinds[i] == 0;
+-        final light = empty ? 0 : (value >> 16) & 255, out = (y * w + x) * 4;
++        final light = empty ? 0 : (value >> 16) & 255, out = outputRow + x * 4;
+         rgba[out] = light;
+         rgba[out + 1] = light;
+         rgba[out + 2] = light;
