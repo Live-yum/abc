@@ -8,6 +8,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terraforge/engine/engine.dart';
 import 'package:terraforge/engine/native_world_circuit_bindings.dart';
+import 'package:terraforge/engine/native_memory_ownership_diagnostics.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 
 const _chunkSize = 1024 * 1024;
@@ -503,6 +504,23 @@ class _HashFixture {
     );
     expect(allocator.live, isEmpty);
     expect(allocator.frees, allocator.allocations.length);
+    if (memoryOwnershipDiagnosticsEnabled) {
+      final row = api.diagnosticOwnerSnapshot();
+      final allocated = allocator.allocations.fold<int>(0, (a, b) => a + b);
+      final uncertain = allocator.freeFailure != null && allocator.frees != 0;
+      expect(row['ffiHashWindowAllocatedBytes'], allocated);
+      expect(row['ffiHashWindowCleanupFailures'], uncertain ? allocator.frees : 0);
+      expect(row['ffiHashWindowAccountingCertain'], !uncertain);
+      if (!uncertain) {
+        expect(row['ffiHashWindowFreedBytes'], allocated);
+        expect(row['ffiHashWindowOutstandingBytes'], 0);
+      } else {
+        // The injected allocator frees and then throws. The observer cannot
+        // claim that a throwing call completed and must preserve uncertainty.
+        expect(row['ffiHashWindowFreedBytes'], 0);
+        expect(row['ffiHashWindowOutstandingBytes'], allocated);
+      }
+    }
   }
 
   void dispose() {

@@ -1,0 +1,530 @@
+// One predeclared ownership arm. The runner invokes two fresh processes once.
+import 'dart:convert';
+import 'dart:developer' show Timeline;
+import 'dart:io';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:terraforge/engine/native_engine.dart' as core;
+import 'package:terraforge/engine/native_memory_ownership_diagnostics.dart';
+
+import 'computer_memory_diagnostic_test.dart' as original;
+import 'support/computer_inputs_native.dart' as inputs;
+import 'support/computer_memory_journal.dart';
+import 'support/computer_memory_probe_telemetry.dart';
+import 'support/generic_circuit_profile.dart';
+import 'support/memory_ownership_gauges.dart';
+import 'support/memory_ownership_retention.dart';
+import 'support/profile_memory_native.dart' as memory;
+import 'support/profile_recorder.dart';
+
+const _base = '9d4cd5a0f9db03042a3986689fea374ba92d78b8';
+
+void main() {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('fixed product memory ownership diagnostic', (tester) async {
+    if (!kProfileMode || !Platform.isLinux ||
+        !memoryOwnershipDiagnosticsEnabled) {
+      fail('Requires opt-in real Linux Flutter profile ownership build');
+    }
+    final arm = Platform.environment['MEMORY_OWNER_ARM'];
+    if (arm != 'probe-only' && arm != 'product-with-ownership') {
+      fail('Explicit memory ownership arm required');
+    }
+    final probeOnly = arm == 'probe-only';
+    binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
+    final imageObserver = ImageOwnershipObserver()..install();
+    final fdObserver = OwnFdObserver();
+    final telemetry = ComputerMemoryProbeTelemetry();
+    final points = <Map<String, Object?>>[], gauges = <Map<String, Object?>>[];
+    final cycles = <Map<String, Object?>>[], waits = <Map<String, Object?>>[];
+    final emptyWrapper = wrapperResultSnapshot(null);
+    ComputerMemoryJournal? journal;
+    ComputerMemoryOsJournal? os;
+    OwnershipRetentionProbe? retention;
+    OwnershipGaugeWriter? gaugeWriter;
+    RandomAccessFile? gaugeOutput;
+    Directory? root;
+    File? gaugeFile;
+    Map<String, Object?>? osResult, rawGauges, rawAllocator, imageSummary;
+    Map<String, Object?>? startupIdentityGate;
+    Map? schedule;
+    String? scheduleSha;
+    var origin = 0, status = 'failed';
+    var vmProbeCalls = 0;
+    String? failure, failureStack;
+
+    try {
+      final scheduleBytes = await File(
+        Platform.environment['ABC_OWNER_SCHEDULE']!,
+      ).readAsBytes();
+      final activeSchedule = jsonDecode(utf8.decode(scheduleBytes)) as Map;
+      schedule = activeSchedule;
+      scheduleSha = sha256.convert(scheduleBytes).toString();
+      expect(schedule['schema'], 'abc.memory-ownership-schedule.v1');
+      expect((schedule['source'] as Map)['commit'], _base);
+      expect((schedule['points'] as List).length, 17);
+      expect((schedule['cycles'] as List).length, 8);
+      expect((schedule['quietWindows'] as List).length, 17);
+      expect((schedule['gaugeSchedule'] as List).length, 52);
+      root = Directory(Platform.environment['ABC_MEMORY_RAW_DIRECTORY']!);
+      if (root.existsSync()) fail('New ownership raw directory required');
+      await root.create(recursive: true);
+      gaugeFile = File('${root.path}/ownership-gauges.jsonl');
+      gaugeOutput = gaugeFile.openSync(mode: FileMode.writeOnly);
+      final writer = OwnershipGaugeWriter(
+        write: (bytes) => gaugeOutput!.writeFromSync(bytes),
+        flush: () => gaugeOutput!.flushSync(),
+      );
+      gaugeWriter = writer;
+      final retentionProbe = OwnershipRetentionProbe.open(
+        Platform.environment['ABC_OWNER_LIBC_HELPER']!,
+      );
+      retention = retentionProbe;
+      if (retentionProbe.initialization['status'] == 'failed') {
+        throw StateError('Allocator helper initialization failed');
+      }
+      final hello = File(Platform.environment['ABC_OWNER_HELLO']!);
+      final helloTemporary = File('${hello.path}.pending');
+      final ready = File(Platform.environment['ABC_OWNER_READY']!);
+      if (hello.existsSync() || helloTemporary.existsSync() || ready.existsSync()) {
+        fail('New owned-process handshake paths required');
+      }
+      helloTemporary.writeAsStringSync(jsonEncode({
+        'schema': 'abc.memory-ownership-hello.v1',
+        'arm': arm,
+        'hostPid': pid,
+        'sourceCommit': const String.fromEnvironment('PERF_COMMIT'),
+        'baseProductCommit': _base,
+        'startedUs': Timeline.now,
+      }), mode: FileMode.writeOnly, flush: true);
+      if (hello.existsSync()) fail('Owned-process hello already exists');
+      helloTemporary.renameSync(hello.path);
+      startupIdentityGate = await waitForOwnershipReady(ready,
+          arm: probeOnly ? 'probe-only' : 'product-with-ownership', hostPid: pid,
+          sourceCommit: const String.fromEnvironment('PERF_COMMIT'),
+          baseProductCommit: _base);
+      // No synthetic image, dummy worker or decoder warm-up in either arm.
+      final source = probeOnly ? null : await inputs.computerInput();
+      final recorder = ProfileRecorder(
+        frameBudgetUs: 1000000 / 60,
+        profile: true,
+        currentRss: memory.currentRss,
+      );
+      final activeJournal = ComputerMemoryJournal(root, recorder)..start();
+      journal = activeJournal;
+      final osJournal = await ComputerMemoryOsJournal.start(root);
+      os = osJournal;
+
+      Future<void> until(int offset, String phase, int cycle) async {
+        final remaining = origin + offset - Timeline.now;
+        if (remaining > 0) {
+          await Future<void>.delayed(Duration(microseconds: remaining));
+        }
+        final actual = Timeline.now - origin;
+        waits.add({
+          'phase': phase,
+          'cycle': cycle,
+          'plannedOffsetUs': offset,
+          'actualOffsetUs': actual,
+          'lateUs': (actual - offset).clamp(0, 1 << 62),
+        });
+      }
+
+      Future<Map<String, Object?>> collect(
+        String id, int cycle, String phase, Map<String, Object?> wrapper,
+      ) async {
+        final started = Timeline.now;
+        Map<String, Object?> worker;
+        try {
+          worker = await core.diagnosticOwnerSnapshot();
+        } catch (_) {
+          worker = {
+            'status': 'failed',
+            'workerGeneration': null,
+            'requestUs': started,
+            'ackUs': null,
+            'failedUs': Timeline.now,
+            'productionPendingBefore': null,
+            'productionPendingAfter': null,
+            'owner': null,
+            'errorKind': 'owner-request-failed',
+          };
+        }
+        final mainStarted = Timeline.now;
+        final imageState = imageObserver.snapshot();
+        final cache = imageCacheSnapshot();
+        final mainEnded = Timeline.now;
+        final fd = fdObserver.sample();
+        return {
+          'id': id,
+          'sequence': gauges.length,
+          'cycle': cycle,
+          'phase': phase,
+          'startUs': started,
+          'mainStartUs': mainStarted,
+          'mainEndUs': mainEnded,
+          'captureEndUs': Timeline.now,
+          'images': imageState,
+          'imageCache': cache,
+          'wrapper': wrapper,
+          'worker': worker,
+          'fd': fd,
+          'atomic': false,
+        };
+      }
+
+      void persist(Map<String, Object?> row, int allocatorIndex) {
+        row['sequence'] = gauges.length;
+        row['allocator'] = retentionProbe.describe(allocatorIndex);
+        final allocator = row['allocator'] as Map;
+        if ((allocator['endUs'] as int) > (row['captureEndUs'] as int)) {
+          row['captureEndUs'] = allocator['endUs'];
+        }
+        final serializationMarker = Timeline.now;
+        row['serializedAfterUs'] = serializationMarker;
+        row['endUs'] = serializationMarker;
+        if (ownershipGaugeFailure(row, probeOnly: probeOnly) != null) {
+          row['partial'] = true;
+        }
+        gauges.add(row);
+        writer.write(row);
+      }
+
+      void requireComplete(Map<String, Object?> row) {
+        final failure = ownershipGaugeFailure(row, probeOnly: probeOnly);
+        if (failure != null) throw StateError(failure);
+      }
+
+      Future<void> gauge(
+        String id, int cycle, String phase, Map<String, Object?> wrapper,
+      ) async {
+        final row = await collect(id, cycle, phase, wrapper);
+        final captured = retentionProbe.capture();
+        persist(row, captured);
+        requireComplete(row);
+      }
+
+      Future<void> quiet(int cycle, String phase,
+          Map<String, Object?> Function() wrapper) async {
+        final window = (activeSchedule['quietWindows'] as List).cast<Map>()
+            .singleWhere((row) => row['cycle'] == cycle && row['phase'] == phase);
+        if (probeOnly) {
+          await until(window['startOffsetUs'] as int, '$phase-quiet-start', cycle);
+        }
+        activeJournal.boundary('drain-start', cycle);
+        for (var i = 0; i < 3; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 1200));
+        activeJournal.boundary('drain-end', cycle);
+        final suffix = '$phase-quiet-end';
+        await gauge(cycle == 8 ? suffix : 'cycle-$cycle.$suffix',
+            cycle, suffix, wrapper());
+      }
+
+      Future<void> point(int cycle, String phase,
+          Map<String, Object?> wrapper) async {
+        final planned = (activeSchedule['points'] as List).cast<Map>()
+            .singleWhere((row) => row['cycle'] == cycle && row['phase'] == phase);
+        if (probeOnly) await until(planned['offsetUs'] as int, phase, cycle);
+        final started = Timeline.now;
+        final prefix = cycle < 0 ? phase : 'cycle-$cycle.$phase';
+        final before = await osJournal.request('point', '$phase.before-gc');
+        final beforeGauge = await collect('$prefix.before-gc', cycle,
+            '$phase.before-gc', wrapper);
+        if (ownershipGaugeFailure(beforeGauge, probeOnly: probeOnly) != null) {
+          beforeGauge['abortedBeforeVm'] = true;
+          final captured = retentionProbe.capture();
+          persist(beforeGauge, captured);
+          requireComplete(beforeGauge);
+        }
+        final allocatorBefore = retentionProbe.capture();
+        final vmStart = Timeline.now;
+        Map<String, Object?>? observed;
+        Map<String, Object?>? afterGauge;
+        int? vmEnd, allocatorAfter;
+        try {
+          try {
+            vmProbeCalls++;
+            observed = await telemetry.measure();
+          } finally {
+            vmEnd = Timeline.now;
+            // Capture the second wire slot before JSON encoding or OS IO.
+            allocatorAfter = retentionProbe.capture();
+          }
+          final afterIndex = allocatorAfter;
+          final vmObservation = observed;
+          if (afterIndex == null || vmObservation == null) {
+            throw StateError('Incomplete VM or allocator observation');
+          }
+          afterGauge = await collect('$prefix.after-gc', cycle,
+              '$phase.after-gc', wrapper);
+          afterGauge['startUs'] = retentionProbe.captureStartUs(afterIndex);
+          final after = await osJournal.request('point', '$phase.after-gc');
+          persist(beforeGauge, allocatorBefore);
+          persist(afterGauge, afterIndex);
+          points.add({
+            'phase': phase,
+            'cycle': cycle,
+            'startUs': started,
+            'endUs': Timeline.now,
+            'vmStartUs': vmStart,
+            'vmEndUs': vmEnd,
+            'osBefore': before,
+            'osAfter': after,
+            'vm': vmObservation['vm'],
+            'probeTelemetry': vmObservation['telemetry'],
+            'recorder': activeJournal.retainedCounts(),
+            'wrapperLatestRetained': wrapper['present'],
+            'gaugeBeforeId': beforeGauge['id'],
+            'gaugeAfterId': afterGauge['id'],
+            'nativeCounters': {
+              'status': 'recorded-in-owner-gauges',
+              'gaugeBeforeId': beforeGauge['id'],
+              'gaugeAfterId': afterGauge['id'],
+              'values': null,
+            },
+            'atomic': false,
+          });
+          requireComplete(beforeGauge);
+          requireComplete(afterGauge);
+          if ((vmObservation['vm'] as Map)['heapUsedBytes'] == null) {
+            throw StateError('VM group observation unavailable');
+          }
+        } catch (_) {
+          // Preserve completed measurements without taking another sample.
+          if (!gauges.any((row) => row['id'] == beforeGauge['id'])) {
+            beforeGauge['partial'] = true;
+            persist(beforeGauge, allocatorBefore);
+          }
+          final afterIndex = allocatorAfter;
+          if (afterIndex != null &&
+              !gauges.any((row) => row['id'] == '$prefix.after-gc')) {
+            final partial = afterGauge ?? <String, Object?>{
+              'id': '$prefix.after-gc',
+              'cycle': cycle,
+              'phase': '$phase.after-gc',
+              'startUs': retentionProbe.captureStartUs(afterIndex),
+              'captureEndUs': Timeline.now,
+              'images': null, 'imageCache': null, 'wrapper': null,
+              'worker': null, 'fd': null, 'atomic': false,
+            };
+            partial['partial'] = true;
+            persist(partial, afterIndex);
+          }
+          rethrow;
+        }
+      }
+
+      await gauge('initialization', -1, 'initialization', emptyWrapper);
+      origin = Timeline.now;
+      await point(-1, 'baseline', emptyWrapper);
+      for (var cycle = 0; cycle < 8; cycle++) {
+        final planned = (activeSchedule['cycles'] as List).cast<Map>()
+            .singleWhere((row) => row['cycle'] == cycle);
+        if (probeOnly) {
+          await until(planned['startOffsetUs'] as int, 'cycle-start', cycle);
+        }
+        activeJournal.boundary('cycle-start', cycle);
+        final evidence = <String, Object?>{};
+        cycles.add(evidence);
+        if (probeOnly) {
+          evidence.addAll({
+            'cycle': cycle,
+            'mode': cycle.isOdd ? 'optimized' : 'standard',
+            'scenario': 'no-world-no-edit',
+            'status': 'idle',
+            'productOperations': 0,
+          });
+          await until(planned['workloadEndOffsetUs'] as int,
+              'idle-workload-slot-end', cycle);
+          activeJournal.boundary('cycle-disposed', cycle);
+          await quiet(cycle, 'retained', () => emptyWrapper);
+          activeJournal.boundary('retained-point', cycle);
+          await point(cycle, 'after-close-retained', emptyWrapper);
+          await activeJournal.flush('cycle-$cycle.release-prefix');
+          activeJournal.boundary('released-prefix', cycle);
+          await quiet(cycle, 'released', () => emptyWrapper);
+          await activeJournal.flush('cycle-$cycle.late-tail');
+          activeJournal.boundary('released-point', cycle);
+          await point(cycle, 'after-close-released', emptyWrapper);
+        } else {
+          // Reuse every original product operation and assertion. Keep only
+          // this cycle's wrapper, with precisely its original release point.
+          final backend = await original.runComputerMemoryDiagnosticCycle(
+            tester: tester, cycle: cycle, source: source!, journal: activeJournal,
+            os: osJournal, evidence: evidence,
+          );
+          await quiet(cycle, 'retained', () => wrapperResultSnapshot(backend.latest));
+          activeJournal.boundary('retained-point', cycle);
+          await point(cycle, 'after-close-retained',
+              wrapperResultSnapshot(backend.latest));
+          await activeJournal.flush('cycle-$cycle.release-prefix');
+          backend.latest = null;
+          activeJournal.boundary('released-prefix', cycle);
+          await quiet(cycle, 'released', () => emptyWrapper);
+          await activeJournal.flush('cycle-$cycle.late-tail');
+          activeJournal.boundary('released-point', cycle);
+          await point(cycle, 'after-close-released', emptyWrapper);
+        }
+        await osJournal.request('rotate', 'cycle-$cycle.end');
+        activeJournal.boundary('cycle-end', cycle);
+      }
+      await quiet(8, 'final', () => emptyWrapper);
+      expect(points.length, 17);
+      expect(gauges.length, 52);
+      expect(retentionProbe.captureCount, 52);
+      expect(points.every((p) => (p['vm'] as Map)['heapUsedBytes'] != null), isTrue);
+      status = 'observed';
+    } catch (error, stack) {
+      failure = error.toString();
+      failureStack = stack.toString();
+    } finally {
+      try {
+        journal?.stop();
+        await journal?.flush('final-received-tail');
+        osResult = await os?.finish();
+        if (osResult != null) {
+          if (osResult['error'] != null) throw StateError('OS sampler incomplete');
+          final files = osResult['files'] as List;
+          for (var i = 0; i < files.length; i++) {
+            final row = Map<String, Object?>.from(files[i] as Map);
+            files[i] = {...row, ...await describeRawFile(
+              File('${root!.path}/${row['file']}'),
+            )};
+          }
+        }
+      } catch (error) {
+        status = 'failed';
+        failure = '$failure; finalization: $error';
+      }
+      try {
+        gaugeOutput?.flushSync();
+        gaugeOutput?.closeSync();
+        if (gaugeFile != null) {
+          rawGauges = {
+            ...await describeRawFile(gaugeFile),
+            'sampleCount': gauges.length,
+          };
+        }
+      } catch (error) {
+        status = 'failed';
+        failure = '$failure; gauge persistence: $error';
+      } finally {
+        imageSummary = imageObserver.close();
+        try {
+          final probe = retention;
+          if (probe != null && root != null) {
+            final file = File('${root.path}/allocator-captures.jsonl');
+            final output = file.openSync(mode: FileMode.writeOnly);
+            try {
+              for (var i = 0; i < probe.captureCount; i++) {
+                output.writeStringSync('${jsonEncode(probe.rawCapture(i))}\n');
+              }
+              output.flushSync();
+            } finally {
+              output.closeSync();
+            }
+            rawAllocator = {
+              ...await describeRawFile(file),
+              'sampleCount': probe.captureCount,
+            };
+          }
+        } catch (error) {
+          status = 'failed';
+          failure = '$failure; allocator persistence: $error';
+        } finally {
+          retention?.close();
+        }
+      }
+      if (imageSummary['restorationComplete'] != true ||
+          imageSummary['priorCallbackFailures'] != 0) {
+        status = 'failed';
+        failure = '$failure; image observer incomplete';
+      }
+      final report = <String, Object?>{
+        'schema': 'abc.memory-ownership.v1',
+        'workloadId': genericCircuitWorkloadId,
+        'status': status,
+        'arm': arm,
+        'hostPid': pid,
+        'baseProductCommit': _base,
+        'buildMode': 'profile',
+        'inputFormat': probeOnly ? 'none' : 'wld-only',
+        'circuitAbi': 2,
+        'plannedCycles': 8,
+        'completedCycles': cycles.where((row) => row['status'] == 'completed').length,
+        'ticksPerCycle': probeOnly ? 0 : 32,
+        'excludedWarmupCycles': 0,
+        'plannedCheckpoints': 17,
+        'vmProbeCalls': vmProbeCalls,
+        'plannedOwnershipGauges': 52,
+        'expectedNativeWorkers': probeOnly ? 0 : 1,
+        'inProcessOsSamplerRetained': true,
+        'externalOsSamplerEnabled': false,
+        'fixture': probeOnly ? null : {
+          'sourceRevision': '0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8',
+          'wldBytes': 405983441,
+          'wldSha256': publicCircuitFixtureSha256,
+        },
+        'runtime': {
+          ...memory.runtimeMetadata(),
+          'commit': const String.fromEnvironment('PERF_COMMIT'),
+          'checkedOutHead': const String.fromEnvironment('PERF_CHECKED_OUT_HEAD'),
+          'workingTreeDirty': const bool.fromEnvironment('PERF_WORKTREE_DIRTY',
+              defaultValue: true),
+          'flutterVersion': const String.fromEnvironment('PERF_FLUTTER_VERSION'),
+          'flutterRevisionPin': '5fc346839b5d0eef006ed8404392afb4dfae428d',
+          'renderer': const String.fromEnvironment('PERF_RENDERER'),
+          ...memory.runtimeOverrides(),
+        },
+        'scheduleSha256': scheduleSha,
+        'scheduleOriginUs': origin,
+        'scheduleObservations': waits,
+        'memoryPoints': points,
+        'ownershipGauges': gauges,
+        'ownershipGaugeWrites': gaugeWriter?.receipts,
+        'allocatorInitialization': retention?.initialization,
+        'startupIdentityGate': startupIdentityGate,
+        'imageObserverSummary': imageSummary,
+        'cycles': cycles,
+        'raw': {
+          'directory': root?.uri.pathSegments.where((s) => s.isNotEmpty).last,
+          'frameChunks': journal?.chunks,
+          'os': osResult,
+          'boundaries': journal?.boundaries,
+          'finalCounts': journal?.retainedCounts(),
+          'recordingStoppedUs': journal?.stoppedUs,
+          'ownershipGauges': rawGauges,
+          'allocatorCaptures': rawAllocator,
+        },
+        'drainPolicy': {
+          'frameBarriers': 3, 'barrierDelayMs': 16, 'quietMs': 1200,
+          'tailPrefixFlushesPerCycle': 2,
+          'capture': 'all-callbacks-received-until-recordingStoppedUs',
+        },
+        'failure': failure,
+        'failureStack': failureStack,
+        'limits': [
+          'Two different workloads, not an RSS subtraction or optimization comparison.',
+          'All 17 existing VM group GC requests remain; profile response overhead is measured.',
+          'Image handle events and ImageCache are distinct from graphics/GPU residency.',
+          'FD enumeration may include its own descriptor; all reads are non-atomic.',
+          'Native tracked bytes and libc statistics overlap and cannot be added to RSS or heap.',
+          'No extra GC, cache eviction, trim, threshold relaxation, or excluded first/cancelled work.',
+        ],
+      };
+      final clean = Map<String, dynamic>.from(jsonDecode(jsonEncode(report)
+          .replaceAll(RegExp(
+            r'''(?:https?|wss?)://(?:127\.0\.0\.1|localhost|\[::1\])(?::[0-9]+)?[^\s<>"']*''',
+          ), '[redacted-local-service-url]')) as Map);
+      binding.reportData = clean;
+      await memory.writeStandaloneReport(clean);
+      await telemetry.close();
+    }
+    expect(status, 'observed', reason: failure);
+  }, timeout: const Timeout(Duration(minutes: 10)));
+}

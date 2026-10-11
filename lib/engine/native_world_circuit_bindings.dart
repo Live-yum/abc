@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' show Timeline;
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
@@ -8,6 +9,7 @@ import 'package:ffi/ffi.dart';
 import 'package:crypto/crypto.dart';
 
 import 'engine.dart';
+import 'native_memory_ownership_diagnostics.dart';
 import 'world_circuit_backend.dart';
 
 typedef _OneC = Int32 Function(Uint32);
@@ -66,6 +68,55 @@ class NativeWorldCircuitBindings {
   final Map<String, Directory> _outputs = {};
   int _outputSequence = 0;
   bool _cancelRequested = false;
+  int _diagnosticHashBytes = 0, _diagnosticReadBytes = 0;
+  int _diagnosticHashAllocated = 0, _diagnosticHashFreed = 0;
+  int _diagnosticReadAllocated = 0, _diagnosticReadFreed = 0;
+  int _diagnosticHashFailures = 0, _diagnosticReadFailures = 0;
+
+  Map<String, Object?> diagnosticOwnerSnapshot() {
+    if (!memoryOwnershipDiagnosticsEnabled) {
+      throw StateError('Memory ownership diagnostics are disabled');
+    }
+    final started = Timeline.now;
+    var closing = 0, worlds = 0, circuits = 0, files = 0;
+    for (final session in _sessions.values) {
+      if (session.closing) closing++;
+      if (session.world != 0) worlds++;
+      if (!session.circuitClosed) circuits++;
+      files += session.files.length;
+    }
+    return {
+      'startUs': started,
+      'hostSessionCount': _sessions.length,
+      'hostClosingSessions': closing,
+      'hostWorldHandles': worlds,
+      'hostCircuitHandles': circuits,
+      'hostOpenFiles': files,
+      'hostOutputLeases': _outputs.length,
+      'ffiHashWindowOutstandingBytes': _diagnosticHashBytes,
+      'ffiReadWindowOutstandingBytes': _diagnosticReadBytes,
+      'ffiHashWindowAllocatedBytes': _diagnosticHashAllocated,
+      'ffiHashWindowFreedBytes': _diagnosticHashFreed,
+      'ffiHashWindowCleanupFailures': _diagnosticHashFailures,
+      'ffiHashWindowAccountingCertain': _diagnosticHashFailures == 0,
+      'ffiReadWindowAllocatedBytes': _diagnosticReadAllocated,
+      'ffiReadWindowFreedBytes': _diagnosticReadFreed,
+      'ffiReadWindowCleanupFailures': _diagnosticReadFailures,
+      'ffiReadWindowAccountingCertain': _diagnosticReadFailures == 0,
+      'endUs': Timeline.now,
+    };
+  }
+
+  void _diagnosticReadDelta(int bytes) {
+    _diagnosticReadBytes += bytes;
+    if (bytes >= 0) {
+      _diagnosticReadAllocated += bytes;
+    } else {
+      _diagnosticReadFreed -= bytes;
+    }
+  }
+
+  void _diagnosticReadFailure() => _diagnosticReadFailures++;
   Map<String, Object?>? _progress;
   static const memoryBudget = 192 * 1024 * 1024;
   NativeWorldCircuitBindings(
@@ -296,6 +347,10 @@ class NativeWorldCircuitBindings {
         if (allocation == nullptr) {
           throw const EngineException('Circuit hash allocation failed');
         }
+        if (memoryOwnershipDiagnosticsEnabled) {
+          _diagnosticHashBytes += chunkSize + 36;
+          _diagnosticHashAllocated += chunkSize + 36;
+        }
         final out = (allocation + chunkSize).cast<Uint32>();
         out.value = 0;
         final status = api.create(out);
@@ -359,7 +414,20 @@ class NativeWorldCircuitBindings {
 
       if (!sinkClosed && sink != null) cleanup(sink.close);
       if (handle != 0) cleanup(() => _checkWorld(api!.destroy(handle)));
-      if (allocation != nullptr) cleanup(() => _hashAllocator.free(allocation));
+      if (allocation != nullptr) {
+        cleanup(() {
+          try {
+            _hashAllocator.free(allocation);
+          } catch (_) {
+            if (memoryOwnershipDiagnosticsEnabled) _diagnosticHashFailures++;
+            rethrow;
+          }
+          if (memoryOwnershipDiagnosticsEnabled) {
+            _diagnosticHashBytes -= chunkSize + 36;
+            _diagnosticHashFreed += chunkSize + 36;
+          }
+        });
+      }
       if (!failed && cleanupError != null) {
         Error.throwWithStackTrace(cleanupError!, cleanupStack!);
       }
@@ -374,7 +442,11 @@ class NativeWorldCircuitBindings {
     final worldSource = WorldCircuitSource.fromMap(source);
     worldSource.toFileMap();
     final session = _Session(0, streamed: true);
-    final inputWindow = _ReadWindow(_readAllocator);
+    final inputWindow = _ReadWindow(
+      _readAllocator,
+      memoryOwnershipDiagnosticsEnabled ? _diagnosticReadDelta : null,
+      memoryOwnershipDiagnosticsEnabled ? _diagnosticReadFailure : null,
+    );
     final out = calloc<Uint32>(),
         event = calloc<Uint32>(12),
         data = calloc<Pointer<Uint8>>();
@@ -550,7 +622,11 @@ class NativeWorldCircuitBindings {
         data = calloc<Pointer<Uint8>>(),
         stats = calloc<Uint32>(24);
     final records = BytesBuilder(copy: false);
-    final inputWindow = _ReadWindow(_readAllocator);
+    final inputWindow = _ReadWindow(
+      _readAllocator,
+      memoryOwnershipDiagnosticsEnabled ? _diagnosticReadDelta : null,
+      memoryOwnershipDiagnosticsEnabled ? _diagnosticReadFailure : null,
+    );
     try {
       while (true) {
         _check(
@@ -701,7 +777,11 @@ class NativeWorldCircuitBindings {
         data = calloc<Pointer<Uint8>>(),
         stats = calloc<Uint32>(24);
     final records = BytesBuilder(copy: false);
-    final inputWindow = _ReadWindow(_readAllocator);
+    final inputWindow = _ReadWindow(
+      _readAllocator,
+      memoryOwnershipDiagnosticsEnabled ? _diagnosticReadDelta : null,
+      memoryOwnershipDiagnosticsEnabled ? _diagnosticReadFailure : null,
+    );
     try {
       final slice = Stopwatch()..start();
       while (true) {
@@ -902,7 +982,9 @@ class _ReadWindow {
   Pointer<Uint8> pointer = nullptr;
   Uint8List? _bytes;
 
-  _ReadWindow(this.allocator);
+  final void Function(int)? _diagnosticDelta;
+  final void Function()? _diagnosticFailure;
+  _ReadWindow(this.allocator, [this._diagnosticDelta, this._diagnosticFailure]);
 
   Uint8List get bytes {
     if (pointer == nullptr) {
@@ -910,6 +992,7 @@ class _ReadWindow {
       if (pointer == nullptr) {
         throw const EngineException('Circuit read allocation failed');
       }
+      _diagnosticDelta?.call(capacity);
       _bytes = pointer.asTypedList(capacity);
     }
     return _bytes!;
@@ -920,7 +1003,13 @@ class _ReadWindow {
     final owned = pointer;
     pointer = nullptr;
     _bytes = null;
-    allocator.free(owned);
+    try {
+      allocator.free(owned);
+    } catch (_) {
+      _diagnosticFailure?.call();
+      rethrow;
+    }
+    _diagnosticDelta?.call(-capacity);
   }
 }
 

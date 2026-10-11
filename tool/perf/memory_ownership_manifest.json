@@ -1,0 +1,399 @@
+{
+  "schema": "abc.memory-ownership-manifest.v1",
+  "baseCommit": "9d4cd5a0f9db03042a3986689fea374ba92d78b8",
+  "baseTree": "68de875853d92b0352077865cf862ffaceaaec92",
+  "branch": "codex/memory-ownership-9d4",
+  "arms": [
+    "probe-only",
+    "product-with-ownership"
+  ],
+  "processInvocationsPerArm": 1,
+  "vmProbeSlotsPerArm": 17,
+  "gaugesPerArm": 52,
+  "armTimeoutSeconds": 900,
+  "groupTimeoutSeconds": 2000,
+  "scheduleSha256": "fd5b0ca2ab01d96923512d6574ffc49c7318ebe1e23e315215251b70669ef5e0",
+  "scope": "Separate counter-ON diagnostic derivative; shipping Web bytes unchanged and unused.",
+  "files": [
+    {
+      "path": ".github/workflows/memory-ownership.yml",
+      "before": null,
+      "after": {
+        "sha256": "65af6f72d86d96dc586403f28de473fee7677d0b67a61e99e863ebe03ad951bb",
+        "bytes": 7993,
+        "mode": "100644",
+        "blob": "0e244caa9d5982401fcea00baf5c35314c8282e9"
+      }
+    },
+    {
+      "path": "integration_test/computer_memory_ownership_test.dart",
+      "before": null,
+      "after": {
+        "sha256": "5a1e99415176a806fbdad400ff47a3f5529136359ea337ce888ae0441ab4dd9a",
+        "bytes": 22577,
+        "mode": "100644",
+        "blob": "24439e48abe0e396c01ffc2f68300578dde7a08a"
+      }
+    },
+    {
+      "path": "integration_test/memory_ownership_profile_smoke_test.dart",
+      "before": null,
+      "after": {
+        "sha256": "723174d5cc53da0f5b6a6c835815d2f1fc7628a9d02752d22d7cf2cae4069b7f",
+        "bytes": 1369,
+        "mode": "100644",
+        "blob": "1a7e6513876420d0d30b25681d4bb8397fc4af5f"
+      }
+    },
+    {
+      "path": "integration_test/support/memory_ownership_gauges.dart",
+      "before": null,
+      "after": {
+        "sha256": "6680ee91790faf5fb21b52da4eba7207a9686e994c08689bf3ad9b44369337e4",
+        "bytes": 11514,
+        "mode": "100644",
+        "blob": "02da1e9374bb10103455d340f6546a92875de845"
+      }
+    },
+    {
+      "path": "integration_test/support/memory_ownership_retention.dart",
+      "before": null,
+      "after": {
+        "sha256": "31a8c3b086300151f46d843d7a171615f6461ad63f684ef915533c0ac8cc8df4",
+        "bytes": 5415,
+        "mode": "100644",
+        "blob": "9abe553a64a782f02d72e70e236dfe854efc7228"
+      }
+    },
+    {
+      "path": "lib/engine/native_engine.dart",
+      "before": {
+        "bytes": 28731,
+        "sha256": "6e7529b12e4bfc5ec3ea8753caa5f6098b90c70f2f2054b593a5471588de8921",
+        "mode": "100644",
+        "blob": "75b69cd9c10975bd12e2793c54748ffda6708787"
+      },
+      "after": {
+        "sha256": "711ad76e97a3eddcb1e16dc60674b801b4e5dcd7de20682c776bbe16b2f246b8",
+        "bytes": 30780,
+        "mode": "100644",
+        "blob": "3259e0fc98e5189a4e96dd17f69a0265d37f2625"
+      }
+    },
+    {
+      "path": "lib/engine/native_memory_ownership_diagnostics.dart",
+      "before": null,
+      "after": {
+        "sha256": "5feaf27776fdc6cbefeee6fd5df42cf5f0e26bbd10bb2a69f02df73835a37504",
+        "bytes": 2827,
+        "mode": "100644",
+        "blob": "9b453fb9157cabec80b97bd3beead687fde31b33"
+      }
+    },
+    {
+      "path": "lib/engine/native_world_circuit_bindings.dart",
+      "before": {
+        "bytes": 34513,
+        "sha256": "424ef0660b6a9363a1957f058a6cf5ec34be9946154370acff2657bd566bae09",
+        "mode": "100644",
+        "blob": "b9904db865f10405ec5efe75ba1d9def8e30281a"
+      },
+      "after": {
+        "sha256": "aa8f58d75a51bc5ad638e67b407bd6220ca2efd0c88f095ae479ac5dfb89c53c",
+        "bytes": 37817,
+        "mode": "100644",
+        "blob": "a2fcc0929a28c14a5cc0431982024b3d013196e6"
+      }
+    },
+    {
+      "path": "native/CMakeLists.txt",
+      "before": {
+        "bytes": 2168,
+        "sha256": "2334e99700346918a0919b43016275b77af16d1358b931a68c9b4e670819c9d4",
+        "mode": "100644",
+        "blob": "9506e5bd149b79c5794493d8602c98eaf8142ef8"
+      },
+      "after": {
+        "sha256": "5c6f2abad6d547123eb7858b50e637ef404d3f038fdc465ebfd9ae3ff840bdee",
+        "bytes": 2646,
+        "mode": "100644",
+        "blob": "a13ac2c97c4b2d1abaff6999b051ecf81ef2fa80"
+      }
+    },
+    {
+      "path": "native/abc_owner_diagnostics.c",
+      "before": null,
+      "after": {
+        "sha256": "e816c2ab7219e47224fd2e5df31b1b7ca2162f77dccc8cce3c657f5793df6c83",
+        "bytes": 1902,
+        "mode": "100644",
+        "blob": "13c60e55511af6ede4c284a09e23f834407d744e"
+      }
+    },
+    {
+      "path": "native/abc_owner_diagnostics.h",
+      "before": null,
+      "after": {
+        "sha256": "8b9a823b6a7e5188047a042f9b89572ce8c9e92c00da084d09af5729fa77f78a",
+        "bytes": 1434,
+        "mode": "100644",
+        "blob": "130bd929b335479f9a9489fd832e43a4f3a0c94b"
+      }
+    },
+    {
+      "path": "native/owner_diagnostic_contract.c",
+      "before": null,
+      "after": {
+        "sha256": "a8e12c36951dfb4069d1d8da110363c87078cc777835c06792e0617794af53d0",
+        "bytes": 8611,
+        "mode": "100644",
+        "blob": "375df5d0e51c650b5ca8786023f6168eb622dd61"
+      }
+    },
+    {
+      "path": "native/vendor/TerraWasm/src/terra_circuit_world.c",
+      "before": {
+        "bytes": 21456,
+        "sha256": "213f1655cfa25f2f2aabcb07e7873ed270b5605f416fd14d2e8b156de99f96f2",
+        "mode": "100644",
+        "blob": "52f5afd0f67db95d5ad860b90665ece04a70853f"
+      },
+      "after": {
+        "sha256": "b6db7228df3c0d030a94e8cf07b7d05222edc0452d5a24e7bf264a0ff81838bb",
+        "bytes": 21888,
+        "mode": "100644",
+        "blob": "b92498158fcaea465fe8ba22b04f13edde9a9547"
+      }
+    },
+    {
+      "path": "test/memory_ownership_gauges_test.dart",
+      "before": null,
+      "after": {
+        "sha256": "acfa09d8f572034b28858433ae846ac5f4bb26fcbc09da8ac888ef4963906801",
+        "bytes": 11477,
+        "mode": "100644",
+        "blob": "9f7d09deefbc0ee6d3739658d0705f102d93cc28"
+      }
+    },
+    {
+      "path": "test/memory_ownership_retention_test.dart",
+      "before": null,
+      "after": {
+        "sha256": "a886e23c9fee4dbc4f9be510265b1b52be0be3b3182b67ec8f623a5e7b622b4e",
+        "bytes": 2370,
+        "mode": "100644",
+        "blob": "297ba833fef610e01ec5b0bd5d23562df5e329db"
+      }
+    },
+    {
+      "path": "test/memory_ownership_worker_test.dart",
+      "before": null,
+      "after": {
+        "sha256": "d1108c33c58961399807fe61eb74ecbb31260757b561352dd9a93c76595d06f6",
+        "bytes": 2481,
+        "mode": "100644",
+        "blob": "2823fa06c9ad48222730e0a923f0b0f68636972d"
+      }
+    },
+    {
+      "path": "test/native_world_circuit_hash_test.dart",
+      "before": {
+        "bytes": 18924,
+        "sha256": "bcc5c47494c7fb558504441274a40f04415325fecbd270fc6578ecdd4dcfa2bc",
+        "mode": "100644",
+        "blob": "5668b962bc4065211fcf3dee2981d6c62a0053f1"
+      },
+      "after": {
+        "sha256": "e8770cbd090131508f7b27cb51840e7f02a551f7174bd599483b5d54d6121196",
+        "bytes": 19902,
+        "mode": "100644",
+        "blob": "aef55cca84100c073ab7911f3aba1539f92c6606"
+      }
+    },
+    {
+      "path": "test/native_world_circuit_ownership_test.dart",
+      "before": {
+        "bytes": 2342,
+        "sha256": "5392f3c63bf7529d8aa76d7eee0dc7dfd9a956868cf8d192c5ef53ac8b4968ca",
+        "mode": "100644",
+        "blob": "4d6f6b68d1042c51a67c11f92e4e5cbbb8c88afb"
+      },
+      "after": {
+        "sha256": "1504ac7a368960ff6c569c2e28c49d9d844b83ec59a88dfb7cdae6cab29bc264",
+        "bytes": 3278,
+        "mode": "100644",
+        "blob": "52565dbe9035289cf32f8d064a4271f2de484e0e"
+      }
+    },
+    {
+      "path": "test/native_world_circuit_read_buffer_test.dart",
+      "before": {
+        "bytes": 12712,
+        "sha256": "1af701fb975d876ccede0c0d65f46663ebe77d68be4ecf7bd5e0e335f9d54814",
+        "mode": "100644",
+        "blob": "a4d88c072bbd9adb4d91619f14ae55f7ec542595"
+      },
+      "after": {
+        "sha256": "a997a53d10ac6e02667345cb287b43344f316c916650ebabb0af0b323754bb17",
+        "bytes": 14234,
+        "mode": "100644",
+        "blob": "7debcae37c37fc078cb27c71812a8a87a7fd5811"
+      }
+    },
+    {
+      "path": "tool/perf/computer_memory_validate.py",
+      "before": {
+        "bytes": 61023,
+        "sha256": "38efacf4afcf972aa1ce2100e9c9203653debf29ef99abf777f6565eced9da20",
+        "mode": "100644",
+        "blob": "438d88785c353020084f716d99761c45f47636b8"
+      },
+      "after": {
+        "sha256": "c2a202c4ae31f36194e5356f37de779abbebcb460bc62c71d0edd4d3fd9371a9",
+        "bytes": 61431,
+        "mode": "100644",
+        "blob": "69c6538a8923ba6bf9e63b0474e564bb6b812e3c"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_CI.md",
+      "before": null,
+      "after": {
+        "sha256": "2043f253a58bb0764fcb8cdb2bb567c0484236886a79d8f12fb2fa0760c11925",
+        "bytes": 5430,
+        "mode": "100644",
+        "blob": "d0a0ce9d594258595c1977e23ebc5f3a4ff9eaed"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_flutter_README.md",
+      "before": null,
+      "after": {
+        "sha256": "6202f66585b4e951e1cf4f084158987967bbebc4529d50f7e209e0fdce6b910a",
+        "bytes": 11075,
+        "mode": "100644",
+        "blob": "66a6133420eaa5bdda66c87a3179190569dbaef1"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_helper_build.py",
+      "before": null,
+      "after": {
+        "sha256": "b2dfbd62d342fc5940af4742f52031f78af228281fdd1eff72f534a9d6292e47",
+        "bytes": 12297,
+        "mode": "100644",
+        "blob": "79f05eca000470fee31e57398a8528f345dc4f36"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_native_contracts.py",
+      "before": null,
+      "after": {
+        "sha256": "0252800aa1875e155198aff1796b46a2dba24037cb0cb23e81a993e9c78ea666",
+        "bytes": 5873,
+        "mode": "100644",
+        "blob": "05ac5e5a243866396a290ce9b06c30647917489d"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_preflight.py",
+      "before": null,
+      "after": {
+        "sha256": "c46719d53d975f6e3cdb2825b645aab847625be4898dbe2b5c39afb70980a1ab",
+        "bytes": 14412,
+        "mode": "100644",
+        "blob": "cf6288b0d7f3153fe0a74ae7f7a074b97363b85b"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_preflight_test.py",
+      "before": null,
+      "after": {
+        "sha256": "789b8b020a73aa735b2851b94baed9c43270daa5e55f6fb1e4e3647f40c2ec3d",
+        "bytes": 9579,
+        "mode": "100644",
+        "blob": "f25fb05b72ceea3f876d06941c31a203b84291ca"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_profile_smoke.py",
+      "before": null,
+      "after": {
+        "sha256": "9b9722cc1224a397795e3089bc752398c54087883b768f8d0a27180e1a465732",
+        "bytes": 2670,
+        "mode": "100644",
+        "blob": "9906e99258e07c74fd161e3df67640a16b9d2fe5"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_run.py",
+      "before": null,
+      "after": {
+        "sha256": "83c4c8b29fbbe5d82cbbc3ab861ca0d18d0caead105b35d32fe56087050b8240",
+        "bytes": 19560,
+        "mode": "100644",
+        "blob": "91333823cc1d87081bd63da154e2887af2875365"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_schedule.json",
+      "before": null,
+      "after": {
+        "sha256": "fd5b0ca2ab01d96923512d6574ffc49c7318ebe1e23e315215251b70669ef5e0",
+        "bytes": 19133,
+        "mode": "100644",
+        "blob": "841760c290b26a7f313ad39f84eaa5bd5bd4134d"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_schedule.py",
+      "before": null,
+      "after": {
+        "sha256": "5fb7d96ca5c74aeb4eb52f603e175f02c33476bbadbf2e82904c0ea29afd1027",
+        "bytes": 7746,
+        "mode": "100644",
+        "blob": "cb56c83bc4394b1514f50d5cf363d10aaa0dd63f"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_test_gate.py",
+      "before": null,
+      "after": {
+        "sha256": "cdb2bb3e07192830243d9f2ff9008075013d1ad4c3791fa17598f1a106954ac1",
+        "bytes": 951,
+        "mode": "100644",
+        "blob": "6170f84cd8e49c481875dc12a800d55318104baf"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_validate.py",
+      "before": null,
+      "after": {
+        "sha256": "21a2bd0d865097382d87f48014b441f288ddd1a251a233baa841b01b4e1d5df0",
+        "bytes": 72297,
+        "mode": "100644",
+        "blob": "87b79a02be355616d00ee72d381c2b4fd89507d8"
+      }
+    },
+    {
+      "path": "tool/perf/memory_ownership_validate_test.py",
+      "before": null,
+      "after": {
+        "sha256": "5e27930aa1dfdace90e5b92f1afb4b619ea8dca88d249555e0fbdf6920a82fe1",
+        "bytes": 49226,
+        "mode": "100644",
+        "blob": "58a47cc0b77be82b565457cba939e3fbf5a3d1cb"
+      }
+    },
+    {
+      "path": "tool/perf/native_owner_libc_probe.c",
+      "before": null,
+      "after": {
+        "sha256": "cdedeb679d128bee9c513f2cd0ad92f2941ab74a705d67f9d99b9dc4b8906c03",
+        "bytes": 4458,
+        "mode": "100644",
+        "blob": "c857d21fac7b8f1b5e6de999b131a6402d968411"
+      }
+    }
+  ]
+}

@@ -268,3 +268,15 @@ int32_t terra_circuit_world_stats(uint32_t handle,TerraCircuitWorldStats* out){
 }
 int32_t terra_circuit_world_cancel(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;cx_viewport_cache_cancel(w);cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;}else w->phase=CX_CANCELLED;memset(&w->event,0,sizeof(w->event));w->tick_remaining=w->tick_stage=w->trigger_remaining=0;return TCW_OK;}
 int32_t terra_circuit_world_close(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;for(uint32_t i=0;i<4;i++)if(sessions[i]==w){sessions[i]=NULL;break;}destroy(w);return TCW_OK;}
+
+#ifdef ABC_OWNER_DIAGNOSTICS
+/* Diagnostic-only, read after serialized owner work completes. No mutation or
+ * allocation. Kept hidden inside the native static engine target. */
+uint64_t cx_owner_diagnostics_counts(void) {
+    uint32_t owners = 0, vms = 0;
+    for (uint32_t i = 0; i < 4; ++i) {
+        if (sessions[i]) { ++owners; if (sessions[i]->vm) ++vms; }
+    }
+    return (uint64_t)owners | ((uint64_t)vms << 32);
+}
+#endif
