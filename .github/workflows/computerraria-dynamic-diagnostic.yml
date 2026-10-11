@@ -1,0 +1,158 @@
+name: Bounded dynamic Computerraria UI diagnostic
+
+on:
+  push:
+    branches: [codex/computerraria-dynamic-5217]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: computerraria-dynamic-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  ABC_PERF_COMMIT: ${{ github.sha }}
+  LIBGL_ALWAYS_SOFTWARE: '1'
+  TERRA_PERF_RUNNER: ubuntu-24.04-xvfb-dynamic-diagnostic
+
+jobs:
+  dynamic-profile:
+    if: github.ref == 'refs/heads/codex/computerraria-dynamic-5217'
+    name: Full public WLD / separate OFF and ON dynamic observations
+    runs-on: ubuntu-24.04
+    # SDK/setup plus one bounded 20-minute build/drive invocation and artifacts.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        id: checkout
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Prepare separate evidence and temporary storage
+        id: evidence
+        run: |
+          mkdir -p build/computerraria/dynamic-diagnostic build/computerraria/tmp/dynamic-diagnostic
+          echo "TMPDIR=$PWD/build/computerraria/tmp/dynamic-diagnostic" >> "$GITHUB_ENV"
+          git rev-parse HEAD > build/computerraria/dynamic-diagnostic/checkout.txt
+      - name: Install Linux profile and display dependencies
+        id: dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+          libstdc++-12-dev zlib1g-dev xvfb mesa-utils
+      - uses: ./.github/actions/setup-performance
+        id: toolchain
+      - name: Check only the new diagnostic Dart sources
+        id: static-checks
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          root = Path('build/computerraria/dynamic-diagnostic/formatted')
+          for name in ('integration_test/computerraria_dynamic_profile_test.dart',
+                       'integration_test/support/computerraria_dynamic_backend.dart',
+                       'test/computerraria_dynamic_backend_test.dart'):
+              target = root / name
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, target)
+          PY
+          dart format \
+            build/computerraria/dynamic-diagnostic/formatted/integration_test/computerraria_dynamic_profile_test.dart \
+            build/computerraria/dynamic-diagnostic/formatted/integration_test/support/computerraria_dynamic_backend.dart \
+            build/computerraria/dynamic-diagnostic/formatted/test/computerraria_dynamic_backend_test.dart \
+            2>&1 | tee build/computerraria/dynamic-diagnostic/format.log
+          python3 - <<'PY'
+          from pathlib import Path
+          import difflib
+          import json
+          root = Path('build/computerraria/dynamic-diagnostic')
+          changes = []
+          patch = []
+          for formatted in sorted((root / 'formatted').rglob('*.dart')):
+              name = str(formatted.relative_to(root / 'formatted'))
+              before, after = Path(name).read_text(), formatted.read_text()
+              if before != after:
+                  changes.append(name)
+                  patch.extend(difflib.unified_diff(before.splitlines(True), after.splitlines(True),
+                                                   fromfile='a/' + name, tofile='b/' + name))
+          (root / 'format.patch').write_text(''.join(patch))
+          (root / 'format-status.json').write_text(json.dumps({
+              'status': 'changes-needed' if changes else 'unchanged',
+              'changedFiles': changes,
+              'trackedSourcesModified': False,
+              'formattingIsAdvisory': True,
+          }, indent=2) + '\n')
+          PY
+          flutter analyze --no-pub \
+            integration_test/computerraria_dynamic_profile_test.dart \
+            integration_test/support/computerraria_dynamic_backend.dart \
+            test/computerraria_dynamic_backend_test.dart \
+            2>&1 | tee build/computerraria/dynamic-diagnostic/analyze.log
+          bash -n tool/perf/computerraria_dynamic_profile.sh
+      - name: Verify external clock ordering and lifecycle boundaries
+        id: backend-tests
+        run: |
+          set -euo pipefail
+          flutter test --no-pub test/computerraria_dynamic_backend_test.dart \
+            2>&1 | tee build/computerraria/dynamic-diagnostic/backend-tests.log
+      - name: Fetch and verify the explicit pinned public input
+        id: inputs
+        run: |
+          set -euo pipefail
+          python3 tool/computerraria_inputs.py 2>&1 | tee build/computerraria/dynamic-diagnostic/input-fetch.log
+          cp build/public-computerraria/input-manifest.json build/computerraria/dynamic-diagnostic/
+          echo "COMPUTERRARIA_WLD=$PWD/build/public-computerraria/computerraria.wld" >> "$GITHUB_ENV"
+          echo "COMPUTERRARIA_PONG=$PWD/test/fixtures/computerraria/pong.bin" >> "$GITHUB_ENV"
+      - name: Record the observed software renderer
+        id: renderer
+        run: |
+          xvfb-run -a -s '-screen 0 1440x1000x24' glxinfo -B > build/computerraria/dynamic-diagnostic/glxinfo.txt
+          cat build/computerraria/dynamic-diagnostic/glxinfo.txt
+          renderer="$(sed -n 's/^OpenGL renderer string: //p' build/computerraria/dynamic-diagnostic/glxinfo.txt)"
+          test -n "$renderer"
+          echo "TERRA_PERF_RENDERER=$renderer" >> "$GITHUB_ENV"
+      - name: Compile and run one bounded actual Linux profile application
+        id: profile
+        run: >-
+          xvfb-run -a -s '-screen 0 1440x1000x24'
+          bash tool/perf/computerraria_dynamic_profile.sh
+          build/computerraria/dynamic-diagnostic/dynamic.json
+      - name: Record final workflow outcomes on success or failure
+        if: always()
+        env:
+          DIAGNOSTIC_STEPS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path('build/computerraria/dynamic-diagnostic')
+          root.mkdir(parents=True, exist_ok=True)
+          (root / 'workflow.json').write_text(json.dumps({
+              'schema': 'abc.computerraria-dynamic-workflow.v1',
+              'sourceCommit': os.environ['ABC_PERF_COMMIT'],
+              'runId': os.environ['GITHUB_RUN_ID'],
+              'runAttempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'steps': json.loads(os.environ['DIAGNOSTIC_STEPS']),
+              'artifactPolicy': 'JSON, text, sanitized logs, PNG captures and formatted new diagnostic Dart sources/patch; no WLD inputs or exports.',
+          }, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: computerraria-dynamic-diagnostic-${{ github.sha }}-${{ github.run_attempt }}
+          # Explicit allowlist: neither public inputs nor temporary saved WLDs.
+          path: |
+            build/computerraria/dynamic-diagnostic/*.json
+            build/computerraria/dynamic-diagnostic/*.log
+            build/computerraria/dynamic-diagnostic/*.txt
+            build/computerraria/dynamic-diagnostic/*.patch
+            build/computerraria/dynamic-diagnostic/formatted/**/*.dart
+            build/computerraria/dynamic-diagnostic/screenshots/**/*.png
+          if-no-files-found: error
+          retention-days: 30
