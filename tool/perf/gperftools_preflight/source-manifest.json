@@ -1,0 +1,120 @@
+{
+  "authoredAllocatorOperations": 15,
+  "authoredAllocatorOperationsCap": 32,
+  "automaticPromotionAllowed": false,
+  "bootstrapTrustPremise": "official GitHub runner image and previously reviewed workflow; installed keyring checksum is consistency, not independent authentication",
+  "dumpIds": [
+    "q0.begin",
+    "q0.end",
+    "q7.begin",
+    "q7.end",
+    "cleanup"
+  ],
+  "entrypoint": [
+    "python3",
+    "tool/perf/gperftools_preflight/run_preflight.py",
+    "--output",
+    "build/gperftools-preflight",
+    "--deb-dir",
+    "build/gperftools-packages",
+    "--apt-download-log",
+    "build/gperftools-preflight-evidence/apt-download.log"
+  ],
+  "expectedAuthorCumulativeBlocks": [
+    2,
+    5,
+    6,
+    8,
+    8
+  ],
+  "expectedAuthorCumulativeBytes": [
+    320,
+    1539,
+    2140,
+    3698,
+    3698
+  ],
+  "expectedAuthorLiveBytes": [
+    320,
+    716,
+    1010,
+    1558,
+    0
+  ],
+  "files": {
+    "README.md": {
+      "bytes": 14654,
+      "mode": "100644",
+      "sha256": "786841ad03a8d8d9730a26121fbed5a4420915a47186e9b42b021e74df8662b7"
+    },
+    "native_contract.c": {
+      "bytes": 9357,
+      "mode": "100644",
+      "sha256": "f182613d780912e60399d4c2650c53c93e41b17e12199cd1d76823ba3ab3c424"
+    },
+    "pprof_raw.py": {
+      "bytes": 7414,
+      "mode": "100644",
+      "sha256": "3bc28fc584db560c865f7f7aa8e3acc72debfe6e40257e8b861367e320093646"
+    },
+    "profile_contract.py": {
+      "bytes": 13340,
+      "mode": "100644",
+      "sha256": "07cee15d0c0c3f6d3be56b60f2339fd419def81d3fcaea4236660468a9f25d79"
+    },
+    "run_preflight.py": {
+      "bytes": 43226,
+      "mode": "100644",
+      "sha256": "b24aa7004d8b8de3f1fdfc54c452161167f19e19ba0be72a7d087a35d6317eaf"
+    },
+    "test_pprof_raw.py": {
+      "bytes": 8062,
+      "mode": "100644",
+      "sha256": "3b548d76d11b621fa6ca4ecfaef694f273c101b8cb9cb54f90afcd41897f83cf"
+    },
+    "test_preflight.py": {
+      "bytes": 19187,
+      "mode": "100644",
+      "sha256": "9d47a9617c399bec23198761a679192cfca751877a4d2100f5b5a51d7b2b1051"
+    }
+  },
+  "fixedPackageVersion": "2.15-3build1",
+  "localValidation": {
+    "emittedFixtureNegativeChecks": 3,
+    "localAptOrProfilerOrSdkInvocations": 0,
+    "nativeCompilation": "passed with -Werror and GPERFTOOLS_OFFLINE API stub",
+    "officialGperftoolsRuntime": "not-run; CI only",
+    "offlineTests": "passed 50",
+    "unprofiledStubInvocations": 1,
+    "unprofiledStubSemanticResult": "passed independent operation and cut oracle; default CI reader rejects stub metadata"
+  },
+  "offlineTestCount": 50,
+  "packages": {
+    "google-perftools": {
+      "architecture": "all",
+      "component": "universe"
+    },
+    "libgoogle-perftools-dev": {
+      "architecture": "amd64",
+      "component": "main"
+    },
+    "libgoogle-perftools4t64": {
+      "architecture": "amd64",
+      "component": "main"
+    }
+  },
+  "priorRejectedTool": {
+    "head": "742dd32011146a830907761da7617b9ccfb8f196",
+    "name": "heaptrack",
+    "result": "realloc-zero free omitted; false503-byte residual; preserved unchanged",
+    "version": "1.5.0+dfsg1-2ubuntu3"
+  },
+  "profiledFixtureInvocations": 1,
+  "profiledFixtureSeconds": 10,
+  "provenanceBoundary": "allocator-replacing full tcmalloc cannot reconcile original glibc +72.729 MiB; no product leak/no-leak conclusion",
+  "realApplicationInvocations": 0,
+  "repoDirectory": "tool/perf/gperftools_preflight",
+  "schema": "abc.gperftools-preflight-source-manifest.v1",
+  "upstreamCommit": "365060c4213a48adb27f63d5dfad41b3dfbdd62e",
+  "upstreamVersion": "2.15"
+}

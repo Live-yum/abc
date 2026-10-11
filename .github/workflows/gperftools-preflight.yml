@@ -1,0 +1,112 @@
+name: Fixed gperftools allocation capture contract
+
+on:
+  push:
+    branches: [codex/gperftools-preflight-9d4]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gperftools-preflight-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  GPERFTOOLS_VERSION: '2.15-3build1'
+
+jobs:
+  capture-contract:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/gperftools-preflight-9d4' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify fixed parent and additive contract-only source scope
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/gperftools-preflight-evidence
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          base = '9d4cd5a0f9db03042a3986689fea374ba92d78b8'
+          def git(*args):
+              return subprocess.check_output(['git', *args])
+          head = git('rev-parse', 'HEAD').decode().strip()
+          assert head == os.environ['GITHUB_SHA']
+          assert git('show', '-s', '--format=%P', head).decode().strip() == base
+          assert git('status', '--porcelain', '--untracked-files=no') == b''
+          entries = git('diff-tree', '--no-commit-id', '--name-status', '-r', '-z', base, head).split(b'\0')
+          assert entries[-1] == b'' and len(entries[:-1]) % 2 == 0
+          rows = []
+          for status, raw_path in zip(entries[:-1:2], entries[1:-1:2]):
+              path = raw_path.decode('utf-8')
+              assert status == b'A', (status, path)
+              assert path == '.github/workflows/gperftools-preflight.yml' or path.startswith('tool/perf/gperftools_preflight/')
+              item = Path(path)
+              assert item.is_file() and not item.is_symlink()
+              mode, kind, blob, tree_path = git('ls-tree', head, '--', path).decode().strip().replace('\t', ' ', 1).split(' ', 3)
+              assert mode == '100644' and kind == 'blob' and tree_path == path
+              data = item.read_bytes()
+              assert git('hash-object', '--', path).decode().strip() == blob
+              rows.append({'path': path, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(), 'gitBlobSha': blob, 'mode': mode})
+          assert rows and any(row['path'] == 'tool/perf/gperftools_preflight/run_preflight.py' for row in rows)
+          proof = {'schema': 'abc.gperftools-contract-source.v1', 'sourceCommit': head, 'parentCommit': base,
+                   'sourceTree': git('rev-parse', 'HEAD^{tree}').decode().strip(),
+                   'baseTree': git('rev-parse', base + '^{tree}').decode().strip(),
+                   'baseFilesUnchanged': True, 'changes': rows,
+                   'scope': 'one synthetic native allocation contract; no Flutter SDK or world workload'}
+          Path('build/gperftools-preflight-evidence/source-proof.json').write_text(json.dumps(proof, indent=2) + '\n')
+          PY
+      - name: Resolve exact packages from the ordinary official Ubuntu repositories
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::http::AllowRedirect=false -o Acquire::https::AllowRedirect=false -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowWeakRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false update 2>&1 | tee build/gperftools-preflight-evidence/apt-update.log
+          sudo apt-get -o Acquire::http::AllowRedirect=false -o Acquire::https::AllowRedirect=false -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowWeakRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false install -y --no-install-recommends "libgoogle-perftools4t64=$GPERFTOOLS_VERSION" "libgoogle-perftools-dev=$GPERFTOOLS_VERSION" "google-perftools=$GPERFTOOLS_VERSION" build-essential binutils gzip zstd 2>&1 | tee build/gperftools-preflight-evidence/apt-install.log
+          mkdir -p build/gperftools-packages
+          (cd build/gperftools-packages && apt-get -o Acquire::http::AllowRedirect=false -o Acquire::https::AllowRedirect=false -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowWeakRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false download "libgoogle-perftools4t64=$GPERFTOOLS_VERSION" "libgoogle-perftools-dev=$GPERFTOOLS_VERSION" "google-perftools=$GPERFTOOLS_VERSION") 2>&1 | tee build/gperftools-preflight-evidence/apt-download.log
+      - name: Run nonempty offline parser and failure-case contracts
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' 2>&1 | tee build/gperftools-preflight-evidence/offline-tests.log
+          import sys
+          import unittest
+          suite = unittest.defaultTestLoader.discover('tool/perf/gperftools_preflight', pattern='test_*.py')
+          count = suite.countTestCases()
+          if count == 0:
+              raise SystemExit('No offline contract tests were discovered')
+          print(f'Discovered {count} offline contract tests', flush=True)
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY
+      - name: Verify package identity and run exactly one bounded synthetic capture contract
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tool/perf/gperftools_preflight/run_preflight.py --output build/gperftools-preflight --deb-dir build/gperftools-packages --apt-download-log build/gperftools-preflight-evidence/apt-download.log 2>&1 | tee build/gperftools-preflight-evidence/contract.log
+      - name: Preserve complete contract evidence including any failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gperftools-preflight-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            build/gperftools-preflight-evidence
+            build/gperftools-preflight
+            build/gperftools-packages
