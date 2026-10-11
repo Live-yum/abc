@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' show Timeline;
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
@@ -17,12 +18,21 @@ import 'player_schema.dart';
 import 'player_projection_backend.dart';
 import 'world_circuit_backend.dart';
 import 'native_world_circuit_bindings.dart';
+import 'native_memory_ownership_diagnostics.dart';
 import 'circuit_rules_backend.dart';
 import 'native_circuit_rules_runtime.dart';
 import 'world_map_backend.dart';
 
 final TerraEngine _sharedEngine = _NativeEngine();
 TerraEngine createTerraEngine() => _sharedEngine;
+
+/// Read-only diagnostic access to the existing shared owner; never starts it.
+Future<Map<String, Object?>> diagnosticOwnerSnapshot() {
+  if (!memoryOwnershipDiagnosticsEnabled) {
+    throw StateError('Memory ownership diagnostics are disabled');
+  }
+  return (_sharedEngine as _NativeEngine)._diagnosticOwnerSnapshot();
+}
 
 /// One long-lived isolate owns the process-global C runtime. Requests execute
 /// synchronously inside that isolate, never on Flutter's rendering isolate.
@@ -154,6 +164,34 @@ class _NativeEngine
   Future<SendPort>? _worker;
   final Map<int, Completer<Object?>> _pending = {};
   int _sequence = 0;
+  int _diagnosticWorkerGeneration = 0;
+
+  Future<Map<String, Object?>> _diagnosticOwnerSnapshot() async {
+    final requested = Timeline.now;
+    final before = _pending.length;
+    if (_worker == null) {
+      return {
+        'status': 'worker-not-started',
+        'workerGeneration': null,
+        'requestUs': requested,
+        'ackUs': Timeline.now,
+        'productionPendingBefore': before,
+        'productionPendingAfter': _pending.length,
+        'owner': null,
+      };
+    }
+    final value = await _call('diagnosticOwnerSnapshot', []);
+    return {
+      'status': 'acknowledged',
+      'workerGeneration': _diagnosticWorkerGeneration,
+      'requestUs': requested,
+      'ackUs': Timeline.now,
+      'productionPendingBefore': before,
+      'productionPendingAfter': _pending.length,
+      'diagnosticRequestExcluded': true,
+      'owner': Map<String, Object?>.from(value as Map),
+    };
+  }
 
   Future<SendPort> _start() async {
     final replies = ReceivePort();
@@ -161,6 +199,7 @@ class _NativeEngine
     replies.listen((dynamic raw) {
       final message = raw as List<dynamic>;
       if (message[0] == 'ready') {
+        if (memoryOwnershipDiagnosticsEnabled) _diagnosticWorkerGeneration++;
         ready.complete(message[1] as SendPort);
       } else if (message[0] == 'startupError') {
         ready.completeError(EngineException(message[1] as String));
@@ -489,6 +528,7 @@ class _Bindings {
   final _Image worldThumbnail, worldMap;
   final _Error lastError;
   final Set<String> _handles = {};
+  NativeOwnerDiagnostics? _ownerDiagnostics;
 
   _Bindings(DynamicLibrary lib)
     : library = lib,
@@ -664,6 +704,21 @@ class _Bindings {
   }
 
   Object? dispatch(String method, List<dynamic> args) {
+    if (method == 'diagnosticOwnerSnapshot' &&
+        memoryOwnershipDiagnosticsEnabled) {
+      final started = Timeline.now;
+      _ownerDiagnostics ??= NativeOwnerDiagnostics.fromLoadedLibrary(library);
+      return {
+        'startUs': started,
+        'ordinaryDocumentHandles': _handles.length,
+        'worldCircuitBindingInitialized': _worldCircuit != null,
+        'host': _worldCircuit?.diagnosticOwnerSnapshot(),
+        'native':
+            _ownerDiagnostics?.snapshot() ??
+            {'status': 'symbols-unavailable', 'values': null},
+        'endUs': Timeline.now,
+      };
+    }
     if (method == 'circuitRulesInitialize') {
       _circuitRules ??= NativeCircuitRulesRuntime(library, args[0] as String);
       return null;

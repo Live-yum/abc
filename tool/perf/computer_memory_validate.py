@@ -173,6 +173,19 @@ def summarize_points(points):
 
 
 class Validator:
+    # Explicit subclass policy hooks: the public counter-OFF contract is the
+    # default. Diagnostic subclasses must supply their own schema/provenance.
+    accepted_report_schemas = ('abc.computer-memory-diagnostic.v1', GENERIC_SCHEMA)
+
+    def validate_counter_build_mode(self):
+        require(str(self.build['cmake']['ABC_PERF_COUNTERS']).upper() in ('OFF', 'FALSE', '0'),
+                'native counter instrumentation unexpectedly enabled')
+
+    def validate_point_owner_state(self, point, retained):
+        require(point['wrapperLatestRetained'] is retained, 'wrapper latest retained/released state differs')
+        require(point['nativeCounters'] == {'status': 'not-exposed-by-counter-disabled-native-library', 'values': None},
+                'native counters unavailable; missing data must not become fake zero')
+
     def __init__(self, report, raw_directory, build, expected_commit, build_sha256):
         self.report, self.root, self.build = report, Path(raw_directory), build
         self.generic = report.get('schema') == GENERIC_SCHEMA
@@ -231,8 +244,7 @@ class Validator:
         tree = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         require(tree == build['sourceTreeSha256'], 'source tree digest mismatch')
         require(build['cmake']['CMAKE_BUILD_TYPE'] == 'Profile', 'actual CMake build is not Profile')
-        require(str(build['cmake']['ABC_PERF_COUNTERS']).upper() in ('OFF', 'FALSE', '0'),
-                'native counter instrumentation unexpectedly enabled')
+        self.validate_counter_build_mode()
         flags = build['effectiveCompileFlags']
         require(set(flags) == {'abc_world_circuit.c.o', 'terra_circuit_world.c.o', 'terra_circuit_vm.c.o'},
                 'actual wiring VM flags missing')
@@ -259,7 +271,7 @@ class Validator:
 
     def validate_header(self):
         report = self.report
-        require(report['schema'] in ('abc.computer-memory-diagnostic.v1', GENERIC_SCHEMA), 'unknown report schema')
+        require(report['schema'] in self.accepted_report_schemas, 'unknown report schema')
         require(report['status'] == 'observed' and report.get('failure') is None
                 and report.get('failureStack') is None, 'failed or partial run cannot pass')
         integer(report['hostPid'], 'host PID', 1)
@@ -773,9 +785,7 @@ class Validator:
                     require(self.os_selected.get(sample['sequence']) == sample, f'{name} OS sample not identical to raw journal')
                     require(sample['phase'] == f'{point["phase"]}.{suffix}', 'OS checkpoint phase differs')
                 retained = point['phase'] == 'after-close-retained'
-                require(point['wrapperLatestRetained'] is retained, 'wrapper latest retained/released state differs')
-                require(point['nativeCounters'] == {'status': 'not-exposed-by-counter-disabled-native-library', 'values': None},
-                        'native counters unavailable; missing data must not become fake zero')
+                self.validate_point_owner_state(point, retained)
                 vm = point['vm']
                 require(vm['gc'] == 'requested-all-isolate-groups' and vm.get('heapUnavailable') is None
                         and vm['heapMeasurementMethod'] == HEAP_METHOD, 'actual GC/isolate-group heap observation missing')
