@@ -1,0 +1,76 @@
+{
+  "schema": "abc.heaptrack-preflight-source-manifest.v1",
+  "repoDirectory": "tool/perf/heaptrack_preflight",
+  "files": {
+    "README.md": {
+      "sha256": "bfbaad5d91c043e42f68471dd3110b0a3f69b93e91e7e65abe829655614c7124",
+      "bytes": 13922,
+      "mode": "100644"
+    },
+    "native_contract.c": {
+      "sha256": "3bebeaeb3dd7e7355c79627c155abe8e2e6e79c32936e70257adb2f1ec671904",
+      "bytes": 19610,
+      "mode": "100644"
+    },
+    "trace_contract.py": {
+      "sha256": "9a1d4d935a9d28cfab2e0a46b8a80ac68ceeef096ced746aed10fffb3a769298",
+      "bytes": 18932,
+      "mode": "100644"
+    },
+    "run_preflight.py": {
+      "sha256": "5fc1a3d747dee4c9989acd596f38ab9d93818aaaaf3f004c82fedb901dac79c7",
+      "bytes": 40467,
+      "mode": "100644"
+    },
+    "test_preflight.py": {
+      "sha256": "8d20bdab1445c2b2a87dad6ae4b5a5e822e2d689e3b0800384160bb1a6e75968",
+      "bytes": 24270,
+      "mode": "100644"
+    }
+  },
+  "fixedPackageVersion": "1.5.0+dfsg1-2ubuntu3",
+  "upstreamVersion": "1.5.0",
+  "rawFormatVersion": 3,
+  "profiledFixtureInvocations": 1,
+  "profiledFixtureSeconds": 10,
+  "authoredAllocatorOperations": 23,
+  "authoredAllocatorOperationsCap": 32,
+  "realApplicationInvocations": 0,
+  "offlineTestCount": 35,
+  "localValidation": {
+    "offlineTests": "passed",
+    "nativeCompilation": "previous revision passed; native source unchanged, not rerun",
+    "unprofiledNativeSemanticInvocations": 1,
+    "unprofiledNativeSemanticResult": "passed",
+    "officialHeaptrackRuntime": "not-run; both earlier CI runs failed before profiler; next CI only",
+    "unprofiledNativeSemanticInvocationsThisRevision": 0
+  },
+  "entrypoint": [
+    "python3",
+    "tool/perf/heaptrack_preflight/run_preflight.py",
+    "--output",
+    "build/heaptrack-preflight",
+    "--deb-dir",
+    "build/heaptrack-packages",
+    "--apt-download-log",
+    "build/heaptrack-preflight-evidence/apt-download.log"
+  ],
+  "revision": "fixed-keyring-bootstrap-consistency-only",
+  "previousRuns": [
+    {
+      "id": 38140930189,
+      "head": "2a4fefc6b34acafeca622f54b5f08fe6e0808f50",
+      "status": "failed-closed",
+      "profiledFixtureInvocations": 0,
+      "mirrorListContents": "not captured; unknown"
+    },
+    {
+      "id": 38142913886,
+      "head": "91bedec7140244c5f74d62abae08009d534f48cf",
+      "status": "failed-closed",
+      "profiledFixtureInvocations": 0,
+      "failedKeyringComponent": "not recorded; unknown"
+    }
+  ],
+  "bootstrapTrustPremise": "official GitHub runner image and previously reviewed workflow code; installed package checksum consistency is not independent signature verification"
+}
