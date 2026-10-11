@@ -1,0 +1,221 @@
+name: One bounded viewport cache ABBA diagnostic
+
+on:
+  push:
+    branches: [codex/viewport-cache-pair-b3f2]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: viewport-cache-pair-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  LIBGL_ALWAYS_SOFTWARE: '1'
+  TERRA_PERF_RUNNER: ubuntu-24.04-xvfb-viewport-cache-abba
+
+jobs:
+  paired:
+    if: github.ref == 'refs/heads/codex/viewport-cache-pair-b3f2' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        id: checkout
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+      - name: Verify predeclared two-commit identity and create isolated trees
+        id: identity
+        run: |
+          set -euo pipefail
+          echo "PAIR_EVIDENCE=$GITHUB_WORKSPACE/build/viewport-cache-pair" >> "$GITHUB_ENV"
+          echo "PAIR_STAGE=$RUNNER_TEMP/abc-viewport-cache-pair" >> "$GITHUB_ENV"
+          python3 tool/perf/viewport_cache_pair.py prepare \
+            "$GITHUB_WORKSPACE/build/viewport-cache-pair" --stage "$RUNNER_TEMP/abc-viewport-cache-pair"
+      - name: Install Linux profile dependencies
+        id: dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+          libstdc++-12-dev zlib1g-dev xvfb mesa-utils
+      - uses: ./.github/actions/setup-flutter
+        id: flutter
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Prepare lockfile-bound Flutter dependencies in both clean arms
+        id: pub-get
+        run: |
+          set -euo pipefail
+          for arm in A B; do
+            (cd "$PAIR_STAGE/$arm-native" && flutter pub get --enforce-lockfile) \
+              2>&1 | tee "$PAIR_EVIDENCE/$arm-pub-get.log"
+          done
+      - name: Analyze common diagnostic Dart and retain advisory formatting
+        id: static-and-backend
+        run: |
+          set -euo pipefail
+          cd "$PAIR_STAGE/A-native"
+          mkdir -p "$PAIR_EVIDENCE/formatted"
+          for source in integration_test/computerraria_dynamic_profile_test.dart \
+              integration_test/support/computerraria_dynamic_backend.dart \
+              test/computerraria_dynamic_backend_test.dart \
+              test/native_viewport_cache_source_guard_test.dart; do
+            mkdir -p "$PAIR_EVIDENCE/formatted/$(dirname "$source")"
+            cp "$source" "$PAIR_EVIDENCE/formatted/$source"
+          done
+          dart format "$PAIR_EVIDENCE/formatted" 2>&1 | tee "$PAIR_EVIDENCE/format.log"
+          flutter analyze --no-pub integration_test/computerraria_dynamic_profile_test.dart \
+            integration_test/support/computerraria_dynamic_backend.dart \
+            test/computerraria_dynamic_backend_test.dart \
+            test/native_viewport_cache_source_guard_test.dart \
+            2>&1 | tee "$PAIR_EVIDENCE/analyze.log"
+          flutter test --no-pub test/computerraria_dynamic_backend_test.dart \
+            2>&1 | tee "$PAIR_EVIDENCE/dynamic-backend-tests.log"
+          bash -n tool/perf/computerraria_dynamic_profile.sh
+          node --check test/web/world_circuit_viewport_cache_actual.cjs
+          python3 -m unittest discover -s tool/perf -p 'viewport_cache_pair_test.py' \
+            2>&1 | tee "$PAIR_EVIDENCE/pair-contract-tests.log"
+      - name: Actual Native semantic parity and warm-hit Dart metadata failures
+        id: native-correctness
+        run: |
+          set -euo pipefail
+          python3 tool/export_viewport_cache_fixture.py "$RUNNER_TEMP/viewport-cache-fixtures"
+          for arm in A B; do
+            root="$PAIR_STAGE/$arm-native"
+            cmake -S "$root/native" -B "$root/build/cache-contract" \
+              -DCMAKE_BUILD_TYPE=Release -DABC_PERF_COUNTERS=OFF \
+              2>&1 | tee "$PAIR_EVIDENCE/$arm-native-configure.log"
+            cmake --build "$root/build/cache-contract" --parallel 4 \
+              2>&1 | tee "$PAIR_EVIDENCE/$arm-native-build.log"
+            cache=0
+            if test "$arm" = B; then cache=1; fi
+            (cd "$root" && TERRAFORGE_ENGINE_LIBRARY="$root/build/cache-contract/libabc_engine.so" \
+              ABC_VIEWPORT_CACHE_FIXTURE="$RUNNER_TEMP/viewport-cache-fixtures/original.wld" \
+              ABC_EXPECT_VIEWPORT_CACHE="$cache" flutter test --no-pub \
+              test/native_viewport_cache_source_guard_test.dart) \
+              2>&1 | tee "$PAIR_EVIDENCE/$arm-native-source-guard.log"
+          done
+          python3 tool/test_viewport_cache.py \
+            "$PAIR_STAGE/A-native/build/cache-contract/libabc_engine.so" \
+            "$PAIR_STAGE/B-native/build/cache-contract/libabc_engine.so" \
+            --output "$PAIR_EVIDENCE/native-semantics.json" \
+            2>&1 | tee "$PAIR_EVIDENCE/native-semantics.log"
+          (cd "$PAIR_STAGE/B-native" && cc -std=c17 -O1 -g \
+            -I native/vendor/TerraWasm/include -I native/vendor/TerraWasm/src \
+            native/circuit_viewport_cache_contract.c \
+            build/cache-contract/terra/libterrax_world_static.a \
+            -Wl,--wrap=tx_persistent_alloc,--wrap=tx_persistent_free -lz -lm \
+            -o build/cache-contract/viewport-cache-contract && \
+            build/cache-contract/viewport-cache-contract) \
+            2>&1 | tee "$PAIR_EVIDENCE/candidate-memory-contract.log"
+      - name: Install the existing pinned official Emscripten toolchain
+        id: emscripten
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch 5.0.7 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          test "$(git -C "$RUNNER_TEMP/emsdk" rev-parse HEAD)" = 41190c21c662e9cc1962aea94e71cbae9fd2fc87
+          "$RUNNER_TEMP/emsdk/emsdk" install 5.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 5.0.7
+      - name: Compile actual WASM and verify generated source/runtime provenance
+        id: wasm-correctness
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          for arm in A B; do
+            root="$PAIR_STAGE/$arm-wasm"
+            python3 tool/perf/viewport_cache_pair.py web-before "$PAIR_EVIDENCE" --arm "$arm"
+            (cd "$root" && ABC_WEB_OUTPUT="$root/web/engine" bash tool/build_web_engine.sh && \
+              node tool/record_web_engine.mjs && python3 tool/verify_authorized_sources.py) \
+              2>&1 | tee "$PAIR_EVIDENCE/$arm-actual-wasm-build-verify.log"
+            python3 tool/perf/viewport_cache_pair.py web-after "$PAIR_EVIDENCE" --arm "$arm"
+          done
+          node test/web/world_circuit_viewport_cache_actual.cjs \
+            "$PAIR_STAGE/A-wasm/web/engine/world.js" "$PAIR_STAGE/A-wasm/web/engine/world.wasm" \
+            "$PAIR_STAGE/B-wasm/web/engine/world.js" "$PAIR_STAGE/B-wasm/web/engine/world.wasm" \
+            "$RUNNER_TEMP/viewport-cache-fixtures" "$PAIR_EVIDENCE/actual-wasm-semantics.json" \
+            2>&1 | tee "$PAIR_EVIDENCE/actual-wasm-semantics.log"
+          node test/web/world_circuit_viewport_probe_contract.cjs \
+            2>&1 | tee "$PAIR_EVIDENCE/supplementary-fake-host-probe.log"
+      - name: Fetch one pinned public input and copy verified bytes to both arms
+        id: public-input
+        run: |
+          set -euo pipefail
+          python3 tool/computerraria_inputs.py 2>&1 | tee "$PAIR_EVIDENCE/public-input-fetch.log"
+          cp build/public-computerraria/input-manifest.json "$PAIR_EVIDENCE/public-input-manifest.json"
+          for arm in A B; do
+            mkdir -p "$PAIR_STAGE/$arm-native/build/public-computerraria"
+            cp build/public-computerraria/computerraria.wld \
+              "$PAIR_STAGE/$arm-native/build/public-computerraria/computerraria.wld"
+          done
+      - name: Record renderer and build exactly two clean Native profile bundles
+        id: profile-builds
+        run: |
+          set -euo pipefail
+          xvfb-run -a -s '-screen 0 1440x1000x24' glxinfo -B > "$PAIR_EVIDENCE/glxinfo.txt"
+          renderer="$(sed -n 's/^OpenGL renderer string: //p' "$PAIR_EVIDENCE/glxinfo.txt")"
+          test -n "$renderer"
+          echo "TERRA_PERF_RENDERER=$renderer" >> "$GITHUB_ENV"
+          export TERRA_PERF_RENDERER="$renderer"
+          python3 tool/perf/viewport_cache_pair.py build-profile "$PAIR_EVIDENCE"
+      - name: One ABBA sequence of four fresh prebuilt processes
+        id: paired-processes
+        run: >-
+          xvfb-run -a -s '-screen 0 1440x1000x24'
+          python3 tool/perf/viewport_cache_pair.py run "$PAIR_EVIDENCE"
+      - name: Persist final workflow state
+        id: outcomes
+        if: always()
+        env:
+          PAIR_STEPS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path('build/viewport-cache-pair')
+          root.mkdir(parents=True,exist_ok=True)
+          (root/'workflow.json').write_text(json.dumps({
+            'sourceCommit':os.environ['GITHUB_SHA'],
+            'runId':os.environ['GITHUB_RUN_ID'],
+            'runAttempt':os.environ['GITHUB_RUN_ATTEMPT'],
+            'steps':json.loads(os.environ['PAIR_STEPS']),
+            'artifactPolicy':'All raw process reports/logs/screenshots, exact source/build manifests and actual verification WASM outputs. No WLD inputs/exports or user saves.',
+          },indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: viewport-cache-pair-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/viewport-cache-pair/**/*.json
+            build/viewport-cache-pair/**/*.log
+            build/viewport-cache-pair/**/*.txt
+            build/viewport-cache-pair/**/*.patch
+            build/viewport-cache-pair/formatted/**/*.dart
+            build/viewport-cache-pair/**/screenshots/*.png
+            build/viewport-cache-pair/wasm/**/*.js
+            build/viewport-cache-pair/wasm/**/*.wasm
+          if-no-files-found: error
+          retention-days: 30
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: viewport-cache-A-native-code-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/viewport-cache-pair/native/A/*
+          if-no-files-found: ignore
+          compression-level: 9
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: viewport-cache-B-native-code-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/viewport-cache-pair/native/B/*
+          if-no-files-found: ignore
+          compression-level: 9
+          retention-days: 30

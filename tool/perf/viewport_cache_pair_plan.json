@@ -1,0 +1,3590 @@
+{
+  "schema": "abc.viewport-cache-pair-plan.v1",
+  "frozenBaseCommit": "b3f2b22312d1369681fc9110a6957e57999a4e94",
+  "order": [
+    "A",
+    "B",
+    "B",
+    "A"
+  ],
+  "processes": 4,
+  "profileBuilds": 2,
+  "maximumRoiCells": 4096,
+  "dynamicSeconds": 15,
+  "productionTickMilliseconds": 100,
+  "mechanicalTicksPerBatch": 6,
+  "externalPulsesPerBatch": 128,
+  "originalProductFiles": {
+    ".flutter-version": {
+      "sha256": "af7ad6b385523c1c98977a15b50c53b1fd4f35b1c5d85513600a03ba3284f6b1",
+      "mode": "100644"
+    },
+    ".github/actions/setup-flutter/action.yml": {
+      "sha256": "c385d4a7395973ba7ec4aa537d1f941ef2313bec5ea71bbebbdd619893827380",
+      "mode": "100644"
+    },
+    ".github/actions/setup-performance/action.yml": {
+      "sha256": "78d89a03661620e07ad61ea5c8d381c131a9ab9930f9a6cca3ed527fef35150f",
+      "mode": "100644"
+    },
+    ".github/workflows/browser-load-diagnostic.yml": {
+      "sha256": "d739a0344693e517a8d25e7ef78ae120f8a7ee91c968e8eb7a344ccfb28849b4",
+      "mode": "100644"
+    },
+    ".github/workflows/ci.yml": {
+      "sha256": "5e586258cc228a1401cd272e798880652df75a88c6b6d723335c63df52d5a337",
+      "mode": "100644"
+    },
+    ".github/workflows/circuit-painter-paired.yml": {
+      "sha256": "11d07a168cd3dacf796e1ad8b91494a750dd21ce2a60eecada795dd09eb34226",
+      "mode": "100644"
+    },
+    ".github/workflows/computer-shell-paired.yml": {
+      "sha256": "519daefdf19bd1e67a17b91c0b83a6d5c709bd3528a08f1658ecd679e473dcd2",
+      "mode": "100644"
+    },
+    ".github/workflows/computerraria.yml": {
+      "sha256": "2381b6a3c46d0a47a88a1104445a123f50f9581d029fc71d4c3a92ab099ea904",
+      "mode": "100644"
+    },
+    ".github/workflows/generic-circuit-compile.yml": {
+      "sha256": "02a0248b89205059973d703e336eec8dd12a73c596e7c64ecd5878a1c9a7c9ec",
+      "mode": "100644"
+    },
+    ".github/workflows/memory-probe-control.yml": {
+      "sha256": "a9fc9d4cf35e936c002dd5bc782eef458de0db1c47a5dfd3f1512166346841b8",
+      "mode": "100644"
+    },
+    ".github/workflows/performance-mapgen-diagnostic.yml": {
+      "sha256": "94536e3df2eba74a54b0ec3e76de3d5fe4559e0d53d376c63a9b2a1fe765810d",
+      "mode": "100644"
+    },
+    ".github/workflows/performance-paired.yml": {
+      "sha256": "804b3dafbaae3a266d304e1994242868c9925e2ec4345a02bb2ea45a23877bb5",
+      "mode": "100644"
+    },
+    ".github/workflows/performance.yml": {
+      "sha256": "3eedd961aaca3d56b9e7d6a62db9d22ba5401699d1a87b44fb677020a9824af8",
+      "mode": "100644"
+    },
+    ".github/workflows/release.yml": {
+      "sha256": "4935a70f388fa7acbde9c3575e1ad64edf4af6af43b590a1bf48b350ce1c0e75",
+      "mode": "100644"
+    },
+    ".github/workflows/rules-only-diagnostic.yml": {
+      "sha256": "192f9ab8d237f505f9c2f6f6904c35591f5b6f8debbd89a8501d0dd0eff09a59",
+      "mode": "100644"
+    },
+    ".gitignore": {
+      "sha256": "93ce16b7587c5b9ca6e4453c859ef31ade6e7b00dd419d99d197042af26250bc",
+      "mode": "100644"
+    },
+    ".metadata": {
+      "sha256": "4d30487c53785bc5e41b2a9c5f2b469f1c4bc4556cb682ab2221edf972b7c76b",
+      "mode": "100644"
+    },
+    "README.md": {
+      "sha256": "a9817ee071e3c9696de2c591b9f3921c5324b180e4c24ea59f6e7ca25e74d0c4",
+      "mode": "100644"
+    },
+    "THIRD_PARTY_NOTICES.md": {
+      "sha256": "8ece20191f29112a041be5d82b0d30d488d06c01ce0a517acaf4db737bf533e2",
+      "mode": "100644"
+    },
+    "analysis_options.yaml": {
+      "sha256": "0a7af570fedc81ea70f9ce3f84d92c8a7036580b6cd60456ca5d43dc53fd57ad",
+      "mode": "100644"
+    },
+    "android/.gitignore": {
+      "sha256": "b027c9de1011765c015e5819bf857c0d75bfcd0886fb01721c091159012e50f1",
+      "mode": "100644"
+    },
+    "android/app/build.gradle.kts": {
+      "sha256": "e8ef532e6e7358c556af8760b4fe234610ec7f5f2498f291b946f256cfac4810",
+      "mode": "100644"
+    },
+    "android/app/src/debug/AndroidManifest.xml": {
+      "sha256": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b",
+      "mode": "100644"
+    },
+    "android/app/src/main/AndroidManifest.xml": {
+      "sha256": "6a75903a20c4ddb145dffafd4876b8ad48a15e751c6a2817f3ebdf2f083e5c67",
+      "mode": "100644"
+    },
+    "android/app/src/main/kotlin/dev/terraforge/terraforge/MainActivity.kt": {
+      "sha256": "a4738ff382eb5f103fadc4a108bdb8b62354ee0c95a8fe78533d041089e85937",
+      "mode": "100644"
+    },
+    "android/app/src/main/res/drawable/launch_background.xml": {
+      "sha256": "94433756fe10005ddd6fc55cc5c0b1e9f3c10b66a08ceac795ece6713d34e28a",
+      "mode": "100644"
+    },
+    "android/app/src/main/res/drawable-v21/launch_background.xml": {
+      "sha256": "7ca6d5cec2169c5a98661a119db23a6f3399c8fef2256ff04f3a642831282478",
+      "mode": "100644"
+    },
+    "android/app/src/main/res/mipmap-hdpi/ic_launcher.png": {
+      "sha256": "1473a5b75e98da7a260c2a9a5946e9be74d9a3a83b3efa40c76b00af25e28d49",
+      "mode": "100644"
+    },
+    "android/app/src/main/res/mipmap-mdpi/ic_launcher.png": {
+      "sha256": "73b2fde16cb0c5c5bb55e34287591a91e926b055d4f778ee855d104d7cf71644",
+      "mode": "100644"
+    },
+    "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png": {
+      "sha256": "810a22f2dc35a0363ad53bb398c69a09461ea218bd09dbbda3f2697683a980a9",
+      "mode": "100644"
+    },
+    "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png": {
+      "sha256": "d518c52b6c41f09599a72cf99aa3993556610d6bf77a9758d13916582451b5ad",
+      "mode": "100644"
+    },
+    "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png": {
+      "sha256": "58131b7038fd3831ca50d613010dce9f8f1d21a3a0b0ef0761a7fd6ad85537d2",
+      "mode": "100644"
+    },
+    "android/app/src/main/res/values/styles.xml": {
+      "sha256": "937d7c82f539c72eb94fd3a3773f29b3d3fef1997213c92cb632298cedf4bda9",
+      "mode": "100644"
+    },
+    "android/app/src/main/res/values-night/styles.xml": {
+      "sha256": "8c5bad5152f217e837519f9c15211d19f39bd45f5f67faf6dd81cb4b299e518f",
+      "mode": "100644"
+    },
+    "android/app/src/profile/AndroidManifest.xml": {
+      "sha256": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b",
+      "mode": "100644"
+    },
+    "android/build.gradle.kts": {
+      "sha256": "bcf45b1baa4c38ff4ba8289a2ea893c90d6a85d85bd0147ddb2d2eaab794e337",
+      "mode": "100644"
+    },
+    "android/gradle/wrapper/gradle-wrapper.properties": {
+      "sha256": "b690d26223576fe4e63889fad9a00df81945cb870b9476cc5a563152a1a88a74",
+      "mode": "100644"
+    },
+    "android/gradle.properties": {
+      "sha256": "0f82b18017fba6bb5ce3aa4b2d1a00c9382fc8aae7b1d9326e44b18abd66d80b",
+      "mode": "100644"
+    },
+    "android/settings.gradle.kts": {
+      "sha256": "016759283e88ade6eba92910583feeef88b962839b957aa414296afd2952d122",
+      "mode": "100644"
+    },
+    "android/terraforge_android.iml": {
+      "sha256": "90d961bc4ccb4b0ae3f75ce495c273f08745a55c50bd213e259723fc341d0193",
+      "mode": "100644"
+    },
+    "assets/computer/WIREHEAD_LICENSE.txt": {
+      "sha256": "c046a3b23796a077fff90096c2ff2b3e9b0501f459407949f3a5817ce56f730c",
+      "mode": "100644"
+    },
+    "assets/fonts/LICENSE.txt": {
+      "sha256": "126b24e3e332c51987f3fe7210abe4370bbc953647992d65a0f35060753ffa4a",
+      "mode": "100644"
+    },
+    "assets/fonts/PROVENANCE.md": {
+      "sha256": "7f0ace5862e2aa0b96c957fab8bb7640dc3029e6f6d093ababda8fb75064c058",
+      "mode": "100644"
+    },
+    "assets/fonts/TerraForgeCJK-Regular.otf": {
+      "sha256": "8d8f6deb9c77910cb8e24fad5b576446cac5f04faa685acaf74fcc5e4079e65b",
+      "mode": "100644"
+    },
+    "assets/private/README.txt": {
+      "sha256": "365312fd6bb974fef4b49fd9223abf1a058b75422894df212e9d19ece2c5e1ca",
+      "mode": "100644"
+    },
+    "assets/private/circuit_rules.provenance.json": {
+      "sha256": "aa3d7623fefb7f15e1da97d07590c942f520becd3d5f7b71aa96f574853467b3",
+      "mode": "100644"
+    },
+    "assets/private/circuit_rules_native.js": {
+      "sha256": "abcf7e457bc693b45cc136834c3410d65d3d7ba2431aac064ed51885073c4e39",
+      "mode": "100644"
+    },
+    "assets/qa/synthetic-circuit.wld": {
+      "sha256": "8638695e76e029e3b7fed42a153a9917f55d1dd72839440a9a477415ae0a64b5",
+      "mode": "100644"
+    },
+    "assets/qa/synthetic-modern.wld": {
+      "sha256": "baea0eb3869f134f4ce500f2244dbe4c49c2eee3850a325c59ee97dff06ef0ab",
+      "mode": "100644"
+    },
+    "assets/qa/synthetic-objects.wld": {
+      "sha256": "38e86a9aeba9e689367271cef406b6fb0d3970fa2fcaddc186e8857a6c547809",
+      "mode": "100644"
+    },
+    "docs/CIRCUIT_PAINTER_PROFILE.md": {
+      "sha256": "16097c3c8b93a394a773ecdbedad1cef03e2116e3df35e7626e32eb4622d8dfc",
+      "mode": "100644"
+    },
+    "docs/CIRCUIT_RULES_HOST.md": {
+      "sha256": "65f084c5232251b01816e8242db5d113ad6e5ec57a14aa1cea9afbcb90000374",
+      "mode": "100644"
+    },
+    "docs/COMPUTERRARIA.md": {
+      "sha256": "433f2c224dfefcc3d6e077c0e57536f57eb0100a79783376c5f58b123309649b",
+      "mode": "100644"
+    },
+    "docs/LOCAL_RESOURCE_PACKS.md": {
+      "sha256": "fc295f26a0717774d879543f1398cd1d5a5069ba7ef3141648ae99fa4c374ec8",
+      "mode": "100644"
+    },
+    "docs/MAP_FORMAT.md": {
+      "sha256": "07535f3587fbdfac305a2a9d147269f805715430dec0cb9306017f7a9c72586f",
+      "mode": "100644"
+    },
+    "docs/MAP_OVERLAYS_AND_TERRAIN_RULES.md": {
+      "sha256": "5ce11ca9b4a36136a09fc9c90857a13b2f81468c4da81278c1600c5816292361",
+      "mode": "100644"
+    },
+    "docs/ONLINE_RESOURCES.md": {
+      "sha256": "39624fd758a387df7d48834c0aa580e5953772825f9f6fec489af3cf7357cf97",
+      "mode": "100644"
+    },
+    "docs/REGION_ENGINE.md": {
+      "sha256": "da4651ee963d05220849af210e6ce24751de8502f8869728441e6111f574f906",
+      "mode": "100644"
+    },
+    "docs/RELEASING.md": {
+      "sha256": "232c69c0d1fbe98ecdb7304ae30ac5cfe6d7aba2ffc52e7fa6f946a40468915b",
+      "mode": "100644"
+    },
+    "docs/TERRARIA_SOURCE_PARITY.md": {
+      "sha256": "b6b7033dacce04bc3979dff5e2614079e3e52da07a4d5fe4e1195a229eab5b45",
+      "mode": "100644"
+    },
+    "docs/VISIBLE_PIXELBOX_ACCEPTANCE.md": {
+      "sha256": "289e12fbb79496280b0280c879c4aae947f08c0b90ba71c947ace18574b7c59e",
+      "mode": "100644"
+    },
+    "docs/WORLD_CIRCUIT_FRAGMENTS.md": {
+      "sha256": "cce9b1b4b30c72effc8c6bb4310baafe0fd50f06391f7903acb7dc16921b3832",
+      "mode": "100644"
+    },
+    "docs/WORLD_CIRCUIT_SUPPORT.md": {
+      "sha256": "132eb3d57e0111a11f91eb6323a5a8c15b2353859e43232270c5a2e5dc9fcc37",
+      "mode": "100644"
+    },
+    "docs/WORLD_PROPERTIES.md": {
+      "sha256": "447c29948a40b6c8e551fe132309a9be452730411f1d93169c755c72f6de82b5",
+      "mode": "100644"
+    },
+    "docs/action-parity-audit.md": {
+      "sha256": "8514625f7d609f4f210d457464eb876ade7a704eadf4507786f25c3107d7e24d",
+      "mode": "100644"
+    },
+    "docs/circuit-sandbox.md": {
+      "sha256": "0979b1aca9d5623279c1d7439b9c0ddfeb7af33d59f1c3c3aa170b5b716cc61c",
+      "mode": "100644"
+    },
+    "docs/cloud-provider.md": {
+      "sha256": "3a0ad507ae9542e1bcc1e7f0e617ab6dec50fec953e63be4fcecc980bdf2c813",
+      "mode": "100644"
+    },
+    "docs/evidence/browser-pure-wld-baseline-2026-10-09.json": {
+      "sha256": "f2fd2491cb196c70bbc8f2e1c4058f85048eaad8076d3ea6cf2dd58bc981655b",
+      "mode": "100644"
+    },
+    "docs/evidence/general-ui-baseline-2026-10-09.json": {
+      "sha256": "4e8677dcc34f1c1f3971c079931855e780a86f016eb8c0e6779de991dc4e2d7a",
+      "mode": "100644"
+    },
+    "docs/evidence/host-wld-regression-2026-10-09.json": {
+      "sha256": "11b3fc34893eeb4fef112f1ba307bfc3c2fe45f9c9f09d0b53293a86105a3fa5",
+      "mode": "100644"
+    },
+    "docs/evidence/ordinary-large-world-load-2026-10-09.json": {
+      "sha256": "685ad8254185caa5a6325f0c4a6978892e87afe3b73310eb4f8982fbd4444429",
+      "mode": "100644"
+    },
+    "docs/evidence/pure-wld-backend-acceptance-2026-10-09.json": {
+      "sha256": "219026a2473f5490e9ed405247e3d7015ea3935da1f1dcefa6190b77579b73e3",
+      "mode": "100644"
+    },
+    "docs/evidence/sparse-lamp-query-2026-10-09.json": {
+      "sha256": "39afe9225852ddd96b89d417114769a8d62085fe2e33c31cf29a1f229021d744",
+      "mode": "100644"
+    },
+    "docs/evidence/standalone-native-load-2026-10-09.json": {
+      "sha256": "27c533d0b186828bc1342e93b843767fd97079d5494ee00e8afd71dd097a1ac9",
+      "mode": "100644"
+    },
+    "docs/evidence/standalone-native-load-optimization-2026-10-09.json": {
+      "sha256": "8b4a97e0e8b035c809a2f6fef8c2d2e433c3430622730ea6a1a7890960ace58f",
+      "mode": "100644"
+    },
+    "docs/feature-matrix.md": {
+      "sha256": "f8c2a60a69ae306f01f5dba1d854208e2dce5c69a22439f5879b551cefecd28a",
+      "mode": "100644"
+    },
+    "docs/migration-plan.md": {
+      "sha256": "b5e3abc83e9bf2dfcaca12d8ab31ca272cb680fba9aa7f73a0eebfd2c8d0505b",
+      "mode": "100644"
+    },
+    "docs/performance/full-shell-rebuild-isolation.md": {
+      "sha256": "48215674e573478e9d1e3737ea9433d5cc0d8cc24224faaac6abf715cc891d3f",
+      "mode": "100644"
+    },
+    "docs/platform-builds.md": {
+      "sha256": "e7b699567994c4b558727b493997d858b33d7781c8e5d70293e58118728cf582",
+      "mode": "100644"
+    },
+    "docs/real-world-validation.md": {
+      "sha256": "0cc831a81d58a4b30cfdf4dd905e429961381768eaf9cba1e0a199e8201d3142",
+      "mode": "100644"
+    },
+    "docs/region-texture-preview.md": {
+      "sha256": "a0c33869d271d9de429e7fff88066331f2c3bfea76902579ed77236483bd2a5b",
+      "mode": "100644"
+    },
+    "docs/sparse-lamp-queries.md": {
+      "sha256": "bbca54f0f1f6a911b8e8c546b9cccdf4ff4020171d0bf5efb3e53d3daae8aed4",
+      "mode": "100644"
+    },
+    "docs/web-computation-workers.md": {
+      "sha256": "d85ce7de233f6f12bf00b3073f04cd07e83f124a9a6b02102b8343f9eaa8df14",
+      "mode": "100644"
+    },
+    "docs/world-circuit-streaming.md": {
+      "sha256": "fc11c2758eaef48eee3f565aa459e30bcc6abed92a832f3a8dff835d95fd7f55",
+      "mode": "100644"
+    },
+    "docs/world-stamp-support.md": {
+      "sha256": "3fc0d571d3ba250362cbac2f0fa9fd25aea3e4a4ac7bce9158e4269cca922b44",
+      "mode": "100644"
+    },
+    "integration_test/circuit_painter_profile_test.dart": {
+      "sha256": "fc04fd71861a338fdc4f485392f19fc1145c50e8f8db8a822fd6f820ac9be24f",
+      "mode": "100644"
+    },
+    "integration_test/computer_memory_diagnostic_test.dart": {
+      "sha256": "dad7e0c2a8367b64968c568f86e8259203d7eb73d0caaad936c6317ffc5b4ab2",
+      "mode": "100644"
+    },
+    "integration_test/computer_memory_probe_control_test.dart": {
+      "sha256": "48daaca6254d4ac8a3bae9c8cc82cd091edba80f448340581697a968c011407b",
+      "mode": "100644"
+    },
+    "integration_test/computer_shell_profile_test.dart": {
+      "sha256": "9dcf0ea3b2e4039155e41a00d631c906f6130b033ae6eb3568574a6a6618ba67",
+      "mode": "100644"
+    },
+    "integration_test/computer_world_profile_test.dart": {
+      "sha256": "2c6504ff6b03a021e8663ca985c6781c52138dc06fbca2fb6927e41ad7e0f939",
+      "mode": "100644"
+    },
+    "integration_test/support/computer_inputs_native.dart": {
+      "sha256": "ea9e6cd37fd035f587b16114b1b0cb8445f1397cb056b414ebf78a715e5a607c",
+      "mode": "100644"
+    },
+    "integration_test/support/computer_inputs_web.dart": {
+      "sha256": "b1027e57369f757b3bc341b85460a062c92d6915b074c4c9d7f800292e03a7e2",
+      "mode": "100644"
+    },
+    "integration_test/support/computer_memory_journal.dart": {
+      "sha256": "4358206dfc1af12a6836a452b65e67178e32538bc509f9ea9a09789b177bc22a",
+      "mode": "100644"
+    },
+    "integration_test/support/computer_memory_probe_telemetry.dart": {
+      "sha256": "39f29e88d4d29ee4519e1f4a0cb01aec7efdc877bcac92664b7d9552785d905c",
+      "mode": "100644"
+    },
+    "integration_test/support/computer_profile_interaction.dart": {
+      "sha256": "d3734140ea907e2360c6e361ff5cbaca93b310561f83bbd35c323d81d0ad18fc",
+      "mode": "100644"
+    },
+    "integration_test/support/computer_profile_storage.dart": {
+      "sha256": "905e0585eccffeadbd799d132129ab27467270f058b399477ebd3f3422bbd0e5",
+      "mode": "100644"
+    },
+    "integration_test/support/computer_profile_storage_native.dart": {
+      "sha256": "8a5f635f46c6e752b8b34b69135d052dbb4b57d94e8a5204379783bc17ca703a",
+      "mode": "100644"
+    },
+    "integration_test/support/computer_profile_storage_web.dart": {
+      "sha256": "f613816f42cce950d2ec8252d42f28a36ffe3a199d4bbda24743937191ecb362",
+      "mode": "100644"
+    },
+    "integration_test/support/generic_circuit_profile.dart": {
+      "sha256": "a18e70bd519becc6f9cf0144f14848ef78aa111f5c70ef3a0305f4b1d0ad6af8",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_controller.dart": {
+      "sha256": "a0f94920f7afc30aa377ce24c8fc6d44260af6cff45451551fa98489871653e5",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_inputs_native.dart": {
+      "sha256": "34565a4d50a271d08e5a5d941b3465cd634d25bacc96d073d7871eeaa86a1848",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_inputs_web.dart": {
+      "sha256": "d1cc41a820af2681fded24d84b290e8ded9d790a5433f0ada26ca452f7d4ae5a",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_memory_native.dart": {
+      "sha256": "8a405c0a7f1bcff0939e822300bba689551a2dd8a9865820ac57665387a4bf10",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_memory_web.dart": {
+      "sha256": "e2afcdee0655edc0e831f86d1979084375c0e35c99511044a3b08d1b10b69f9b",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_navigation.dart": {
+      "sha256": "738f6571ed52748bdd09e6ba15cba0d1c1e007eead2c207857f62d617480ef06",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_navigation_regression.dart": {
+      "sha256": "d6cc20ead09d769fc28f993739e6ff1ab2881c6255f92bda1248e39b8805f7a2",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_os_memory_native.dart": {
+      "sha256": "b7139a45079f1e4ba243f33260e52b3e4415409437f4b5d9ddcc97c6570b5478",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_os_memory_web.dart": {
+      "sha256": "3bf50696ad8d1418a292975007ba2d690b810d8f9f7cad12fedafb130c87736d",
+      "mode": "100644"
+    },
+    "integration_test/support/profile_recorder.dart": {
+      "sha256": "153195cdaa9046d62161c89dfbb68a1104164bcf3fa8fffd69710d47f81e132a",
+      "mode": "100644"
+    },
+    "integration_test/ui_profile_test.dart": {
+      "sha256": "a90f08a70bf5cb6b91a9f5ca9d273a6b12debddc8177738a44da35a9d46ea618",
+      "mode": "100644"
+    },
+    "ios/.gitignore": {
+      "sha256": "37380775aeb2499662b7aca80f4ac4c95ae827c3ba2bfa179aa3e9af4812c623",
+      "mode": "100644"
+    },
+    "ios/Flutter/AppFrameworkInfo.plist": {
+      "sha256": "da12038f9b2688a8a26160fea2609fa8fcb11421448c109f09c0f573efe7698d",
+      "mode": "100644"
+    },
+    "ios/Flutter/Debug.xcconfig": {
+      "sha256": "71b3e66a777cc5ac0b20b9d110527e72a652892a8a6e8b2299e618bc3ec751a5",
+      "mode": "100644"
+    },
+    "ios/Flutter/Release.xcconfig": {
+      "sha256": "71b3e66a777cc5ac0b20b9d110527e72a652892a8a6e8b2299e618bc3ec751a5",
+      "mode": "100644"
+    },
+    "ios/Runner/AppDelegate.swift": {
+      "sha256": "451c6d9ba0a2b3ff43092ea349c60fa79a91f1158b915eb29dbdd357cb95d7b8",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json": {
+      "sha256": "3b1e214f466ffedff74baa5598ad5c4421130eea6bc8d57b8fe23435e8280ae4",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png": {
+      "sha256": "e27d6ac9095b8393d0366a55c02b4a154be1ae44ec81e86f332d075ff237ad8b",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png": {
+      "sha256": "0c001a329d2880f16d9065dd3e6a15f1f6656cdb642b26b0f781a49d223dc462",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png": {
+      "sha256": "fa8205b4caa957430da7cec926f1701d6b4c31fdcbeafa6d0108348676030e81",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@3x.png": {
+      "sha256": "1956efe7ae8c04ea69083d844b8eccb3bf13624974b3112f74b3406264314975",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png": {
+      "sha256": "8fe732634cd7a8bd49b79bfc2ef90428ae7c89def66a301eddd8dbf5a030e19a",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png": {
+      "sha256": "aebfadc48ac44edaa9d2e551b01c8ddd3b7e3320018f76923a728998465908d1",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@3x.png": {
+      "sha256": "856a6063ec7b28d48efc05fa96653e9a92ac06e64e25ec3bf60eca503552de66",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@1x.png": {
+      "sha256": "fa8205b4caa957430da7cec926f1701d6b4c31fdcbeafa6d0108348676030e81",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@2x.png": {
+      "sha256": "f1386ae2cf2305fe0db44ec6172fe8fff3f0ffc351a55aadb44f278592ee94e7",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@3x.png": {
+      "sha256": "0a1350e7691f3059781bee7a0daee02e88a82403311da0a52b81939410c3e8ca",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png": {
+      "sha256": "0a1350e7691f3059781bee7a0daee02e88a82403311da0a52b81939410c3e8ca",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@3x.png": {
+      "sha256": "3d6aff7b283fd1b123caa0b8299222fcb04ea0ea5993390832fb644c9a5d710e",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png": {
+      "sha256": "2bfe64241ebfe4875456b75ac4ac06b73bb2fcb9a9a4cb7313593769db6991ac",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png": {
+      "sha256": "a48028cf861f22a5f4ae79165f22fee51a94f4f214b6df2c616cc0760babd27d",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png": {
+      "sha256": "a991123f19e99c435f215706eb382cb0bbe04503e37fcc6ff74d0717cb3d5cac",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/LaunchImage.imageset/Contents.json": {
+      "sha256": "ccc7950fd5f5b82067c85f667940a9d59189151460761ece8098ca78daa19469",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png": {
+      "sha256": "93ae7d494fad0fb30cbf3ae746a39c4bc7a0f8bbf87fbb587a3f3c01f3c5ce20",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png": {
+      "sha256": "93ae7d494fad0fb30cbf3ae746a39c4bc7a0f8bbf87fbb587a3f3c01f3c5ce20",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png": {
+      "sha256": "93ae7d494fad0fb30cbf3ae746a39c4bc7a0f8bbf87fbb587a3f3c01f3c5ce20",
+      "mode": "100644"
+    },
+    "ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md": {
+      "sha256": "a985b626c4f7546a8ba392d135e9226c3547c8e2b46895f5f2bdf40d7b14ef9f",
+      "mode": "100644"
+    },
+    "ios/Runner/Base.lproj/LaunchScreen.storyboard": {
+      "sha256": "857e61203b3deafb05766d8fcda898b86a7cb6f3d5e385ecc9926c4d698215e9",
+      "mode": "100644"
+    },
+    "ios/Runner/Base.lproj/Main.storyboard": {
+      "sha256": "fd367b6c43006d61b730f674970dd48b9f662c8f2264e52ffc1558102a2c9f2d",
+      "mode": "100644"
+    },
+    "ios/Runner/Info.plist": {
+      "sha256": "73d230e295548997078e09ee07c9b6064a171b31ed874250e71852c1c92d19f3",
+      "mode": "100644"
+    },
+    "ios/Runner/Runner-Bridging-Header.h": {
+      "sha256": "1a8d11d01d1cc92c650c9c9ed35299240052d4683a15a719a2315ef44185e074",
+      "mode": "100644"
+    },
+    "ios/Runner/SceneDelegate.swift": {
+      "sha256": "add68b905971dedfcc0d0b5b7118030de5925ba8c081ad9815463699e3a444ad",
+      "mode": "100644"
+    },
+    "ios/Runner.xcodeproj/project.pbxproj": {
+      "sha256": "ea3c28e9717f3b7d86382242b1b120b87105715030f55b8159f15c861b3d3272",
+      "mode": "100644"
+    },
+    "ios/Runner.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
+      "sha256": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f",
+      "mode": "100644"
+    },
+    "ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist": {
+      "sha256": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542",
+      "mode": "100644"
+    },
+    "ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings": {
+      "sha256": "11b247bc6796892d67c9a821d18604db4dd6a880981b34f38460b9866e6b247f",
+      "mode": "100644"
+    },
+    "ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme": {
+      "sha256": "9fbce429f56243561dd437a527136c9f9ed77165e3b271b923faf236cfcd0484",
+      "mode": "100644"
+    },
+    "ios/Runner.xcworkspace/contents.xcworkspacedata": {
+      "sha256": "46c3c9702ff7c5584e11c954d943cfb6e07fb26e3fbd072ddbc0f388aa352de1",
+      "mode": "100644"
+    },
+    "ios/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist": {
+      "sha256": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542",
+      "mode": "100644"
+    },
+    "ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings": {
+      "sha256": "11b247bc6796892d67c9a821d18604db4dd6a880981b34f38460b9866e6b247f",
+      "mode": "100644"
+    },
+    "ios/RunnerTests/RunnerTests.swift": {
+      "sha256": "5e8f4908dacea6f29b2a790e4d38bf5fded69096063f9a27a2f21584d62b30c0",
+      "mode": "100644"
+    },
+    "lib/application/circuit_rules_workspace.dart": {
+      "sha256": "acc49f7efd515c00069a7537870978b54b6ada524eb214035535c047e381714e",
+      "mode": "100644"
+    },
+    "lib/application/workspace.dart": {
+      "sha256": "4e230339b915ab7f734936fdf575252793b9a7c42b09806d2ce3cf36a38b2e9d",
+      "mode": "100644"
+    },
+    "lib/cloud/cloud.dart": {
+      "sha256": "4d269178515ce6b5086d8e5d183eb2aee815564cdaddba359c09aae5ad491212",
+      "mode": "100644"
+    },
+    "lib/cloud/cloud_api.dart": {
+      "sha256": "270a7805e253dddc1c19e8d2184fed7c8c8d3eb5335cd87bfd62335f7931df9f",
+      "mode": "100644"
+    },
+    "lib/cloud/cloud_backend.dart": {
+      "sha256": "d8dec7778e3511a7727d6488451a8a546b9016e304c5424e3cdfa69fb93242d1",
+      "mode": "100644"
+    },
+    "lib/cloud/cloud_models.dart": {
+      "sha256": "e19e74dc936a7ca33445c0a300da3cb8f5c8309fc1ce6e90b62470208c6e98fd",
+      "mode": "100644"
+    },
+    "lib/cloud/cloud_operation_store.dart": {
+      "sha256": "6ac1f2eba6e43c485f768439eebbd350e0a1a7373a0bcbbff14e38b42105c4da",
+      "mode": "100644"
+    },
+    "lib/cloud/generation_schema.dart": {
+      "sha256": "8ef54ada2f3e74c386134a54b8364ba3be6431349b9631cc345d1d1e39ad1737",
+      "mode": "100644"
+    },
+    "lib/diagnostics/host_stage_timings.dart": {
+      "sha256": "327b70247692649c8b7f16560bd110188e06ee4139c92444d5266eaaae16ecbb",
+      "mode": "100644"
+    },
+    "lib/domain/achievement_catalog.dart": {
+      "sha256": "8084c402a3b14e90776b06a995118bc8694864c87f24731cc23d2a5e4e089c30",
+      "mode": "100644"
+    },
+    "lib/domain/achievements.dart": {
+      "sha256": "362abede1e982050fa989551d3ad4faa8dad4559c896f5059102c46cc2317e3e",
+      "mode": "100644"
+    },
+    "lib/domain/bestiary_tools.dart": {
+      "sha256": "5b4ed7ae1d5c4346b099aa887c3bc83206af62a07f48ef5c9bfdb2d32d43e9f9",
+      "mode": "100644"
+    },
+    "lib/domain/canvas_document.dart": {
+      "sha256": "c3c711c1f372ee82a9b0f524a092e97644287e9bdb5e5f1cc4a196808cbd3a98",
+      "mode": "100644"
+    },
+    "lib/domain/chest_tools.dart": {
+      "sha256": "31bea7e4e21e021cfc8e9ab8ef9aed331e085d5d2c800f9c45aef682551080ac",
+      "mode": "100644"
+    },
+    "lib/domain/circuit_display.dart": {
+      "sha256": "e8b98fd935efcc3503580d70de426416f8f85b1b6b25418e3c635f081e51fa69",
+      "mode": "100644"
+    },
+    "lib/domain/circuit_document.dart": {
+      "sha256": "7438c6d43997ab0a7e2a8d30ce66a9dfbe096cf97f3881e59a278fd59a4c8f14",
+      "mode": "100644"
+    },
+    "lib/domain/circuit_edit_plan.dart": {
+      "sha256": "ff3a6c99a84aa4fee82524bf0a3efe59bbfc2cc4a5fb0925589db66a8412f8b5",
+      "mode": "100644"
+    },
+    "lib/domain/fusion_document.dart": {
+      "sha256": "5e5f21990bc6ba3830eba7ed624894c9a37427bbc1fdebf31d51537a15e47e30",
+      "mode": "100644"
+    },
+    "lib/domain/fusion_placement.dart": {
+      "sha256": "26b9058bbdf973788f626befe9f840014ba356ed00f0255b5e59a1d64f043bad",
+      "mode": "100644"
+    },
+    "lib/domain/image_import.dart": {
+      "sha256": "3fe0886c05dd3ef5f99311e10d0411cac1a868dbee7bf9b2e0d182d77883f8c5",
+      "mode": "100644"
+    },
+    "lib/domain/map_markers.dart": {
+      "sha256": "5aeaf75b3530a21ed0e1896c5ec2aae0b288182cffa7ac170f769dd88ecc79ce",
+      "mode": "100644"
+    },
+    "lib/domain/named_scheme_library.dart": {
+      "sha256": "82d0e58c621b71d66e4f7efe229f665f17812d5fa4035f0bc9682ab7d8b58221",
+      "mode": "100644"
+    },
+    "lib/domain/player_conversion.dart": {
+      "sha256": "221e547354d3175a6e35908e0472dd367f76822ecc5fdaa45541495d73adcda3",
+      "mode": "100644"
+    },
+    "lib/domain/player_tools.dart": {
+      "sha256": "c360ece896e7630d64a76b07fbab4bdf9f91a537f945bca80129b918c3029955",
+      "mode": "100644"
+    },
+    "lib/domain/prefix_rules.dart": {
+      "sha256": "5e3799b962a66093c4223d9d5105c87d22f994030ce14f7a76f959691c0b7863",
+      "mode": "100644"
+    },
+    "lib/domain/region_brush.dart": {
+      "sha256": "dcd51da6ee0761e4cd29b0decfc2129b81053fdf79680e4ad28287dc18253f1b",
+      "mode": "100644"
+    },
+    "lib/domain/region_document.dart": {
+      "sha256": "7b568108588f390c04f651dd661313647ada4e9428cbb7583c09f98295155100",
+      "mode": "100644"
+    },
+    "lib/domain/resource_catalog.dart": {
+      "sha256": "58ddfc806b912d00f31b8f572f2815121ef6efb438133c1bd344ca8708d53802",
+      "mode": "100644"
+    },
+    "lib/domain/save_record.dart": {
+      "sha256": "6e6934689a9380efd630732e54e0c54443a76d7f1163342fe7473762927dc702",
+      "mode": "100644"
+    },
+    "lib/domain/terrain_rule_plan.dart": {
+      "sha256": "8ef5526580222c0cc8266c11c03ba6a2717690d4d59974784213c2a11c44a269",
+      "mode": "100644"
+    },
+    "lib/domain/terraria_map.dart": {
+      "sha256": "f0cb6a52aee5e2bbb1c09ebd53606eee1dc30abaab21c98a4d51204846a5755e",
+      "mode": "100644"
+    },
+    "lib/domain/vault_history.dart": {
+      "sha256": "68eccb9b0b7bb1d253d56e31da65459131878ec180fddc2c8113a3861feff013",
+      "mode": "100644"
+    },
+    "lib/domain/world_circuit_geometry.dart": {
+      "sha256": "562796a2c1926da1e14cfc6a362d959355cb8469be0ef2a772a8a03ddd529427",
+      "mode": "100644"
+    },
+    "lib/domain/world_map_overlay.dart": {
+      "sha256": "deb4e6a29c3bf35753ac695d7a398524e6379d4fff2422e6045973606742771c",
+      "mode": "100644"
+    },
+    "lib/domain/world_rule_presets.dart": {
+      "sha256": "9b3addb37d80b276ccf5a309b504f456ab5432a3154e36c368825d88bf1320aa",
+      "mode": "100644"
+    },
+    "lib/domain/world_rules.dart": {
+      "sha256": "57179ef6def5d8939398bbda3e927b28f1cdb871078c22d9ab2e0fb02a1e1ee5",
+      "mode": "100644"
+    },
+    "lib/domain/world_stamp.dart": {
+      "sha256": "c107a245303048606e730ef60d77bdaff10bbe20115859738b7e0f2e4d8474b4",
+      "mode": "100644"
+    },
+    "lib/engine/circuit_backend.dart": {
+      "sha256": "333b5409f7dc1a7b36a49ee4e16851fb51899615ef60e89fbd8c646eb57ad227",
+      "mode": "100644"
+    },
+    "lib/engine/circuit_factory.dart": {
+      "sha256": "9d4dc14657e01681627a6b5b3962e9273e5b4afe976d32e017a20001f51d7ad8",
+      "mode": "100644"
+    },
+    "lib/engine/circuit_factory_web.dart": {
+      "sha256": "cec9dbfd0b9e8b35575cf6fa588d3629c22b4017fe0a66d9dfff1a1ecbd6d039",
+      "mode": "100644"
+    },
+    "lib/engine/circuit_rules_backend.dart": {
+      "sha256": "e27880638273c868606ff7bbb8cf3edf0a4cb9bcdff162bc51ded27b6ed65d3d",
+      "mode": "100644"
+    },
+    "lib/engine/engine.dart": {
+      "sha256": "1d158ad421811e0ebd1888e29aaef8f35e7b599370652e01f88126f7aff4ce9b",
+      "mode": "100644"
+    },
+    "lib/engine/map_backend.dart": {
+      "sha256": "8e527ebc0de296d8a87226153db4aa510913627a7269e02351b0d2a95bfc2157",
+      "mode": "100644"
+    },
+    "lib/engine/map_backend_native.dart": {
+      "sha256": "4ac274018a416246559832189203230412d89fec28b9090720ba5e95eef30443",
+      "mode": "100644"
+    },
+    "lib/engine/map_backend_web.dart": {
+      "sha256": "4cbc16910e42a4375e106fdaec6c0f6433c1278ce2d4f16321ecf58faa4bc37e",
+      "mode": "100644"
+    },
+    "lib/engine/map_worker_owner.dart": {
+      "sha256": "e82d1c0a150c03faf44c984fe2136d8253de27385351056c91b140ddd9a48176",
+      "mode": "100644"
+    },
+    "lib/engine/native_circuit_bindings.dart": {
+      "sha256": "037e4f127ac01602e99abb096f1bd75b63b269c429fe864e3b99e4b25aed7022",
+      "mode": "100644"
+    },
+    "lib/engine/native_circuit_rules_bindings.dart": {
+      "sha256": "503d789088b77d0f6bb8ea78d25bcb73a60b567535bd1ab045d249151f682e8d",
+      "mode": "100644"
+    },
+    "lib/engine/native_circuit_rules_runtime.dart": {
+      "sha256": "f3c211bbdab04cc1753a399e01dfaefeb6499b1398c994ff5be35c7e68737392",
+      "mode": "100644"
+    },
+    "lib/engine/native_engine.dart": {
+      "sha256": "6e7529b12e4bfc5ec3ea8753caa5f6098b90c70f2f2054b593a5471588de8921",
+      "mode": "100644"
+    },
+    "lib/engine/native_quickjs_runtime.dart": {
+      "sha256": "79bc1e07a02035974981cbf5c287d6da4656e317d0bf2888ab8340d2b8f7b3b5",
+      "mode": "100644"
+    },
+    "lib/engine/native_world_circuit_bindings.dart": {
+      "sha256": "424ef0660b6a9363a1957f058a6cf5ec34be9946154370acff2657bd566bae09",
+      "mode": "100644"
+    },
+    "lib/engine/player_projection_backend.dart": {
+      "sha256": "dd0ecb8d8a49e4ad80deeaccb0eefe3ef53782cf707df404f660b41fb1c62652",
+      "mode": "100644"
+    },
+    "lib/engine/player_projection_factory.dart": {
+      "sha256": "e189541318cb3bb8ed880dc17d58eada140a63dd1c1d289269bac4c02db88f83",
+      "mode": "100644"
+    },
+    "lib/engine/player_projection_factory_web.dart": {
+      "sha256": "bfe9fb3c62c4e0632ddcd7464c3e87f98184a391d17b52def33cf435a0f5ed74",
+      "mode": "100644"
+    },
+    "lib/engine/player_projection_web.dart": {
+      "sha256": "26eae69714d1fb8c9175e63145e98e38e2681f335e40dc9395ddba48266d8f16",
+      "mode": "100644"
+    },
+    "lib/engine/player_schema.dart": {
+      "sha256": "d08a0d0a4801b8d33dc00f0344ce980f3376756ab5698f52d40a8e48b2a2f132",
+      "mode": "100644"
+    },
+    "lib/engine/region_backend.dart": {
+      "sha256": "1e6ba44af26596a12e58b67d86f2fb7747cb41f805c5efb95860f70896cb5ca6",
+      "mode": "100644"
+    },
+    "lib/engine/region_backend_native.dart": {
+      "sha256": "9e618bcef2460a5ed73751bdb853ff6f3e71a5fa32738b613e98aa2e3edb7d03",
+      "mode": "100644"
+    },
+    "lib/engine/region_backend_web.dart": {
+      "sha256": "daeb4ad79bb20644edb702972358079a80954de2d17657ce9483f7bc749a259b",
+      "mode": "100644"
+    },
+    "lib/engine/region_factory.dart": {
+      "sha256": "fccb09d954f50b8fa002f82e5399ecb5fed12c7770e218b1ff59a93c63d69121",
+      "mode": "100644"
+    },
+    "lib/engine/region_factory_web.dart": {
+      "sha256": "555efd4f2bbf732f2db93acceac4fed4f4f8674bacb3d897fe8a6e3e8ae2916b",
+      "mode": "100644"
+    },
+    "lib/engine/web_circuit_backend.dart": {
+      "sha256": "b0eec541a72ab717808a8d5759268d021d9ed7bc885b325c3e5a74c53f14dd07",
+      "mode": "100644"
+    },
+    "lib/engine/web_engine.dart": {
+      "sha256": "77ac870edf922b596e9947931e935591a1dab564f504a440a3956b33f844fe83",
+      "mode": "100644"
+    },
+    "lib/engine/web_world_circuit_backend.dart": {
+      "sha256": "683df24b1b185754d693148f593391cab05436d6806195a9952f8ca2d357edb7",
+      "mode": "100644"
+    },
+    "lib/engine/world_circuit_backend.dart": {
+      "sha256": "8c040b046cb7fddd1617898d5e96ed71b0ad4afcb40e20cf0947eb9608a90f2e",
+      "mode": "100644"
+    },
+    "lib/engine/world_circuit_factory.dart": {
+      "sha256": "24c2256d579db1ed6730b3998f831ea0f2169a734f9b77b82e700547af570233",
+      "mode": "100644"
+    },
+    "lib/engine/world_circuit_factory_web.dart": {
+      "sha256": "f399e300a732b2e2c5f43eaf6434064ba97ea515bf92798793adb5c6eeacaaee",
+      "mode": "100644"
+    },
+    "lib/engine/world_circuit_session.dart": {
+      "sha256": "7a9ac1efd2daac080af4ef2951c8f9d667287baccc88865e3c64b51738526d63",
+      "mode": "100644"
+    },
+    "lib/engine/world_map_backend.dart": {
+      "sha256": "8e38096aad3425c19df3e011486990ae3d11e34ad655af16dd69dd57e70d5b91",
+      "mode": "100644"
+    },
+    "lib/main.dart": {
+      "sha256": "d62a2718176ecc2cd11252a8fdafe6b1073df184668071a25fcfd4add1b3af88",
+      "mode": "100644"
+    },
+    "lib/platform/files.dart": {
+      "sha256": "e10874eb43668146ab8a9591c1412f95b6c074a563c0f0e221a08850d2e7d513",
+      "mode": "100644"
+    },
+    "lib/platform/resource_store.dart": {
+      "sha256": "a48033ac64064315e0692fafd2b12fa21998747dcb66e2a40193fb7af90fda0b",
+      "mode": "100644"
+    },
+    "lib/platform/vault.dart": {
+      "sha256": "da708ec189740635ee45775a7c3e89884c5e57ae46d3ea5a96bb8726bc45f4eb",
+      "mode": "100644"
+    },
+    "lib/platform/vault_native.dart": {
+      "sha256": "e2bc67038bd9bc84fb337c6ada234d00137b749f6ef91cb9435de678e19a88ad",
+      "mode": "100644"
+    },
+    "lib/platform/vault_web.dart": {
+      "sha256": "db78426518a84acfb3507b243a7f2ddd4dce47818bd9a62fcd4702ed8969f131",
+      "mode": "100644"
+    },
+    "lib/platform/world_circuit_files.dart": {
+      "sha256": "58e239895f3b2300e6c1c0dafa47fff50f7664c284c8da6cb7e341750d1d44d6",
+      "mode": "100644"
+    },
+    "lib/platform/world_circuit_files_native.dart": {
+      "sha256": "5aa7f884e917bc690678976ebbeab09d5b74b57fa2023282993a86b4410b796a",
+      "mode": "100644"
+    },
+    "lib/platform/world_circuit_files_web.dart": {
+      "sha256": "393abfa93cf0ccf55bf4d59e97dd98ab29598769fc9f0b4a2005078436771f7c",
+      "mode": "100644"
+    },
+    "lib/resources/online_resource_authority.dart": {
+      "sha256": "97d0919e66b0c4e6c98fb09de5298ded7475a5ba0adf8aaf784cfd13f0f21b49",
+      "mode": "100644"
+    },
+    "lib/resources/online_resource_normalizer.dart": {
+      "sha256": "a6351c63cb358f18b06277e45ccacbde3b7cf54fac96ea5f16aa36f0f25ef0a0",
+      "mode": "100644"
+    },
+    "lib/resources/online_resource_protocol.dart": {
+      "sha256": "02947d8f0859f29db55ef197a02fa7090caaaf2aa2a0a599c997cb6d99266f8d",
+      "mode": "100644"
+    },
+    "lib/resources/online_resource_service.dart": {
+      "sha256": "0969b857cebd9f9fa343b1f1cb288f6dd275f2a7892da579ac2fe4194275cec7",
+      "mode": "100644"
+    },
+    "lib/resources/online_resource_storage.dart": {
+      "sha256": "c9ff63f638b44c632c8804bcf6c4dca2d68de92589b12c2af84e4d7243c0eaa4",
+      "mode": "100644"
+    },
+    "lib/resources/online_resource_storage_native.dart": {
+      "sha256": "c05019f457ad9f2c171f1d0922fa5862e9fb0c8087725e96383295f39ae766b5",
+      "mode": "100644"
+    },
+    "lib/resources/online_resource_storage_web.dart": {
+      "sha256": "4e3f144d6a58f7bf57507cd45bdde5bc32b3c70d10717271918b5941d4560aa7",
+      "mode": "100644"
+    },
+    "lib/resources/online_resource_transport.dart": {
+      "sha256": "b1a00f6e05b41ca2fda1ec8eca80892ee3cc6a7d3a20ca19f09333f13ea10622",
+      "mode": "100644"
+    },
+    "lib/resources/public_resource_client.dart": {
+      "sha256": "7cfbfee65a4ec730e1583b64b8663f734e3a22a8e00e086fa61b4f229758a24c",
+      "mode": "100644"
+    },
+    "lib/resources/public_resource_client_web.dart": {
+      "sha256": "301d2c4d9a64824452f0c18668fd8578e47cf4381a45c3ba102ae7f9c955bba2",
+      "mode": "100644"
+    },
+    "lib/ui/achievement_tools_panel.dart": {
+      "sha256": "bab80db90dcb5575a231d30acf2ac633caa69e8c5cddad3081678d3bf6c3c3e7",
+      "mode": "100644"
+    },
+    "lib/ui/authoritative_circuit_panel.dart": {
+      "sha256": "0910c3873b748f8112afa897eb146c21162dd9ef7dc3a80a0ff2747cc14f9973",
+      "mode": "100644"
+    },
+    "lib/ui/bestiary_tools_panel.dart": {
+      "sha256": "4a19bfa06e36e0144cfaef73d0d8bb6f4ba1cfa58aa56f5957b4a7018c20516c",
+      "mode": "100644"
+    },
+    "lib/ui/catalog_browser.dart": {
+      "sha256": "628ac430b0b1d8e0b8ae774797b9ec9e3f931fe2d6e667387f372214ea934470",
+      "mode": "100644"
+    },
+    "lib/ui/chest_tools_panel.dart": {
+      "sha256": "0e281654bffbd5d07663d22caf5bd141e393e9c28f00dd62f76d92cabadd6e70",
+      "mode": "100644"
+    },
+    "lib/ui/circuit_edit_tools.dart": {
+      "sha256": "6388adf811c11a6a116ae8548ae99444a2110dd82be676b33180d6e759b66a29",
+      "mode": "100644"
+    },
+    "lib/ui/cloud_help_section.dart": {
+      "sha256": "a4ee4495013b53a0f1f88fd2e208ffa4a52ecf73869e8d65b2d36ab98501232a",
+      "mode": "100644"
+    },
+    "lib/ui/cloud_profile_dialog.dart": {
+      "sha256": "772b9bb512d2230039c572301c0b4bbdcadae19608fc6b15e641f1f87f25f3b5",
+      "mode": "100644"
+    },
+    "lib/ui/cloud_workspace_panel.dart": {
+      "sha256": "a94967fa85e499998f44fc8fab4bc03a6cc3a92352a3ec011a3ef8bd41044c36",
+      "mode": "100644"
+    },
+    "lib/ui/computer_display.dart": {
+      "sha256": "5cd4c36f82e8a2c22707e4319eb5c953a071028b0e9fc3c3c35e9c78d85f1fb2",
+      "mode": "100644"
+    },
+    "lib/ui/fusion_placement_panel.dart": {
+      "sha256": "1229c2f628045c33a3618c2003e307cd2ff2c11ff4b1610b494e8b74956dee42",
+      "mode": "100644"
+    },
+    "lib/ui/generation_options_form.dart": {
+      "sha256": "2e19851fe0dd648f97e68b913fb181ff1903c8155553e096cd54c25ab6359391",
+      "mode": "100644"
+    },
+    "lib/ui/map_markers_panel.dart": {
+      "sha256": "ba5e250077536dfd8c8e4f7052b3a22fcf94387baa59256465f82522135c9fef",
+      "mode": "100644"
+    },
+    "lib/ui/named_scheme_panel.dart": {
+      "sha256": "cd7d3a9c898a9a3cade17330c8515f00fa664c3f629d483dfc1f9e3beddc0384",
+      "mode": "100644"
+    },
+    "lib/ui/online_resources_panel.dart": {
+      "sha256": "0e3b22e78670031150e31d71ab11212477eeeb53751fbc503cbede9212a8d805",
+      "mode": "100644"
+    },
+    "lib/ui/player_tools_panel.dart": {
+      "sha256": "bfa020e15c1bc42b87eb3d0309bd74a421bec92327375a8a214ad418fd335de7",
+      "mode": "100644"
+    },
+    "lib/ui/region_brush_panel.dart": {
+      "sha256": "ac3f39e8eccb4e7f285369cea5ae09835f5b302329727a5f396a576e4c72639e",
+      "mode": "100644"
+    },
+    "lib/ui/region_inspector.dart": {
+      "sha256": "eeeacbf759a0d63e4019c65e06be86871e4c10779b03341a0ef3f4122645218e",
+      "mode": "100644"
+    },
+    "lib/ui/region_texture_canvas.dart": {
+      "sha256": "91f2dac1bb17e4c03b813d7ebacf5b55aaed882f773b27de0477b06cfbb70edc",
+      "mode": "100644"
+    },
+    "lib/ui/terra_app.dart": {
+      "sha256": "99ae41accda451d62811ddeb7af7b2f290d9ab14fbb8b4e1eb16e4adcba6d37a",
+      "mode": "100644"
+    },
+    "lib/ui/terra_contract.dart": {
+      "sha256": "c6aa2bd333c4f3c30d64d64f45abcf072abbe616e26c4d9e85edbea4db87a6a5",
+      "mode": "100644"
+    },
+    "lib/ui/terra_painters.dart": {
+      "sha256": "6ea341a4d40b9f4e1bb618579dffa2e4bcbbb1ce94afe33c7b4618ec46e640d0",
+      "mode": "100644"
+    },
+    "lib/ui/terra_theme.dart": {
+      "sha256": "d24049d56a9f9487ae1efeec2384bf29e168e2f0be64ac0bba885a2ef3e0cca3",
+      "mode": "100644"
+    },
+    "lib/ui/terraria_map_panel.dart": {
+      "sha256": "cbc4b01b6d2bc633104e6e4d136662ad65f559e1b0be7ad9b05cb9d7ebd3c742",
+      "mode": "100644"
+    },
+    "lib/ui/vault_history_panel.dart": {
+      "sha256": "8003841146a59e7572857c49a81e03742471b7259a4e232613eab5cf4d5da7fe",
+      "mode": "100644"
+    },
+    "lib/ui/world_circuit_panel.dart": {
+      "sha256": "bb29ea6f1a98ab9187e3d8cb2daf7dec82fcab1d5447cebd3e865efdaed4fef0",
+      "mode": "100644"
+    },
+    "lib/ui/world_map_view.dart": {
+      "sha256": "34727d8c45e9ac0c18687f0913a35fbb68d9e8da3c25b28451b17e59c5928126",
+      "mode": "100644"
+    },
+    "lib/ui/world_properties_panel.dart": {
+      "sha256": "a8a77bb90844286e4640fae545415b9cf3148442d616c71162929a95bdf2bc33",
+      "mode": "100644"
+    },
+    "lib/ui/world_rules_panel.dart": {
+      "sha256": "11cfb5b085bde85fc6d593dfb01ee42686ef44ea771e810a92e89d47d382e1d0",
+      "mode": "100644"
+    },
+    "linux/.gitignore": {
+      "sha256": "5ded4f1a9d10d34bf6ee5beb0711d88ee2ef07b0f07ace9ed77935a246e8eb82",
+      "mode": "100644"
+    },
+    "linux/CMakeLists.txt": {
+      "sha256": "505ae37f66029f68553be2c6e64acaac40ccbaa3c4de5d2db006f5f151be24c2",
+      "mode": "100644"
+    },
+    "linux/flutter/CMakeLists.txt": {
+      "sha256": "787189e2623313cfee590a0b553338eb9fc68b3af922ddd77c5d39c75f989aeb",
+      "mode": "100644"
+    },
+    "linux/flutter/generated_plugin_registrant.cc": {
+      "sha256": "ba37a5e4b50087b4e36f62262fa69eeb4505f7cbf4274e299a21633165a31723",
+      "mode": "100644"
+    },
+    "linux/flutter/generated_plugin_registrant.h": {
+      "sha256": "00f93bb5b1faefdede8f6065df327522900fb0b8efee86bacf424fd947ed14bb",
+      "mode": "100644"
+    },
+    "linux/flutter/generated_plugins.cmake": {
+      "sha256": "b2bffc8ce495d96035f885d06a7328f1f786c3ecd5e11cdf38b365d459c51865",
+      "mode": "100644"
+    },
+    "linux/quickjs_bundle.cmake": {
+      "sha256": "fb277fd40c727243033919a6c9a60a58f6e5546b6bcdc8a193f374aa53987f29",
+      "mode": "100644"
+    },
+    "linux/runner/CMakeLists.txt": {
+      "sha256": "8cdcfd911e770fd7d511c97c7bce6559486a815352a47c953f7ef632e236d2cc",
+      "mode": "100644"
+    },
+    "linux/runner/main.cc": {
+      "sha256": "ea23f7cdf74091d63bba29ef60486370b766157b848f0cfe62bd8b1c1695a0c1",
+      "mode": "100644"
+    },
+    "linux/runner/my_application.cc": {
+      "sha256": "1bac5296ab36fe2decf0b1624ec9a59493ebf5c8ce30c7825a7be647c34fe6cc",
+      "mode": "100644"
+    },
+    "linux/runner/my_application.h": {
+      "sha256": "a4218d7ac0db8a9a6716daf216b2d4fc6bdc7ac647e3183078b2c962ebdfcf70",
+      "mode": "100644"
+    },
+    "macos/.gitignore": {
+      "sha256": "ffec1a0bbd70547186b82ad4e49089bafab2de309b89de97c776d70debb179fa",
+      "mode": "100644"
+    },
+    "macos/Flutter/Flutter-Debug.xcconfig": {
+      "sha256": "62290ad8e938bf410206d8c7e131262696b58a6df110d39faf3399396ffe61b1",
+      "mode": "100644"
+    },
+    "macos/Flutter/Flutter-Release.xcconfig": {
+      "sha256": "62290ad8e938bf410206d8c7e131262696b58a6df110d39faf3399396ffe61b1",
+      "mode": "100644"
+    },
+    "macos/Flutter/GeneratedPluginRegistrant.swift": {
+      "sha256": "4be3865c620ebd3147860bdab4330177b1a05c10b691f27f63dab0cb700db8bf",
+      "mode": "100644"
+    },
+    "macos/Runner/AppDelegate.swift": {
+      "sha256": "ce9dbe45a57c59e85519da50a26c471615b9c8cdd85a8f4a39d2e480e62a4af4",
+      "mode": "100644"
+    },
+    "macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json": {
+      "sha256": "bc6ba8105ca69651aeeb77358851590de295dca04681a1d58c0f449641c242f3",
+      "mode": "100644"
+    },
+    "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png": {
+      "sha256": "e27d6ac9095b8393d0366a55c02b4a154be1ae44ec81e86f332d075ff237ad8b",
+      "mode": "100644"
+    },
+    "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png": {
+      "sha256": "11553090d4935242e5b341434cfc0a278cdd612819f2cb73938b09b68ca0ac42",
+      "mode": "100644"
+    },
+    "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png": {
+      "sha256": "06fadf84ae1533a02befdb56a1eb8dbfa283b8c10e7ad4d40849bc386e8c45fa",
+      "mode": "100644"
+    },
+    "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png": {
+      "sha256": "27f1f04fca764e56a3d34a3faefda5636993a24dbc6874420610a35a9d92fdd4",
+      "mode": "100644"
+    },
+    "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png": {
+      "sha256": "14651bc00f6fc3053b9b2084b2e64a9216d99c2c8110cd5072f081f106f72760",
+      "mode": "100644"
+    },
+    "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png": {
+      "sha256": "b8accee7ba5240097260cf9e0117bc36052c511c57afceeb03708195b1c93511",
+      "mode": "100644"
+    },
+    "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png": {
+      "sha256": "7d05ddac25b35c4c51dc93466c8ca66a8e08e215604a50f7d280eb3a065693be",
+      "mode": "100644"
+    },
+    "macos/Runner/Base.lproj/MainMenu.xib": {
+      "sha256": "be9e9ef8469d3262370e0f0b855ed163cbf9c8362c59e330b2ffe63b86fa42f4",
+      "mode": "100644"
+    },
+    "macos/Runner/Configs/AppInfo.xcconfig": {
+      "sha256": "d665ce4be861785faba9d129ba1399bc74c0af23c0fc29a6aefe2f6cf0fe59cf",
+      "mode": "100644"
+    },
+    "macos/Runner/Configs/Debug.xcconfig": {
+      "sha256": "8067d533ef6593760baad9a9855a786a7a77470fcc3f0925ec04fe43bc1ac4b0",
+      "mode": "100644"
+    },
+    "macos/Runner/Configs/Release.xcconfig": {
+      "sha256": "7a6a4b4d973a23052fa0a0388dd261e32d311d7b66ba1bfc3b914b361808ac61",
+      "mode": "100644"
+    },
+    "macos/Runner/Configs/Warnings.xcconfig": {
+      "sha256": "0e341a392b16ad302d12890aa3dac9257a6c10ece685437604259a85341645a3",
+      "mode": "100644"
+    },
+    "macos/Runner/DebugProfile.entitlements": {
+      "sha256": "c22c4b97cb1fa44ad3b4393dccc70a8a98eafbbe00be5c5bf6f39fc123d3ed5b",
+      "mode": "100644"
+    },
+    "macos/Runner/Info.plist": {
+      "sha256": "093a582591729d99ca5c9f5bdaff1739dbee4277838acc4fa5633c8993c5a50b",
+      "mode": "100644"
+    },
+    "macos/Runner/MainFlutterWindow.swift": {
+      "sha256": "65c9613c11bcedfa51416b16c975d8ba6ff12b405fc19d60db8755d92e86d9fe",
+      "mode": "100644"
+    },
+    "macos/Runner/Release.entitlements": {
+      "sha256": "c0e0afd6abe100386f5bc3ee241557a7b91c9ce59b8c1e99e962bceb49729cfb",
+      "mode": "100644"
+    },
+    "macos/Runner.xcodeproj/project.pbxproj": {
+      "sha256": "4b0c45863f7ac89f2f6e54c0d53b43a7de36f8a75e2dacfe3362e660601f99a5",
+      "mode": "100644"
+    },
+    "macos/Runner.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist": {
+      "sha256": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542",
+      "mode": "100644"
+    },
+    "macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme": {
+      "sha256": "7b15453ed3c3f8a9471914fa516017be898aa44b70c519ef6d46e93db9a6e517",
+      "mode": "100644"
+    },
+    "macos/Runner.xcworkspace/contents.xcworkspacedata": {
+      "sha256": "46c3c9702ff7c5584e11c954d943cfb6e07fb26e3fbd072ddbc0f388aa352de1",
+      "mode": "100644"
+    },
+    "macos/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist": {
+      "sha256": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542",
+      "mode": "100644"
+    },
+    "macos/RunnerTests/RunnerTests.swift": {
+      "sha256": "6bc180bc77c7def7a21d197233e25dff42cc493ab9d294632edafc18fdf0ac44",
+      "mode": "100644"
+    },
+    "native/CIRCUIT_RULES_HOST.md": {
+      "sha256": "61f33748f62c824fac7910dc0c01752c35eef5cd1cf25b10fa070492698f3265",
+      "mode": "100644"
+    },
+    "native/CMakeLists.txt": {
+      "sha256": "2334e99700346918a0919b43016275b77af16d1358b931a68c9b4e670819c9d4",
+      "mode": "100644"
+    },
+    "native/abc_circuit.c": {
+      "sha256": "137c1e3cf41e4b3232e01991e7743086b6c8f3a387fb27079fbfe7280d23f23f",
+      "mode": "100644"
+    },
+    "native/abc_circuit.h": {
+      "sha256": "4513b6129f6cfd69c14e0e976e8db8f250e572e30c81d9a8bc072ba8cca3b126",
+      "mode": "100644"
+    },
+    "native/abc_circuit_rules.c": {
+      "sha256": "5084e5624888c1b544b36d45f838872924103787746b842eb19f212c2f1c4ab3",
+      "mode": "100644"
+    },
+    "native/abc_circuit_rules.h": {
+      "sha256": "303c96d2d6031d10633e6882890e7ab8b26ee90507a2d4fa92281c9c9cc5970c",
+      "mode": "100644"
+    },
+    "native/abc_engine.c": {
+      "sha256": "547dc6f841af3937d7a8b105c07a85d58fa664f04b73644bcfcd02e2ab456e8d",
+      "mode": "100644"
+    },
+    "native/abc_engine.h": {
+      "sha256": "01996ad42c046f023cb1f9c7840859ac0f4af286fd84c594dac103fb88a583ed",
+      "mode": "100644"
+    },
+    "native/abc_perf.c": {
+      "sha256": "5ad003d6b64eeac35623b698a5b851d680848ef1f99caf827db79c50ca0816fd",
+      "mode": "100644"
+    },
+    "native/abc_region.c": {
+      "sha256": "7159329476f013b35cd1d15f768a277aa18eb971c2c43d54204bfb60f5f834a1",
+      "mode": "100644"
+    },
+    "native/abc_region.h": {
+      "sha256": "64dcf15a1d3d88131b1299e3b76609f2bcc0776766cf8addce6b21693050ae58",
+      "mode": "100644"
+    },
+    "native/abc_world_circuit.c": {
+      "sha256": "f6f1bcea4c98d752134599a46cdd7ac61fe0378cd5811ba783dd13faeebd789d",
+      "mode": "100644"
+    },
+    "native/abc_world_circuit.h": {
+      "sha256": "5cee7a496abff6bd797f6f0650e4fcf727faea5fbcc5da87a6e1abe58ab00417",
+      "mode": "100644"
+    },
+    "native/circuit_device_epoch_contract.c": {
+      "sha256": "c3ee17c845a7236ba2a1928edad0d9c9959b67eb903002cee4fd589e086d44ee",
+      "mode": "100644"
+    },
+    "native/circuit_edit_smoke.dart": {
+      "sha256": "93705519bf3eedeb12c249270b587dc53efffb7e3f76c6337c06a50a843d862c",
+      "mode": "100644"
+    },
+    "native/circuit_integration_test.dart": {
+      "sha256": "54428eb9a9779f3176a3c57a060048db75314918f9b0b111edffc668a824ad82",
+      "mode": "100644"
+    },
+    "native/circuit_rules_bundle_test.dart": {
+      "sha256": "f1063a08bfa77eacf78f3a2d93c8663a5d4ee0b40370a2be4624624856759619",
+      "mode": "100644"
+    },
+    "native/circuit_rules_corpus_test.dart": {
+      "sha256": "04c69e8ea2ac51773826afd67028840c500488bc52df93f9f3ac8778792c1303",
+      "mode": "100644"
+    },
+    "native/circuit_rules_runtime_smoke_test.dart": {
+      "sha256": "eb3e5a16cc034cb5375d2e2c2e31373f36e4cdddfa2079ded86f0279698470ee",
+      "mode": "100644"
+    },
+    "native/circuit_smoke.dart": {
+      "sha256": "1136b9677ce45d0a946390e218bce6b058ced00dea983d04b59e35c1708eaf1e",
+      "mode": "100644"
+    },
+    "native/circuit_timer_order_contract.c": {
+      "sha256": "01ecbaa3883abffe1f9db92ccc5c41558bbbdd66ba11c40335f6d90e70ece2df",
+      "mode": "100644"
+    },
+    "native/circuit_wired_light_contract.c": {
+      "sha256": "b6095ba1e0672cb4ade75e9ec4aa2c3f652ea45cceb05e01859147ec2ae0dba6",
+      "mode": "100644"
+    },
+    "native/circuit_wld_pixel_contract.c": {
+      "sha256": "598864fc4bd8d635ee73d81742a56f3e3e025038cc970935b5ae5d5a47cf0e5c",
+      "mode": "100644"
+    },
+    "native/computerraria_acceptance.dart": {
+      "sha256": "a08a4ac9742aeca512645e6100098a1835283152664bd922687c312c2ac5202a",
+      "mode": "100644"
+    },
+    "native/computerraria_soak.dart": {
+      "sha256": "6332bb82293b123d96c4e2d359da29005ea103d20c8c81b25d88e3065768b9b2",
+      "mode": "100644"
+    },
+    "native/dart_smoke.dart": {
+      "sha256": "b74fa80ee4ac2292c4f0985a7a2dac5e8a5a6228a0297767fae5c8833bd58e2c",
+      "mode": "100644"
+    },
+    "native/fixtures/computerraria/programs.json": {
+      "sha256": "488395bb26e3aa4422c4b9415410773cd3e78f8da8cbbe9626d434b4527ad86c",
+      "mode": "100644"
+    },
+    "native/fixtures/sparse-lamp-queries.json": {
+      "sha256": "d6eda9e2fe296dd83bfa826d35461115da97ac427b2d4d364b294e9422dbd33b",
+      "mode": "100644"
+    },
+    "native/fixtures/sparse-lamp-sequential-query.inc": {
+      "sha256": "169c75466e3a42c5156bbb3dec1bfdf3e8945d9e494d3733f9352ac787de3748",
+      "mode": "100644"
+    },
+    "native/generate_circuit_fixture.py": {
+      "sha256": "4251f1c224bd5b40f3a46f85a7da85f94674f96f4c031aa4ea99aa17a7ae13f3",
+      "mode": "100644"
+    },
+    "native/generate_circuit_fragment_fixture.py": {
+      "sha256": "aa1c2815b23b6fa5c81149fef323e22aefe92806e730b4036c29c66067bc7ce0",
+      "mode": "100644"
+    },
+    "native/generate_circuit_pixel_fixture.py": {
+      "sha256": "e1bea75e015872adc0b95f24e3be1511dfdb73a174439541079c9b3969ef3e95",
+      "mode": "100644"
+    },
+    "native/generate_player_fixture.dart": {
+      "sha256": "e95eb320501d4159513fc93e128ad0a469e14c82d38fc144a811df9b727bab0e",
+      "mode": "100644"
+    },
+    "native/generate_region_object_fixture.py": {
+      "sha256": "d64ac1dc18d192b6828932f77428c8c6bb2b6b771d481f276de6606622654e78",
+      "mode": "100644"
+    },
+    "native/generate_world_fixture.py": {
+      "sha256": "8362152bef9ec3a7f22cc61c3794bddb3837a5ba13709c4ddd91d9ecd12f39fc",
+      "mode": "100644"
+    },
+    "native/native_contract.c": {
+      "sha256": "399d1b7b3a5047342858fecf61f8ba6b97b712ec600d785e91d8bd0e484c5ba0",
+      "mode": "100644"
+    },
+    "native/patches/full-world-pixels.json": {
+      "sha256": "0fb4d649de9a75ccba15ab78e3c698d2ffb1f6f4be71a54e942d566a599aacc9",
+      "mode": "100644"
+    },
+    "native/patches/full-world-pixels.patch": {
+      "sha256": "5ca117c59e503914e4565399357fc999f0e585d87d76dbd7db62df16fa48af81",
+      "mode": "100644"
+    },
+    "native/region_contract.c": {
+      "sha256": "382e8a63e860d7df8d1ce9e50f73ba77919ea97ce95c421eba8fa03508715b52",
+      "mode": "100644"
+    },
+    "native/region_objects_smoke.dart": {
+      "sha256": "cb872651e6d7475c82af6555b95b0c88cca954a654c68f4c5555779e65a25d4f",
+      "mode": "100644"
+    },
+    "native/region_smoke.dart": {
+      "sha256": "48270d7b5a0a0dd018120bfd1077b4ba63e376a57833af12b9b5e0dbc037f4cb",
+      "mode": "100644"
+    },
+    "native/stamp_fixture.dart": {
+      "sha256": "23d917822d00901ebfa9f2f09ed956e3634e3dd2747aade223c7a145271ef4da",
+      "mode": "100644"
+    },
+    "native/stamp_readback.c": {
+      "sha256": "8eae8cea3c93e9af5ff7eccbc1bee42ab404f22c179acaf12f5eea7b3ed74d86",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/CMakeLists.txt": {
+      "sha256": "13ca35fcd82ef93368a47fb913c73f2c5831b01746a9ad5d27a32a69f21048ce",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/README.md": {
+      "sha256": "313a422441afd1ef68ab88cdfc1c0abdd9f2b48e4d2aee786263e898c5402231",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/SOURCE_MANIFEST.json": {
+      "sha256": "d8102b109c9e0f77c7ec75ac118cefaded33a10f726038d9722c03a2ad9aaffa",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/exports.plr.txt": {
+      "sha256": "85eade9370f871e2506c4ef13e52347a81fdf4de5acc9a6cc883f04acfe74b80",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/exports.txt": {
+      "sha256": "2fb901864740bef3b13d0c7cf38a80599cc9d13a3feb0f481f1d95109df2ead0",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/exports.web.txt": {
+      "sha256": "5e57ff4f62926651454fb7d0f9f4f345a919284b88a27cf82866c6643df3a3b6",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/exports.wld.txt": {
+      "sha256": "9d0dec77e282ee6ac9427e3ad9778e468a561dfda5f547dfe73d640bdbd6d367",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/exports.wld.web.txt": {
+      "sha256": "3893755c3b53d084244ad7810b464b7bb655dd4897432841e7fceba14bda933a",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_abi.h": {
+      "sha256": "9080459a63f5a564d8852958ef6b87a147c05cc27387ef698b0a9707e8f41aea",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_checkpoint.h": {
+      "sha256": "ab0eb3a2c248a9d01333ef5b252943d4bf7df27b0dc55fe291ac835d2c370e29",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_circuit.h": {
+      "sha256": "1b66da0fa3603a8bc797ba3e4b8af00e8c4ede5487457d8ff981371e1d6b3b15",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_circuit_actuation.h": {
+      "sha256": "e3c852404f86c059655d83f905d73af32c653bf51dfced8d0596993395f189b1",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_circuit_anchor_permissions.h": {
+      "sha256": "666e0fbde504a0af9e0b3d36f55f76fee076ae922da86409512a4a7a458ab06c",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_circuit_materials.h": {
+      "sha256": "3eaad5ddd07dfab57d3437009e4dfea7268477dcb94a2b05f30cb513dfe27d96",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_circuit_mechanism_tiles.h": {
+      "sha256": "a7566697b367725ec23bfd73ee81013c37ed3bfffcbd2e72db20bb83287f6224",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_circuit_support_materials.h": {
+      "sha256": "c2c2ef196a45487b0450aacbca9ec92417af4e689fd540c3ba7e0ec729b78456",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_circuit_vm.h": {
+      "sha256": "a2e53842d027a57a8565f38979fe2108ca7213ed2c2a4779bce94542d1f20165",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_circuit_world.h": {
+      "sha256": "41bb49cd77e237dc8bd44119f2d44ff52addeda80ebd39f506647e454bc01f80",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_color_data.h": {
+      "sha256": "e3015d4944b17132dc38ab354b98cd9afd13331eb82305beabebc595505d4c87",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_commands.h": {
+      "sha256": "7787386480fa898db8a78e47ff68effe0817fcc01cd2f5c13d1a2733c60bc049",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_hash.h": {
+      "sha256": "e07f75ff0bf32bad55ac673cd0edf9999ee74f90c87b19d8d0c56a85ed01ec71",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_icon.h": {
+      "sha256": "e80f62ba59ce77beeeb35617f64f56195dc23903fa6225395c6bcba931ca7b31",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_legacy.h": {
+      "sha256": "82aa6129a12aea1f2d571b27bc456e39aaa5dd6495c3dfe28af449052e0797bb",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_map.h": {
+      "sha256": "fbff98c8a26530418ebeb26bd661fdd84b1b8409dacfddee389366968854a2fb",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_map_runtime.h": {
+      "sha256": "cd058170763dc87d24f49506f50d20bcb461305b6ccd0e46fbca724f0f694b93",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_output.h": {
+      "sha256": "5ff838003f4553c8b71ca1d51d66dd9aa282a3f18c16b741f0189f5e10c45aff",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_pixel_workspace.h": {
+      "sha256": "c1f1eb923d8bd7a4117e6753519392e681fd9fc1a12ca5ec9282e5b981cc725b",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_plr.h": {
+      "sha256": "3a11a8d3f7b0cc10361cf3830298b2362141b7a6c2c3ab238c5f05d445a77134",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_reader.h": {
+      "sha256": "b9a967a6aef5e3772183b08d35f70e810d750866561f3d451ae3363bcd5684cd",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_regions.h": {
+      "sha256": "2bd6c5b596dc0b952e1a1039dab5c7f169e8628f3a65d03bb5665f21045788ca",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_render_task.h": {
+      "sha256": "077fad3fde3fdaa219b31327e2d76f49c52c881ef7dedaccc718764b2b1042d6",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_status.h": {
+      "sha256": "0d12cea620b684f56eab8415c56074f50314afdbc426c2c150b44f741ec279c3",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_stream.h": {
+      "sha256": "e821f1d139d8b7ba5c8c80a294b41d9894965573d561312d4745d4c4448bb77d",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_stream_map.h": {
+      "sha256": "4367b3e6f428f7599eff3721561312964f7288289568273993fe97e3ae827e49",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_stream_metadata.h": {
+      "sha256": "847cba0156afd0174157d29da77d305ddb5dd38efc2299565a2dd33affd42057",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_stream_png.h": {
+      "sha256": "9de4221c8861842f5d6e99ee0f29afb6c27d25b25d7598cf69266474b89ed986",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_task.h": {
+      "sha256": "ae6e6811c81bd2abf1cb65d31d482b1625051425298df0b27666edc0de9e12f2",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_theme.h": {
+      "sha256": "2d027f7b16e8b8982375345ab37c6cf8e208fcae314af6b4b3bec21cfdc21ac8",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_txci.h": {
+      "sha256": "6f2324285de2fef89a851886a0c4b214584784eb7cfe8e6eb86e69ff1b844862",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_types.h": {
+      "sha256": "e3365263e47f86240a68f2c7ce01d534627bf14d39a5d981a47bb1ff13efe7b7",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_wld_guard_task.h": {
+      "sha256": "69af108da6093f44d58891a1779c5cf6a7bbdeafb50b75a1f7dbd5797943c732",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/include/terra_world.h": {
+      "sha256": "793a851bee2828a8c5b3f9ba31b0a8f537ee0add75b835a7df2c781a44ace3f0",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/scripts/memory-growth-limit.js": {
+      "sha256": "e7159079f2e27ad218c551cb2a7d0bae0df9d5c3f231d9d0e93c3f3165137b32",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_abi.c": {
+      "sha256": "4f98355e039052130029940cf2e10eae935995961f8ce4a9af512f7db027418c",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_api.c": {
+      "sha256": "88f868eb30f105c50e951c5b88835c81d081d6865a223a3581fdba4b9da31b08",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit.c": {
+      "sha256": "ea4db01eb573d2d80748a8ea47bee5b416952e2ef5fc18b47d7c2f30b7345030",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_actuation.c": {
+      "sha256": "21604a6d3424770dfd1058a7c592e1c32f37216e01054fd34c419aebd3c0cfab",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_compile.c": {
+      "sha256": "815f8bc8babf5b19a0b75d011475d244d6a6f2dbaeaf902c7d11ad6da7e11d88",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_devices.c": {
+      "sha256": "9c5d89b23cd17a79c3c0098e03b244a6034a50380d04f8f59c6a835c0073533e",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_fragments.inc": {
+      "sha256": "f007bf4e99679c8f7f11857140eeb5999d200278357a49d472d7b284d3eb9557",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_objects.h": {
+      "sha256": "7519f4048f045043fd6ad46ae318e02222c8ed32eab6b6da719da4b68d0bf13b",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_query.c": {
+      "sha256": "d834d6048e3f26724208a2f00858490eb5d3ba5c0f7aa182bb8806e85a13aff0",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_rules.c": {
+      "sha256": "02f364eaddd6d2611d4251300990bcea047cae882f15f49c8283f4e7bcf098c0",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_supports.inc": {
+      "sha256": "af85808cd12c7994ff7efab98bb6d4254b4b9309ea45cd94ed1bc512ce2a9b13",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_timer_order.c": {
+      "sha256": "2c4dba557077d6b45de3804e59a8edbabf816ff2f46cd1947573d1f6b265de1c",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_vm.c": {
+      "sha256": "666b4ffa3aee8aebff63edfa8729773022ea60e9499807cc916335f6d492a251",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_world.c": {
+      "sha256": "ed79b8cbe797c2a34d87571fe32c64e44c4a2ff5710ff17001383439df8b713a",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_world_internal.h": {
+      "sha256": "3635ba50af93041801c872117ba5e222f678a2b99cdae071d9bdeb189fb953f8",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_commands.c": {
+      "sha256": "ee013dc5b399c887ceccfce8ae2f591838401ee99bb5d82d32110267877b3b44",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_commit.c": {
+      "sha256": "a443977c1ba5b144eb7f111e1656baa6c87959e4ae2fc00dc4f5f4381ba16034",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_defaults.inc": {
+      "sha256": "f36fb0250094d0a7583c872b76f9b85972b13fb127cfa2062874005daa094b22",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_future.c": {
+      "sha256": "175911734da419d342e5c35f114beb0b7e1f3c65a047e3bdc84a57a7753168ff",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_hash.c": {
+      "sha256": "acf3d1964e43d12a725d8d1b58874916976ef55b83c54d10eb3ae788a58a960d",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_icon.c": {
+      "sha256": "4d9284598cf949865f3f898961bfc404aa67b0aeb42c6953469a44415f288ed6",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_json.c": {
+      "sha256": "df1e8e69c4af44db084043f9c44877266794cc52737cbfe646ad29bc6edbee1b",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_legacy_npc.c": {
+      "sha256": "f10faeecaeaf29a5fd1fd96fa9dd758bd2d411600ab59b44380db95b816d189f",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_map.c": {
+      "sha256": "65ce45072b283f5755a9adc83ef1255ec4f0fe22495a5c49729f1ea7a4658844",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_map_runtime.c": {
+      "sha256": "17f669fd51f7018dfa435063014cd13d535384e4dc14c8bd0aa88b842f1521a4",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_markers.c": {
+      "sha256": "52566c7689bc1554ea81ec4b5d63bfc0f3e5a42c24315cf4a56a63102e88e47e",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_mem.c": {
+      "sha256": "0bd457d06c896e4641e934329edcbf2e0dd30ceafdca57ae418a8811187957b5",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_mutators.c": {
+      "sha256": "7be340e4f3ef0bb1e0924b5b5800eff73d96a3941f39c82ee5ec28a41d298bdb",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_ops.c": {
+      "sha256": "b94441647cfea04945b9a1cc8c1eb2311b0311bed158dbe794c360fe5abc3081",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_pixel_art.c": {
+      "sha256": "4d6f3ecd00ab7ee54a370a3c559801cd92dd629afae26af57d393f9688569650",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_pixel_art_bulk_fast.c": {
+      "sha256": "5c2e4ca0dfbc52554c280be339fe91015fc0801eec40f9e1375c9e20552abbf8",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_pixel_art_metadata.c": {
+      "sha256": "2e32afa85cbe43763ef3450b8af0ee8119c59ad718becede5f9f82182c07f259",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_pixel_workspace.c": {
+      "sha256": "b3d9c62406f3c50aac0321a686170beaff034a9759dcb79144611d06b9bbd3de",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_plr.c": {
+      "sha256": "0f656113342921ec91e2ddd0cd3a4c1ace83ef22c7042d083ec321b5cf533962",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_reader.c": {
+      "sha256": "70848ab5708b8c5685fb9774fc89fbe72602bd984e276eb3c0fc25dc2fb124a6",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_region_cells.inc": {
+      "sha256": "1972f597c7bcc87c74be7f4f8b80e240d133344d6187adb857891dcd436e3592",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_regions.c": {
+      "sha256": "73703b056ad5f2cef16a43700f97f4d0053e518e3839ad6d293221f9354541c2",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_render.c": {
+      "sha256": "c5b83e40b36c5e19746a81956e5047ec476db11cf7cc23e282f7bf8854223d79",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_render_core.inc": {
+      "sha256": "cf2272a9698885a0efda7f0e22c55ca921354ac3aaae08075c3ca07c7dbadba6",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_render_png_lowmem.c": {
+      "sha256": "f175b6e09f715ee494a9a546af24837249c2e43b0e882dd234df84362319a133",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_stream.c": {
+      "sha256": "887e0a1759db5d3b96189e72327c653ee85ab50f18c3ed374f5ca46fbd17bf1d",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_stream_png.c": {
+      "sha256": "95ab3ceeefe65baef8dba143569e0a434b6508d15933cf4213ab90d029f25718",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_stream_stamp.inc": {
+      "sha256": "cb0e08be232a0ca47f63f10dd242a5e1693d29d8f60e3207df8d174c8f4afe12",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_task.c": {
+      "sha256": "ed582bc4f77533736c147e36715e43520d64f1ad0386529d9af782ad60874b51",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_theme.c": {
+      "sha256": "566172246c8b7f1d624c0a3e21f56b2efee1346c892e94483cc1934e14d98d27",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_theme_data.inc": {
+      "sha256": "b70d765d6955acc9565ce80722d15dbacea52d3e45b30e1b08a22120a27d4ba8",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_tile_record.h": {
+      "sha256": "de89a164aad62401ff0193130bc56234c9abf2aafc142d45b0ec7619542138cc",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_txci.c": {
+      "sha256": "4d9652fe9606b01aab6cde945fbe04cc593192f247f27735852bf7c6b7e87116",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_update.c": {
+      "sha256": "f53d579869734c84a71f10b6f9ef8bc65e121fd5efda7863e6e58db4992e2791",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_wld.c": {
+      "sha256": "8b4bcec36063ff7116bfcfdf130429ea6a923bcbf959d0a9235e83a7b00ab8fc",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_wld_guard.c": {
+      "sha256": "addf1d327183d02e605aa2aa90b62a69531bc2c8aa9b3cc0b9641656a822ec74",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_wld_guard_task.c": {
+      "sha256": "7d487ee532443652d6c02b74c2c900ba2bffe19c3fb324d83f0b01e81100c9cf",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_wld_legacy.c": {
+      "sha256": "cbd806adab9ce1c65106e1ee3eda53bdbee38c3567912c1617e5a389880caf95",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_zlib_bridge.c": {
+      "sha256": "90d525c13fd448abcd473ed53912e9a59af4849d6faa75d2948d8dbbfdbc4bc7",
+      "mode": "100644"
+    },
+    "native/world_circuit_fragments_smoke.dart": {
+      "sha256": "c755b63c1390817a66e966ea5adcdb66b2d7d7e0d7de528474d1a4b303081423",
+      "mode": "100644"
+    },
+    "native/world_circuit_geometry_smoke.dart": {
+      "sha256": "e0da17d69f09772f2128fe5ec16c268595d5c6139b7d2bdc19694b02a91bdeb7",
+      "mode": "100644"
+    },
+    "native/world_circuit_smoke.dart": {
+      "sha256": "37de3d81297e73904ea385d635baac65e89214489f482dc7c0fede64d27eea03",
+      "mode": "100644"
+    },
+    "native/world_circuit_source_smoke.dart": {
+      "sha256": "951264223400e39d9356164fd9b7b337089a1d33c680c3c794849c849ea3d57c",
+      "mode": "100644"
+    },
+    "package-lock.json": {
+      "sha256": "1813ccd7059d6d4fc0281e1925fbc38ca44a8ae5e2b7180ac0c1f43ada8b07b5",
+      "mode": "100644"
+    },
+    "package.json": {
+      "sha256": "18e7fe0e480f2901f8b3772545f1c89bcef7fc41fc9872f73667b2351c213076",
+      "mode": "100644"
+    },
+    "pubspec.lock": {
+      "sha256": "9cd23f6f2914d3420f3419a759af3f754e5173481aa029c8e519c5354d411135",
+      "mode": "100644"
+    },
+    "pubspec.yaml": {
+      "sha256": "22918d9d9069c6ec81240cedbc6441331c21ec14c6751c0e92648022518ec711",
+      "mode": "100644"
+    },
+    "test/achievement_catalog_test.dart": {
+      "sha256": "058e1c909e9c94d43c7c2f432ca86ac85e35831f12aa6062954cb3b491763f90",
+      "mode": "100644"
+    },
+    "test/achievement_tools_panel_test.dart": {
+      "sha256": "6dcacb8ecb6dbdb2ff96fae33a7b859d9a0171a1dcf3b08159697bb6dfd8b0da",
+      "mode": "100644"
+    },
+    "test/achievement_workspace_test.dart": {
+      "sha256": "8d94dbf06c45d3c8eebac319f9229041c5f3c5d33ed909e63807bbf75bc6ed7a",
+      "mode": "100644"
+    },
+    "test/achievements_test.dart": {
+      "sha256": "83594d1763a8be775ff49bf4023847da0dd85adddf3a91fd732345d81208d43d",
+      "mode": "100644"
+    },
+    "test/authoritative_circuit_panel_test.dart": {
+      "sha256": "5e8c54ba6a27c2d2a731c9531dd70fd1239a7e90be3922ecd9bffc2dce45b5d4",
+      "mode": "100644"
+    },
+    "test/authoritative_circuit_scroll_state_test.dart": {
+      "sha256": "c99f043f96ab96965f5e003d45ad2048723fc6b9a32cb8f2c75720aa0ad0d99b",
+      "mode": "100644"
+    },
+    "test/bestiary_tools_panel_test.dart": {
+      "sha256": "34eefdd8f71a37f9047febf526747bb5314e1c3ebd27f5464896e5842b45a145",
+      "mode": "100644"
+    },
+    "test/bestiary_tools_test.dart": {
+      "sha256": "479dd2da622ee14537ba13703ac8f7e445a3ed5ef519792c121acfab8239ed4f",
+      "mode": "100644"
+    },
+    "test/canvas_document_test.dart": {
+      "sha256": "f8d9ff97094a107730fd7a8214649c3221fad0c02c8d8c83afa5b1c7b18a3e85",
+      "mode": "100644"
+    },
+    "test/chest_tools_panel_test.dart": {
+      "sha256": "96bde8345d10e0efcddc770d02699a7e9cae51ab6f4f013e86a8a2506d69b978",
+      "mode": "100644"
+    },
+    "test/chest_tools_test.dart": {
+      "sha256": "ee9d7f59415e92cd7545f783a09ce1913534c2c615082cf9f648de66a664ae97",
+      "mode": "100644"
+    },
+    "test/circuit_display_region_test.dart": {
+      "sha256": "f60e0daedadfd4447f825df564663fc1eb617a44a4065cc0c4a8f30ad345cf2b",
+      "mode": "100644"
+    },
+    "test/circuit_document_test.dart": {
+      "sha256": "499a50f222fdc5817aa6693e2762aba3ef74a3e82c15f13b8b29525f10fc124c",
+      "mode": "100644"
+    },
+    "test/circuit_edit_plan_test.dart": {
+      "sha256": "d55316438795f4bb9a3723d018dc386b81977300695445b21d7ba0c1abb787e1",
+      "mode": "100644"
+    },
+    "test/circuit_edit_tools_test.dart": {
+      "sha256": "0216ff15de6ba5abba3ff0297ebedbcecf362aff57224a5c836daa787e4b5dc0",
+      "mode": "100644"
+    },
+    "test/circuit_edit_workspace_test.dart": {
+      "sha256": "e05aae903bb97e50e2ee6a737de7dbea1db1d38b007fcbd8ae5e935b67260661",
+      "mode": "100644"
+    },
+    "test/circuit_navigation_test.dart": {
+      "sha256": "2a3f7614fb0852188d7eb205f1e9297f0c23ede17bd941434234e9dbdf097933",
+      "mode": "100644"
+    },
+    "test/circuit_rules_workspace_test.dart": {
+      "sha256": "5e85dec57cf18a156f87d601576ee05e40141a143bd9d045eaa86999d6deee84",
+      "mode": "100644"
+    },
+    "test/cloud_account_help_ui_test.dart": {
+      "sha256": "50851a6384599c3d9db523d0835c2304ea4f7adcb79fdbc4931ca2642df62499",
+      "mode": "100644"
+    },
+    "test/cloud_app_routes_test.dart": {
+      "sha256": "0b425c12c5d4288c264e230536758f8559d129b958af58c7d91e3fb809f570f8",
+      "mode": "100644"
+    },
+    "test/cloud_reference_contract_test.dart": {
+      "sha256": "1d54d7a86ba53753b1ca0247d84db433ee8c4d373acf82f710d6259f7ca180a7",
+      "mode": "100644"
+    },
+    "test/cloud_test.dart": {
+      "sha256": "71abb2a9505d6c6524330716a2af4fc670a6758508e5bd53d0c1220279f99855",
+      "mode": "100644"
+    },
+    "test/computer_circuit_session_test.dart": {
+      "sha256": "c7b1afec8483c8bb75d5d33146dac17e10b2e96fcc339d8ecd940bb3d7c966ed",
+      "mode": "100644"
+    },
+    "test/computer_display_test.dart": {
+      "sha256": "7818be58d7cb5fbe8adb39ff3dd32bfba5567058011ab7b50998b7d01abd5fb2",
+      "mode": "100644"
+    },
+    "test/computer_profile_input_test.dart": {
+      "sha256": "8ec7012ae9d566bb82d236f2c55378043be52525b58f0617a613c46078e4e6b8",
+      "mode": "100644"
+    },
+    "test/computer_provenance_test.dart": {
+      "sha256": "9b40770941c30aa376d0f9f4abbc81da93722b7fb9053d0e257889f94abff0be",
+      "mode": "100644"
+    },
+    "test/computer_runtime_batch_test.dart": {
+      "sha256": "ca6a863f16f84ab1a47eae20af973ed3a34b79963a250e95378d266fd0ae60ff",
+      "mode": "100644"
+    },
+    "test/computer_workspace_test.dart": {
+      "sha256": "46aa0510e11cbdc7d07506b825ea43e88451bd9e67446608d196c14d92b8ef33",
+      "mode": "100644"
+    },
+    "test/computerraria_computer_test.dart": {
+      "sha256": "3b25c61e225c0f028f52cc40f6494d6c006b236181b1e7b031aa0df4c84b29ec",
+      "mode": "100644"
+    },
+    "test/fixtures/computerraria/LICENSE": {
+      "sha256": "c046a3b23796a077fff90096c2ff2b3e9b0501f459407949f3a5817ce56f730c",
+      "mode": "100644"
+    },
+    "test/fixtures/computerraria/README.md": {
+      "sha256": "cc86cc9049a68299d7d387dc762831ed4a10169ee55738387dae2dbf73a54f01",
+      "mode": "100644"
+    },
+    "test/fixtures/computerraria/pong.bin": {
+      "sha256": "d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d",
+      "mode": "100644"
+    },
+    "test/fixtures/generic-circuit/synthetic-visible-pixelbox.wld": {
+      "sha256": "5bccdba4f0d4db4eda3a11020cdfaed7ccde019ab12016fb150254df23e295d7",
+      "mode": "100644"
+    },
+    "test/fusion_object_payloads_test.dart": {
+      "sha256": "e3da1433ba00ca5550b6325dc2eedec49efc0d47094ce03cc4190a0b9a334622",
+      "mode": "100644"
+    },
+    "test/fusion_placement_panel_test.dart": {
+      "sha256": "a1dfbeab58ff9cebf006c4b98086ef1000d888ae270cc2b0d5a880b9c28c70e1",
+      "mode": "100644"
+    },
+    "test/fusion_placement_test.dart": {
+      "sha256": "7094f1f2fb7c5c960b1c365d1de52c6208b8b609467d2727d839fe6a26e282d8",
+      "mode": "100644"
+    },
+    "test/generic_circuit_profile_selection_test.dart": {
+      "sha256": "9e5a533ea843c32f82c3e0f108a2e5abbc887f26e4bf6080ab82aa3886cf5cde",
+      "mode": "100644"
+    },
+    "test/generic_circuit_runtime_test.dart": {
+      "sha256": "be35e9291192b4f11d56f76eaeb04bc826dd9a2026c119dd7320d321c5d6757a",
+      "mode": "100644"
+    },
+    "test/generic_circuit_visual_test.dart": {
+      "sha256": "75b361883ef7390d2dd199db0d209254eb90090ad84f2a835e35badf0973c416",
+      "mode": "100644"
+    },
+    "test/history_budget_test.dart": {
+      "sha256": "ae03c88d4b4eca4b135f28db6398af3a0f760343595138d0978d59ce984ef170",
+      "mode": "100644"
+    },
+    "test/host_stage_timings_test.dart": {
+      "sha256": "407930f7b161ee662c9fb25972b5051ee9671e1ad689d10094b18e2b3230c195",
+      "mode": "100644"
+    },
+    "test/image_import_test.dart": {
+      "sha256": "02041d2f6f940e367271fe967ca87f04f4d160144dda43f7026353d714fdba44",
+      "mode": "100644"
+    },
+    "test/map_app_routes_test.dart": {
+      "sha256": "8c46b217e6cff81701f122d0317f0a10779a8a25f19903198c77b8ca675257de",
+      "mode": "100644"
+    },
+    "test/map_backend_test.dart": {
+      "sha256": "bcc50eac3eaeff20ec29bf08730e59124181c223a98fb4cf187f28d2244d337f",
+      "mode": "100644"
+    },
+    "test/map_marker_workspace_test.dart": {
+      "sha256": "37e74c41783bf4b6a124e77f257b81a3ee3731af0a5579d519736efad37bcaff",
+      "mode": "100644"
+    },
+    "test/map_markers_panel_test.dart": {
+      "sha256": "cbc456d28ba4ceba6d3ff26f48ffa13554d0d68989504fb3d2c81140cc24e8d4",
+      "mode": "100644"
+    },
+    "test/map_markers_test.dart": {
+      "sha256": "2fa0bb3b0e60118601a0f37a066789976c1f9131bd8a5ed822631ef97b41a2b6",
+      "mode": "100644"
+    },
+    "test/map_workspace_test.dart": {
+      "sha256": "59022728ae2d50756ec0757bbfcc45fd9ca6fa5ab5b3788e6071f6dc0bc11e1a",
+      "mode": "100644"
+    },
+    "test/named_scheme_library_test.dart": {
+      "sha256": "87de5385add9a076a0c63a7af1b989d42955cd6336e7baad32736c2769b48d59",
+      "mode": "100644"
+    },
+    "test/named_scheme_panel_test.dart": {
+      "sha256": "9bdff37e094244f21c6cad9d7baa6aa01c10c9e686fd5fba2401106c2c9c883c",
+      "mode": "100644"
+    },
+    "test/named_scheme_workspace_test.dart": {
+      "sha256": "2759a34a9bfd6576ef9e2d3f107efa5defc5f9180e7573adf39d132eec8a653c",
+      "mode": "100644"
+    },
+    "test/native_bestiary_workspace_test.dart": {
+      "sha256": "fcf65a4000ca4b9e5b0b397ba04b5552a02908fa9f3efeb2f18d3b18804eed1c",
+      "mode": "100644"
+    },
+    "test/native_binary_map_test.dart": {
+      "sha256": "1a132648755ccbfcd9fb6ceb3678d792f8648136aec84d348bddd86b4c4b3500",
+      "mode": "100644"
+    },
+    "test/native_chest_workspace_test.dart": {
+      "sha256": "1537cf1d3c41da7219402da1a4760c9495bfa6c70b6560036d1e69d8b5147650",
+      "mode": "100644"
+    },
+    "test/native_conversion_workspace_test.dart": {
+      "sha256": "10c353177157f302ddd54e2ec37bb1f343325c13d39fafb6fbd7d7a005e7b96f",
+      "mode": "100644"
+    },
+    "test/native_engine_lifecycle_test.dart": {
+      "sha256": "385a1b60387ad780d4a697513aa46adbc1d2b96e065e7affd2578b081710ef6e",
+      "mode": "100644"
+    },
+    "test/native_fusion_placement_test.dart": {
+      "sha256": "e0b0f076b1453400994cb4a43266ee83db83a827e25f90d2f5c750967bf416e8",
+      "mode": "100644"
+    },
+    "test/native_fusion_placement_workspace_test.dart": {
+      "sha256": "89a17e2a7c275470519c30fa40abd7ad9931f9d6ce603084d9de587818041426",
+      "mode": "100644"
+    },
+    "test/native_map_marker_test.dart": {
+      "sha256": "3f29c2d247a683bb9e65c980879ed5ac5b53ad48b7dc0b73a7193b4747600660",
+      "mode": "100644"
+    },
+    "test/native_player_conversion_test.dart": {
+      "sha256": "772e1e4c57e4cd066564ebd6c377979cecccb596ee13f33fe265af4e4b204b38",
+      "mode": "100644"
+    },
+    "test/native_player_slot_actions_test.dart": {
+      "sha256": "9264c177c7dbc5b8867a46a0d6a99859f02432dffc269122e9f3a85f2c1230b2",
+      "mode": "100644"
+    },
+    "test/native_region_workspace_test.dart": {
+      "sha256": "c289ba840f9bbd44f728b22f15c3c8a34717045b18076ad624b25995fb49dbb8",
+      "mode": "100644"
+    },
+    "test/native_terrain_workspace_test.dart": {
+      "sha256": "86d8d920bde993e86b47b68952f4e4acf2c93debc503bc71723a7891f0e643a3",
+      "mode": "100644"
+    },
+    "test/native_workspace_integration_test.dart": {
+      "sha256": "54679a44601be8a8e3e79f00ead088f448e94d33938b711e8c9afe7b7d6d4121",
+      "mode": "100644"
+    },
+    "test/native_world_circuit_abi_test.dart": {
+      "sha256": "22866d6cfe32ca7a0490af6085a5c7563e8312c9ec88e28b8a6401e894219444",
+      "mode": "100644"
+    },
+    "test/native_world_circuit_close_fixture.c": {
+      "sha256": "9043305369063bf8e3830120862ae041290e062e831897368b504aebc895baf3",
+      "mode": "100644"
+    },
+    "test/native_world_circuit_close_test.dart": {
+      "sha256": "b7eeac3e891511cc38bb6a564802f4740da840d1e9b69a9bab6ef82cfcc09f3d",
+      "mode": "100644"
+    },
+    "test/native_world_circuit_hash_fixture.c": {
+      "sha256": "741849729b41f45246cc6c16d732aedac4fd28b179966ca91fec7bae53790e3e",
+      "mode": "100644"
+    },
+    "test/native_world_circuit_hash_test.dart": {
+      "sha256": "bcc5c47494c7fb558504441274a40f04415325fecbd270fc6578ecdd4dcfa2bc",
+      "mode": "100644"
+    },
+    "test/native_world_circuit_ownership_test.dart": {
+      "sha256": "5392f3c63bf7529d8aa76d7eee0dc7dfd9a956868cf8d192c5ef53ac8b4968ca",
+      "mode": "100644"
+    },
+    "test/native_world_circuit_read_buffer_fixture.c": {
+      "sha256": "a9f48e266b3d858a8aaa808d8400c35ce7d7e2afcab1e6412da420690f283a75",
+      "mode": "100644"
+    },
+    "test/native_world_circuit_read_buffer_test.dart": {
+      "sha256": "1af701fb975d876ccede0c0d65f46663ebe77d68be4ecf7bd5e0e335f9d54814",
+      "mode": "100644"
+    },
+    "test/native_world_circuit_workspace_test.dart": {
+      "sha256": "6c1f2a4a84a68a413251270aa1e102187ca53ef0fb6cd5e769e3be3534c54d84",
+      "mode": "100644"
+    },
+    "test/native_world_fragment_workspace_test.dart": {
+      "sha256": "628c095bb6729ce0679ad401937371e4c51250839ccc9e83f898a08a7e85cc9e",
+      "mode": "100644"
+    },
+    "test/native_world_overlay_test.dart": {
+      "sha256": "55e7be85a7eabedb6ee9de49c15f90ab75b2c6375ba0e41e90e447fd2a7f418a",
+      "mode": "100644"
+    },
+    "test/native_world_properties_test.dart": {
+      "sha256": "ef5ffb0946efa2e4539ae4b7ded003757fa2de2f8cb2938ee45a0307c14b4b77",
+      "mode": "100644"
+    },
+    "test/native_world_rules_test.dart": {
+      "sha256": "3bee7bc54c3037a00cc8cb2129865c24fed5661dd6ac50c2625d2df64b0dbcfa",
+      "mode": "100644"
+    },
+    "test/online_resource_service_test.dart": {
+      "sha256": "61094eccd855063506db6b4cf7735894b26ba5b65451b061599eac649c53cd59",
+      "mode": "100644"
+    },
+    "test/online_resource_storage_native_test.dart": {
+      "sha256": "496b908239293631ab7836a28a97a061134093e78226f1c427604ccde178b23d",
+      "mode": "100644"
+    },
+    "test/online_resource_transport_test.dart": {
+      "sha256": "c5d8e54c2e2de3cb1a0af65320fae37c82ca941b34575c32ddd95874fc911bdd",
+      "mode": "100644"
+    },
+    "test/online_resource_workspace_guard_test.dart": {
+      "sha256": "eb92fefb2e7093f15a5f017979490b17e499cac5e9a1fefae773996c836f10df",
+      "mode": "100644"
+    },
+    "test/online_resources_panel_test.dart": {
+      "sha256": "efd9a38782556d2437685732a542fc473b4206be25bf62f1faab188190f19eab",
+      "mode": "100644"
+    },
+    "test/performance/cloud_actions_test.dart": {
+      "sha256": "fd2d4144ea23898a521e73d4231cff7c5707c19d8842e2faf221129f5331c25b",
+      "mode": "100644"
+    },
+    "test/performance/measurements.dart": {
+      "sha256": "b4e78a04d512ab98c7fcc64f19ad6ac3488d78b9964429fecdfc70cba0eb678c",
+      "mode": "100644"
+    },
+    "test/performance/native_actions_test.dart": {
+      "sha256": "1dd6aa4945052eee5d9d85a09f08e5dd0ed8b19e97dfaad4dd9e8d52f1b7c5cb",
+      "mode": "100644"
+    },
+    "test/performance/native_counters.dart": {
+      "sha256": "16c294ef0d53f9deb0c5172d9fca81cc510b7258917c5756daa941343aaab41c",
+      "mode": "100644"
+    },
+    "test/performance/online_resources_test.dart": {
+      "sha256": "810c4bfdd1650a6002ca27d08ed7ac462f454b53e442d5c929bb730f971bddbf",
+      "mode": "100644"
+    },
+    "test/performance/public_catalog_fixture.dart": {
+      "sha256": "3d8d821aeb4fbd8395159d2fb25b98795f4aae4a23de9e5692602304259e3523",
+      "mode": "100644"
+    },
+    "test/performance/public_dispatch_actions_test.dart": {
+      "sha256": "190f1200dd2f10b2c11e09d7904b2afcf4337ce439ec41e2f1c084d2fefc5562",
+      "mode": "100644"
+    },
+    "test/platform_files_test.dart": {
+      "sha256": "d2b44669b67f3cf6d4af954b622063d909a156179e7eee8c7cfc5d2242946228",
+      "mode": "100644"
+    },
+    "test/player_conversion_test.dart": {
+      "sha256": "0fed66229e624f38e9fa18c7d35ec36c2dce6f9f0ff8499083ff75ee45a70ac9",
+      "mode": "100644"
+    },
+    "test/player_slot_actions_panel_test.dart": {
+      "sha256": "939ffad745e05f383342afd3ae1d842c7cee9dfb4cd48f0ac223f2854c80fd52",
+      "mode": "100644"
+    },
+    "test/player_slot_actions_test.dart": {
+      "sha256": "5e1537018004c0f549c4e9662cd0835fe00ade1d3f4d36e8c2ce3ad282d00ae1",
+      "mode": "100644"
+    },
+    "test/player_tools_panel_test.dart": {
+      "sha256": "2018afae01e343ed035f4c263f9701f908aab3715c4ee931ebae41090f889be2",
+      "mode": "100644"
+    },
+    "test/player_tools_test.dart": {
+      "sha256": "d1240f6fe17621100ed9be251360e73816b71dca48ba217c845a06db702eff84",
+      "mode": "100644"
+    },
+    "test/prefix_real_catalog_test.dart": {
+      "sha256": "30b479155e33c65280aaa333987cccc5e9a2b413bdec81065616dae772ea8988",
+      "mode": "100644"
+    },
+    "test/prefix_rules_test.dart": {
+      "sha256": "f6c87b33948154bec35b892805921e0e69092c4748ef7c6de7721dd571a4e184",
+      "mode": "100644"
+    },
+    "test/profile_memory_test.dart": {
+      "sha256": "9fd1b323390e888971382025246dc1b432b7c37ddb1a5d71b8547d3615dc477a",
+      "mode": "100644"
+    },
+    "test/profile_navigation_test.dart": {
+      "sha256": "d154f90cd56d961d84e9f1f5778f44549cf813c8ab371434b0a6849be722812e",
+      "mode": "100644"
+    },
+    "test/profile_os_memory_test.dart": {
+      "sha256": "505649df8e241e4ec67e491f1d69946259b30b65e152fbec33d1fa33ca44b14d",
+      "mode": "100644"
+    },
+    "test/region_brush_panel_test.dart": {
+      "sha256": "25127bec341375792b778ca0392984b15840ca06545c4313069217ac84225a3e",
+      "mode": "100644"
+    },
+    "test/region_brush_test.dart": {
+      "sha256": "e32862960a9f1ac7c7c814b9610e42d56c4ac8246d29d4e408b1f35f1a5f819c",
+      "mode": "100644"
+    },
+    "test/region_brush_workspace_test.dart": {
+      "sha256": "2dd3f586fe75895f41e4cf1d2772507d7cefa110514e4c5ef8c07586de5e133c",
+      "mode": "100644"
+    },
+    "test/region_document_test.dart": {
+      "sha256": "589fee8807d5278fbfe3af572a1a1db5366eabd9f062d8d379cf2145daca138e",
+      "mode": "100644"
+    },
+    "test/region_texture_canvas_test.dart": {
+      "sha256": "be49530916c0de3e87be96d3923a04f53fbdb7986b1b2a5adeeb1cf569b5b8fc",
+      "mode": "100644"
+    },
+    "test/resource_store_test.dart": {
+      "sha256": "229b0ea8f1b830ee5de7beb6f8e926940f0584f318eb4ed19d3e7ff6d6abed9c",
+      "mode": "100644"
+    },
+    "test/review_safety_repro_test.dart": {
+      "sha256": "daee025889986b850b3ddf30b85901889cac8ffebc56e9f29982ea5d33820271",
+      "mode": "100644"
+    },
+    "test/save_record_test.dart": {
+      "sha256": "3ff4014c0040a5fed6dacfd9cb6bae0b8bd03ab01c5d74579c56c1860a96e4ce",
+      "mode": "100644"
+    },
+    "test/support/circuit_painter_c61_reference.dart": {
+      "sha256": "b977a451659361c79f289649c49a15e76588ae6b312b57f1376447aef12cbdf9",
+      "mode": "100644"
+    },
+    "test/support/cloud_preview.dart": {
+      "sha256": "ac1089752cccf4624ca0b104659b0eef7248a3f88caa6fe6290de6ef7f63a667",
+      "mode": "100644"
+    },
+    "test/support/computer_circuit_backend.dart": {
+      "sha256": "2c7af80afc101a18c0101f55191ebea20cdf3295dbb2678e12c1c06f1f22890d",
+      "mode": "100644"
+    },
+    "test/support/computerraria/fixture_driver.dart": {
+      "sha256": "ffc3e84482e6d374c02776fd2e88a1b3a0a0e1658e1fba238329cef2752faafa",
+      "mode": "100644"
+    },
+    "test/support/computerraria/layout.dart": {
+      "sha256": "99713c0252aef5b3df102f7d9c68dc3bc6d71e2a533f449f2c6f646fc920536c",
+      "mode": "100644"
+    },
+    "test/support/computerraria/provenance.dart": {
+      "sha256": "793df32e9fae304d98996e53a2909263e1a3b35c84e03e12c26148405bbb9b5e",
+      "mode": "100644"
+    },
+    "test/support/fusion_placement_fixture.dart": {
+      "sha256": "dee5b1c51e147183fb8269ba34a9bf860ecbb01d98502ead1c73940892e881fb",
+      "mode": "100644"
+    },
+    "test/support/generic_circuit_backend.dart": {
+      "sha256": "a09d09169c7d8863e4bad37ee6a5ce265198d06326291fc872ce9259d243b41e",
+      "mode": "100644"
+    },
+    "test/support/generic_world_circuit_backend.dart": {
+      "sha256": "8de5bf10b9ca7527a022dbdfd6345cdc30a288304e13e975450f2f4a0aed3378",
+      "mode": "100644"
+    },
+    "test/support/online_resource_fixture.dart": {
+      "sha256": "722e299221c7dfa23ef4137a81618432b5fee8bcd327995343dd3e5226621ec5",
+      "mode": "100644"
+    },
+    "test/support/player_action_fixtures.dart": {
+      "sha256": "66abbe9fb2ecfdb941845d471bd86a6992864c82afa6b485769d6f505f96ed82",
+      "mode": "100644"
+    },
+    "test/terra_ui_test.dart": {
+      "sha256": "c51c0f01d2ea6c3cdb1b03a7f3a2726587d4ed952883d8836cf85e3a8863e655",
+      "mode": "100644"
+    },
+    "test/terrain_rule_plan_test.dart": {
+      "sha256": "01f69d3adfffa989e85068aa40f2646a53bcab6b4934b15eec2f9073e25cf7ab",
+      "mode": "100644"
+    },
+    "test/terraria_map_panel_test.dart": {
+      "sha256": "16d3991a0268a2504c554230bab811230a0cca283e8d23fea09c8cef2088e1e4",
+      "mode": "100644"
+    },
+    "test/terraria_map_test.dart": {
+      "sha256": "ab148f11c4b319152d34fe385931d53568f9f1f6d6a32c0fd28aed7acd7150c2",
+      "mode": "100644"
+    },
+    "test/vault_history_test.dart": {
+      "sha256": "e9d1f2615f32d68696ee75498404987a76308c9995dbcba1371311e75e760f20",
+      "mode": "100644"
+    },
+    "test/vault_test.dart": {
+      "sha256": "c981cb4ea3e0e12b1acd28279f17d9a37f304e8e0377a0c0806ca164cb5f8576",
+      "mode": "100644"
+    },
+    "test/visible_pixelbox_persistence_test.dart": {
+      "sha256": "ea79992eb87af5bf54a159ad7823b3dfc68dd23d8243193427ce811720cd45bb",
+      "mode": "100644"
+    },
+    "test/web/circuit_rules_lifecycle.cjs": {
+      "sha256": "1d82f85f635f31396a3b99f93dc42072f3c9c0a9523b066454c1a99f6eb24d3e",
+      "mode": "100644"
+    },
+    "test/web/circuit_rules_worker_smoke.cjs": {
+      "sha256": "ca824a609676f5856a000b48a1068df1830ec984e614646ebc1fafb00939eea8",
+      "mode": "100644"
+    },
+    "test/web/computerraria_continuation_probe.cjs": {
+      "sha256": "d9ad96555943d17fa712d7fd07ea3fd8d1b2543ac3b7601f2ba8ba68f6030ed2",
+      "mode": "100644"
+    },
+    "test/web/computerraria_file_acceptance.cjs": {
+      "sha256": "c3534a0e95bbf200f2ba4e3abb667852927145c76d0616037497e9d9843a94ec",
+      "mode": "100644"
+    },
+    "test/web/document_worker_retirement_contract.cjs": {
+      "sha256": "742cd73aa88764f1aabd9de6db8b1f15163bf2c1dbf453a6590ce8256ac6d98e",
+      "mode": "100644"
+    },
+    "test/web/document_worker_retirement_smoke.cjs": {
+      "sha256": "ee98b9417bacaab5dde1f8a0ca00d9aba10f55cdd93482b4b0317ee112b6a614",
+      "mode": "100644"
+    },
+    "test/web/engine_worker_lifecycle.cjs": {
+      "sha256": "5416fcefb18a32a425364feff521c7a815e565baa15b536f79d1ba6b033b6ac3",
+      "mode": "100644"
+    },
+    "test/web/engine_worker_smoke.cjs": {
+      "sha256": "794c5a8324bb535ce9cc991d6e02e3ab9d8c2128d404e5d1b8ebc26cb2d7cd1d",
+      "mode": "100644"
+    },
+    "test/web/helpers/engine_worker_host.cjs": {
+      "sha256": "f2fbb2c8b4ccc954d084d6d9d91d58cec82c77b75bbb3635fa20fa8db02c6d25",
+      "mode": "100644"
+    },
+    "test/web/helpers/world_file_host.cjs": {
+      "sha256": "ab0ff8ee6c49b1b95701cac4afbfa0ea93b8dd1b8af37d3a514ba36c9f3ffeab",
+      "mode": "100644"
+    },
+    "test/web/online_resource_storage_smoke.cjs": {
+      "sha256": "fc8bf33cf84d012fec21406bd429976448e56dc0c117dcfb9a9533006fefd8f7",
+      "mode": "100644"
+    },
+    "test/web/public_resource_client_contract.cjs": {
+      "sha256": "32b5ea14e81c6ff23e2d92a8471a28c8ca24c0905061910cc895acfeaf93c925",
+      "mode": "100644"
+    },
+    "test/web/public_resource_client_contract.dart": {
+      "sha256": "ac1880ce4abdff17d6cfadadd908ca1b5846f30a21429798094fa8350adecb46",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_cleanup_contract.cjs": {
+      "sha256": "e462b7c0bcad1a53450e90a9a7288a9631d965efce6921e2f92a3eff42e4a4a0",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_file_smoke.cjs": {
+      "sha256": "c088946ec4e6a7e91692805db0a357f426e12788d54ec7ea31e467935334b995",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_fragments_contract.cjs": {
+      "sha256": "bad989e26368b1da9ce65289dec7980d9b9a663e7281f55af674ffc0d221aefa",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_fragments_smoke.cjs": {
+      "sha256": "ba36a6e40eb68b1a9b647042d073e41ac83410d534234c281f2012ffe4663303",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_hash_contract.cjs": {
+      "sha256": "537c90ec0a304540ddcbf3ac983d414d0c9b9843dfbfd6298fab2b3e5f09d29c",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_lights_contract.cjs": {
+      "sha256": "841f43b307b3869195687f6d82dd0ea66b759996a8b8acf3d24eb48b99910475",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_optimization_contract.cjs": {
+      "sha256": "8df1aa8ee85fff88d9f96018d5972ceb30e57afb88f783f685ddfc3204996eb6",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_smoke.cjs": {
+      "sha256": "7b08479e0b9ee9c7cae826f4da9344969d02f1267e9c7ca0d7442e348356e42c",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_streaming_contract.cjs": {
+      "sha256": "13bd0d386516a2a5935dea4446734ba811bffac432a3392ab35465b4fda96798",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_streaming_hash_contract.cjs": {
+      "sha256": "48ac1cbd55e5c184b5d432010929509cab8e02840f570d04b512ba4690df44c3",
+      "mode": "100644"
+    },
+    "test/web/world_circuit_timer_contract.cjs": {
+      "sha256": "a6113438304e1b803a7d33cf00ce9b505e8a4a646ce3a408ddeb9822a4963957",
+      "mode": "100644"
+    },
+    "test/web/world_export_smoke.cjs": {
+      "sha256": "df2fefa982bc25eb7b303a5bbad2244e68d2109695850634746929bda13765b7",
+      "mode": "100644"
+    },
+    "test/web/world_worker_retirement_contract.cjs": {
+      "sha256": "cbf83db0d6fa98a273a44e971a772e32f8f32e720e641ac4d8589c62c0b0ed58",
+      "mode": "100644"
+    },
+    "test/workspace_circuit_updates_test.dart": {
+      "sha256": "aec9bf010261dbc4fe882d02c1163d902fd33a9eef26df35c8a75f23129451d3",
+      "mode": "100644"
+    },
+    "test/workspace_recovery_test.dart": {
+      "sha256": "2c53cf3971f11e79362cb483dda2f835683510e87653e7c77b77a973459a75d8",
+      "mode": "100644"
+    },
+    "test/workspace_test.dart": {
+      "sha256": "f5b37d528e1d118151f5e386d711e86fa1466f908831a436eb973081b2a2c38d",
+      "mode": "100644"
+    },
+    "test/workspace_view_snapshot_test.dart": {
+      "sha256": "f042b25c37d831500e91b11ea6efaf3a739dac1069a263e4d0b1d87adfe5882f",
+      "mode": "100644"
+    },
+    "test/world_circuit_confirmation_lifecycle_test.dart": {
+      "sha256": "7d90827615a35ad2ff68cbfa23f9dc1798e8a821f6a493c20e3f1872375bce00",
+      "mode": "100644"
+    },
+    "test/world_circuit_files_test.dart": {
+      "sha256": "25a4b76b98439ace56887d430c144e730dc6786f291a06816d0c97e461628d25",
+      "mode": "100644"
+    },
+    "test/world_circuit_fragments_test.dart": {
+      "sha256": "3c70fe2d570a8c665a2efc6e21c9caee6c65b9dbf7f9b502e17f80d2506d301f",
+      "mode": "100644"
+    },
+    "test/world_circuit_load_diagnostics_test.dart": {
+      "sha256": "90bea3b90a83070887e6fee1705ca88c01662f6d6c38a33265937b5585baae13",
+      "mode": "100644"
+    },
+    "test/world_circuit_load_workspace_test.dart": {
+      "sha256": "46635343b85c3651bcb772427f1c5cd6d719f8211db01a43a4b40a1be72361fe",
+      "mode": "100644"
+    },
+    "test/world_circuit_painter_test.dart": {
+      "sha256": "bb9785d907f85d73e1fdc03111f4eae1ec9629bf4093681074ef1d8b6ebab271",
+      "mode": "100644"
+    },
+    "test/world_circuit_panel_test.dart": {
+      "sha256": "0a5fb53a09cc117b28c76baff6f51330dea290be581ca066cb801a580a1a4291",
+      "mode": "100644"
+    },
+    "test/world_circuit_progress_lifecycle_test.dart": {
+      "sha256": "c41e7f1c13810026ddfd7b9591d09bba35165b583d5694852d54253f314267db",
+      "mode": "100644"
+    },
+    "test/world_circuit_runtime_notifications_test.dart": {
+      "sha256": "7d237603fc99dc0b1566d08d4b5691fd5fd0e75b3ff92fdba9bcf8ffbb6b0b36",
+      "mode": "100644"
+    },
+    "test/world_circuit_session_test.dart": {
+      "sha256": "7181f74161adb295212056ecd5f78a4fc820d2f902e45130a2ec22b7a964b177",
+      "mode": "100644"
+    },
+    "test/world_map_overlay_test.dart": {
+      "sha256": "882a39b5df24b8898e00a50065f173565e3dd3866e0ed3f30c1439ecad54737f",
+      "mode": "100644"
+    },
+    "test/world_overlay_workspace_test.dart": {
+      "sha256": "7c37c9bf59dc6adf5b868c08aa64ece0500d768ef01f76f7eb2144b221239567",
+      "mode": "100644"
+    },
+    "test/world_properties_panel_test.dart": {
+      "sha256": "df4c057169580dcf89dcd45c3842ba51092c2464a057b725c94806b7e6877616",
+      "mode": "100644"
+    },
+    "test/world_rule_preferences_test.dart": {
+      "sha256": "3883ef8710e86c46974f67a5e7e51082db4811741b92b273f616eb0bdc4f538a",
+      "mode": "100644"
+    },
+    "test/world_rule_presets_private_test.dart": {
+      "sha256": "e8ded35a1df4ac4d3d0bb6dbda509659a00e94196f6a04a69ff539dd76b23507",
+      "mode": "100644"
+    },
+    "test/world_rule_presets_test.dart": {
+      "sha256": "23ddb7a63b5feed9794270e523ff5c06b871ad2748c1c6d51a2a26c9504f92d6",
+      "mode": "100644"
+    },
+    "test/world_rule_presets_workspace_test.dart": {
+      "sha256": "c90e049851bb23c2f706baa25671a2afbf2c2ecf2d783f4764372da1ab3d670a",
+      "mode": "100644"
+    },
+    "test/world_rules_panel_test.dart": {
+      "sha256": "e1b91f794bbd73645261f0096d99a59b9723ec5adb5c3229ee5ac63b77bdae39",
+      "mode": "100644"
+    },
+    "test/world_rules_test.dart": {
+      "sha256": "104ba993bcc7c7eb50497d13362675fcefc4cbde68d188680a6331b09942894a",
+      "mode": "100644"
+    },
+    "test/world_stamp_test.dart": {
+      "sha256": "91c01b99916923b9501c98544048864d290689baa706ba05460ff24ecd61b86f",
+      "mode": "100644"
+    },
+    "test_driver/circuit_painter_profile_driver.dart": {
+      "sha256": "956a459de0ab8bcafb309108511dcf726e000a77ba73f7c686b0ea88ce467c4f",
+      "mode": "100644"
+    },
+    "test_driver/ui_profile_driver.dart": {
+      "sha256": "e26b6053d5f58f3ecff29e33873d9ee0155bcf9df70fcef1873fbee0a9be1be7",
+      "mode": "100644"
+    },
+    "tool/.gitignore": {
+      "sha256": "06d5a0903e3ea49efd4719e109f37be87f2d6c98f1543d95a33a863905ad7830",
+      "mode": "100644"
+    },
+    "tool/authorized_source_additions_test.py": {
+      "sha256": "fd04cbc208c8c05783c8f2a68ff3c7a760f93d18da3029d8aaf9b43c18b5d50d",
+      "mode": "100644"
+    },
+    "tool/build_apple_engine.sh": {
+      "sha256": "b1ce1c4e0ab65eac320a815764def91e362e8dc0d18aa40541e54fdee7591971",
+      "mode": "100644"
+    },
+    "tool/build_circuit_rules.mjs": {
+      "sha256": "1f4ef082587ead85204a627934b34bc4c57131bf34f32e3ee57f448758cc11a8",
+      "mode": "100644"
+    },
+    "tool/build_map_worker.sh": {
+      "sha256": "8658398af94a5962887c00e93234e1bdac522414142dfff5eef1dc326434e4d6",
+      "mode": "100644"
+    },
+    "tool/build_resource_pack.py": {
+      "sha256": "3253c674fbfacae78499bb408b7a23fb301db0e397cb9103011f9a34940fb62b",
+      "mode": "100644"
+    },
+    "tool/build_web_engine.sh": {
+      "sha256": "57d62297538a4712302b3f592ed42ae6e68e72a79df9fe9affbedf3afcbd1d54",
+      "mode": "100755"
+    },
+    "tool/computerraria_inputs.py": {
+      "sha256": "e5ce3e54e97dbbc99e16b4863f4a9514b845dbaf684e0abc2ae1d2ac0cf2dd5d",
+      "mode": "100644"
+    },
+    "tool/computerraria_inputs_test.py": {
+      "sha256": "05d3ba74dbf454577954ac035a49bcc63bf0808339d8421e2865483fd1a8f623",
+      "mode": "100644"
+    },
+    "tool/flutter.sh": {
+      "sha256": "bfe5851e2299caca1c7bc7e6356f7412b7a263e52de67e9677c861a927d07dfb",
+      "mode": "100755"
+    },
+    "tool/generate_icons.py": {
+      "sha256": "afdbb2c821b89f3c2341a26b9d429d013a3c39e4b09b480ab5424fadd863e7be",
+      "mode": "100644"
+    },
+    "tool/generate_visible_pixelbox_fixture.py": {
+      "sha256": "99b993db5f764e6913be3c5bbf70cea9240e909756bbcfde678a0a3765b71a7f",
+      "mode": "100644"
+    },
+    "tool/linux_bundle_test.py": {
+      "sha256": "c8c5f7e5c53e900124f1c22dc1189e2ffdc77d975dba3c1449e5507a80a3b7ba",
+      "mode": "100644"
+    },
+    "tool/map_worker.dart": {
+      "sha256": "8b4ff84bd94bea9b8eea805820c321ea4ccc3e00a6d74894629ce24775e0f96e",
+      "mode": "100644"
+    },
+    "tool/perf/BROWSER_LOAD_DIAGNOSTIC.md": {
+      "sha256": "879bf2c63b8ec0e642031bbe003aaedfbab61833609a705d747ec2265e9f01df",
+      "mode": "100644"
+    },
+    "tool/perf/CI.md": {
+      "sha256": "efba54ec449a5f69e0276a5b453047bf853b78a0dc90f6c6d9e0dd24f9ac75eb",
+      "mode": "100644"
+    },
+    "tool/perf/COMPUTERRARIA.md": {
+      "sha256": "3067f2a6188430d24b09e4887399e7b8475f076a8db98f8a3097ad9473822168",
+      "mode": "100644"
+    },
+    "tool/perf/COMPUTER_MEMORY_DIAGNOSTIC.md": {
+      "sha256": "bf2ef754375074062cbccbbf98f5e467304a9a395d0abf75c8e747da2ec2b97b",
+      "mode": "100644"
+    },
+    "tool/perf/NATIVE_ENGINE_LIFECYCLE.md": {
+      "sha256": "dc01456d9b06766f7166fc6594eaea38cda777662227bba40f0e6382dee36a86",
+      "mode": "100644"
+    },
+    "tool/perf/NATIVE_LOAD_PEAK.md": {
+      "sha256": "de4f7547319e41d1f4e766182565e85d3e82b291dcdb2d01c367467d0a8e8dda",
+      "mode": "100644"
+    },
+    "tool/perf/PUBLIC_DISPATCH_COVERAGE.md": {
+      "sha256": "b49123d30b445b4baba8c309a72e0119e32038c9b75bd5a5f97755438dce0c29",
+      "mode": "100644"
+    },
+    "tool/perf/README.md": {
+      "sha256": "412bb55fef011504b502824820739357f5c10a97f18eb6c03aafdfb9d56dd902",
+      "mode": "100644"
+    },
+    "tool/perf/UI_PROFILE.md": {
+      "sha256": "ac5af52b43db67e3bcf5b85b51da82984df9a36d0146ca59185b68422542f95f",
+      "mode": "100644"
+    },
+    "tool/perf/action_catalog.json": {
+      "sha256": "9ed27decb1b5ed30bdd3e560d89e6ed5c5fb9a284d958aed54a947d06ba8b9e9",
+      "mode": "100644"
+    },
+    "tool/perf/action_gaps.json": {
+      "sha256": "1426b3e021901742998dbd771eee7561bb9b6e2a56fc7dba9c853b45948fb3a1",
+      "mode": "100644"
+    },
+    "tool/perf/benchmark_wasm.mjs": {
+      "sha256": "be4c99a63cbb3e1a17c16fce297cfc8ab06d80ebe5d443bb61e454bb664472ab",
+      "mode": "100644"
+    },
+    "tool/perf/browser_load_checks_test.py": {
+      "sha256": "762ae75ded899892efb12805c91380b19e1321ad45a310d48142b2845c68653e",
+      "mode": "100644"
+    },
+    "tool/perf/browser_load_diagnostic.py": {
+      "sha256": "d6e4eb4483ef722560d8220ab84e1f9eb4762617dbf8e3d8933995a36218474d",
+      "mode": "100644"
+    },
+    "tool/perf/browser_load_driver.mjs": {
+      "sha256": "33aa2d3348a6db8261d01bf20655db5f4a9dcb1fb39df9b3563aa01b75496753",
+      "mode": "100644"
+    },
+    "tool/perf/browser_load_driver_test.mjs": {
+      "sha256": "4e0f1a0fd88378eb1cc9398ea71f035c0068f6a1c967a23946b2fde8eab51e71",
+      "mode": "100644"
+    },
+    "tool/perf/ci_helpers_test.py": {
+      "sha256": "1ef204d92bd0c2422f15ad451eccafb767bf867e02f02c8e661d40704e033308",
+      "mode": "100644"
+    },
+    "tool/perf/circuit_painter_paired.py": {
+      "sha256": "024f3a6a97e17db01f5b86957242bdfeab7373095f086368a61179c15c876e83",
+      "mode": "100644"
+    },
+    "tool/perf/circuit_painter_paired_test.py": {
+      "sha256": "ad800f655cf7ce3a269da725bbf4d1d124880bcfe30ec4fdc92bf7f3555df0f4",
+      "mode": "100644"
+    },
+    "tool/perf/compare.py": {
+      "sha256": "66905a3f148366c84cada1e3fe61aa6ddc22ca6f0c781aaad8d0979dc9a68d75",
+      "mode": "100644"
+    },
+    "tool/perf/compare_ci.py": {
+      "sha256": "2804cab3aad1e313ab3ab47d1df2f2f7317f2aae866a29ac9a85694e0a8d641c",
+      "mode": "100644"
+    },
+    "tool/perf/computer_memory_checks_test.py": {
+      "sha256": "0b219368e55b02d38558ecd705e3fc8319c56a53bd19b5746277adee86a9b877",
+      "mode": "100644"
+    },
+    "tool/perf/computer_memory_diagnostic.sh": {
+      "sha256": "6faca46ddd22cd445e2d54865a35dcfbd1700b38f2f5a3472a91756df62daf6d",
+      "mode": "100644"
+    },
+    "tool/perf/computer_memory_run.py": {
+      "sha256": "e0c79d8297c2976e14da7642fedcec4f48fe899523adc005a1d32b9781509949",
+      "mode": "100644"
+    },
+    "tool/perf/computer_memory_validate.py": {
+      "sha256": "38efacf4afcf972aa1ce2100e9c9203653debf29ef99abf777f6565eced9da20",
+      "mode": "100644"
+    },
+    "tool/perf/computer_shell_paired.py": {
+      "sha256": "3fdcb480f7d52bcf645a2c2db5c3dacf07b651fe90e2752cc93d1edcd75b1a64",
+      "mode": "100644"
+    },
+    "tool/perf/computer_shell_paired_test.py": {
+      "sha256": "e4db26d618839f0e0fcab015fb0f2d353c1398154d336292c69b8ca85db50b8e",
+      "mode": "100644"
+    },
+    "tool/perf/computerraria_checks_test.py": {
+      "sha256": "186edb4d33da45cc906d06deace4b162d8c4dffd3c26ca412aa3ce42c1f089be",
+      "mode": "100644"
+    },
+    "tool/perf/computerraria_compare.py": {
+      "sha256": "0709481d5d8a9649a8f66980e7d292be0c9afad353a39afb7c9e7278963b6c1e",
+      "mode": "100644"
+    },
+    "tool/perf/computerraria_profile.sh": {
+      "sha256": "e731453d30b2de42f249af5a88e7d1a09ca632aff87d22602fcb0607fc94238a",
+      "mode": "100644"
+    },
+    "tool/perf/computerraria_provenance.py": {
+      "sha256": "c33e5ac322441bbe9c6b0389d3c304ac8ad2d326f7a535d61dd47045b4594282",
+      "mode": "100644"
+    },
+    "tool/perf/coverage_report.py": {
+      "sha256": "957f06bbd5d376e17b20de954d4e65210a2b9234964bab22bb420e3160653c78",
+      "mode": "100644"
+    },
+    "tool/perf/generate_native_map.py": {
+      "sha256": "6103d4fa294e6a215d00a8a71174db53a28042055e58b11e5a566a4293fa14bd",
+      "mode": "100644"
+    },
+    "tool/perf/generate_synthetic_modern_world.py": {
+      "sha256": "6423121385aa79b87369ffd6362e36999c8e63efc80a88a8efdda4fc4c202f11",
+      "mode": "100644"
+    },
+    "tool/perf/generate_synthetic_world.py": {
+      "sha256": "19ab1b7501e9fd36a1334ca012f0c3b4098942618a6db5d98326ba426fd3a04b",
+      "mode": "100644"
+    },
+    "tool/perf/map_actions.dart": {
+      "sha256": "c6f1985d973c98c679d2465ea08f149affbdfc32c006a175bf91a7b3d9bbdb81",
+      "mode": "100644"
+    },
+    "tool/perf/map_actions_web.dart": {
+      "sha256": "ecacb63355b538b63529e50d0177d45a4dd9e895e0030b6613ca21ee9aa40aa6",
+      "mode": "100644"
+    },
+    "tool/perf/map_fixture.dart": {
+      "sha256": "b432203595dd3f7adf960922e17bfee54476a5073422d0e5fd101fbc6851af84",
+      "mode": "100644"
+    },
+    "tool/perf/map_metadata.dart": {
+      "sha256": "f0b73107f3aa87722ef894c07663d312791aae37eebcbe59281910dca516105e",
+      "mode": "100644"
+    },
+    "tool/perf/map_owner_native.dart": {
+      "sha256": "416050584dabf6b35842da9efc07ad84e035a895391728c41e4d0ea422da9ecd",
+      "mode": "100644"
+    },
+    "tool/perf/map_perf_core.dart": {
+      "sha256": "5f26211531a5d0cbd57a5532dbf4b12e8cc14224f47f599f9b42ab07981e6c6f",
+      "mode": "100644"
+    },
+    "tool/perf/map_report_metadata.cjs": {
+      "sha256": "23e1a1192663cd982a8c8a3c8d073ff84d2dd7f5121a7a117e3c94537aa2080c",
+      "mode": "100644"
+    },
+    "tool/perf/map_worker_browser.html": {
+      "sha256": "8b8da3d938bb85636e5dfaa8d88b0d9ee87d01c7d393f3a8be9be2aa821bb03d",
+      "mode": "100644"
+    },
+    "tool/perf/map_worker_node_owner.cjs": {
+      "sha256": "3045e43c380e37d22e670b2d672269b4f609e0295ea266a28a587f9092981151",
+      "mode": "100644"
+    },
+    "tool/perf/mapgen_diagnostic_README.md": {
+      "sha256": "41d12334f4da02791a19b993220686a32ed856620b119fd83743295184f983e2",
+      "mode": "100644"
+    },
+    "tool/perf/mapgen_diagnostic_contract.py": {
+      "sha256": "5ee146a2934413b075d2db357a8782c88c1c3297e625d5d2f7998af58f50dc6d",
+      "mode": "100644"
+    },
+    "tool/perf/mapgen_diagnostic_probe.py": {
+      "sha256": "b0b7a9686e924ca9edad4b652629aa02b137659ce83ce38ba0ee0c8eee04d922",
+      "mode": "100644"
+    },
+    "tool/perf/mapgen_diagnostic_runner.py": {
+      "sha256": "5e9d5774e7b7022409ae6a2a9ecd7fe89e2707d6bcf96ea783b3dd6e63774e4b",
+      "mode": "100644"
+    },
+    "tool/perf/mapgen_diagnostic_test.py": {
+      "sha256": "c8256366bccbd66b2507ec94d0bf675800d5e851b8bce529ac517dd502393472",
+      "mode": "100644"
+    },
+    "tool/perf/mapgen_diagnostic_validate.py": {
+      "sha256": "e69f0fba5ebe01ea21ded8adf2eea1a2fba3619560166423046d8180365510c3",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_README.md": {
+      "sha256": "cc62c4f728fbdda675ce1a84a085e24128cc3054af96a40eaf4c2b4fd27f94ed",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_manifest.json": {
+      "sha256": "418fdf8a27a73001ffff4295a92399ffa6e26075b2e0b25aa577c7e35c10669f",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_os.py": {
+      "sha256": "044207ebf2defe3cbf51af2cfa99216639862f0200acf69858796a9e95ecd87d",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_os_test.py": {
+      "sha256": "415a6646a23f533c8d0f234cfbb8e4232525139611d406b1a8386b3ed82fd823",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_prepare.py": {
+      "sha256": "49eccaf035462f189e5bea4537794beca01c70a37abc87890d91a6d51e57a3ff",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_prepare_test.py": {
+      "sha256": "e5b636ba86bb56eb6e039f795d53be9b60493c11d62b89742f8878492548f8e1",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_rss.py": {
+      "sha256": "4ff0193a28dd637f4bc34fca09c0cd385cac68deaa13e7a0e99e8bcdebb00e72",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_rss_test.py": {
+      "sha256": "46dda4234d9b7c5525ec6ae89f783aa8e9037dec3de6da78a41a3862e1b6d897",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_run.py": {
+      "sha256": "c5b58c8581af81cfe4b0a738fdd95c375bbd3651e516400c09e07f0b992cd069",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_runner_test.py": {
+      "sha256": "9efbc10414112eb2801d368532fd9d4e1670cd039f62adfdc80fc5ff024774b6",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_schedule.json": {
+      "sha256": "bedae8b1416f4124160c4e75323436e3b04df4fc1b709c89a04a34070087657a",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_validate.py": {
+      "sha256": "9edfe6d88d1468bcc7358097f5ac362d68f10ce867df814295e5aef7d52ea6bd",
+      "mode": "100644"
+    },
+    "tool/perf/memory_probe_control_validate_test.py": {
+      "sha256": "57c8b1157e2dc5e3a442751e1de4a0f203a1ee5daf274e8f477bcfb2f3315c8b",
+      "mode": "100644"
+    },
+    "tool/perf/metrics.mjs": {
+      "sha256": "b1b89a3c9e83a327f16c10d0a66065a1c16a5b498851262dafc643f7a2e4b6e8",
+      "mode": "100644"
+    },
+    "tool/perf/native_load_only.c": {
+      "sha256": "25c1fc52ea12e9a4ea59adbc66db87fd6f00a1bb21d3d3df55749e424c7b173e",
+      "mode": "100644"
+    },
+    "tool/perf/native_load_peak.py": {
+      "sha256": "833f46022884168c3d2cecbf4ed1f60cc925c2af8b097778ce7d51f928695dcf",
+      "mode": "100644"
+    },
+    "tool/perf/paired_contract.py": {
+      "sha256": "82f319038d9be22f9ae1dbbfdc11c7b6028cbd6570afbfabbd504a3c506ea406",
+      "mode": "100644"
+    },
+    "tool/perf/paired_runner.py": {
+      "sha256": "d3ec6cac2076cf9e0327f2a601c6ee52e8d21920b9197444d83bd50278d0cf31",
+      "mode": "100644"
+    },
+    "tool/perf/paired_test.py": {
+      "sha256": "c930317c77c74c15838c2027c945ac59973a9c99006c2e887c948e5ce117efe6",
+      "mode": "100644"
+    },
+    "tool/perf/paired_validate.py": {
+      "sha256": "d1903fe3375173ad29577f097016b909b45f038eff9514c55f3c40c504a4f22f",
+      "mode": "100644"
+    },
+    "tool/perf/prepare_map_browser.py": {
+      "sha256": "cd71f3d94640e072531da448004e4bbd6080ac404269352dc7b0daff5b4abda2",
+      "mode": "100644"
+    },
+    "tool/perf/public_dispatch_checks_test.py": {
+      "sha256": "5cf7ee9bb34cf9e746122d973b4a93aa66134e263fe5d7081f225dd7b51532e7",
+      "mode": "100644"
+    },
+    "tool/perf/public_dispatch_validate.py": {
+      "sha256": "37d95a10bfee0fdb08110482b761f90cc9c1d87f802fd1adf9e3125e250da014",
+      "mode": "100644"
+    },
+    "tool/perf/report.schema.json": {
+      "sha256": "292c358e79173a5a0daea440dab02a55c4e64389524ada35d247f4dbd3d28bc9",
+      "mode": "100644"
+    },
+    "tool/perf/rules_diagnostic/README.md": {
+      "sha256": "985f6895f897be6ca5a291aeb4cc49974c147e7886f7cbc3d6b7ff30110cdebc",
+      "mode": "100644"
+    },
+    "tool/perf/rules_diagnostic/diagnostic_probe.mjs": {
+      "sha256": "67335a1de6708615898c1139c195981ebffea4aa0476878de848be08c6e46582",
+      "mode": "100644"
+    },
+    "tool/perf/rules_diagnostic/event_scope.py": {
+      "sha256": "bb85a5c1664b2a959a40d0c02941655873cae284a5f31c9a374db948d53fb764",
+      "mode": "100644"
+    },
+    "tool/perf/rules_diagnostic/prepare_inputs.py": {
+      "sha256": "bba96c0335e645e9d263e84296bd8b4d9413deed72197d7a5b6279c2f5133d8c",
+      "mode": "100644"
+    },
+    "tool/perf/rules_diagnostic/run_diagnostic.py": {
+      "sha256": "cab017ccad419e9ca2899cc89231fb9ff23904cdcc2a92ba213099e4d127d72e",
+      "mode": "100644"
+    },
+    "tool/perf/rules_diagnostic/runner.template.mjs": {
+      "sha256": "283309a2ac9c936235e9fd331a6bd9f3983c481aa65f4e9196d4e273f7de757d",
+      "mode": "100644"
+    },
+    "tool/perf/rules_diagnostic/test_diagnostic.py": {
+      "sha256": "4e54fc8ee0c3ad45a5be5bd8c2341804657ffa0fac5378296f94ba89c74b2362",
+      "mode": "100644"
+    },
+    "tool/perf/rules_diagnostic/test_event_scope.py": {
+      "sha256": "e120e14688d9c7b01f818b1403205b62f2b96fcebcff063b6f6386b2d5483fc7",
+      "mode": "100644"
+    },
+    "tool/perf/rules_diagnostic/test_probe.mjs": {
+      "sha256": "b408c59dde804df592e8b714a586575bbf098b5835f8dfacec3507c9cc146d1e",
+      "mode": "100644"
+    },
+    "tool/perf/run_ci_suite.py": {
+      "sha256": "33258516eb3a1c207a8dcd1ba6867ab611e992d52cffa33dab103c5514768315",
+      "mode": "100644"
+    },
+    "tool/perf/run_map_web.cjs": {
+      "sha256": "973c895b81120404c9d21bbb30d2936d8298772ce69a8e1a044edfe6451643ad",
+      "mode": "100644"
+    },
+    "tool/perf/test_compare.py": {
+      "sha256": "579a0aeecff5856fa0d9dde93a682f6db3ac251dfb0a020e98e48a587dd274f6",
+      "mode": "100644"
+    },
+    "tool/perf/ui_checks_test.py": {
+      "sha256": "20424db715888b4f48cfe2af52e02312287ef58b5395a95fffd27421a577bd85",
+      "mode": "100644"
+    },
+    "tool/perf/ui_compare.py": {
+      "sha256": "649f09a7837a9efaaef346c8c997b2af7508e66d2126b815493cf1b90eafe65f",
+      "mode": "100644"
+    },
+    "tool/perf/ui_profile.sh": {
+      "sha256": "735b0e0405efa8b18147dd55cc9cd1bbf8a298d5d9f606f7670f4e624905617d",
+      "mode": "100644"
+    },
+    "tool/perf/ui_validate.py": {
+      "sha256": "e5c1371bb16a68615e5e04b40293c9d80f9c2da5be8ba8822916bebfa4ab0cbc",
+      "mode": "100644"
+    },
+    "tool/perf/update_action_gaps.py": {
+      "sha256": "ed40da5d79bf1deee89fdcb8cb7c123c89683162d8a9c1e4c5ea6b76adbd02ce",
+      "mode": "100644"
+    },
+    "tool/perf/verify_baseline.py": {
+      "sha256": "e38b8fcf58c5d2ea9323b8ec96185ad58ec271412a49ae84bdd2f5bbf4be2883",
+      "mode": "100644"
+    },
+    "tool/perf/verify_synthetic_modern_world.py": {
+      "sha256": "17db519f26b664ca6c76a2c17cd75441345776fa0a623ec4c508c5763ff758db",
+      "mode": "100644"
+    },
+    "tool/perf/write_map_fixture.dart": {
+      "sha256": "16880c921b5312e5fcb06fcb87551c9fc6bc6e42c896b70b5ef6dd31bbd66fa0",
+      "mode": "100644"
+    },
+    "tool/preview_server.mjs": {
+      "sha256": "074c65e9b2bff0573e85e0d2c15471f424c5c71047a162584dd22bcfe741e4e0",
+      "mode": "100644"
+    },
+    "tool/record_web_engine.mjs": {
+      "sha256": "9c8000529aaee139e0657d2f797230151b995f5ea0ad632c1d136e79c9485c11",
+      "mode": "100644"
+    },
+    "tool/release/publish.py": {
+      "sha256": "c1ccb5edc1ea897af8a30cacb7ea8d951a7f4316edce16d0ec64353b46b8dfcd",
+      "mode": "100644"
+    },
+    "tool/release/publish_test.py": {
+      "sha256": "60649e8005b36def7e0d8b81a83710f68f72822cbf6fa5cc4ca54a9bb23af6ce",
+      "mode": "100644"
+    },
+    "tool/run-preview.sh": {
+      "sha256": "19b47315b720f9745c5f54d65f089769b0711ac7da41b0ba64e462f474280095",
+      "mode": "100644"
+    },
+    "tool/test_build_resource_pack.py": {
+      "sha256": "3866297ac919e05925c77c10f6571c152162bd9b2e086c33d156eb873a395ace",
+      "mode": "100644"
+    },
+    "tool/test_circuit_rules.mjs": {
+      "sha256": "85599a70b90cf363cd660a61f37a77e76185fb535caa4a346a3693fc38aed96c",
+      "mode": "100644"
+    },
+    "tool/test_map_worker.cjs": {
+      "sha256": "03bc5357ae632b7ef6a769d97421581a81496bfe578f1f1a3cd6d4aeefe15519",
+      "mode": "100644"
+    },
+    "tool/test_sparse_lamp_queries.py": {
+      "sha256": "f737a4e17aa02a4af80e68208dc14dbd2c4e1d21ab8fba3bf3ba6b4155c27ee8",
+      "mode": "100644"
+    },
+    "tool/test_timer_fifo.py": {
+      "sha256": "0207b919b5b62d6259a01380ed8322f1206177f96dd44a4fd647c780fecc0cfb",
+      "mode": "100644"
+    },
+    "tool/test_timer_gate_origins.py": {
+      "sha256": "8db76ee8e5a4a1e51552b306d6f3c5b4d8492c14cdb9779284d6f68eba906dea",
+      "mode": "100644"
+    },
+    "tool/test_web_binary_map.mjs": {
+      "sha256": "2d870b7c74cb8bbf23f548e0af9d1e01e63325a853924b50fcf5837e2a1d7d70",
+      "mode": "100644"
+    },
+    "tool/test_web_circuit.mjs": {
+      "sha256": "f182d94c0af3a58468320893ca90cb9e7d6090a80d2dab4187efd6c229658716",
+      "mode": "100644"
+    },
+    "tool/test_web_engine.mjs": {
+      "sha256": "3da5e2615b125d116506c5255d9d3577413437249ad8d184e5835577c43857a5",
+      "mode": "100644"
+    },
+    "tool/test_web_fusion_placement.mjs": {
+      "sha256": "159b7a07902d5753744ac90fd0923ed3661da8ce2a782a1cd5b33d94afc1d8d9",
+      "mode": "100644"
+    },
+    "tool/test_web_markers.mjs": {
+      "sha256": "915caaf1a606effcb9afa6b06a2f91ca80c1f8d134d8330b9d75caa376f7a465",
+      "mode": "100644"
+    },
+    "tool/test_web_region.mjs": {
+      "sha256": "4984b868ea27e09cc1edab696be1779881c653b023184a8d9675c5a38156d46b",
+      "mode": "100644"
+    },
+    "tool/test_web_world_rules.mjs": {
+      "sha256": "267b3327565dc9ac130032d8dd9c5a77313250d0c5d982183e7c3a8d5aaf364f",
+      "mode": "100644"
+    },
+    "tool/test_wired_lights.py": {
+      "sha256": "ea5f9b0a828cfc96ff0e6d83eb64f07fe554d5e8ad56555e589e3ea641c28633",
+      "mode": "100644"
+    },
+    "tool/verify_authorized_sources.py": {
+      "sha256": "3a0e9817c6f8d6f613659c0cc94619dab22fff7d8c9ad4ea4c7a8d1df19db616",
+      "mode": "100644"
+    },
+    "tool/verify_cjk_font.py": {
+      "sha256": "d2eb968a2d91ff8ba4855af7a7362e8693649e223e7d7b0b81c3526bbcb19f28",
+      "mode": "100644"
+    },
+    "tool/verify_resource_pack.dart": {
+      "sha256": "84c2497d35daceee908288f3c978fd18596c4d90bcb8655ecdc8cd5a0cf0437c",
+      "mode": "100644"
+    },
+    "vendor/computerraria/LICENSE": {
+      "sha256": "c046a3b23796a077fff90096c2ff2b3e9b0501f459407949f3a5817ce56f730c",
+      "mode": "100644"
+    },
+    "vendor/computerraria/README.md": {
+      "sha256": "e2662fe338ea3caf34a06a8a027fad0b1764d866cea99a1991542c60153ef0d6",
+      "mode": "100644"
+    },
+    "vendor/computerraria/build-pong.sh": {
+      "sha256": "2fe2f89b6a0bf57a829d69946367645fea019b23133f24ad19f4f145aa0f3877",
+      "mode": "100644"
+    },
+    "vendor/computerraria/elf-to-rom.py": {
+      "sha256": "18439b9c67a697f5afbc57355cc36dbde04e1fa9b1c2699b062d73144cc36ff1",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/pong/.cargo/config.toml": {
+      "sha256": "db2e13b5ee6c843e77bc73ec286bf2db554dd96905dec4c7bdf6cfd1730f549c",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/pong/Cargo.lock": {
+      "sha256": "3c391ce11ea7891eef5fe7c2f1f34afc326154a3a11458957b42d4713c01b18d",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/pong/Cargo.toml": {
+      "sha256": "ac4546c207598ef6075fc314c8a9f344b595b320bf870615522c6f38241492d7",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/pong/copy-bin.sh": {
+      "sha256": "9f79dd0e5e61d4cd9fd32b8bbb1e79822a6ab357ddf773582a359e3b69277ab2",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/pong/src/main.rs": {
+      "sha256": "15122e0035f48ad98c3b77222fa47dbfe81888f95dfc469705431916a2a62052",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/tdriver/.cargo/config.toml": {
+      "sha256": "68f84eeec48d60eec148c0fde2ba53704fbc81e62954b21451927ee170fa04bc",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/tdriver/Cargo.toml": {
+      "sha256": "5832fac16d5bdab5b313b05645b4c46b2914ceffe8e83d6c67eebb5cdcdc206d",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/tdriver/build.rs": {
+      "sha256": "5200c6ddc6b555c517965e1561b674e309d3296f2a1a24a680688367f9bb449f",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/tdriver/link.x": {
+      "sha256": "570081a43384194837d874991c8f2b5c4bd8344e04db926bbd6717c685c6dc27",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/tdriver/src/graphics.rs": {
+      "sha256": "6aa7d7a3e966b282eff91e67fdcff791049ef65db4ce45e3f1e04768dfaaf404",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/app/tdriver/src/lib.rs": {
+      "sha256": "433a62ad74d658255a6c08055747160467148af4a465883f395415cab2669eb5",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/output/elf-summary.json": {
+      "sha256": "718b4b40e08401706936c7e83399bd0a0c7bb88f063a830dd4fb7aca624d765a",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/output/pong.bin": {
+      "sha256": "d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/output/pong.elf": {
+      "sha256": "4ac484d740ed7e485a53c9232ded661f9d82c9e82800c2d6dbba41e9dabd67d5",
+      "mode": "100755"
+    },
+    "vendor/computerraria/pong-build/output/pong.txt": {
+      "sha256": "cc002bd14ee3be359c09699731da64cebd294946d0a863ca46e05e2c1f8d3816",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build/output/rustc-version.txt": {
+      "sha256": "e569d7e196207e57f20aae13320a6b747b909de88c603c401bdb14ee3eeb121c",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-build-fix.patch": {
+      "sha256": "b79bf11f0e28f6799b14b503ded82986da53058acffc3e038222e34204f4d7d9",
+      "mode": "100644"
+    },
+    "vendor/computerraria/pong-provenance.json": {
+      "sha256": "52a4d9a31bddad16f1b822325002daa56bf883d4c7e00d2d63767fdffdd74442",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/LICENSE": {
+      "sha256": "c046a3b23796a077fff90096c2ff2b3e9b0501f459407949f3a5817ce56f730c",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/pong/.cargo/config.toml": {
+      "sha256": "db2e13b5ee6c843e77bc73ec286bf2db554dd96905dec4c7bdf6cfd1730f549c",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/pong/Cargo.lock": {
+      "sha256": "3c391ce11ea7891eef5fe7c2f1f34afc326154a3a11458957b42d4713c01b18d",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/pong/Cargo.toml": {
+      "sha256": "ac4546c207598ef6075fc314c8a9f344b595b320bf870615522c6f38241492d7",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/pong/copy-bin.sh": {
+      "sha256": "9f79dd0e5e61d4cd9fd32b8bbb1e79822a6ab357ddf773582a359e3b69277ab2",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/pong/src/main.rs": {
+      "sha256": "15122e0035f48ad98c3b77222fa47dbfe81888f95dfc469705431916a2a62052",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/tdriver/.cargo/config.toml": {
+      "sha256": "68f84eeec48d60eec148c0fde2ba53704fbc81e62954b21451927ee170fa04bc",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/tdriver/Cargo.toml": {
+      "sha256": "5832fac16d5bdab5b313b05645b4c46b2914ceffe8e83d6c67eebb5cdcdc206d",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/tdriver/build.rs": {
+      "sha256": "5200c6ddc6b555c517965e1561b674e309d3296f2a1a24a680688367f9bb449f",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/tdriver/link.x": {
+      "sha256": "570081a43384194837d874991c8f2b5c4bd8344e04db926bbd6717c685c6dc27",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/tdriver/src/graphics.rs": {
+      "sha256": "9e0e5c463f17536c81c80cfc728b4b52fb8464901d0cc6ebea225b868829a153",
+      "mode": "100644"
+    },
+    "vendor/computerraria/upstream/app/tdriver/src/lib.rs": {
+      "sha256": "433a62ad74d658255a6c08055747160467148af4a465883f395415cab2669eb5",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/README.md": {
+      "sha256": "6a6af9939a944c9c140179851e6c289c0df78e79db868e9491d36859c453d61f",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/actuation-data.mjs": {
+      "sha256": "4715dc69bf7e0b7fbc4684d07df63e25192c4d69c0e4bd1182c2fbb6aef8f5fb",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/actuation.mjs": {
+      "sha256": "d3789df0806d1af3b41667fc22a69ee4395e3070d6db0d8a9ce695dddb449854",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/catalog.mjs": {
+      "sha256": "c87adfc2f32519d7bbfb0ff678006782d7e0d135144e374865d96f2e782c3d83",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/compat.mjs": {
+      "sha256": "d84ac4845dded541024a59d757023f01d37b6d0c292c7e24ae999125331be9d7",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/device-state.mjs": {
+      "sha256": "30f5b53d866a92dff374754a5ad36f26acc6a71a3d786b948aa7303892eb22d7",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/devices-catalog.mjs": {
+      "sha256": "bff150682b66921f53c66d9a6b55d4fe4dccb75fc0c975f5f1d78c68889a711c",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/editor.mjs": {
+      "sha256": "1215c9abccf29b351d7624d35bf9e567b87241490f79d798dc7d76669630feb4",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/effect-state.mjs": {
+      "sha256": "8809d71d23928de65577f4942d4431c05e7f9e3723b771cbe0b2fa129bf5422d",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/effects-catalog.mjs": {
+      "sha256": "21deced1c62667189a1f6747cbd76c419f47670c1b061247a537f7bf035e1ca5",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/engine.mjs": {
+      "sha256": "9acf91d3b6f5e953c094102e83c9d09625213af6febe07880e2f568564511264",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/hello-example.mjs": {
+      "sha256": "c0b733c6f7b3000cc6e7de685f0bee24cac1a44db0652e011d06b388de6dffbc",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/lighting-batch1-catalog.mjs": {
+      "sha256": "340947b2df8bb971286228130c2b15e5378e55d77cf90196999fd1cb4f6934fc",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/lighting-catalog.mjs": {
+      "sha256": "22a479d73d11b50818c0b5dc0f3c59fd1c9753401c98b9147cea8082aa65dd98",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/lighting-extra-catalog.mjs": {
+      "sha256": "9acee0da203d4872d020a71f573978c98bba84839e8a9167224243b6770add98",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/mechanical-state.mjs": {
+      "sha256": "452a5433501000ecb7407f05c6dba9ea6b70c71d86b23ac3ddab4a4e38d4e958",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/mechanism-state.mjs": {
+      "sha256": "ce3de380f61856779af77a53375e699601d513c53b6171ff7243a5a5d40c2c1a",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/mechanisms-catalog.mjs": {
+      "sha256": "6a5e48b2c55f7db9406928be969bdcb692a7a56d7b198f225ab31292b997b9f3",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/model.mjs": {
+      "sha256": "862cb2010e16dc6013d8fd82dbd46eb3ab1ff5b437e77a8d3e13b1031a66f84e",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/native-tile-data.mjs": {
+      "sha256": "23a3806c39ca3161b99f1ef1aff3bed9e87d7c57050b863c1a01ea05be61e03f",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/native-tiles.mjs": {
+      "sha256": "8ae841fce7a66f785e96e9279b848f462d28a9292f81baaecff2fcc82b14b22f",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/object-records.mjs": {
+      "sha256": "46d7b6ae8e50507c7369b9792681b32f2660059d9df71f5de6096a81f17f7f8b",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/object-text.mjs": {
+      "sha256": "1fe3340838cd4850b8814c7e2851b7d6ad0022b5b6dd699e46616e7ca730fc1b",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/one-shot-state.mjs": {
+      "sha256": "5fdd12dad0be6df39a0cc1e96c4bd6c7f2cba0ab33c7153577e18fa7c1dc8766",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/one-shot.mjs": {
+      "sha256": "1717b7f3dcd14c7281521fbcdb201d6054685a26ee887dc3ee957f4556fc0713",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/placement-support-data.mjs": {
+      "sha256": "06fed9e7a78022668ff88c84fa6a351812baad0f41e132f4188566961a9b8c55",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/placement-supports.mjs": {
+      "sha256": "512abe9944db4088e4d4a57d75771cb05b51c857f5bccf6a1111cd69ea270489",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/pulse-catalog.mjs": {
+      "sha256": "20158581567727dcb7150bc6113e8fe4fd64b6d87803fe1ec39ec0ff1721f0b2",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/pulse-state.mjs": {
+      "sha256": "e14fc41d67f9a117a41be1a9683a3e132f3013866b53aac7ed56b0e9aa289b0b",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/register-example.mjs": {
+      "sha256": "555d83b9858828c710f3b1a1b420a43bb85266ae09d5d7774bdceb966b40a69e",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/remaining-catalog.mjs": {
+      "sha256": "5ecbed2c08b84e33d71c008126c8d88ea7dfe23d1df71da647b038ac53ec663b",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/remaining-state.mjs": {
+      "sha256": "541d0c962b3787bdee287f951dbaa2d94eddd3650b119140d35f5ce34f585dbc",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/routing.mjs": {
+      "sha256": "6496c158b9a30abab2a13c9eab71def9aed3734b7a6998b19419a29593c795cd",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/storage-catalog.mjs": {
+      "sha256": "0eb10dbc774fe542e82c07113386cf0d1996c883322a09aa8d5fe08b2d0fe23e",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/storage-state.mjs": {
+      "sha256": "24bd8787b1f1d17c667859c5116663d1a32e0c7a0e4a9a5101ddd75c90e5b095",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/support-state.mjs": {
+      "sha256": "ddd98610ceb00b42f0e91e49ab1d05cf50b29f3e4c1150834bcf989a9ccbca75",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/domain/world-tile.mjs": {
+      "sha256": "a404df631013e05939b033ed31f96c03cd591f20ade4bb595c4543781bf0ffe3",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/runtime/native-traversal.mjs": {
+      "sha256": "3c3e14c846b9c1ca4d68cc924c4613f2f7a91d9a56099653c85dab31525617cd",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/services/computation-session.mjs": {
+      "sha256": "75e06f8e45bf98f84b4e3d723d3a185bc9bde9ae34cd7d8bdb2d87a41bad044a",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/features/circuit/services/memory.mjs": {
+      "sha256": "650e7ce8d491326146439be1b12c2033eb4fb8e2be10b1f104e4fcf9353cc6fd",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/retrieved-source-manifest.json": {
+      "sha256": "45f2e305f7fdfe80b05940f02c18629bf0eab9a9ac628a505d7669193faec05a",
+      "mode": "100644"
+    },
+    "vendor/viewer-circuit/shared/circuit-object-protocol.mjs": {
+      "sha256": "e5cc1ae5222346bfa2873e4031e6f714c9b71c8a838e32879a738593f4fda5a0",
+      "mode": "100644"
+    },
+    "vendor/wirehead/LICENSE": {
+      "sha256": "c046a3b23796a077fff90096c2ff2b3e9b0501f459407949f3a5817ce56f730c",
+      "mode": "100644"
+    },
+    "vendor/wirehead/README.md": {
+      "sha256": "4e49c4f138a42d3be17af24d37225dff4e99b5d260273d1ae3f4f3d09bf6534a",
+      "mode": "100644"
+    },
+    "web/circuit_rules_adapter/native-entry.mjs": {
+      "sha256": "a9bd380cd04d493f54aead11ee348125c98dde47e4c8a75d9bf2aba510f4f9da",
+      "mode": "100644"
+    },
+    "web/circuit_rules_adapter/native-traversal.mjs": {
+      "sha256": "71f903723fdb7ef11b1bdfcc5302cb5c2f6fd4dc8f74c4c99b1cddfdfc99f0b3",
+      "mode": "100644"
+    },
+    "web/circuit_rules_adapter/rules-facade.mjs": {
+      "sha256": "c9a404ea611bb6fb7419191fe0eb7c77ba91bed2445cf50fda679aec15c1e853",
+      "mode": "100644"
+    },
+    "web/circuit_rules_adapter/web-entry.mjs": {
+      "sha256": "b4211860f009fb608d9235d2c2cf20c7adad30c7642636a0b02dc3870a89330b",
+      "mode": "100644"
+    },
+    "web/engine/circuit_rules.engine-provenance.json": {
+      "sha256": "805c8773d7cbe5f43c9e6805d45d396713fdf5702d1595c48666a7df31e4a7bd",
+      "mode": "100644"
+    },
+    "web/engine/circuit_rules_web.js": {
+      "sha256": "5354077e8fd4e04fb3b93557281a389a6849a1d68aeb68c36cb6dfa4c65254a5",
+      "mode": "100644"
+    },
+    "web/engine/manifest.json": {
+      "sha256": "7a7e577e68328d82fbdb6c8fc8594aad9be397e86c8487e89254bd43ffd53b72",
+      "mode": "100644"
+    },
+    "web/engine/map_worker.js": {
+      "sha256": "3cc67c056ca1098b58ddd2cebd894ca6eeb835e23655b9c5b21b5ffd23bb9460",
+      "mode": "100644"
+    },
+    "web/engine/player.js": {
+      "sha256": "dc3fb611b14adccc891042f6e3f9754b42c96c947548f02740835a28046cd7d8",
+      "mode": "100644"
+    },
+    "web/engine/player.wasm": {
+      "sha256": "0ffbcb5a3a9c075f34751ee51fa23762cce369f3500f98ae710f8d756130461b",
+      "mode": "100755"
+    },
+    "web/engine/world.js": {
+      "sha256": "50bb9a182ac1c596d5c67b84ced4d77c69a29d6bf41a4346807d46920962b47d",
+      "mode": "100644"
+    },
+    "web/engine/world.wasm": {
+      "sha256": "6ad549936e141495fc02b79a456d844edf5783442fc4766cda4db8e004107405",
+      "mode": "100755"
+    },
+    "web/favicon.png": {
+      "sha256": "7d05ddac25b35c4c51dc93466c8ca66a8e08e215604a50f7d280eb3a065693be",
+      "mode": "100644"
+    },
+    "web/icons/Icon-192.png": {
+      "sha256": "58131b7038fd3831ca50d613010dce9f8f1d21a3a0b0ef0761a7fd6ad85537d2",
+      "mode": "100644"
+    },
+    "web/icons/Icon-512.png": {
+      "sha256": "b8accee7ba5240097260cf9e0117bc36052c511c57afceeb03708195b1c93511",
+      "mode": "100644"
+    },
+    "web/icons/Icon-maskable-192.png": {
+      "sha256": "58131b7038fd3831ca50d613010dce9f8f1d21a3a0b0ef0761a7fd6ad85537d2",
+      "mode": "100644"
+    },
+    "web/icons/Icon-maskable-512.png": {
+      "sha256": "b8accee7ba5240097260cf9e0117bc36052c511c57afceeb03708195b1c93511",
+      "mode": "100644"
+    },
+    "web/index.html": {
+      "sha256": "cd91181475256236e7f1aa401f4b9a4a133ba71b616fc484a2fbde3bf87d4afe",
+      "mode": "100644"
+    },
+    "web/manifest.json": {
+      "sha256": "10aa5bbcbaeeb4cdb3451e1c7609f65e4faefbd73873ca8c47338c9b5b7e71a2",
+      "mode": "100644"
+    },
+    "web/online_resource_storage.js": {
+      "sha256": "66d2ae4321812ab3a46100b0d881724572a8b36c4fe0b6eeee2606d73bfa841f",
+      "mode": "100644"
+    },
+    "web/terra_circuit.js": {
+      "sha256": "6873aeb8346e126caed40579a7770c71e838958056c67c5c558f49821fd78f2b",
+      "mode": "100644"
+    },
+    "web/terra_circuit_rules.js": {
+      "sha256": "754c4e0f44e71a73e4c0dec04a997f22d281bf8d8940cd95510204013e5c47bf",
+      "mode": "100644"
+    },
+    "web/terra_circuit_rules_worker.js": {
+      "sha256": "ffd6bac40a930fdc35ce04ee4cd80c84203f0e4e82bfdf52a7430f45b61b4457",
+      "mode": "100644"
+    },
+    "web/terra_engine.js": {
+      "sha256": "922e679284f0df78651df39e8c6213c2b8ff50bcc057369caae98c72559b4a1e",
+      "mode": "100644"
+    },
+    "web/terra_engine_worker.js": {
+      "sha256": "4c231da2337da8de45047347875094ecfbf1ec858ce0f46e8edebd2c76a80937",
+      "mode": "100644"
+    },
+    "web/terra_map.js": {
+      "sha256": "c070b0b4fb19f86bb8a3c4355eb559318ae59d68339790e8d541377d465e32cc",
+      "mode": "100644"
+    },
+    "web/terra_map_worker.js": {
+      "sha256": "a6ecbfcf394e042acd3559b9ebb2edefe6773628b4eb76c9dd48ec09b9390544",
+      "mode": "100644"
+    },
+    "web/terra_region.js": {
+      "sha256": "5234a7672504cdddac5fd9b90ef4ca34ae0d09aff2e45fea5c2c921b480c9cc6",
+      "mode": "100644"
+    },
+    "web/terra_region_worker.js": {
+      "sha256": "4c42847b78a8d13a78b1b643777d1d60f9f9844adcde28f48ab0607617ff3387",
+      "mode": "100644"
+    },
+    "web/terra_vault.js": {
+      "sha256": "f429ebf5babc422aea8ced565a106a8b2b2881d979ade0db7827fbbb0c5eb717",
+      "mode": "100644"
+    },
+    "web/terra_worker_rpc.js": {
+      "sha256": "f8cd5d38a0e95a514493039f20ce5491eef501767084967602a5c04c5e52395e",
+      "mode": "100644"
+    },
+    "web/terra_world_circuit.js": {
+      "sha256": "30dc022c1207891c86100cfd5d21090d30125ee407a30a0a4cb41c8eae1dc6a7",
+      "mode": "100644"
+    }
+  },
+  "candidateRuntimeChanges": {
+    "native/vendor/TerraWasm/src/terra_circuit_devices.c": {
+      "sha256": "8796cfe4d5486a28140eeeb70ac405360b3156e44bc983740a3e76a9ae18e0cc",
+      "bytes": 22082,
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_query.c": {
+      "sha256": "265375211b0784e49b853afd7a53952f6a7ebbdbd33b4ab047276836a3cbe1f9",
+      "bytes": 23386,
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_rules.c": {
+      "sha256": "8ff445c41a26ca3e89bbbabb39643e47f19cfaec5945f9fd1510c2eb6a40133b",
+      "bytes": 14366,
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_vm.c": {
+      "sha256": "00a4854571fa809b04827958acf93e7ffcc70a28750192f506ba254a121e933b",
+      "bytes": 19692,
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_world.c": {
+      "sha256": "213f1655cfa25f2f2aabcb07e7873ed270b5605f416fd14d2e8b156de99f96f2",
+      "bytes": 21456,
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/src/terra_circuit_world_internal.h": {
+      "sha256": "6f6792c12b1a6ab54a2344d9024e0a3b49e4c483747903ce859449ebdd0d2c3c",
+      "bytes": 10826,
+      "mode": "100644"
+    }
+  },
+  "candidateProvenanceChanges": {
+    "native/patches/full-world-pixels.json": {
+      "bytes": 13171,
+      "sha256": "b7c9ad0a9df85fb1108ed1abf20af5ae39f1971060e91d160c6f223af8b5bb75",
+      "gitSha": "f761d28d09d822b54b3307ccc6442dfc4dd7d000",
+      "mode": "100644"
+    },
+    "native/patches/full-world-pixels.patch": {
+      "bytes": 118428,
+      "sha256": "9a9259aa82c92537231d5ca2af8519fa7c06f01a84e5b007feab33eb796e3f13",
+      "gitSha": "813c17850367b29dfb23b4665c329f019255cf64",
+      "mode": "100644"
+    },
+    "native/vendor/TerraWasm/SOURCE_MANIFEST.json": {
+      "bytes": 18074,
+      "sha256": "8fe9e685b4e49e344ffcb12b3483bff7570db313511647f082bd471c74fb5d5a",
+      "gitSha": "b9ec4be1affed363a482cfdaf49162b78e69fe89",
+      "mode": "100644"
+    },
+    "tool/build_web_engine.sh": {
+      "bytes": 2208,
+      "sha256": "8b203bf8d0f7cd97b2617a1ff79469fc24dc9b61c5b3d085037152abd7400358",
+      "gitSha": "d5fb9ed45f46eae0c9f4dc791ff402f41981d6ce",
+      "mode": "100755"
+    }
+  },
+  "publicationIdentityComplete": true,
+  "note": "Exact B runtime/provenance identity finalized from publisher sealed manifest; A/B must be two clean committed checkouts.",
+  "commonHarnessPaths": [
+    ".github/workflows/viewport-cache-paired.yml",
+    "integration_test/computerraria_dynamic_profile_test.dart",
+    "integration_test/support/computerraria_dynamic_backend.dart",
+    "native/circuit_viewport_cache_contract.c",
+    "test/native_viewport_cache_source_guard_test.dart",
+    "test/web/world_circuit_viewport_cache_actual.cjs",
+    "test/web/world_circuit_viewport_probe_contract.cjs",
+    "tool/export_viewport_cache_fixture.py",
+    "tool/perf/VIEWPORT_CACHE_PAIR.md",
+    "tool/perf/computerraria_dynamic_profile.sh",
+    "tool/perf/viewport_cache_pair.py",
+    "tool/perf/viewport_cache_pair_plan.json",
+    "tool/perf/viewport_cache_pair_test.py",
+    "tool/test_viewport_cache.py"
+  ],
+  "dynamicWindowKind": "original-15-second-wall-window",
+  "ordinalComparisonPolicy": "Compare all common pulse/tick ordinals; retain and enumerate every unmatched tail ordinal per process.",
+  "saveComparisonPolicy": "Always verify per-process save/reopen continuation. Cross-process saved bytes only compared at equal completed-batch counts and equal pre-save sampled state; no full-state equivalence claim for unequal counts."
+}

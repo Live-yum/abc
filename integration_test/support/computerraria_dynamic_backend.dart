@@ -107,6 +107,8 @@ class ComputerrariaDynamicBackend
         'nativeTicks': result.ticks,
         'netPulses': result.netPulses,
         'gatesFired': result.gatesFired,
+        'nativeActiveBytes': result.activeBytes,
+        'nativePeakBytes': result.peakBytes,
       });
       return result;
     } catch (error) {

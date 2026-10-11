@@ -182,6 +182,7 @@ void main() {
     final recorder = ProfileRecorder(
       frameBudgetUs: 1000000 / (knownHz ? observedHz : 60),
       profile: true,
+      currentRss: () => ProcessInfo.currentRss,
     );
     final modeResults = <Map<String, Object?>>[];
     final preparation = <String, Object?>{'status': 'pending'};
@@ -573,6 +574,39 @@ void main() {
         }
         await measure('import-derived', () => action('worldCircuitImport'));
         expect(backend!.latest!.sourceSha256, prepared.sha256);
+        // Identical bounded read-only probes outside the timed dynamic window.
+        // Displacing the ROI makes 'cold' refer only to the selected tile cache,
+        // never the OS filesystem cache or a cold process.
+        final viewportProbes = <Map<String, Object?>>[];
+        row['viewportQueryProbes'] = viewportProbes;
+        await backend!.commandWorldCircuit(
+          backend!.activeSession!,
+          WorldCircuitCommand.viewport(6484, 800, 64, 48),
+        );
+        String? probeHash;
+        for (final label in ['selected-roi-cold', 'selected-roi-warm-1', 'selected-roi-warm-2']) {
+          final began = Timeline.now;
+          final value = await backend!.commandWorldCircuit(
+            backend!.activeSession!,
+            WorldCircuitCommand.viewport(6485, 800, 64, 48),
+          );
+          final ended = Timeline.now;
+          final hash = sha256.convert(value.records).toString();
+          probeHash ??= hash;
+          expect(hash, probeHash);
+          expect(value.records.length, 3072 * 16);
+          viewportProbes.add({
+            'label': label,
+            'startUs': began,
+            'endUs': ended,
+            'wallUs': ended - began,
+            'recordsSha256': hash,
+            'recordCount': value.records.length ~/ 16,
+            'nativeActiveBytes': value.activeBytes,
+            'nativePeakBytes': value.peakBytes,
+            'rssBytes': ProcessInfo.currentRss,
+          });
+        }
         await selectMonitor();
         final preparedPixels = screenHash();
         final initialRam = await ramHash();
@@ -957,6 +991,9 @@ void main() {
       ];
       report['controllerOperations'] = recorder.controllerResults();
       report['clockDiagnostics'] = recorder.clockDiagnostics();
+      report['processRssAtCleanupBytes'] = ProcessInfo.currentRss;
+      report['processLifetimePeakRssBytes'] = ProcessInfo.maxRss;
+      report['memoryLimit'] = 'RSS endpoints and process-lifetime high water only; no steady-window RSS peak or plateau assertion.';
       binding.reportData = report;
       final file = File(standalonePath);
       await file.parent.create(recursive: true);

@@ -262,7 +262,25 @@ def main():
         if temporary == report.parent or report.parent in temporary.parents or temporary in report.parent.parents:
             raise ValueError('Temporary WLD storage must be separate from report artifacts')
         bundle = Path('build/linux/x64/profile/bundle')
-        if bundle.exists():
+        prebuilt_path = os.environ.get('ABC_DYNAMIC_PREBUILT_MANIFEST')
+        prebuilt = None
+        if prebuilt_path:
+            prebuilt = json.loads(Path(prebuilt_path).read_text())
+            if (prebuilt.get('schema') != 'abc.computerraria.build.v1' or
+                    prebuilt.get('source') != {'commit': head, 'checkedOutHead': head, 'dirty': False}):
+                raise ValueError('Prebuilt manifest is not this clean committed arm')
+            for name, value in prebuilt['sourceFilesSha256'].items():
+                if digest(name) != value:
+                    raise ValueError('Prebuilt source hash mismatch: ' + name)
+            for name, relative in (('terraforge', 'terraforge'),
+                                   ('libabc_engine.so', 'lib/libabc_engine.so'),
+                                   ('libapp.so', 'lib/libapp.so')):
+                actual = bundle / relative
+                if digest(actual) != prebuilt['artifacts'][name]['sha256']:
+                    raise ValueError('Prebuilt artifact mismatch: ' + name)
+            record['prebuiltManifestSha256'] = digest(prebuilt_path)
+            record['buildPolicy'] = 'verified-prebuilt-fresh-process-no-rebuild'
+        elif bundle.exists():
             raise ValueError('A fresh profile build directory is required; no prior bundle may be attributed')
         paths['inputs'].write_text(json.dumps({
             'schema': 'abc.computerraria-dynamic-inputs.v1',
@@ -284,6 +302,8 @@ def main():
                 f'--dart-define=PERF_FLUTTER_VERSION={version}',
                 f'--dart-define=PERF_RENDERER={renderer}',
                 f'--dart-define=PERF_RUNNER={os.getenv("TERRA_PERF_RUNNER", "local-linux-xvfb")}']
+        if prebuilt is not None:
+            argv.append(f'--use-application-binary={bundle.resolve() / "terraforge"}')
         record.update({'status': 'running', 'command': argv})
         save()
         with paths['log'].open('x') as output:
@@ -332,6 +352,8 @@ def main():
         if all(path.is_file() for path in [*artifacts, cache, ninja]):
             record_build([str(path) for path in artifacts], paths['build'], cache, ninja)
             build = json.loads(paths['build'].read_text())
+            if prebuilt is not None and build != prebuilt:
+                raise ValueError('Prebuilt source/artifact manifest changed while running')
             if build['cmake'].get('ABC_PERF_COUNTERS') != 'OFF':
                 raise ValueError('Diagnostic requires the ordinary counter-disabled native profile build')
             record['buildProvenanceRecorded'] = True
