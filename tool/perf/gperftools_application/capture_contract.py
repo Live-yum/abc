@@ -115,7 +115,9 @@ class CutWatcher:
                 self.cuts.append(evidence)
                 self.records.append({'cut': cut, 'gaugeObservedMonotonic': gauge['observed'],
                                      'receiptSeenMonotonic': seen, 'ackPublishedMonotonic': ended,
-                                     'receipt': receipt})
+                                     'receipt': receipt,
+                                     'mappingEvidence': {key: evidence['bracket'][key] for key in
+                                         ('mappingRoles', 'mapDifferences', 'beforeSha256', 'afterSha256')}})
         for index in range(len(self.cuts) + 1, 2):
             require(not (self.directory / (CUTS[index][2] + '.receipt')).exists(), 'Out-of-order dump receipt')
 
@@ -170,9 +172,9 @@ def sidecar_caps(roots, *, extra_bytes=0):
             'All application sidecars exceed aggregate 256 MiB cap')
     require(sum(row['heapCount'] for row in records) <= 4, 'Unexpected extra application profile')
     maps = [(name, entry['bytes']) for row in records for name, entry in row['files'].items() if name.endswith('.maps')]
-    startup = [(name, size) for name, size in maps if Path(name).name == 'startup.maps']
-    endpoints = [(name, size) for name, size in maps if Path(name).name != 'startup.maps']
-    require(len(startup) <= 2 and len(endpoints) <= 8 and len(maps) <= 10
+    startup = [(name, size) for name, size in maps if Path(name).name in ('startup.maps', 'startup-consistency.maps')]
+    endpoints = [(name, size) for name, size in maps if Path(name).name not in ('startup.maps', 'startup-consistency.maps')]
+    require(len(startup) <= 4 and len(endpoints) <= 8 and len(maps) <= 12
             and sum(size for _, size in maps) <= 10 << 20,
-            'Two startup identity plus eight endpoint maps cap exceeded')
+            'Four startup identity/consistency plus eight endpoint maps cap exceeded')
     return sum(row['retainedBytes'] for row in records)

@@ -26,11 +26,11 @@ TARGET = 'integration_test/computer_memory_ownership_test.dart'
 OLD_WORKFLOW = '.github/workflows/memory-ownership.yml'
 NEW_WORKFLOW = '.github/workflows/gperftools-application.yml'
 ROOT = Path(__file__).resolve().parents[3]
-DIRECT_PARENT = '96c096e5ada603f1e6db517a76101dd9fe4e09d5'
-DIRECT_PARENT_TREE = '7b6223f3b1c5703e8fadca6d3921b7597f9ced56'
+DIRECT_PARENT = '698563decf443823edebebbffcd930154a69dc90'
+DIRECT_PARENT_TREE = '9a38eaffbd709f0eb3e96d911bdaafab8cbb7b04'
 INPLACE_TEST = 'tool/perf/gperftools_application/test_inplace_elf_contracts.py'
-REVIEWED_IMPLEMENTATION_BLOBS = {'tool/perf/gperftools_application/attribution_coverage.py': '9329db360c1df47ed92640dffae5d64c99ff2455', 'tool/perf/gperftools_application/elf_identity.py': 'ad747cf2a9172da1c1ce22cc3e8a2424b5542910', 'tool/perf/gperftools_application/run_pair.py': 'a85f81ee214ea0bdbce5b50ef213394818a5a9df', 'tool/perf/gperftools_application/test_attribution_coverage.py': '012cf61a0acab8b6977e536c8eaec4603bb924d3', 'tool/perf/gperftools_application/test_deferred_identity_contracts.py': 'b1e3bc5cfa7a9aa5bd1f3ecc4f050fa1de5ab9d8', 'tool/perf/gperftools_application/test_runner_contracts.py': '4057b720385312788ed4e3434a1aab5411dad299'}
-NEW_FILES = frozenset(['tool/perf/gperftools_application/attribution_coverage.py', 'tool/perf/gperftools_application/test_attribution_coverage.py', 'tool/perf/gperftools_application/test_deferred_identity_contracts.py'])
+REVIEWED_IMPLEMENTATION_BLOBS = {'tool/perf/gperftools_application/capture_contract.py': '3ffec84895a7e7a07841b68053dd208c9593c803', 'tool/perf/gperftools_application/test_runner_contracts.py': 'beab030e1d577c1bf152eb6cf4cda287fed007bb', 'tool/perf/gperftools_application/run_pair.py': '315bed4ef9946393f01a3ed74b2ea8d8cb3713c8', 'tool/perf/gperftools_application/dependencies.py': '483aa018cb10c82abd431dce099ab87462f1ef41', 'tool/perf/gperftools_application/test_maps_capture_contracts.py': 'e8ec9fee21eba312ab64cf748dcbcc33b8d1f2ae', 'tool/perf/gperftools_application/elf_identity.py': '945692a26651679c80b342d8ff8c3af74d146603', 'tool/perf/gperftools_application_contracts/application_contract.py': '3c707459d19220766e65e4320a5751826582b3b1', 'tool/perf/gperftools_application_contracts/test_maps_role_contracts.py': '7da98ed6d8ab80b76dac7aa59d2eb88caf3cd219'}
+NEW_FILES = frozenset(['tool/perf/gperftools_application/test_maps_capture_contracts.py', 'tool/perf/gperftools_application_contracts/test_maps_role_contracts.py'])
 CORRECTION_PATHS = frozenset(REVIEWED_IMPLEMENTATION_BLOBS) | frozenset({
     'tool/perf/gperftools_application/application_source.py',
     MANIFEST,
@@ -116,26 +116,26 @@ def verify_layers(manifest, base, inherited, current):
 
 
 def verify_correction_parent(head, parents, parent_tree_sha, parent, current):
-    """Only the eight reviewed correction paths may differ from the pinned parent.
+    """Only the ten reviewed correction paths may differ from the pinned parent.
 
     The independent 9d4/5a checks still run in verify_layers. This additional gate
     prevents a follow-up commit from modifying any already-reviewed application,
     workload, workflow, package contract, budget, or provenance dependency.
     """
     require(parents == [head, DIRECT_PARENT],
-            'Deferred-symbol correction must have exactly the fixed diagnostic parent')
+            'Maps-role correction must have exactly the fixed diagnostic parent')
     require(parent_tree_sha == DIRECT_PARENT_TREE, 'Fixed diagnostic parent tree differs')
-    require(set(parent) - set(current) == set(), 'Deferred-symbol correction cannot delete parent files')
+    require(set(parent) - set(current) == set(), 'Maps-role correction cannot delete parent files')
     require(set(current) - set(parent) == NEW_FILES,
-            'Only the three reviewed deferred-symbol files may be added to the fixed parent')
+            'Only the two reviewed maps-role test files may be added to the fixed parent')
     changed = {name for name in parent.keys() | current.keys() if parent.get(name) != current.get(name)}
-    require(changed == CORRECTION_PATHS, 'Deferred-symbol correction differs outside the exact eight-path delta')
+    require(changed == CORRECTION_PATHS, 'Maps-role correction differs outside the exact ten-path delta')
     for name in CORRECTION_PATHS:
         require(current[name]['mode'] == '100644'
                 and (name in NEW_FILES or parent[name]['mode'] == '100644'),
-                'Deferred-symbol correction paths must remain regular non-executable sources')
+                'Maps-role correction paths must remain regular non-executable sources')
     for name, blob in REVIEWED_IMPLEMENTATION_BLOBS.items():
-        require(current[name]['blob'] == blob, 'Reviewed deferred-symbol implementation bytes differ: ' + name)
+        require(current[name]['blob'] == blob, 'Reviewed maps-role implementation bytes differ: ' + name)
     return sorted(changed)
 
 
@@ -147,7 +147,7 @@ def source_gate(root, base_root, inherited_root, output):
     require(head == os.environ.get('GITHUB_SHA'), 'Checkout head differs from this exact CI event')
     parents = git(root, 'rev-list', '--parents', '-n', '1', head).split()
     require(parents == [head, DIRECT_PARENT],
-            'Deferred-symbol correction must have exactly the fixed diagnostic parent')
+            'Maps-role correction must have exactly the fixed diagnostic parent')
     parent_tree_sha = git(root, 'rev-parse', DIRECT_PARENT + '^{tree}')
     require(parent_tree_sha == DIRECT_PARENT_TREE, 'Fixed diagnostic parent tree differs')
     require(not git(root, 'status', '--porcelain', '--untracked-files=all'), 'Clean committed source required')
@@ -182,7 +182,7 @@ def source_gate(root, base_root, inherited_root, output):
              'diagnosticOverlay': True, 'shippingRuntimeUsed': False,
              'scheduleSha256': files['tool/perf/memory_ownership_schedule.json']['sha256'],
              'patchBaseCommit': DIRECT_PARENT,
-             'patchScope': 'exact-eight-path-deferred-symbol-correction',
+             'patchScope': 'exact-ten-path-maps-role-correction',
              'patchSha256': hashlib.sha256(git(root, 'diff', '--binary', '--full-index', DIRECT_PARENT, head, binary=True)).hexdigest()}
     with Path(output).open('x') as stream:
         json.dump(proof, stream, indent=2, sort_keys=True); stream.write('\n')

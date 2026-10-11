@@ -2,8 +2,8 @@
   "baseCommit": "9d4cd5a0f9db03042a3986689fea374ba92d78b8",
   "baseTree": "68de875853d92b0352077865cf862ffaceaaec92",
   "branch": "refs/heads/codex/memory-allocation-application-9d4",
-  "directParentCommit": "96c096e5ada603f1e6db517a76101dd9fe4e09d5",
-  "directParentTree": "7b6223f3b1c5703e8fadca6d3921b7597f9ced56",
+  "directParentCommit": "698563decf443823edebebbffcd930154a69dc90",
+  "directParentTree": "9a38eaffbd709f0eb3e96d911bdaafab8cbb7b04",
   "files": {
     ".flutter-version": {
       "blob": "a50854ef9eaa3672c40096fbbbe6beb8747a8788",
@@ -4266,10 +4266,10 @@
       "sha256": "aa7a4d3c8625ccc256fc0ef950d1d6d8aafdaed5b4fa32843582955201f1c078"
     },
     "tool/perf/gperftools_application/application_source.py": {
-      "blob": "d87ee916380b33d6b7e253b3264602f3c48fefa0",
-      "bytes": 13332,
+      "blob": "676f1501bfd52ea81e09d361f11c45e701cfc51e",
+      "bytes": 13435,
       "mode": "100644",
-      "sha256": "80d5061b232372494ed977096618a8297b119772edda38907577d688f51cb6fd"
+      "sha256": "3fc87d8bcd365fe46bdbaad96cb37d7bf0f6f09ab2a5a18bd349b6f0032b0b5b"
     },
     "tool/perf/gperftools_application/attribution_coverage.py": {
       "blob": "9329db360c1df47ed92640dffae5d64c99ff2455",
@@ -4284,22 +4284,22 @@
       "sha256": "946f915daa0788a5ebfe58b9ef9aaf616715d6f0218dbdb111205a8a2957d37e"
     },
     "tool/perf/gperftools_application/capture_contract.py": {
-      "blob": "6a6948f30da50e416a751b211ce5b9bbbf988b30",
-      "bytes": 10672,
+      "blob": "3ffec84895a7e7a07841b68053dd208c9593c803",
+      "bytes": 10956,
       "mode": "100644",
-      "sha256": "2e0d192a35e199c5093cbde4a8453554989fe7b96c965292fedde8393f677084"
+      "sha256": "4931fa322bcdddd34e5fbca9661877a9cd824761c1c29c626ab97da736f516a7"
     },
     "tool/perf/gperftools_application/dependencies.py": {
-      "blob": "ba27279e0ebd60a588b3d9a9e5d1de0b94f30b3e",
+      "blob": "483aa018cb10c82abd431dce099ab87462f1ef41",
       "bytes": 1596,
       "mode": "100644",
-      "sha256": "b885f0b8af16cd0011c03a793c25e5983728eecd9d93d1c0829624ca6eff3b0b"
+      "sha256": "e0d6fac52424f48bd37ed98a560607e304b582e50ebf3d68fdd6ed5971173676"
     },
     "tool/perf/gperftools_application/elf_identity.py": {
-      "blob": "ad747cf2a9172da1c1ce22cc3e8a2424b5542910",
-      "bytes": 45479,
+      "blob": "945692a26651679c80b342d8ff8c3af74d146603",
+      "bytes": 46867,
       "mode": "100644",
-      "sha256": "247188f1c181dbc8e0ec69ec83670b0f99c5b68064f2aadfb33ae483e80b3f01"
+      "sha256": "d0cc55807f683f9f788fdb1d838191a223c853abcc60edbe8171bbce040f9216"
     },
     "tool/perf/gperftools_application/harness_frozen_sources.json": {
       "blob": "974f2b4fcbd4202d59674881b764bc04e12e8f0e",
@@ -4320,10 +4320,10 @@
       "sha256": "cf6386b728d98c9b6bc9fc116c4df9a96fe8952b6a0a10e509ba6a25be0c0282"
     },
     "tool/perf/gperftools_application/run_pair.py": {
-      "blob": "a85f81ee214ea0bdbce5b50ef213394818a5a9df",
-      "bytes": 34563,
+      "blob": "315bed4ef9946393f01a3ed74b2ea8d8cb3713c8",
+      "bytes": 34592,
       "mode": "100644",
-      "sha256": "d2a1e76991e967fd53cdfd7347a9fa8cdc57be1409061dffd08f89274e253360"
+      "sha256": "d8891c998476343ad913dccef14a5f2ccf20991f7dfbab76db427a223049b67d"
     },
     "tool/perf/gperftools_application/test_attribution_coverage.py": {
       "blob": "012cf61a0acab8b6977e536c8eaec4603bb924d3",
@@ -4349,11 +4349,17 @@
       "mode": "100644",
       "sha256": "99b87b014f411fcf98dc26d252df0064d44f14ae610329be1e02624f687845de"
     },
-    "tool/perf/gperftools_application/test_runner_contracts.py": {
-      "blob": "4057b720385312788ed4e3434a1aab5411dad299",
-      "bytes": 24116,
+    "tool/perf/gperftools_application/test_maps_capture_contracts.py": {
+      "blob": "e8ec9fee21eba312ab64cf748dcbcc33b8d1f2ae",
+      "bytes": 9528,
       "mode": "100644",
-      "sha256": "1b64c7dd511a8f4e9c73e5b22400d120bda1f7468d8907b562cd881fc04b59d3"
+      "sha256": "91fd4b8dcd0b590a5414836454fd40e3cb61b090bfcec84fa4eb2009b9e15e77"
+    },
+    "tool/perf/gperftools_application/test_runner_contracts.py": {
+      "blob": "beab030e1d577c1bf152eb6cf4cda287fed007bb",
+      "bytes": 24177,
+      "mode": "100644",
+      "sha256": "6d83976a43fe30b0319d84273dae1d456519b3af97bccfb44975ecd795ff859f"
     },
     "tool/perf/gperftools_application_contracts/ENTRYPOINT_CONTRACT.md": {
       "blob": "8db6796471c77a19d5cb54d22fc7fb81511a6224",
@@ -4380,10 +4386,10 @@
       "sha256": "455eced87350e3f57bc3eaf8728141cdc4aafb58de3048f4e24677dfd937c9c4"
     },
     "tool/perf/gperftools_application_contracts/application_contract.py": {
-      "blob": "08b322ffc2dd5918b587cbfd8c1c349986079b68",
-      "bytes": 29875,
+      "blob": "3c707459d19220766e65e4320a5751826582b3b1",
+      "bytes": 32505,
       "mode": "100644",
-      "sha256": "4cbfff240cfd5073f347af52aa3bb1c87cd1669b5a3375f14e44623a2504d1bf"
+      "sha256": "34e4edb73bcfa035ea159bc5c95f1c71f9d553724bfd04a58e8575dacda25c4d"
     },
     "tool/perf/gperftools_application_contracts/bounded_supervision.py": {
       "blob": "be1c1a338e709b774c72530a8206664d0b1cb33d",
@@ -4558,6 +4564,12 @@
       "bytes": 9991,
       "mode": "100644",
       "sha256": "fedb99018a10e8226e522fa9091d8b9211ca32e118aaa3b87709ad8c9fb90f07"
+    },
+    "tool/perf/gperftools_application_contracts/test_maps_role_contracts.py": {
+      "blob": "7da98ed6d8ab80b76dac7aa59d2eb88caf3cd219",
+      "bytes": 31270,
+      "mode": "100644",
+      "sha256": "96213034462532d236978a333aa6d97ffc4fae2ae8378696c3345ac7c856701a"
     },
     "tool/perf/gperftools_application_contracts/test_native_contracts.py": {
       "blob": "c213ab903bd380eb0fb2809ff43db17fabfed53b",

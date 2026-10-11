@@ -190,8 +190,8 @@ class PairRunner:
                                 'nativeElapsedCheckSeconds': 10},
                             'observedTargetRssStopBytes': 2 << 30, 'kernelHardRssLimit': False,
                             'mapBudget': {'startupIdentityMaps': 2, 'endpointBracketMaps': 8,
-                                'totalMaps': 10, 'eachBytesMaximum': 1 << 20, 'aggregateBytesMaximum': 10 << 20,
-                                'startupConsistencyReadsNotRetained': 2, 'totalProcMapsReads': 12},
+                                'startupConsistencyMaps': 2, 'totalMaps': 12, 'eachBytesMaximum': 1 << 20, 'aggregateBytesMaximum': 10 << 20,
+                                'startupConsistencyReadsNotRetained': 0, 'totalProcMapsReads': 12},
                             'ackPolicy': 'supervisor conservatively requires ACK within 2s of dumpEnd; native starts its 2s wait after receipt publication'}
         self.persist()
 

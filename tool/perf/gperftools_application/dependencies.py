@@ -26,5 +26,5 @@ PINS = {
 for name, expected in PINS.items():
     if hashlib.sha256((PREFLIGHT / name).read_bytes()).hexdigest() != expected:
         raise RuntimeError('Official package/parser dependency changed: ' + name)
-if hashlib.sha256((CONTRACTS / 'application_contract.py').read_bytes()).hexdigest() != '4cbfff240cfd5073f347af52aa3bb1c87cd1669b5a3375f14e44623a2504d1bf':
+if hashlib.sha256((CONTRACTS / 'application_contract.py').read_bytes()).hexdigest() != '34e4edb73bcfa035ea159bc5c95f1c71f9d553724bfd04a58e8575dacda25c4d':
     raise RuntimeError('ACK-v2/in-place ELF application contract dependency changed')

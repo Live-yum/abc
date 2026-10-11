@@ -32,6 +32,7 @@ from run_pair import (KNOWN_IMAGE_FAILURE, actual_ci_guard, exact_profile_files,
 from test_inplace_elf_contracts import InplaceElfContracts
 from test_attribution_coverage import AttributionCoverageContracts
 from test_deferred_identity_contracts import DeferredIdentityContracts
+from test_maps_capture_contracts import MapsCaptureContracts
 
 
 class ProcessContracts(unittest.TestCase):

@@ -45,7 +45,9 @@ raw_parser = _load('pprof_raw')
 ContractError = small.ContractError
 require = small.require
 MAX_HEAP = 1 << 20  # exclusive, the upstream fixed buffer
-MAX_MAPS = 1 << 20  # inclusive, each of eight raw snapshots
+MAX_MAPS = 1 << 20  # inclusive, each retained raw snapshot
+MAX_MAPS_FILES = 12  # retain the original reads, including both startup reads
+MAX_MAPS_TOTAL = 10 << 20  # unchanged accepted pair-wide maps byte budget
 MAX_RAW = 16 << 20  # inclusive; NEVER the child's 64 MiB RLIMIT_FSIZE
 MAX_SIDECAR = 256 << 20
 MAX_MODULE = 64 << 20  # unchanged built application/tool artifact limit
@@ -121,7 +123,10 @@ def parse_maps(data, *, heap_format=False):
         require(row['start'] < row['end'] < 2**64 and row['inode'] < 2**64
                 and row['offset'] < 2**64 and (not rows or rows[-1]['end'] <= row['start']),
                 'Overlapping/invalid maps range')
-        require(not name.endswith(' (deleted)'), 'Deleted mapping cannot establish file identity')
+        # A deleted data mapping is retained verbatim as evidence. Never strip
+        # the suffix and open the old path as though it still identified a file.
+        require('x' not in perms or not name.endswith(' (deleted)'),
+                'Deleted executable mapping cannot establish file identity')
         require(not name or name.startswith('/') or re.fullmatch(
             r'\[(?:heap|stack(?::\d+)?|vdso|vvar|vvar_vclock|vsyscall|anon:[^\[\]]+|anon_shmem:[^\[\]]+)\]', name),
             'Unknown or unresolved mapping path')
@@ -167,6 +172,40 @@ def map_key(row, *, device=False):
     return tuple(row[k] for k in keys) + ((row['device'],) if device else ())
 
 
+def map_role(row):
+    """Classify retained maps evidence without inventing code/file identity."""
+    executable = 'x' in row['permissions']
+    if row['path'].startswith('/'):
+        if row['path'].endswith(' (deleted)'):
+            require(not executable, 'Deleted executable mapping cannot establish file identity')
+            return 'deleted-file-non-executable'
+        return 'file-executable' if executable else 'file-non-executable'
+    kind = 'named' if row['path'] else 'anonymous'
+    return kind + ('-executable' if executable else '-non-executable')
+
+
+def map_role_counts(rows):
+    counts = defaultdict(int)
+    for row in rows:
+        counts[map_role(row)] += 1
+    return dict(sorted(counts.items()))
+
+
+def map_difference(before, after, *, device=False):
+    """Record exact additions/removals, without inferring why a range changed.
+
+    gperftools omits real device numbers. Compare device only when both inputs
+    are /proc evidence, and keep every original row (including deleted paths).
+    """
+    left = {map_key(row, device=device): row for row in before}
+    right = {map_key(row, device=device): row for row in after}
+    describe = lambda rows, keys: [{'role': map_role(rows[key]), 'mapping': rows[key]}
+                                   for key in sorted(keys)]
+    return {'comparesDevice': device,
+            'removed': describe(left, left.keys() - right.keys()),
+            'added': describe(right, right.keys() - left.keys())}
+
+
 def validate_map_bracket(profile, before_path, after_path, *, necessary_pcs=()):
     before_bytes = bounded_bytes(before_path, MAX_MAPS)
     after_bytes = bounded_bytes(after_path, MAX_MAPS)
@@ -176,10 +215,14 @@ def validate_map_bracket(profile, before_path, after_path, *, necessary_pcs=()):
     expected = executable_files(before)
     require(expected and expected == executable_files(after) == executable_files(profile['maps']),
             'Incomplete/unstable file-backed executable map set')
-    before_all, after_all, dumped = ({map_key(r) for r in rows}
-                                    for rows in (before, after, profile['maps']))
-    require(before_all & after_all <= dumped <= before_all | after_all,
-            'Incomplete/unknown full maps snapshot (including stable anonymous tail)')
+    # Preserve the existing executable/anonymous-code interval gate. Data
+    # regions may be created and removed entirely inside the bracket; their
+    # differences are evidence, not proof of code substitution or truncation.
+    before_code, after_code, dumped_code = ({map_key(r) for r in rows
+                                            if 'x' in r['permissions']}
+                                           for rows in (before, after, profile['maps']))
+    require(before_code & after_code <= dumped_code <= before_code | after_code,
+            'Incomplete/unknown full maps executable snapshot (including stable anonymous tail)')
     # Device is absent from the profiler's text, so independently retain/compare
     # it between /proc snapshots; inode/path/range/offset must also be stable.
     require({map_key(r, device=True) for r in before if map_key(r) in expected}
@@ -196,10 +239,17 @@ def validate_map_bracket(profile, before_path, after_path, *, necessary_pcs=()):
         row = candidates[0][0]
         if not row['path'].startswith('/'):
             non_elf.append({'pc': pc, 'mapping': row})
-    # Requiring all map rows would reject ordinary allocator growth during dump;
-    # required executable mappings and PCs are exact, anonymous rows preserved.
+    # "complete" means the bounded evidence and required code/PC contracts
+    # passed; it does not assert simultaneous equality of mutable data maps.
     return {'before': before, 'after': after, 'nonElfFrames': non_elf,
             'fileExecutableMaps': sorted(expected), 'complete': True,
+            'mappingRoles': {'before': map_role_counts(before),
+                             'profile': map_role_counts(profile['maps']),
+                             'after': map_role_counts(after)},
+            'mapDifferences': {
+                'beforeToProfile': map_difference(before, profile['maps']),
+                'profileToAfter': map_difference(profile['maps'], after),
+                'beforeToAfter': map_difference(before, after, device=True)},
             'beforeSha256': hashlib.sha256(before_bytes).hexdigest(),
             'afterSha256': hashlib.sha256(after_bytes).hexdigest(),
             'atomicObjectSnapshot': False}
@@ -424,7 +474,7 @@ def check_sidecar_caps(directory, *, expected_files=None, max_heaps=4):
                 require(size <= MAX_RAW, 'Official raw 16 MiB cap')
             entries[rel] = {'bytes': size}
     require(max_heaps in (2, 4) and heap_count <= max_heaps and heap_bytes < max_heaps * MAX_HEAP
-            and maps_count <= 8 and maps_bytes <= 8 * MAX_MAPS, 'Pair heap/maps total cap')
+            and maps_count <= MAX_MAPS_FILES and maps_bytes <= MAX_MAPS_TOTAL, 'Pair heap/maps total cap')
     if expected_files is not None:
         runtime_expected = set(expected_files)
         # These two fixed in-progress names exist only during atomic ACK

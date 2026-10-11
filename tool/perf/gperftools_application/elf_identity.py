@@ -294,16 +294,43 @@ def load_bias(rows, metadata):
     return next(iter(candidates))
 
 
-def target_maps(identity):
+def target_maps(identity, evidence_path, cap_check):
+    evidence_path = Path(evidence_path)
     identity.verify()
-    fd = os.open('maps', os.O_RDONLY | os.O_NOFOLLOW, dir_fd=identity.proc_fd)
+    read_start = time.monotonic_ns()
     try:
-        with os.fdopen(fd, 'rb', closefd=False) as stream:
-            data = stream.read(MAX_MAPS + 1)
-        require(0 < len(data) <= MAX_MAPS, 'Startup target maps cap')
-    finally:
-        os.close(fd)
+        fd = os.open('maps', os.O_RDONLY | os.O_NOFOLLOW, dir_fd=identity.proc_fd)
+        try:
+            with os.fdopen(fd, 'rb', closefd=False) as stream:
+                data = stream.read(MAX_MAPS + 1)
+        finally:
+            os.close(fd)
+    except BaseException as exc:
+        save(evidence_path.with_suffix('.capture.json'), {
+            'stage': evidence_path.stem, 'readStartMonotonicNs': read_start,
+            'readEndMonotonicNs': time.monotonic_ns(),
+            'rawAvailable': False, 'complete': False,
+            'readErrorType': type(exc).__name__, 'savedBeforeParse': True,
+            'readLimitBytes': MAX_MAPS + 1,
+        }, new=True)
+        cap_check()
+        raise
+    read_end = time.monotonic_ns()
+    # Persist the bounded read before either parsing or post-read identity checks.
+    # An over-cap read retains only the bounded prefix and explicitly marks it incomplete.
+    with evidence_path.open('xb') as stream:
+        stream.write(data[:MAX_MAPS])
+    save(evidence_path.with_suffix('.capture.json'), {
+        'stage': evidence_path.stem, 'readStartMonotonicNs': read_start,
+        'readEndMonotonicNs': read_end, 'rawAvailable': True,
+        'readBytes': len(data), 'retainedBytes': min(len(data), MAX_MAPS),
+        'complete': len(data) <= MAX_MAPS,
+        'retainedSha256': hashlib.sha256(data[:MAX_MAPS]).hexdigest(),
+        'readLimitBytes': MAX_MAPS + 1, 'savedBeforeParse': True,
+    }, new=True)
+    cap_check()
     identity.verify()
+    require(0 < len(data) <= MAX_MAPS, 'Startup target maps cap')
     return data, parse_maps(data)
 
 
@@ -319,9 +346,8 @@ class BoundModules:
         presealed = presealed or {}
         sealed = {**required, **presealed}
         try:
-            data, maps = target_maps(identity)
             Path(evidence).mkdir(mode=0o700, parents=True, exist_ok=False)
-            (Path(evidence) / 'startup.maps').write_bytes(data)
+            data, maps = target_maps(identity, self.evidence / 'startup.maps', cap_check)
             rows = [row for row in maps if 'x' in row['permissions'] and row['path'].startswith('/')]
             paths = sorted({row['path'] for row in rows})
             require(0 < len(paths) <= 128 and set(required) <= set(paths),
@@ -349,7 +375,7 @@ class BoundModules:
             cap_check()
             validate_module_records({'fileExecutableMaps': sorted(self.executable_keys)}, self.records)
             self.verify_metadata()
-            _, latest = target_maps(identity)
+            _, latest = target_maps(identity, self.evidence / 'startup-consistency.maps', cap_check)
             require({map_key(row) for row in latest if 'x' in row['permissions'] and row['path'].startswith('/')} == self.executable_keys,
                     'Executable module maps changed during startup gate')
             need_time(deadline)
