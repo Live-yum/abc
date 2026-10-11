@@ -617,6 +617,16 @@ void main() {
         }
         captures.add(await capture('fixed-trace'));
         if (optimized) {
+          // Resolve test finders only after the previous awaited pump/capture.
+          // Frame callbacks read these live production objects directly; tester
+          // APIs would conflict with the next action's guarded pump.
+          final monitor = find.byType(ComputerDisplay);
+          final monitorElement = tester.element(monitor);
+          final rawElement = tester.element(
+            find.descendant(of: monitor, matching: find.byType(RawImage)),
+          );
+          final monitorBox = monitorElement.findRenderObject() as RenderBox;
+          final displayView = View.of(monitorElement);
           final nativeStart = backend!.frames.length;
           final uiStart = uiChanges.length;
           final beforeDynamicPixels = screenHash();
@@ -640,14 +650,21 @@ void main() {
               return;
             }
             try {
-              final monitor = find.byType(ComputerDisplay);
-              final raw = tester.widget<RawImage>(
-                find.descendant(of: monitor, matching: find.byType(RawImage)),
-              );
+              if (!monitorElement.mounted ||
+                  !rawElement.mounted ||
+                  !monitorBox.attached ||
+                  !identical(monitorElement.findRenderObject(), monitorBox)) {
+                throw StateError('Running production monitor was replaced');
+              }
+              final raw = rawElement.widget;
+              if (raw is! RawImage) {
+                throw StateError('Running production image was replaced');
+              }
               if (raw.image == null) return;
-              final rect = tester.getRect(monitor);
+              final rect =
+                  monitorBox.localToGlobal(Offset.zero) & monitorBox.size;
               final viewport =
-                  tester.view.physicalSize / tester.view.devicePixelRatio;
+                  displayView.physicalSize / displayView.devicePixelRatio;
               if (rect.width <= 0 ||
                   rect.height <= 0 ||
                   rect.left < -1 ||
