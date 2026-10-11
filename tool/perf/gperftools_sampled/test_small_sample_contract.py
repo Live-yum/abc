@@ -6,16 +6,19 @@ connection to the known allocation and cannot prove real stack/lifetime matches.
 Official development headers are used only by the explicit compile-only test.
 """
 from __future__ import annotations
+from contextlib import contextmanager
 import errno
 import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import stat
 import subprocess
 import tempfile
 import unittest
+import resource
 
 ROOT=Path(__file__).resolve().parent
 STUB_HEADER='''// OFFLINE ONLY. Synthetic public-API-shaped stub.
@@ -61,12 +64,26 @@ class SmallSampleContractTests(unittest.TestCase):
         cls.binary=cls.build/'small-offline-stub'
         cls.flags=['-std=c++17','-O2','-Wall','-Wextra','-Werror',
                    '-fno-omit-frame-pointer','-fno-optimize-sibling-calls']
-        run([shutil.which('c++') or 'c++',*cls.flags,'-I',str(cls.build),'-I',str(ROOT),
+        selected=os.environ.get('ABC_SAMPLE_STUB_FORTIFY_LEVEL','default')
+        if selected not in ('default','2','3'):
+            raise ValueError('ABC_SAMPLE_STUB_FORTIFY_LEVEL must be default, 2, or 3')
+        # Select a known test level without accepting arbitrary compiler flags.
+        # Default keeps the compiler's own hardening; forced levels remain on.
+        fortify_flags=[] if selected=='default' else ['-U_FORTIFY_SOURCE',f'-D_FORTIFY_SOURCE={selected}']
+        compiler=shutil.which('c++') or 'c++'
+        cls.compiler_version=run([compiler,'--version']).stdout.splitlines()[0]
+        run([compiler,*cls.flags,*fortify_flags,'-I',str(cls.build),'-I',str(ROOT),
              '-DABC_SAMPLE_OFFLINE_TESTING',f'-DABC_SAMPLE_LIBRARY_CONFIG="{cls.config}"',
              str(ROOT/'small_contract_stub_test.cc'),str(ROOT/'sample_wrapper.cc'),
              *[f'-Wl,--wrap={name}' for name in
-               ('malloc','free','dlsym','dladdr','open','openat','read','write','close','fsync')],
+               ('malloc','free','dlsym','dladdr','open','openat','read','__read_chk','write','close','fsync')],
              '-ldl','-o',str(cls.binary)])
+        build_info=json.loads(run([str(cls.binary),'--offline-build-info']).stdout)
+        assert build_info['offline'] and not build_info['officialRuntimeInvoked']
+        cls.fortify_level=build_info['fortifyLevel']
+        if selected!='default' and cls.fortify_level!=int(selected):
+            raise AssertionError('Requested fortified test level was not compiled')
+        print(f'Synthetic small contract: {cls.compiler_version}; __USE_FORTIFY_LEVEL={cls.fortify_level}')
 
     @classmethod
     def tearDownClass(cls):
@@ -80,6 +97,19 @@ class SmallSampleContractTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    @contextmanager
+    def fresh_case(self):
+        # A failed subTest assertion must not leave a cut directory for the
+        # next subcase. Explicit existing-cut/symlink tests keep their setup.
+        previous=self.directory
+        with tempfile.TemporaryDirectory(prefix='abc-small-offline-subcase-') as tmp:
+            self.directory=Path(tmp)
+            self.directory.chmod(0o700)
+            try:
+                yield
+            finally:
+                self.directory=previous
+
     def case(self,scenario='success',env_changes=None,output=None):
         env=clean_environment()
         for key,value in (env_changes or {}).items():
@@ -89,6 +119,7 @@ class SmallSampleContractTests(unittest.TestCase):
         execution,evidence=map(json.loads,lines)
         self.assertTrue(evidence['offline'])
         self.assertFalse(evidence['officialRuntimeInvoked'])
+        self.assertEqual(evidence['fortifyLevel'],self.fortify_level)
         self.assertEqual(evidence['liveFds'],0)
         self.assertEqual((evidence['knownStillLive'],evidence['probeStillLive']),(0,0))
         self.assertLessEqual(evidence['knownAllocations'],1)
@@ -120,39 +151,36 @@ class SmallSampleContractTests(unittest.TestCase):
 
     def test_null_or_unowned_probe_never_samples(self):
         for scenario in ('null-provider','probe-not-owned','probe-allocation-failure'):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],r['sampleCalls'],r['knownAllocations']),(7,0,0))
                 self.assertEqual(list(self.directory.iterdir()),[])
 
     def test_all_public_provider_addresses_are_required(self):
         for scenario in ('wrong-instance-address','wrong-calloc-address','wrong-realloc-address','wrong-free-address'):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],r['sampleCalls'],r['instanceCalls']),(6,0,0))
 
     def test_changed_instance_or_provider_rejects_after_single_sample(self):
         for scenario in ('provider-address-changed','instance-changed-after-sample'):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],r['sampleCalls'],r['knownAllocations']),(25,1,0))
                 self.assertEqual(self.cut()['nativeStatus'],4)
                 self.assertFalse((self.directory/'baseline/q0.sample.heap').exists())
-                shutil.rmtree(self.directory/'baseline')
 
     def test_missing_or_changed_instance_after_allocation_frees_once(self):
         for scenario in ('null-provider-held','instance-changed-held','ownership-not-owned'):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],r['sampleCalls'],r['knownFrees']),(9,1,1))
-                shutil.rmtree(self.directory/'baseline')
 
     def test_ownership_and_instance_exceptions_free_once(self):
         for scenario,status in (('ownership-throw-known',91),('ownership-bad-alloc-known',90),('instance-throw-held',91)):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],r['sampleCalls'],r['knownFrees']),(status,1,1))
-                shutil.rmtree(self.directory/'baseline')
 
     def test_known_allocation_failure_has_no_held_or_freed_retry(self):
         execution,r=self.case('known-allocation-failure')
@@ -168,11 +196,10 @@ class SmallSampleContractTests(unittest.TestCase):
 
     def test_empty_and_oversized_samples_reject_without_retries(self):
         for scenario,native in (('sample-empty',10),('sample-at-limit',11)):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],r['sampleCalls'],self.cut()['nativeStatus']),(25,1,native))
                 self.assertTrue((self.directory/'baseline/after.maps').exists())
-                shutil.rmtree(self.directory/'baseline')
 
     def test_invalid_sample_bytes_are_preserved_not_claimed_semantically_valid(self):
         execution,r=self.case('sample-nul')
@@ -182,20 +209,18 @@ class SmallSampleContractTests(unittest.TestCase):
 
     def test_fixed_environment_and_full_profiler_rejection_are_inert(self):
         for changes,native in (({'TCMALLOC_SAMPLE_PARAMETER':'1'},3),({'ABC_SAMPLED_DIAGNOSTIC':None},1),({'HEAPPROFILE':'0'},3)):
-            with self.subTest(changes=changes):
+            with self.subTest(changes=changes), self.fresh_case():
                 execution,r=self.case(env_changes=changes)
                 self.assertEqual((execution['status'],r['sampleCalls'],self.cut()['nativeStatus']),(23,0,native))
                 self.assertEqual(r['mapsOpens'],1)
-                shutil.rmtree(self.directory/'baseline')
 
     def test_maps_failure_preserves_bounded_bytes_and_after_map_once(self):
         for scenario,size in (('maps-read-error',32),('maps-read-eintr',32),('maps-empty',0),('maps-no-newline',32),('maps-over-limit',1048576)):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],r['sampleCalls'],r['mapsOpens']),(24,0,2))
                 self.assertEqual((self.directory/'baseline/before.maps').stat().st_size,size)
                 self.assertTrue((self.directory/'baseline/after.maps').exists())
-                shutil.rmtree(self.directory/'baseline')
 
     def test_maps_exact_limit_complete_newline_is_permitted(self):
         execution,r=self.case('maps-at-limit')
@@ -210,34 +235,29 @@ class SmallSampleContractTests(unittest.TestCase):
 
     def test_output_faults_never_retry_or_sample(self):
         for scenario in ('before-output-open-failure','before-short-write','before-write-eintr','before-sync-failure'):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],r['sampleCalls'],r['mapsOpens']),(24,0,2))
-                shutil.rmtree(self.directory/'baseline')
 
     def test_close_errors_are_recorded_without_retry_or_descriptor_leak(self):
         for scenario in ('maps-close-failure','before-close-failure'):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],execution['cleanupErrno'],r['sampleCalls']),(24,errno.EINTR,0))
-                shutil.rmtree(self.directory/'baseline')
 
     def test_report_failure_preserves_earlier_primary_status(self):
         for scenario,status,calls in (('report-write-failure',27,1),('primary-and-report-failure',23,0)):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],r['sampleCalls']),(status,calls))
-                shutil.rmtree(self.directory/'baseline')
 
     def test_final_descriptor_cleanup_error_rejects_successful_captures(self):
         for scenario in ('root-close-failure','library-close-failure'):
-            with self.subTest(scenario=scenario):
+            with self.subTest(scenario=scenario), self.fresh_case():
                 execution,r=self.case(scenario)
                 self.assertEqual((execution['status'],execution['cleanupErrno'],r['exitStatus']),
                                  (0,errno.EINTR,92))
                 self.assertEqual((r['sampleCalls'],r['knownFrees'],r['probeFrees']),(3,1,1))
-                for name in ('baseline','held','freed'):
-                    shutil.rmtree(self.directory/name)
 
     def test_existing_cut_is_not_reused_or_overwritten(self):
         baseline=self.directory/'baseline';baseline.mkdir();sentinel=baseline/'untouched';sentinel.write_bytes(b'keep')
@@ -262,6 +282,42 @@ class SmallSampleContractTests(unittest.TestCase):
     def test_known_allocation_symbol_survives_optimized_offline_build(self):
         symbols=run(['nm','--defined-only',str(self.binary)]).stdout
         self.assertRegex(symbols,r'(?m)^\S+ T abc_sample_known_allocate$')
+
+    def test_fortified_read_boundary_keeps_real_overflow_guard(self):
+        command=[str(self.binary),'fortified-read-boundary',str(self.directory)]
+        valid=json.loads(run([*command,'1']).stdout)
+        self.assertTrue(valid['offline'])
+        self.assertFalse(valid['officialRuntimeInvoked'])
+        self.assertEqual(valid['fortifiedReadBytes'],1)
+        overflow=subprocess.run([*command,'2'],check=False,text=True,capture_output=True,
+            timeout=30,env=clean_environment(),
+            preexec_fn=lambda:resource.setrlimit(resource.RLIMIT_CORE,(0,0)))
+        self.assertEqual(overflow.returncode,-signal.SIGABRT)
+        self.assertNotIn('fortifiedReadBytes',overflow.stdout)
+
+    def test_missing_fortified_interception_reproduces_original_empty_maps(self):
+        if self.fortify_level!=3:
+            self.skipTest('Original maps-dispatch regression is exercised by the level-3 suite.')
+        # Explicit fault injection forwards maps to the real checked read,
+        # recreating the old missing-wrap behavior on the /dev/null fixture.
+        execution,r=self.case('bypass-fortified-maps')
+        self.assertEqual((execution['status'],r['sampleCalls'],r['mapsOpens']),(24,0,2))
+        self.assertEqual(self.cut()['nativeStatus'],0)
+        self.assertEqual((self.directory/'baseline/before.maps').stat().st_size,0)
+        self.assertEqual((self.directory/'baseline/after.maps').stat().st_size,0)
+
+    def test_failed_subcase_does_not_leave_a_cut_for_next_subcase(self):
+        with self.assertRaises(AssertionError):
+            with self.fresh_case():
+                previous=self.directory
+                execution,_=self.case()
+                self.assertEqual(execution['status'],0)
+                self.fail('Intentional assertion to verify unconditional subcase cleanup')
+        self.assertFalse(previous.exists())
+        with self.fresh_case():
+            self.assertNotEqual(self.directory,previous)
+            execution,r=self.case()
+            self.assertEqual((execution['status'],r['sampleCalls']),(0,3))
 
     def test_official_headers_compile_only_when_explicitly_supplied(self):
         supplied=os.environ.get('ABC_SAMPLE_OFFICIAL_HEADERS')

@@ -75,6 +75,8 @@ extern "C" void __real_free(void *);
 extern "C" int __real_open(const char *,int,...);
 extern "C" int __real_openat(int,const char *,int,...);
 extern "C" ssize_t __real_read(int,void *,size_t);
+extern "C" ssize_t __real___read_chk(int,void *,size_t,size_t);
+extern "C" ssize_t __read_chk(int,void *,size_t,size_t);
 extern "C" ssize_t __real_write(int,const void *,size_t);
 extern "C" int __real_close(int);
 extern "C" int __real_fsync(int);
@@ -153,6 +155,13 @@ extern "C" ssize_t __wrap_read(int fd,void *buffer,size_t count) {
   if(n && maps_offset+n==size && !(maps_index==1 && is("maps-no-newline"))) static_cast<char *>(buffer)[n-1]='\n';
   maps_offset+=n;return static_cast<ssize_t>(n);
 }
+extern "C" ssize_t __wrap___read_chk(int fd,void *buffer,size_t count,size_t object_size) {
+  // Preserve libc's actual fortified failure, including for synthetic maps.
+  // Every non-maps descriptor continues through libc's checked read too.
+  if(count>object_size || fd!=maps_fd || is("bypass-fortified-maps"))
+    return __real___read_chk(fd,buffer,count,object_size);
+  return __wrap_read(fd,buffer,count);
+}
 extern "C" ssize_t __wrap_write(int fd,const void *bytes,size_t count) {
   ++write_calls;
   if(kinds[fd]==1 && is("before-short-write")) return __real_write(fd,bytes,count/2);
@@ -177,17 +186,35 @@ extern "C" int __wrap_close(int fd) {
 }
 
 int main(int argc,char **argv) {
-  if(argc!=3) return 2;
+  if(argc==2 && !strcmp(argv[1],"--offline-build-info")) {
+    printf("{\"offline\":true,\"officialRuntimeInvoked\":false,\"fortifyLevel\":%d}\n",__USE_FORTIFY_LEVEL);
+    return 0;
+  }
+  if(argc!=3 && argc!=4) return 2;
   scenario=argv[1];
+  if(is("fortified-read-boundary")) {
+    if(argc!=4) return 2;
+    // Runtime count prevents the compiler diagnosing the intentional negative
+    // test before libc's actual buffer-overflow guard can be exercised.
+    char byte[1];
+    const size_t count=static_cast<size_t>(strtoul(argv[3],nullptr,10));
+    const int fd=open("/proc/self/maps",O_RDONLY|O_CLOEXEC);
+    if(fd<0) return 3;
+    const ssize_t n=__read_chk(fd,byte,count,sizeof byte);
+    close(fd);
+    printf("{\"offline\":true,\"officialRuntimeInvoked\":false,\"fortifiedReadBytes\":%zd}\n",n);
+    return 0;
+  }
   if(is("primary-and-report-failure")) assert(setenv("TCMALLOC_SAMPLE_PARAMETER","bad",1)==0);
   char *args[]={argv[0],argv[2],nullptr};
   int result=small_contract_main(2,args);
   printf("{\"offline\":true,\"officialRuntimeInvoked\":false,\"exitStatus\":%d,"
+    "\"fortifyLevel\":%d,"
     "\"sampleCalls\":%u,\"instanceCalls\":%u,\"ownershipCalls\":%u,"
     "\"knownAllocations\":%u,\"knownFrees\":%u,\"probeAllocations\":%u,\"probeFrees\":%u,"
     "\"knownLiveAtSample\":[%u,%u,%u],\"knownStillLive\":%d,\"probeStillLive\":%d,"
     "\"mapsOpens\":%u,\"mapsReads\":%u,\"writeCalls\":%u,\"closeCalls\":%u,\"liveFds\":%d}\n",
-    result,sample_calls,instance_calls,ownership_calls,known_allocations,known_frees,
+    result,__USE_FORTIFY_LEVEL,sample_calls,instance_calls,ownership_calls,known_allocations,known_frees,
     probe_allocations,probe_frees,known_live_at_sample[0],known_live_at_sample[1],known_live_at_sample[2],
     known_pointer!=nullptr,probe_pointer!=nullptr,maps_opens,maps_reads,write_calls,close_calls,live_fds);
   return 0;

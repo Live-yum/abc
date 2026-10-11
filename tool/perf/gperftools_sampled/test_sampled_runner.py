@@ -1,16 +1,21 @@
 """Offline orchestration/source/weighted-output contracts; never starts SDK."""
 import copy
+import hashlib
 import json
 import math
 import os
 from pathlib import Path
 import struct
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from sampled_source import (validate_overlay, verify_historical_parent, PARENT, PARENT_TREE, MANIFEST,
-    TARGET, BRIDGE, WORKFLOW, BRANCH, BASE, BASE_TREE, INHERITED, HISTORICAL_PARENT, HISTORICAL_PARENT_TREE)
+    TARGET, BRIDGE, WORKFLOW, BRANCH, BASE, BASE_TREE, INHERITED, HISTORICAL_PARENT, HISTORICAL_PARENT_TREE,
+    DIRECT_PARENT, DIRECT_PARENT_TREE, CORRECTION_PATHS, REVIEWED_FIXTURE_SHA256,
+    validate_correction_parent, validate_correction_bytes, verify_correction,
+    build_correction_manifest, ORIGINAL_ADDED_PATHS)
 from sampled_contract import PERIOD
 from sampled_pprof import validate_weighted_raw, check_sampled_diagnostics
 from run_sampled_q0 import (SampledRunner, ci_guard, sampled_commands, sample_environment, BUDGETS,
@@ -87,6 +92,169 @@ class SourceTests(unittest.TestCase):
         with patch('sampled_source.git', return_value='0' * 40), patch('sampled_source.tree') as tree:
             with self.assertRaises(ValueError): verify_historical_parent(Path('/parent'), Path('/base'), Path('/original'))
             tree.assert_not_called()
+
+
+class FixtureCorrectionSourceTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='sampled-correction-source-')
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.head = 'f' * 40
+        self.base = {name: {'mode': '100644', 'blob': 'original'} for name in
+                     ('lib/product.dart', 'tool/perf/memory_ownership_schedule.json',
+                      'integration_test/computer_memory_ownership_test.dart')}
+        paths = set(CORRECTION_PATHS) | {TARGET, BRIDGE}
+        for index in range(ORIGINAL_ADDED_PATHS - len(paths)):
+            paths.add(f'tool/perf/gperftools_sampled/synthetic-{index}.py')
+        self.parent = self.base | {name: {'mode': '100644', 'blob': 'frozen'} for name in paths}
+        self.current = copy.deepcopy(self.parent)
+        for name in CORRECTION_PATHS:
+            self.current[name]['blob'] = 'corrected'
+        self.workflow = (b'permissions:\n  contents: read\n'
+            b'          fetch-depth: 2\n          persist-credentials: false\n'
+            b'          ref: frozen-2b\n          fetch-depth: 2\n'
+            b'          path: build/sampled-parent\n')
+        self.changed_workflow = self.workflow.replace(b'fetch-depth: 2', b'fetch-depth: 3', 1)
+        (self.root / WORKFLOW).parent.mkdir(parents=True)
+        (self.root / WORKFLOW).write_bytes(self.changed_workflow)
+        self.data = {name: ('synthetic frozen ' + name).encode() for name in paths - {MANIFEST}}
+        self.data[WORKFLOW] = self.workflow
+        self.parent_manifest = {'schema': 'abc.sampled-source-manifest.v1',
+            'parentCommit': PARENT, 'parentTree': PARENT_TREE, 'branch': BRANCH,
+            'addedFiles': {name: {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+                           for name, data in self.data.items()}}
+        self.manifest = copy.deepcopy(self.parent_manifest)
+        self.manifest.update(directParentCommit=DIRECT_PARENT, directParentTree=DIRECT_PARENT_TREE,
+            correctionPaths=sorted(CORRECTION_PATHS), reviewedFixtureSha256=dict(REVIEWED_FIXTURE_SHA256))
+        self.files = {name: {'sha256': digest} for name, digest in REVIEWED_FIXTURE_SHA256.items()}
+
+    def topology(self, **changes):
+        values = dict(head=self.head, parents=[self.head, DIRECT_PARENT],
+            parent_tree_sha=DIRECT_PARENT_TREE, parent=self.parent, current=self.current)
+        values.update(changes)
+        return validate_correction_parent(**values)
+
+    def git_value(self, root, *args, binary=False):
+        if args == ('rev-list', '--parents', '-n', '1', self.head): return self.head + ' ' + DIRECT_PARENT
+        if args == ('rev-list', '--parents', '-n', '1', DIRECT_PARENT): return DIRECT_PARENT + ' ' + PARENT
+        if args == ('rev-parse', DIRECT_PARENT + '^{tree}'): return DIRECT_PARENT_TREE
+        if args == ('rev-parse', PARENT + '^{tree}'): return PARENT_TREE
+        if args == ('show', DIRECT_PARENT + ':' + MANIFEST): return json.dumps(self.parent_manifest)
+        if args[0] == 'show' and args[1].startswith(DIRECT_PARENT + ':'):
+            self.assertTrue(binary)
+            return self.data[args[1].split(':', 1)[1]]
+        raise AssertionError(args)
+
+    def verify(self):
+        with patch('sampled_source.git', side_effect=self.git_value), \
+             patch('sampled_source.tree', side_effect=lambda root, ref: {PARENT: self.base, DIRECT_PARENT: self.parent}[ref]):
+            return verify_correction(self.root, self.head, self.current, self.manifest, self.files)
+
+    def test_exact_six_paths_replay_original_34_path_seal(self):
+        self.assertEqual(self.verify(), sorted(CORRECTION_PATHS))
+        self.assertEqual(len(self.parent_manifest['addedFiles']) + 1, 34)
+
+    def test_wrong_parent_merge_parent_and_wrong_tree_rejected(self):
+        for parents in ([self.head, PARENT], [self.head, DIRECT_PARENT, PARENT], [self.head]):
+            with self.subTest(parents=parents), self.assertRaises(ValueError): self.topology(parents=parents)
+        with self.assertRaises(ValueError): self.topology(parent_tree_sha='0' * 40)
+
+    def test_added_deleted_extra_or_missing_correction_path_rejected(self):
+        changes = []
+        added = copy.deepcopy(self.current); added['tool/perf/gperftools_sampled/extra.py'] = {'mode': '100644', 'blob': 'new'}; changes.append(added)
+        deleted = copy.deepcopy(self.current); del deleted[TARGET]; changes.append(deleted)
+        missing = copy.deepcopy(self.current); missing[MANIFEST] = self.parent[MANIFEST]; changes.append(missing)
+        for name in (TARGET, BRIDGE, *self.base):
+            extra = copy.deepcopy(self.current); extra[name]['blob'] = 'unreviewed'; changes.append(extra)
+        for current in changes:
+            with self.subTest(current=current), self.assertRaises(ValueError): self.topology(current=current)
+
+    def test_correction_modes_remain_regular_nonexecutable(self):
+        for mode in ('100755', '120000'):
+            current = copy.deepcopy(self.current); current[MANIFEST]['mode'] = mode
+            with self.subTest(mode=mode), self.assertRaises(ValueError): self.topology(current=current)
+
+    def test_fixed_fixture_bytes_and_only_first_checkout_change(self):
+        validate_correction_bytes(self.workflow, self.changed_workflow, self.files)
+        for name in REVIEWED_FIXTURE_SHA256:
+            files = copy.deepcopy(self.files); files[name]['sha256'] = '0' * 64
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                validate_correction_bytes(self.workflow, self.changed_workflow, files)
+        for workflow in (self.workflow, self.changed_workflow.replace(b'contents: read', b'contents: write'),
+                         self.workflow.replace(b'fetch-depth: 2', b'fetch-depth: 3'), self.changed_workflow + b'extra-trigger\n'):
+            with self.subTest(workflow=workflow), self.assertRaises(ValueError):
+                validate_correction_bytes(self.workflow, workflow, self.files)
+
+    def test_original_c9_seal_is_checked_against_c9_bytes(self):
+        self.data[TARGET] += b'changed'
+        with self.assertRaisesRegex(ValueError, 'Original sampled c9 seal bytes'): self.verify()
+
+    def test_original_c9_parent_and_2b_tree_are_still_pinned(self):
+        original = self.git_value
+        for target, replacement in (
+            (('rev-list', '--parents', '-n', '1', DIRECT_PARENT), DIRECT_PARENT + ' ' + '0' * 40),
+            (('rev-parse', PARENT + '^{tree}'), '0' * 40)):
+            def changed(root, *args, binary=False):
+                return replacement if args == target else original(root, *args, binary=binary)
+            with self.subTest(target=target), patch.object(self, 'git_value', side_effect=changed), self.assertRaises(ValueError):
+                self.verify()
+
+    def test_original_product_and_workload_still_match_2b(self):
+        for name in self.base:
+            previous = self.parent[name]
+            self.parent[name] = {'mode': '100644', 'blob': 'changed-in-c9'}
+            self.current[name] = dict(self.parent[name])
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'frozen product/workload'):
+                self.verify()
+            self.parent[name] = previous; self.current[name] = dict(previous)
+
+    def test_manifest_direct_pins_and_exact_scope_required(self):
+        for key, value in (('directParentCommit', PARENT), ('directParentTree', PARENT_TREE),
+                           ('correctionPaths', []), ('reviewedFixtureSha256', {}), ('branch', 'other')):
+            previous = self.manifest[key]; self.manifest[key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'seal pins or scope'): self.verify()
+            self.manifest[key] = previous
+
+    def test_seal_plan_is_deterministic_and_excludes_self_hash(self):
+        for name, data in self.data.items():
+            path = self.root / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(data)
+        first = build_correction_manifest(self.root, self.parent_manifest)
+        self.assertNotIn(MANIFEST, first['addedFiles'])
+        (self.root / MANIFEST).write_text('Different manifest bytes must not feed their own hash')
+        self.assertEqual(build_correction_manifest(self.root, self.parent_manifest), first)
+        self.assertEqual(first['parentCommit'], PARENT)
+        self.assertEqual(first['directParentCommit'], DIRECT_PARENT)
+
+    def test_depth_three_local_git_retains_required_history_shape(self):
+        # Genuine local Git objects test shallow-history behavior separately
+        # from fixed c9/2b SHA checks. These synthetic SHAs are not substitutes
+        # for verification of the actual remote commits.
+        origin = self.root / 'origin'; origin.mkdir()
+        env = os.environ | {'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null',
+            'GIT_AUTHOR_NAME': 'Offline Fixture', 'GIT_AUTHOR_EMAIL': 'fixture@example.invalid',
+            'GIT_COMMITTER_NAME': 'Offline Fixture', 'GIT_COMMITTER_EMAIL': 'fixture@example.invalid'}
+        def command(path, *args, check=True):
+            return subprocess.run(['git', *args], cwd=path, env=env, check=check,
+                capture_output=True, text=True, timeout=20)
+        command(origin, 'init', '--quiet')
+        commits = []
+        for value in ('older ancestor', 'original 2b shape', 'sampled c9 shape', 'fixture correction shape'):
+            (origin / 'source.txt').write_text(value)
+            command(origin, 'add', 'source.txt'); command(origin, 'commit', '--quiet', '-m', value)
+            commits.append(command(origin, 'rev-parse', 'HEAD').stdout.strip())
+        for depth in (2, 3):
+            clone = self.root / ('depth-' + str(depth))
+            command(self.root, 'clone', '--quiet', '--depth', str(depth), origin.as_uri(), str(clone))
+            self.assertEqual(command(clone, 'rev-list', '--parents', '-n', '1', commits[3]).stdout.split(), commits[3:1:-1])
+            parents = command(clone, 'rev-list', '--parents', '-n', '1', commits[2]).stdout.split()
+            if depth == 3:
+                self.assertEqual(parents, [commits[2], commits[1]])
+                self.assertEqual(command(clone, 'show', commits[1] + ':source.txt').stdout, 'original 2b shape')
+                self.assertEqual(command(clone, 'rev-parse', commits[1] + '^{tree}').returncode, 0)
+                self.assertEqual(command(clone, 'show', commits[2] + ':source.txt').stdout, 'sampled c9 shape')
+            else:
+                self.assertEqual(parents, [commits[2]])
+                self.assertNotEqual(command(clone, 'cat-file', '-e', commits[1] + '^{tree}', check=False).returncode, 0)
 
 
 class OrchestrationTests(unittest.TestCase):

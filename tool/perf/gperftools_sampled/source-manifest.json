@@ -2,7 +2,7 @@
   "addedFiles": {
     ".github/workflows/gperftools-sampled-q0.yml": {
       "bytes": 9773,
-      "sha256": "6fcacf0e7bdb112ce8b3a2242349da6f1ad56c1aec424032b918ea9096b40eea"
+      "sha256": "5f3158a692ff0b03be7ba93fd880b763a92b4fc852395d29ebf8231b6e7f2baa"
     },
     "integration_test/computer_memory_sampled_q0_test.dart": {
       "bytes": 22521,
@@ -77,8 +77,8 @@
       "sha256": "d2b004827ca63a0aaa79c11afda1040e61ef8cff4033efd62a6ba0a0c66c2a17"
     },
     "tool/perf/gperftools_sampled/sampled_source.py": {
-      "bytes": 7477,
-      "sha256": "32352fa5d87853b915ddb1d88b6cca9e1b83b408796df9dc093c727baf226baf"
+      "bytes": 13448,
+      "sha256": "b397b666ba617969ea1eb7f8f7e9bbd471bffed91f0ed0b5b32b855e93b98944"
     },
     "tool/perf/gperftools_sampled/sampled_supervision.py": {
       "bytes": 38788,
@@ -89,8 +89,8 @@
       "sha256": "de38fb10853f3b32033fb765a95b1c0872674719cd0a9c82714403babc8881da"
     },
     "tool/perf/gperftools_sampled/small_contract_stub_test.cc": {
-      "bytes": 9040,
-      "sha256": "7c8c10bc35268f316cab541d7774471fe2042347da3e5556865d430e9bae546b"
+      "bytes": 10399,
+      "sha256": "e1f5d28f545c25523c616b1799b55a9496f690e2800230e2501bbc111e4fc935"
     },
     "tool/perf/gperftools_sampled/small_sample_contract.cc": {
       "bytes": 7728,
@@ -117,8 +117,8 @@
       "sha256": "b87a7cf2acb30d0bc2421461056d947c5179a67a53c8301a0a961d7706b57b81"
     },
     "tool/perf/gperftools_sampled/test_sampled_runner.py": {
-      "bytes": 15299,
-      "sha256": "de199a17fedd3c49f665a65dcc68bccadc4d345afd0bc1d27b57fc8b6f68b0e4"
+      "bytes": 26310,
+      "sha256": "64f6e0d9fa5bfcc2eb7df75f592f7ff5b1116e628b54952820f24f25305a9cdc"
     },
     "tool/perf/gperftools_sampled/test_sampled_supervision.py": {
       "bytes": 23101,
@@ -129,13 +129,27 @@
       "sha256": "cc3a42dfd0387a1423e14aea657c3626fc95e434b9ec609b22d494ec10ae883b"
     },
     "tool/perf/gperftools_sampled/test_small_sample_contract.py": {
-      "bytes": 15024,
-      "sha256": "eb4a75d6193ae41dd9656f444ac589352982ffb4b698da2f87ad3b9e4bec88c9"
+      "bytes": 18413,
+      "sha256": "9fd49312dc5320fe0b6c9304709bc019b49c13c5919db3ab25827ada331957e0"
     }
   },
   "branch": "refs/heads/codex/sampled-q0-feasibility-9d4",
+  "correctionPaths": [
+    ".github/workflows/gperftools-sampled-q0.yml",
+    "tool/perf/gperftools_sampled/sampled_source.py",
+    "tool/perf/gperftools_sampled/small_contract_stub_test.cc",
+    "tool/perf/gperftools_sampled/source-manifest.json",
+    "tool/perf/gperftools_sampled/test_sampled_runner.py",
+    "tool/perf/gperftools_sampled/test_small_sample_contract.py"
+  ],
+  "directParentCommit": "c9cbca50f9796c104e023a83aa085583ec4346cc",
+  "directParentTree": "206051c0bc836bb41ff46f285495af770ae3017e",
   "parentCommit": "2b6397da3279926d91280d9a32f4b19d3488f349",
   "parentTree": "01b1dadab0cde210d61c560c4137b4a942a09f1d",
+  "reviewedFixtureSha256": {
+    "tool/perf/gperftools_sampled/small_contract_stub_test.cc": "e1f5d28f545c25523c616b1799b55a9496f690e2800230e2501bbc111e4fc935",
+    "tool/perf/gperftools_sampled/test_small_sample_contract.py": "9fd49312dc5320fe0b6c9304709bc019b49c13c5919db3ab25827ada331957e0"
+  },
   "schema": "abc.sampled-source-manifest.v1",
   "selfHashPolicy": "Self omitted from addedFiles; Git blob and independently enumerated current tree bind manifest bytes."
 }
