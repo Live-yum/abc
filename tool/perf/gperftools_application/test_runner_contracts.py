@@ -18,7 +18,8 @@ from application_contract import ContractError, MAX_SIDECAR, map_key
 from bounded_supervision import PairBudget, TargetProcessIdentity, cleanup_owned_group
 from application_process import clean_environment, read_json, run_command
 from application_source import (BASE, BASE_TREE, INHERITED, PACKAGE_GATE, BRANCH,
-    MANIFEST, TARGET, NEW_WORKFLOW, verify_layers)
+    MANIFEST, TARGET, NEW_WORKFLOW, DIRECT_PARENT, DIRECT_PARENT_TREE, PREFIX_TEST,
+    CORRECTION_PATHS, verify_correction_parent, verify_layers)
 from capture_contract import CLOCK, CutWatcher, GaugeTail, validate_startup, sidecar_caps
 from elf_identity import BoundModules, elf_metadata, endpoint_delta, file_identity, load_bias
 from run_pair import (KNOWN_IMAGE_FAILURE, actual_ci_guard, exact_profile_files,
@@ -290,6 +291,7 @@ class SourceContracts(unittest.TestCase):
         current={**inherited,TARGET:{**row,'blob':'b'*40},MANIFEST:dict(row),NEW_WORKFLOW:dict(row)}
         manifest=dict(schema='abc.gperftools-application-source-manifest.v1',baseCommit=BASE,baseTree=BASE_TREE,
             inheritedCommit=INHERITED,packageGateCommit=PACKAGE_GATE,branch=BRANCH,
+            directParentCommit=DIRECT_PARENT,directParentTree=DIRECT_PARENT_TREE,
             files={k:dict(v) for k,v in current.items() if k!=MANIFEST},inheritedFiles=copy.deepcopy(inherited))
         return manifest,base,inherited,current
     def test_whole_tree_protects_original_product_and_diagnostic(self):
@@ -302,6 +304,73 @@ class SourceContracts(unittest.TestCase):
         with self.assertRaises(ValueError): verify_layers(*values)
         values=self.fixture(); del values[0]['inheritedFiles']['base/0']
         with self.assertRaises(ValueError): verify_layers(*values)
+
+
+class CorrectionSourceContracts(unittest.TestCase):
+    def fixture(self):
+        head='e'*40
+        old={'mode':'100644','blob':'a'*40}
+        new={'mode':'100644','blob':'b'*40}
+        parent={name:dict(old) for name in CORRECTION_PATHS if name != PREFIX_TEST}
+        parent.update({name:dict(old) for name in (
+            'lib/main.dart', 'native/abc_owner_diagnostics.c',
+            'integration_test/computer_memory_ownership_test.dart',
+            'integration_test/computer_memory_diagnostic_test.dart',
+            'integration_test/support/generic_circuit_profile.dart',
+            'tool/perf/memory_ownership_schedule.json', NEW_WORKFLOW,
+            'tool/perf/gperftools_application/run_pair.py')})
+        current=copy.deepcopy(parent)
+        current.update({name:dict(new) for name in CORRECTION_PATHS})
+        return head,[head,DIRECT_PARENT],DIRECT_PARENT_TREE,parent,current
+
+    def test_accepts_only_exact_correction_on_fixed_parent_and_tree(self):
+        self.assertEqual(verify_correction_parent(*self.fixture()),sorted(CORRECTION_PATHS))
+
+    def test_wrong_parent_old_base_merge_or_tree_rejected(self):
+        for parents in (['e'*40,BASE],['e'*40,'f'*40],['e'*40,DIRECT_PARENT,BASE],['e'*40]):
+            values=list(self.fixture());values[1]=parents
+            with self.subTest(parents=parents),self.assertRaisesRegex(ValueError,'fixed diagnostic parent'):
+                verify_correction_parent(*values)
+        values=list(self.fixture());values[2]='f'*40
+        with self.assertRaisesRegex(ValueError,'parent tree differs'):
+            verify_correction_parent(*values)
+
+    def test_extra_added_deleted_or_missing_correction_path_rejected(self):
+        values=self.fixture();values[4]['tool/perf/gperftools_application/extra.py']={'mode':'100644','blob':'c'*40}
+        with self.assertRaises(ValueError):verify_correction_parent(*values)
+        values=self.fixture();del values[4]['lib/main.dart']
+        with self.assertRaises(ValueError):verify_correction_parent(*values)
+        values=self.fixture();values[4][MANIFEST]=dict(values[3][MANIFEST])
+        with self.assertRaises(ValueError):verify_correction_parent(*values)
+
+    def test_product_workload_schedule_roi_workflow_and_budget_changes_rejected(self):
+        for name in ('lib/main.dart','native/abc_owner_diagnostics.c',TARGET,
+                     'integration_test/computer_memory_diagnostic_test.dart',
+                     'integration_test/support/generic_circuit_profile.dart',
+                     'tool/perf/memory_ownership_schedule.json',NEW_WORKFLOW,
+                     'tool/perf/gperftools_application/run_pair.py'):
+            values=self.fixture();values[4][name]['blob']='d'*40
+            with self.subTest(name=name),self.assertRaisesRegex(ValueError,'exact five-path'):
+                verify_correction_parent(*values)
+
+    def test_correction_mode_or_symlink_changes_rejected(self):
+        for mode in ('100755','120000'):
+            for name in CORRECTION_PATHS:
+                values=self.fixture();values[4][name]['mode']=mode
+                with self.subTest(name=name,mode=mode),self.assertRaisesRegex(ValueError,'regular non-executable'):
+                    verify_correction_parent(*values)
+        values=self.fixture();values[3][MANIFEST]['mode']='100755'
+        with self.assertRaisesRegex(ValueError,'regular non-executable'):
+            verify_correction_parent(*values)
+
+    def test_layer_manifest_wrong_or_missing_parent_pins_rejected(self):
+        for field in ('directParentCommit','directParentTree'):
+            for missing in (False,True):
+                values=SourceContracts().fixture()
+                if missing:del values[0][field]
+                else:values[0][field]='f'*40
+                with self.subTest(field=field,missing=missing),self.assertRaisesRegex(ValueError,'Source layer pins'):
+                    verify_layers(*values)
 
 
 if __name__ == '__main__':

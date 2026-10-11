@@ -26,6 +26,16 @@ TARGET = 'integration_test/computer_memory_ownership_test.dart'
 OLD_WORKFLOW = '.github/workflows/memory-ownership.yml'
 NEW_WORKFLOW = '.github/workflows/gperftools-application.yml'
 ROOT = Path(__file__).resolve().parents[3]
+DIRECT_PARENT = '2c14f3fad066fd1046f6db874c98331ce6d6e630'
+DIRECT_PARENT_TREE = 'b87a69b8a5f601a1f1015b10040a71f5ee36e4c0'
+PREFIX_TEST = 'tool/perf/gperftools_application_contracts/test_prefix_marker_contracts.py'
+CORRECTION_PATHS = frozenset({
+    'tool/perf/gperftools_application_contracts/quiet_dump_linux.c',
+    PREFIX_TEST,
+    'tool/perf/gperftools_application/application_source.py',
+    'tool/perf/gperftools_application/test_runner_contracts.py',
+    MANIFEST,
+})
 
 
 def require(value, text):
@@ -80,7 +90,9 @@ def verify_layers(manifest, base, inherited, current):
             and manifest.get('baseCommit') == BASE and manifest.get('baseTree') == BASE_TREE
             and manifest.get('inheritedCommit') == INHERITED
             and manifest.get('packageGateCommit') == PACKAGE_GATE
-            and manifest.get('branch') == BRANCH, 'Source layer pins differ')
+            and manifest.get('branch') == BRANCH
+            and manifest.get('directParentCommit') == DIRECT_PARENT
+            and manifest.get('directParentTree') == DIRECT_PARENT_TREE, 'Source layer pins differ')
     require(len(base) == 886, 'Full fixed shipping tree differs')
     declared = manifest['files']
     require(set(declared) == set(current) - {MANIFEST}, 'Manifest final tree inventory differs')
@@ -104,19 +116,46 @@ def verify_layers(manifest, base, inherited, current):
     return True
 
 
+def verify_correction_parent(head, parents, parent_tree_sha, parent, current):
+    """Only the five reviewed correction paths may differ from the pinned parent.
+
+    The independent 9d4/5a checks still run in verify_layers. This additional gate
+    prevents a follow-up commit from modifying any already-reviewed application,
+    workload, workflow, package contract, budget, or provenance dependency.
+    """
+    require(parents == [head, DIRECT_PARENT],
+            'Prefix correction must have exactly the fixed diagnostic parent')
+    require(parent_tree_sha == DIRECT_PARENT_TREE, 'Fixed diagnostic parent tree differs')
+    require(set(parent) - set(current) == set(), 'Prefix correction cannot delete parent files')
+    require(set(current) - set(parent) == {PREFIX_TEST},
+            'Only the reviewed prefix regression may be added to the fixed parent')
+    changed = {name for name in parent.keys() | current.keys() if parent.get(name) != current.get(name)}
+    require(changed == CORRECTION_PATHS, 'Prefix correction differs outside the exact five-path delta')
+    for name in CORRECTION_PATHS:
+        require(current[name]['mode'] == '100644'
+                and (name == PREFIX_TEST or parent[name]['mode'] == '100644'),
+                'Prefix correction paths must remain regular non-executable sources')
+    return sorted(changed)
+
+
 def source_gate(root, base_root, inherited_root, output):
     root, base_root, inherited_root = map(Path, (root, base_root, inherited_root))
     require(os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('GITHUB_REF') == BRANCH
             and os.environ.get('GITHUB_RUN_ATTEMPT') == '1', 'Only fixed branch first GitHub attempt allowed')
     head = git(root, 'rev-parse', 'HEAD')
     require(head == os.environ.get('GITHUB_SHA'), 'Checkout head differs from this exact CI event')
-    require(git(root, 'rev-list', '--parents', '-n', '1', head).split() == [head, BASE],
-            'Application diagnostic must be exactly one child of fixed product')
+    parents = git(root, 'rev-list', '--parents', '-n', '1', head).split()
+    require(parents == [head, DIRECT_PARENT],
+            'Prefix correction must have exactly the fixed diagnostic parent')
+    parent_tree_sha = git(root, 'rev-parse', DIRECT_PARENT + '^{tree}')
+    require(parent_tree_sha == DIRECT_PARENT_TREE, 'Fixed diagnostic parent tree differs')
     require(not git(root, 'status', '--porcelain', '--untracked-files=all'), 'Clean committed source required')
     require(git(base_root, 'rev-parse', 'HEAD') == BASE and git(base_root, 'rev-parse', 'HEAD^{tree}') == BASE_TREE,
             'Independent shipping checkout differs')
     require(git(inherited_root, 'rev-parse', 'HEAD') == INHERITED, 'Independent inherited checkout differs')
     base, inherited, current = tree(base_root, BASE), tree(inherited_root, INHERITED), tree(root, head)
+    correction_paths = verify_correction_parent(
+        head, parents, parent_tree_sha, tree(root, DIRECT_PARENT), current)
     payload = (root / MANIFEST).read_bytes()
     require(len(payload) <= 4 << 20, 'Source manifest cap')
     manifest = json.loads(payload)
@@ -132,6 +171,8 @@ def source_gate(root, base_root, inherited_root, output):
     package_manifest_sha = validate_source_manifest()
     proof = {'schema': 'abc.memory-ownership-source.v1', 'sourceCommit': head,
              'baseProductCommit': BASE, 'baseProductTree': BASE_TREE,
+             'directParentCommit': DIRECT_PARENT, 'directParentTree': DIRECT_PARENT_TREE,
+             'correctionPaths': correction_paths,
              'inheritedDiagnosticCommit': INHERITED, 'officialPackageGateCommit': PACKAGE_GATE,
              'officialPackageSourceManifestSha256': package_manifest_sha,
              'sourceTree': git(root, 'rev-parse', 'HEAD^{tree}'), 'baseFiles': 886,
@@ -139,7 +180,9 @@ def source_gate(root, base_root, inherited_root, output):
              'selfHashPolicy': 'manifest excludes itself; independent Git tree and this proof bind its bytes',
              'diagnosticOverlay': True, 'shippingRuntimeUsed': False,
              'scheduleSha256': files['tool/perf/memory_ownership_schedule.json']['sha256'],
-             'patchSha256': hashlib.sha256(git(root, 'diff', '--binary', '--full-index', BASE, head, binary=True)).hexdigest()}
+             'patchBaseCommit': DIRECT_PARENT,
+             'patchScope': 'exact-five-path-prefix-marker-correction',
+             'patchSha256': hashlib.sha256(git(root, 'diff', '--binary', '--full-index', DIRECT_PARENT, head, binary=True)).hexdigest()}
     with Path(output).open('x') as stream:
         json.dump(proof, stream, indent=2, sort_keys=True); stream.write('\n')
     return proof
@@ -149,10 +192,17 @@ def verify_source_proof(root, proof):
     require(proof.get('schema') == 'abc.memory-ownership-source.v1'
             and proof.get('baseProductCommit') == BASE
             and proof.get('inheritedDiagnosticCommit') == INHERITED
-            and proof.get('officialPackageGateCommit') == PACKAGE_GATE, 'Layered source proof missing')
+            and proof.get('officialPackageGateCommit') == PACKAGE_GATE
+            and proof.get('directParentCommit') == DIRECT_PARENT
+            and proof.get('directParentTree') == DIRECT_PARENT_TREE
+            and proof.get('patchBaseCommit') == DIRECT_PARENT, 'Layered source proof missing')
     require(git(root, 'rev-parse', 'HEAD') == proof['sourceCommit']
             and not git(root, 'status', '--porcelain', '--untracked-files=all'), 'Source checkout changed')
     current = tree(root, proof['sourceCommit'])
+    correction_paths = verify_correction_parent(
+        proof['sourceCommit'], git(root, 'rev-list', '--parents', '-n', '1', proof['sourceCommit']).split(),
+        git(root, 'rev-parse', DIRECT_PARENT + '^{tree}'), tree(root, DIRECT_PARENT), current)
+    require(proof.get('correctionPaths') == correction_paths, 'Correction proof paths differ')
     require(set(current) == set(proof['sourceFiles']), 'Source proof tree differs')
     for name, expected in current.items():
         require(identity(Path(root) / name, expected) == proof['sourceFiles'][name], 'Source bytes changed after gate')

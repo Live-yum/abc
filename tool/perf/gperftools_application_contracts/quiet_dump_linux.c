@@ -152,6 +152,15 @@ static void clear_child_profiler_environment(void) {
         (void)unsetenv(key);
     }
 }
+/* gperftools 2.15 GetUniquePathFromEnv sets only the first byte's 0x80
+ * child marker after consuming HEAPPROFILE. Accept exactly that representation
+ * or the original sealed absolute prefix; do not normalize or mutate environ.
+ * This precondition does not replace any subsequent target/provider checks. */
+static int profile_prefix_matches(const char *value,const char *expected) {
+    if(!value || !value[0] || !expected || expected[0]!='/') return 0;
+    unsigned char first=(unsigned char)value[0],wanted=(unsigned char)expected[0];
+    return (first==wanted || first==(wanted|0x80u)) && !strcmp(value+1,expected+1);
+}
 unsigned abc_quiet_abi(void) {return ABC_QUIET_ABI;}
 int abc_quiet_initialize(void) {
     if(runtime.init_attempted) return ABC_QUIET_BAD_INIT;
@@ -163,7 +172,7 @@ int abc_quiet_initialize(void) {
     if(!runtime.arm || !preload || strcmp(preload,abc_sealed_library.path) || !output || strcmp(output,runtime.arm->output)) return initialization_failed(ABC_QUIET_BAD_INIT);
     char expected[PATH_MAX],actual[PATH_MAX];
     int length=snprintf(expected,sizeof expected,"%s/heap",runtime.arm->output);
-    if(length<0 || length>=(int)sizeof expected || !prefix || strcmp(prefix,expected) || getenv("HEAPPROFILESIGNAL")) return initialization_failed(ABC_QUIET_BAD_INIT);
+    if(length<0 || length>=(int)sizeof expected || !profile_prefix_matches(prefix,expected) || getenv("HEAPPROFILESIGNAL")) return initialization_failed(ABC_QUIET_BAD_INIT);
     const char *const flags[]={"HEAP_PROFILE_ALLOCATION_INTERVAL","HEAP_PROFILE_DEALLOCATION_INTERVAL","HEAP_PROFILE_INUSE_INTERVAL","HEAP_PROFILE_TIME_INTERVAL","HEAP_PROFILE_CLEANUP","HEAP_PROFILE_MMAP","HEAP_PROFILE_ONLY_MMAP","HEAP_PROFILE_MMAP_LOG"};
     for(unsigned i=0;i<8;i++) {const char *value=getenv(flags[i]);if(!value || strcmp(value,"0")) return initialization_failed(ABC_QUIET_BAD_INIT);}
     ssize_t n=readlink("/proc/self/exe",actual,sizeof actual-1);
