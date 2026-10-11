@@ -2,8 +2,8 @@
   "baseCommit": "9d4cd5a0f9db03042a3986689fea374ba92d78b8",
   "baseTree": "68de875853d92b0352077865cf862ffaceaaec92",
   "branch": "refs/heads/codex/memory-allocation-application-9d4",
-  "directParentCommit": "bed5893ae53a7bf740ba6f0e000ae71eda4241f4",
-  "directParentTree": "2d927a130f036350116101a420e409c0f81352d6",
+  "directParentCommit": "96c096e5ada603f1e6db517a76101dd9fe4e09d5",
+  "directParentTree": "7b6223f3b1c5703e8fadca6d3921b7597f9ced56",
   "files": {
     ".flutter-version": {
       "blob": "a50854ef9eaa3672c40096fbbbe6beb8747a8788",
@@ -4266,10 +4266,16 @@
       "sha256": "aa7a4d3c8625ccc256fc0ef950d1d6d8aafdaed5b4fa32843582955201f1c078"
     },
     "tool/perf/gperftools_application/application_source.py": {
-      "blob": "1b33cba1117511a390bb03d74b7ced0e805c1954",
-      "bytes": 13040,
+      "blob": "d87ee916380b33d6b7e253b3264602f3c48fefa0",
+      "bytes": 13332,
       "mode": "100644",
-      "sha256": "04ef975ce48fa00fc1cc2097475f51dcd5e4cf7aaccc960bacf2b49a641974d4"
+      "sha256": "80d5061b232372494ed977096618a8297b119772edda38907577d688f51cb6fd"
+    },
+    "tool/perf/gperftools_application/attribution_coverage.py": {
+      "blob": "9329db360c1df47ed92640dffae5d64c99ff2455",
+      "bytes": 6346,
+      "mode": "100644",
+      "sha256": "ca7a24666195e9cf6bf8c452413f76680468a675b6d02d2c19bd51b69c087972"
     },
     "tool/perf/gperftools_application/capture_build.py": {
       "blob": "da5574e883c3384f94e7d500a4dde7a5523e6560",
@@ -4290,10 +4296,10 @@
       "sha256": "b885f0b8af16cd0011c03a793c25e5983728eecd9d93d1c0829624ca6eff3b0b"
     },
     "tool/perf/gperftools_application/elf_identity.py": {
-      "blob": "9d1485df7f6df3c5fa3f225bd1ee6a0016fa3130",
-      "bytes": 34573,
+      "blob": "ad747cf2a9172da1c1ce22cc3e8a2424b5542910",
+      "bytes": 45479,
       "mode": "100644",
-      "sha256": "8c6a1ed5699c7eb17c55e1df026cfba4d800601432c3b2316357e649265da2e6"
+      "sha256": "247188f1c181dbc8e0ec69ec83670b0f99c5b68064f2aadfb33ae483e80b3f01"
     },
     "tool/perf/gperftools_application/harness_frozen_sources.json": {
       "blob": "974f2b4fcbd4202d59674881b764bc04e12e8f0e",
@@ -4314,16 +4320,28 @@
       "sha256": "cf6386b728d98c9b6bc9fc116c4df9a96fe8952b6a0a10e509ba6a25be0c0282"
     },
     "tool/perf/gperftools_application/run_pair.py": {
-      "blob": "fa8aab4a3ea62f6a8e329961ea66af89a0f4c194",
-      "bytes": 32951,
+      "blob": "a85f81ee214ea0bdbce5b50ef213394818a5a9df",
+      "bytes": 34563,
       "mode": "100644",
-      "sha256": "c95a04aae5e46844be375504638d8cccd287d9c610bc6755062ce8e8375edbe7"
+      "sha256": "d2a1e76991e967fd53cdfd7347a9fa8cdc57be1409061dffd08f89274e253360"
+    },
+    "tool/perf/gperftools_application/test_attribution_coverage.py": {
+      "blob": "012cf61a0acab8b6977e536c8eaec4603bb924d3",
+      "bytes": 8243,
+      "mode": "100644",
+      "sha256": "a37bfdb018a52ce5df27fa67c47780a99e755ebd7026fe22ef1d28a60e9a2883"
     },
     "tool/perf/gperftools_application/test_dart_source_contract.py": {
       "blob": "2f031c6e6d1a7b70c673a3210bc830e71e7be41a",
       "bytes": 12533,
       "mode": "100644",
       "sha256": "de5a26c4aecd39cb68a012a14211002378d5d724b5705d85df4a6e7715386fbb"
+    },
+    "tool/perf/gperftools_application/test_deferred_identity_contracts.py": {
+      "blob": "b1e3bc5cfa7a9aa5bd1f3ecc4f050fa1de5ab9d8",
+      "bytes": 52661,
+      "mode": "100644",
+      "sha256": "672a38a19bd4f72260a1adef6221a9e8e12696ab2aee4c971d1d80edc71ec3f3"
     },
     "tool/perf/gperftools_application/test_inplace_elf_contracts.py": {
       "blob": "9e8e9cc73de632a8c7ec3b418c44f0f4cc0daef8",
@@ -4332,10 +4350,10 @@
       "sha256": "99b87b014f411fcf98dc26d252df0064d44f14ae610329be1e02624f687845de"
     },
     "tool/perf/gperftools_application/test_runner_contracts.py": {
-      "blob": "ce24a57cea20cc3b6846c2e9b117eb5d9560619a",
-      "bytes": 23578,
+      "blob": "4057b720385312788ed4e3434a1aab5411dad299",
+      "bytes": 24116,
       "mode": "100644",
-      "sha256": "a5b446df61886161805ea6d399aa1cfdc648287ef95fb11e7035e5f8b19798ac"
+      "sha256": "1b64c7dd511a8f4e9c73e5b22400d120bda1f7468d8907b562cd881fc04b59d3"
     },
     "tool/perf/gperftools_application_contracts/ENTRYPOINT_CONTRACT.md": {
       "blob": "8db6796471c77a19d5cb54d22fc7fb81511a6224",

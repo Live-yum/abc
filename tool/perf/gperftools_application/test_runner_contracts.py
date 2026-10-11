@@ -19,7 +19,7 @@ from application_contract import ContractError, MAX_SIDECAR, map_key
 from bounded_supervision import PairBudget, TargetProcessIdentity, cleanup_owned_group
 from application_process import clean_environment, read_json, run_command
 from application_source import (BASE, BASE_TREE, INHERITED, PACKAGE_GATE, BRANCH,
-    MANIFEST, TARGET, NEW_WORKFLOW, DIRECT_PARENT, DIRECT_PARENT_TREE, INPLACE_TEST,
+    MANIFEST, TARGET, NEW_WORKFLOW, DIRECT_PARENT, DIRECT_PARENT_TREE, INPLACE_TEST, NEW_FILES,
     CORRECTION_PATHS, REVIEWED_IMPLEMENTATION_BLOBS, verify_correction_parent, verify_layers)
 from capture_contract import CLOCK, CutWatcher, GaugeTail, validate_startup, sidecar_caps
 from elf_identity import BoundModules, elf_metadata, endpoint_delta, file_identity, load_bias
@@ -30,6 +30,8 @@ from run_pair import (KNOWN_IMAGE_FAILURE, actual_ci_guard, exact_profile_files,
 # The unchanged workflow discovers test_runner_*.py; include the reviewed
 # in-place ELF contracts through that existing entry point.
 from test_inplace_elf_contracts import InplaceElfContracts
+from test_attribution_coverage import AttributionCoverageContracts
+from test_deferred_identity_contracts import DeferredIdentityContracts
 
 
 class ProcessContracts(unittest.TestCase):
@@ -323,14 +325,16 @@ class CorrectionSourceContracts(unittest.TestCase):
         head='e'*40
         old={'mode':'100644','blob':'a'*40}
         new={'mode':'100644','blob':'b'*40}
-        parent={name:dict(old) for name in CORRECTION_PATHS if name != INPLACE_TEST}
+        parent={name:dict(old) for name in CORRECTION_PATHS if name not in NEW_FILES}
         parent.update({name:dict(old) for name in (
             'lib/main.dart', 'native/abc_owner_diagnostics.c',
             'integration_test/computer_memory_ownership_test.dart',
             'integration_test/computer_memory_diagnostic_test.dart',
             'integration_test/support/generic_circuit_profile.dart',
             'tool/perf/memory_ownership_schedule.json', NEW_WORKFLOW,
-            'tool/perf/gperftools_application/run_pair.py')})
+            'tool/perf/gperftools_application/run_pair.py', INPLACE_TEST,
+            'tool/perf/gperftools_application/dependencies.py',
+            'tool/perf/gperftools_application_contracts/bounded_supervision.py')})
         current=copy.deepcopy(parent)
         current.update({name:dict(new) for name in CORRECTION_PATHS})
         for name, blob in REVIEWED_IMPLEMENTATION_BLOBS.items():
@@ -341,7 +345,7 @@ class CorrectionSourceContracts(unittest.TestCase):
         self.assertEqual(verify_correction_parent(*self.fixture()),sorted(CORRECTION_PATHS))
 
     def test_wrong_parent_old_base_merge_or_tree_rejected(self):
-        for parents in (['e'*40,BASE],['e'*40,'f'*40],['e'*40,DIRECT_PARENT,BASE],['e'*40]):
+        for parents in (['e'*40,BASE],['e'*40,'bed5893ae53a7bf740ba6f0e000ae71eda4241f4'],['e'*40,'f'*40],['e'*40,DIRECT_PARENT,BASE],['e'*40]):
             values=list(self.fixture());values[1]=parents
             with self.subTest(parents=parents),self.assertRaisesRegex(ValueError,'fixed diagnostic parent'):
                 verify_correction_parent(*values)
@@ -362,7 +366,9 @@ class CorrectionSourceContracts(unittest.TestCase):
                      'integration_test/computer_memory_diagnostic_test.dart',
                      'integration_test/support/generic_circuit_profile.dart',
                      'tool/perf/memory_ownership_schedule.json',NEW_WORKFLOW,
-                     'tool/perf/gperftools_application/run_pair.py'):
+                     'tool/perf/gperftools_application/run_pair.py', INPLACE_TEST,
+                     'tool/perf/gperftools_application/dependencies.py',
+                     'tool/perf/gperftools_application_contracts/bounded_supervision.py'):
             values=self.fixture();values[4][name]['blob']='d'*40
             with self.subTest(name=name),self.assertRaises(ValueError):
                 verify_correction_parent(*values)

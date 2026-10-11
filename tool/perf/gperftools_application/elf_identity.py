@@ -116,9 +116,9 @@ class MetadataReader:
                 'fullSymbolScanComplete': True, 'completeElfRetained': False}
 
 
-def elf_metadata_fd(fd, size, deadline, *, necessary_offsets=()):
+def elf_metadata_fd(fd, size, deadline, *, necessary_offsets=(), debug_input=False):
     reader = MetadataReader(size, lambda off, count: os.pread(fd, count, off), deadline)
-    return _elf_metadata(reader, necessary_offsets)
+    return _elf_metadata(reader, necessary_offsets, debug_input=debug_input)
 
 
 def elf_metadata(data):
@@ -127,17 +127,19 @@ def elf_metadata(data):
     return _elf_metadata(reader, None)
 
 
-def _elf_metadata(reader, necessary_offsets):
+def _elf_metadata(reader, necessary_offsets, *, debug_input=False):
     header_bytes = reader.read(0, 64)
     require(header_bytes[:7] == b'\x7fELF\x02\x01\x01', 'Expected ELF64 little endian')
     header = struct.unpack_from('<HHIQQQIHHHHHH', header_bytes, 16)
     kind, machine, version, _, phoff, shoff, _, ehsize, phsize, phnum, shsize, shnum, shstr = header
-    require(kind in (2, 3) and machine == 62 and version == 1 and ehsize == 64,
+    require(kind in ((1, 2, 3) if debug_input else (2, 3)) and machine == 62 and version == 1 and ehsize == 64,
             'Unsupported ELF platform/type/header')
-    require(phsize == 56 and 0 < phnum <= 256 and shsize == 64 and 0 < shnum <= 65535
+    require((phsize == 56 and 0 < phnum <= 256 or debug_input and phnum == 0 and phsize in (0, 56))
+            and shsize == 64 and 0 < shnum <= 65535
             and shstr < shnum, 'Unsupported extended/absent ELF tables')
     phdata = reader.read(phoff, phnum * phsize)
     shdata = reader.read(shoff, shnum * shsize)
+    sections = [struct.unpack_from('<IIQQQQIIQQ', shdata, i * 64) for i in range(shnum)]
     loads, note_ranges = [], []
     for i in range(phnum):
         ptype, flags, off, vaddr, _, filesz, memsz, align = struct.unpack_from('<IIQQQQQQ', phdata, i * 56)
@@ -148,8 +150,10 @@ def _elf_metadata(reader, necessary_offsets):
             loads.append(dict(offset=off, vaddr=vaddr, fileSize=filesz, memorySize=memsz, flags=flags, align=align))
         elif ptype == 4:
             note_ranges.append((off, filesz))
+    # Standalone DWZ/debug ELFs can expose the GNU ID in SHT_NOTE only.
+    note_ranges.extend((section[4], section[5]) for section in sections if section[1] == 7)
     build_ids = set()
-    for off, size in note_ranges:
+    for off, size in sorted(set(note_ranges)):
         note, cursor = reader.read(off, size), 0
         while cursor < len(note):
             require(len(note) - cursor >= 12, 'Truncated ELF note')
@@ -163,18 +167,28 @@ def _elf_metadata(reader, necessary_offsets):
                 build_ids.add(note[desc_start:end].hex())
             cursor = desc_start + ((descsz + 3) & ~3)
             require(cursor <= len(note), 'ELF note padding extent')
-    require(len(build_ids) == 1 and loads, 'Unique GNU build ID/PT_LOAD required')
-    sections = [struct.unpack_from('<IIQQQQIIQQ', shdata, i * 64) for i in range(shnum)]
+    require(len(build_ids) == 1 and (loads or debug_input), 'Unique GNU build ID/PT_LOAD required')
     shnames = sections[shstr]
     require(shnames[1] == 3, 'ELF section-name table missing')
     section_names = reader.read(shnames[4], shnames[5])
-    names = []
-    for section in sections:
+    names, inventory, inventory_bytes = [], [], 0
+    for section_index, section in enumerate(sections):
         start = section[0]
         require(start < len(section_names), 'ELF section-name extent')
         end = section_names.find(b'\x00', start)
         require(start <= end < start + 65536, 'ELF section-name terminator')
-        names.append(bytes(section_names[start:end]))
+        name = bytes(section_names[start:end])
+        names.append(name)
+        item = dict(index=section_index, name=name.decode('ascii', errors='backslashreplace'),
+                    nameBytesHex=name.hex(), type=section[1], flags=section[2],
+                    address=section[3], offset=section[4], bytes=section[5],
+                    link=section[6], info=section[7], align=section[8], entrySize=section[9])
+        inventory_bytes += len(json.dumps(item, sort_keys=True).encode())
+        require(inventory_bytes <= 4 << 20, 'ELF section inventory JSON exceeds 4 MiB')
+        # NOBITS has no file payload; all other declared sections must be bound.
+        if section[1] != 8:
+            reader.extent(section[4], section[5])
+        inventory.append(item)
     symbols, scans = {'dynsym': [], 'symtab': []}, []
     selected_json_bytes = 0
     offsets = None if necessary_offsets is None else sorted(set(necessary_offsets))
@@ -217,19 +231,32 @@ def _elf_metadata(reader, necessary_offsets):
                       'stringsSha256': hashlib.sha256(string_data).hexdigest(),
                       'entryCount': size // 24, 'acceptedFunctionCount': accepted,
                       'matchedFunctionCount': matched, 'fullScanComplete': True})
-    debug_link = None
+    debug_link, alt_link, raw_links = None, None, {}
     for name, section in zip(names, sections):
-        if name != b'.gnu_debuglink':
+        if name not in (b'.gnu_debuglink', b'.gnu_debugaltlink', b'.debug_sup'):
             continue
-        require(debug_link is None, 'Duplicate GNU debuglink')
+        label = name.decode('ascii')
+        require(label not in raw_links, 'Duplicate debug link section: ' + label)
+        require(0 < section[5] <= 65536 + 68, 'Debug link payload extent')
         payload = reader.read(section[4], section[5])
+        raw_links[label] = {'offset': section[4], 'bytes': section[5],
+                            'sha256': hashlib.sha256(payload).hexdigest(), 'rawHex': payload.hex()}
+        if name == b'.debug_sup':
+            continue  # Recorded exactly; DWARF supplementary interpretation is unknown.
         end = payload.find(b'\x00')
-        require(0 < end < 65536, 'GNU debuglink filename extent')
+        require(0 < end < 65536, 'GNU debug link filename extent')
         filename = payload[:end].decode('utf-8', errors='strict')
-        require('/' not in filename and filename not in ('.', '..'), 'GNU debuglink unsafe filename')
-        crc_offset = (end + 4) & ~3
-        require(len(payload) == crc_offset + 4, 'GNU debuglink CRC extent')
-        debug_link = {'filename': filename, 'crc32': struct.unpack_from('<I', payload, crc_offset)[0]}
+        require(not any(ord(char) < 32 or ord(char) == 127 for char in filename),
+                'GNU debug link unsafe filename')
+        if name == b'.gnu_debuglink':
+            require('/' not in filename and filename not in ('.', '..'), 'GNU debuglink unsafe filename')
+            crc_offset = (end + 4) & ~3
+            require(len(payload) == crc_offset + 4 and not any(payload[end:crc_offset]), 'GNU debuglink CRC extent')
+            debug_link = {'filename': filename, 'crc32': struct.unpack_from('<I', payload, crc_offset)[0]}
+        else:
+            require(filename not in ('.', '..') and 4 <= len(payload) - end - 1 <= 64,
+                    'GNU debugaltlink BuildID extent')
+            alt_link = {'filename': filename, 'buildId': payload[end + 1:].hex()}
     unsupported_debug = [name.decode('ascii') for name in names
                          if name in (b'.gnu_debugaltlink', b'.debug_sup')]
     proof = reader.proof()
@@ -237,9 +264,17 @@ def _elf_metadata(reader, necessary_offsets):
                  necessaryElfOffsets=offsets,
                  offlineResymbolizationSelfContained=False)
     return {'buildId': next(iter(build_ids)), 'ptLoad': loads, **symbols,
-            'metadataProof': proof, 'gnuDebuglink': debug_link,
+            'metadataProof': proof, 'gnuDebuglink': debug_link, 'gnuDebugaltlink': alt_link,
+            'sectionInventory': inventory, 'debugLinkPayloads': raw_links,
             'unsupportedSupplementaryDebugSections': unsupported_debug,
-            'debugInfo': None, 'debugInfoPolicy': 'embedded-or-existing-build-id-matched-only; no downloads',
+            'debugCapabilities': {'externalResolution': 'deferred-until-actual-PCs',
+                'dwarfInterpretation': 'unknown-not-used-for-trusted-functions',
+                'supplementary': 'recorded-unresolved' if unsupported_debug else 'not-declared',
+                'compressedSections': [item['name'] for item in inventory
+                    if item['flags'] & 0x800 or item['name'].startswith('.zdebug')],
+                'splitDwarfSections': [item['name'] for item in inventory if item['name'].endswith('.dwo')],
+                'splitDwarfAttributes': 'unknown-not-scanned'},
+            'debugInfo': None, 'debugInfoPolicy': 'exact-ELF-functions; deferred-bounded-external-debug; no downloads',
             'hasEmbeddedDebugInfo': b'.debug_info' in names or b'.zdebug_info' in names,
             'elfType': kind}
 
@@ -303,13 +338,12 @@ class BoundModules:
                     row['loadedAtStartup'] = False
                     row['loadedIdentityProven'] = False
                     self.deferred[path] = row
-                save(Path(evidence) / (row['sha256'] + '.json'), row, new=True)
+                save(Path(evidence) / (row['sha256'] + '-' + hashlib.sha256(path.encode()).hexdigest() + '.json'), row, new=True)
                 cap_check()
-            self.seal_indirect_debug(deadline)
-            save(self.evidence / 'debug-inputs.json', {
-                'directPprofSelections': self.debug_selections,
-                'standardIndirectCandidates': self.indirect_debug,
-                'policy': 'record absence; bind present standard debuglink/build-id candidates; reject unsupported supplementary sections',
+            save(self.evidence / 'startup-debug-policy.json', {
+                'externalResolution': 'deferred-until-complete-raw-actual-PC-stage',
+                'modulePaths': sorted(self.files),
+                'policy': 'identity gate binds actual ELF bytes and mappings; external debug capability is separate',
                 'allPossibleBinutilsExternalReadsProven': False,
                 'noDebugDownloads': True}, new=True)
             cap_check()
@@ -323,11 +357,13 @@ class BoundModules:
             self.close()
             raise
 
-    def seal_file(self, path, deadline):
+    def seal_file(self, path, deadline, *, debug_input=False):
         need_time(deadline)
         path = str(path)
         require(str(Path(path).resolve()) == path, 'Loaded module path is not canonical')
         if path in self.files:
+            require(debug_input or self.files[path].get('identityRole') == 'actual-module',
+                    'External debug input cannot establish actual-module identity')
             return self.files[path]
         fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
         self.held[path] = (fd, None)
@@ -342,12 +378,13 @@ class BoundModules:
                     'Unique ELF input exceeds 1 GiB per arm')
             self.unique_inputs[key] = info.st_size
         digest = stream_sha(fd, info.st_size, deadline, cap=cap)
-        metadata = elf_metadata_fd(fd, info.st_size, deadline)
+        metadata = elf_metadata_fd(fd, info.st_size, deadline, debug_input=debug_input)
         path_matches_fd(path, fd, stat_key(info))
         row = dict(path=path, bytes=info.st_size, sha256=digest,
                    device=info.st_dev, inode=info.st_ino,
                    inputPolicy='inplace-system-elf' if system_elf(path) else 'sealed-built-artifact',
                    storagePolicy='retained-FD-and-original-path-no-ELF-copy',
+                   identityRole='external-debug-input' if debug_input else 'actual-module',
                    pathFdBindingAtomic=False, offlineRerunRequiresSameSha256Elf=True,
                    **metadata)
         self.files[path] = row
@@ -362,20 +399,15 @@ class BoundModules:
     def seal_debug_selection(self, image, build_id, deadline):
         # Exactly the two paths opened by official pprof DebuggingLibrary. Its
         # caller may invoke it again on the first selected debug image for nm.
-        result = []
+        self.ensure_debug_roots([image])
+        result, visited = [], {image}
         current = image
         for level in range(2):
             candidates = []
             selected = None
             for name in self.debug_candidates(current):
-                regular = Path(name).is_file()
-                candidate = {'path': name, 'regularFile': regular}
-                if regular:
-                    canonical = str(Path(name).resolve())
-                    candidate['canonicalPath'] = canonical
-                    debug = self.seal_file(canonical, deadline)
-                    require(debug['buildId'] == build_id, 'Official pprof debug candidate BuildID mismatch: ' + name)
-                    candidate.update({key: debug[key] for key in ('device', 'inode', 'bytes', 'sha256', 'buildId')})
+                candidate = self.debug_candidate(name, build_id, deadline, kind='official-pprof')
+                if candidate['regularFile']:
                     if selected is None:
                         selected = name
                 candidates.append(candidate)
@@ -383,11 +415,15 @@ class BoundModules:
                            'candidates': candidates, 'selected': selected})
             if selected is None:
                 break
+            canonical = str(Path(selected).resolve())
+            require(canonical not in visited, 'Official pprof debug candidate cycle')
+            visited.add(canonical)
             current = selected
         self.debug_selections[image] = result
         return result
 
     def capture_file(self, path, expected, deadline, cap_check):
+        """Seal the actual module only. No external filename is opened here."""
         row = dict(self.seal_file(path, deadline))
         if expected is not None:
             require({key: row[key] for key in ('path', 'device', 'inode', 'bytes', 'sha256')} == expected,
@@ -395,21 +431,149 @@ class BoundModules:
         if row['hasEmbeddedDebugInfo']:
             row['debugInfo'] = {'buildId': row['buildId'], 'sha256': row['sha256'],
                                 'kind': 'embedded', 'source': path, 'completeElfRetained': False}
-        else:
-            candidate = Path('/usr/lib/debug/.build-id') / row['buildId'][:2] / (row['buildId'][2:] + '.debug')
-            row['endpointDebugCandidate'] = {'path': str(candidate), 'regularFile': candidate.is_file()}
-            if candidate.exists():
-                debug_path = str(candidate.resolve())
-                debug = self.seal_file(debug_path, deadline)
-                require(debug['buildId'] == row['buildId'], 'Installed debug build ID does not match module')
-                self.endpoint_debug[path] = debug_path
-                row['endpointDebugCandidate']['canonicalPath'] = debug_path
-                row['debugInfo'] = {'buildId': row['buildId'], 'sha256': debug['sha256'],
-                    'bytes': debug['bytes'], 'kind': 'existing-build-id-match',
-                    'source': debug_path, 'completeElfRetained': False,
-                    'metadataProof': debug['metadataProof']}
-        row['officialDebugSelection'] = self.seal_debug_selection(path, row['buildId'], deadline)
+        row['externalDebugResolution'] = {'state': 'deferred', 'reason': 'no-actual-PC-selection-yet'}
         return row
+
+    def ensure_debug_roots(self, images=()):
+        # Freeze roots before any debug files are added. They cannot enlarge the
+        # authority of their own links. Mapped/build artifacts supply only their
+        # containing directories, never an inferred common root such as /.
+        if not hasattr(self, 'debug_roots'):
+            images = set(images) | {path for path, row in self.files.items()
+                                     if row.get('identityRole') != 'external-debug-input'}
+            self.debug_roots = tuple(sorted({str(Path(root).resolve()) for root in
+                ('/usr/lib', '/usr/lib64', '/lib', '/lib64')} |
+                {str(Path(path).parent) for path in images if not system_elf(path)}))
+            require('/' not in self.debug_roots, 'Debug input root cannot be the whole filesystem')
+
+    def debug_candidate(self, name, build_id, deadline, *, kind, crc=None):
+        need_time(deadline)
+        path = Path(name)
+        require(path.is_absolute(), 'Debug candidate must be absolute')
+        try:
+            canonical = str(path.resolve())
+        except (OSError, RuntimeError, ValueError) as error:
+            require(False, 'Debug candidate path resolution failed: ' + str(error))
+        require(any(Path(canonical).is_relative_to(root) for root in self.debug_roots),
+                'Debug candidate escapes original system/build roots: ' + str(path))
+        present = path.exists() or path.is_symlink()
+        require(not present or path.is_file(), 'Debug candidate is not a regular file: ' + str(path))
+        candidate = {'path': str(path), 'canonicalPath': canonical, 'regularFile': present,
+                     'kind': kind, 'state': 'present-bound' if present else 'absent',
+                     'expectedBuildId': build_id, 'expectedCrc32': crc}
+        if present:
+            debug = self.seal_file(canonical, deadline, debug_input=True)
+            require(debug['buildId'] == build_id, 'Debug candidate BuildID mismatch: ' + str(path))
+            candidate.update({key: debug[key] for key in ('device', 'inode', 'bytes', 'sha256', 'buildId')})
+            if crc is not None:
+                fd, expected = self.held[canonical]
+                observed, offset = 0, 0
+                while offset < debug['bytes']:
+                    need_time(deadline)
+                    data = os.pread(fd, min(MAX_ELF_READ, debug['bytes'] - offset), offset)
+                    require(data, 'Indirect debug candidate truncated')
+                    observed = zlib.crc32(data, observed)
+                    offset += len(data)
+                require(observed == crc, 'GNU debuglink CRC mismatch: ' + str(path))
+                path_matches_fd(canonical, fd, expected)
+                candidate['observedCrc32'] = observed
+        return candidate
+
+    def resolve_symbol_debug(self, selected_paths, deadline):
+        """Resolve only selected modules and their bounded, standard local chain.
+
+        Missing links/capability stay explicit unknown. Present mismatched,
+        escaping, malformed or cyclic links still fail. These checks are not
+        syscall tracing and cannot atomically constrain official tool reads.
+        """
+        self.ensure_debug_roots(selected_paths)
+        graph, active, done, candidate_json_bytes = {}, set(), set(), 0
+
+        def visit(path):
+            nonlocal candidate_json_bytes
+            need_time(deadline)
+            require(path not in active, 'External debug link cycle: ' + path)
+            if path in done:
+                return
+            require(len(active) < 128 and len(done) + len(active) < 4096,
+                    'External debug chain metadata bound exceeded')
+            active.add(path)
+            row, candidates = self.files[path], []
+            link = row.get('gnuDebuglink')
+            expected = []
+            if link:
+                parent, filename = Path(path).parent, link['filename']
+                for name in (parent / filename, parent / '.debug' / filename,
+                             Path('/usr/lib/debug' + str(parent)) / filename):
+                    expected.append((str(name), row['buildId'], 'gnu-debuglink', link['crc32']))
+            build_id = row['buildId']
+            expected.append(('/usr/lib/debug/.build-id/' + build_id[:2] + '/' + build_id[2:] + '.debug',
+                             build_id, 'build-id', None))
+            alt = row.get('gnuDebugaltlink')
+            if alt:
+                filename = Path(alt['filename'])
+                name = filename if filename.is_absolute() else Path(path).parent / filename
+                expected.append((str(name), alt['buildId'], 'gnu-debugaltlink', None))
+                expected.append(('/usr/lib/debug/.build-id/' + alt['buildId'][:2] + '/' + alt['buildId'][2:] + '.debug',
+                                 alt['buildId'], 'gnu-debugaltlink-build-id', None))
+            seen = set()
+            for name, expected_id, kind, crc in expected:
+                key = (name, expected_id, kind, crc)
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidate = self.debug_candidate(name, expected_id, deadline, kind=kind, crc=crc)
+                candidate_json_bytes += len(json.dumps(candidate, sort_keys=True).encode())
+                require(candidate_json_bytes <= 4 << 20, 'External debug candidate JSON exceeds 4 MiB')
+                candidates.append(candidate)
+                if candidate['regularFile']:
+                    target = candidate['canonicalPath']
+                    # The build-ID path of an already-selected debug file is an
+                    # identity alias, not a supplementary recursive dependency.
+                    if kind == 'build-id' and target in active:
+                        candidate['identityAlias'] = True
+                    else:
+                        visit(target)
+            active.remove(path)
+            done.add(path)
+            graph[path] = candidates
+            self.indirect_debug[path] = candidates
+
+        for path in selected_paths:
+            row = self.records[path]
+            row['officialDebugSelection'] = self.seal_debug_selection(path, row['buildId'], deadline)
+            visit(path)
+            for level in row['officialDebugSelection']:
+                for candidate in level['candidates']:
+                    if candidate['regularFile']:
+                        visit(candidate['canonicalPath'])
+            if not row['hasEmbeddedDebugInfo']:
+                candidate = next(item for item in graph[path] if item['kind'] == 'build-id')
+                row['endpointDebugCandidate'] = candidate
+                if candidate['regularFile']:
+                    debug_path = candidate['canonicalPath']
+                    debug = self.files[debug_path]
+                    self.endpoint_debug[path] = debug_path
+                    row['debugInfo'] = {'buildId': row['buildId'], 'sha256': debug['sha256'],
+                        'bytes': debug['bytes'], 'kind': 'existing-build-id-match', 'source': debug_path,
+                        'completeElfRetained': False, 'metadataProof': debug['metadataProof']}
+            alt_candidates = [item for item in graph[path] if item['kind'].startswith('gnu-debugaltlink')]
+            row['externalDebugResolution'] = {'state': 'resolved-candidates-capability-limited',
+                'supplementary': [{'path': item['path'], 'state': item['state'], 'kind': item['kind'],
+                                  'expectedBuildId': item['expectedBuildId']} for item in alt_candidates],
+                'dwarfFunctionAttribution': 'unknown-not-used',
+                'trustedFunctions': 'only-bound-exact-nonzero-ELF-symbol-ranges'}
+            row['debugCapabilities'] = dict(row['debugCapabilities'], externalResolution='bounded-candidates-recorded')
+        self.verify_metadata()
+        save(self.evidence / 'debug-inputs.json', {
+            'selectedModulePaths': selected_paths,
+            'directPprofSelections': self.debug_selections,
+            'standardIndirectCandidates': self.indirect_debug,
+            'allowedRoots': self.debug_roots,
+            'policy': 'record absent; bind present; reject malformed/escaping/cyclic/mismatched/replaced inputs',
+            'allPossibleBinutilsExternalReadsProven': False, 'pathFdBindingAtomic': False,
+            'noDebugDownloads': True}, new=True)
+        self.cap_check()
 
     def seal_indirect_debug(self, deadline):
         """Bind standard local debuglink/build-ID candidates, not a filesystem scan.
@@ -418,6 +582,7 @@ class BoundModules:
         every binutils version's possible external file lookup has been traced.
         Supplementary/DWZ link sections require a separate contract and fail.
         """
+        self.ensure_debug_roots()
         while set(self.files) - set(self.indirect_debug):
             path = sorted(set(self.files) - set(self.indirect_debug))[0]
             row = self.files[path]
@@ -435,33 +600,17 @@ class BoundModules:
             expected.setdefault(build_id_path, None)
             candidates = []
             for name, expected_crc in expected.items():
-                need_time(deadline)
-                candidate = {'path': name, 'regularFile': Path(name).is_file(), 'expectedCrc32': expected_crc}
-                if candidate['regularFile']:
-                    canonical = str(Path(name).resolve())
-                    debug = self.seal_file(canonical, deadline)
-                    require(debug['buildId'] == build_id, 'Indirect debug candidate BuildID mismatch: ' + name)
-                    candidate.update(canonicalPath=canonical, **{key: debug[key]
-                        for key in ('device', 'inode', 'bytes', 'sha256', 'buildId')})
-                    if expected_crc is not None:
-                        fd, _ = self.held[canonical]
-                        crc, offset = 0, 0
-                        while offset < debug['bytes']:
-                            need_time(deadline)
-                            data = os.pread(fd, min(MAX_ELF_READ, debug['bytes'] - offset), offset)
-                            require(data, 'Indirect debug candidate truncated')
-                            crc = zlib.crc32(data, crc)
-                            offset += len(data)
-                        require(crc == expected_crc, 'GNU debuglink CRC mismatch: ' + name)
-                        candidate['observedCrc32'] = crc
+                candidate = self.debug_candidate(name, build_id, deadline,
+                    kind='legacy-standard', crc=expected_crc)
                 candidates.append(candidate)
             self.indirect_debug[path] = candidates
 
     def prepare_symbols(self, profiles, deadline):
-        """Rescan every accepted table; retain all exact candidates for every PC.
+        """Select all actual PCs, including zero-live historical buckets.
 
         Empty-PC modules still have a complete bounded startup scan proof. No
-        unsampled module is skipped by official pprof itself.
+        external debug path for an unsampled module is resolved by this stage.
+        Official tool reads are separately disclosed as not exhaustively traced.
         """
         offsets = {path: set() for path in self.records}
         for profile in profiles:
@@ -471,24 +620,35 @@ class BoundModules:
                                 if item['start'] <= pc < item['end'] and 'x' in item['permissions']]
                     require(len(mappings) == 1, 'Necessary PC lacks unique executable mapping')
                     mapping = mappings[0]
+                    require(not mapping['path'].startswith('/') or mapping['path'] in self.records,
+                            'Necessary file PC lacks sealed module')
                     if mapping['path'] in self.records:
                         _, offset = normalized_file_pc(pc, mapping, self.records[mapping['path']])
                         offsets[mapping['path']].add(offset)
-        self.verify_metadata()
-        for path, row in self.records.items():
+        self.rehash(deadline)
+        selected = sorted(path for path, pcs in offsets.items() if pcs)
+        self.resolve_symbol_debug(selected, deadline)
+        for path in selected:
+            row = self.records[path]
             need_time(deadline)
             fd, _ = self.held[path]
             metadata = elf_metadata_fd(fd, row['bytes'], deadline, necessary_offsets=offsets[path])
             require(metadata['buildId'] == row['buildId'] and metadata['ptLoad'] == row['ptLoad'],
                     'ELF identity changed during symbol extraction')
+            require(all(metadata[key] == row[key] for key in
+                        ('sectionInventory', 'debugLinkPayloads', 'gnuDebuglink', 'gnuDebugaltlink')),
+                    'ELF debug metadata changed during symbol extraction')
             row.update({key: metadata[key] for key in ('dynsym', 'symtab', 'metadataProof')})
             if path in self.endpoint_debug:
                 debug_path = self.endpoint_debug[path]
                 debug_fd, _ = self.held[debug_path]
                 debug = elf_metadata_fd(debug_fd, self.files[debug_path]['bytes'], deadline,
-                                        necessary_offsets=offsets[path])
+                                        necessary_offsets=offsets[path], debug_input=True)
                 require(debug['buildId'] == row['buildId'], 'Debug BuildID changed during symbol extraction')
-                row['symtab'].extend(debug['symtab'])
+                if debug['elfType'] == row['elfType']:
+                    row['symtab'].extend(debug['symtab'])
+                else:
+                    row['debugInfo']['symbolCapability'] = 'unknown-incompatible-ELF-address-space'
                 row['debugInfo']['metadataProof'] = debug['metadataProof']
             ordered = sorted({(symbol['address'], symbol['address'] + symbol['size'], symbol['name'])
                               for kind in ('dynsym', 'symtab') for symbol in row[kind]})
@@ -511,11 +671,16 @@ class BoundModules:
                 require(candidate_json_bytes <= 4 << 20, 'Per-PC candidate JSON exceeds 4 MiB')
                 candidates.append(item)
             row['metadataProof']['perPcCandidates'] = candidates
-            save(self.evidence / (row['sha256'] + '-endpoint-symbols.json'), row, new=True)
+            save(self.evidence / (row['sha256'] + '-' + hashlib.sha256(path.encode()).hexdigest() + '-endpoint-symbols.json'), row, new=True)
             self.cap_check()
-        self.verify_metadata()
+        self.rehash(deadline)
         return {'limits': INPLACE_ELF_LIMITS, 'uniqueElfInputBytes': sum(self.unique_inputs.values()),
                 'uniqueElfInputCount': len(self.unique_inputs), 'pathFdBindingAtomic': False,
+                'selectedModulePaths': selected,
+                'unobservedModulePaths': sorted(set(self.records) - set(selected)),
+                'deferredUnloadedModulePaths': sorted(self.deferred),
+                'externalDebugStage': 'after-complete-raw-actual-PC-selection',
+                'allPossibleBinutilsExternalReadsProven': False,
                 'offlineResymbolizationSelfContained': False,
                 'requiresSameSha256ElfAndDebugFilesForOfflineRerun': True}
 
@@ -534,16 +699,19 @@ class BoundModules:
             for level in levels:
                 for candidate in level['candidates']:
                     path = Path(candidate['path'])
-                    require(path.is_file() == candidate['regularFile'],
+                    present = path.exists() or path.is_symlink()
+                    require(present == candidate['regularFile'] and (not present or path.is_file()),
                             'Official pprof debug selection changed: ' + str(path))
-                    if candidate['regularFile']:
+                    if candidate.get('canonicalPath') is not None:
                         require(str(path.resolve()) == candidate['canonicalPath'],
                                 'Official pprof debug candidate changed: ' + str(path))
         for candidates in self.indirect_debug.values():
             for candidate in candidates:
                 path = Path(candidate['path'])
-                require(path.is_file() == candidate['regularFile'], 'Indirect debug availability changed')
-                if candidate['regularFile']:
+                present = path.exists() or path.is_symlink()
+                require(present == candidate['regularFile'] and (not present or path.is_file()),
+                        'Indirect debug availability changed')
+                if candidate.get('canonicalPath') is not None:
                     require(str(path.resolve()) == candidate['canonicalPath'], 'Indirect debug path changed')
         for row in [*self.records.values(), *self.deferred.values()]:
             if 'endpointDebugCandidate' in row:

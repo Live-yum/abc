@@ -26,13 +26,13 @@ TARGET = 'integration_test/computer_memory_ownership_test.dart'
 OLD_WORKFLOW = '.github/workflows/memory-ownership.yml'
 NEW_WORKFLOW = '.github/workflows/gperftools-application.yml'
 ROOT = Path(__file__).resolve().parents[3]
-DIRECT_PARENT = 'bed5893ae53a7bf740ba6f0e000ae71eda4241f4'
-DIRECT_PARENT_TREE = '2d927a130f036350116101a420e409c0f81352d6'
+DIRECT_PARENT = '96c096e5ada603f1e6db517a76101dd9fe4e09d5'
+DIRECT_PARENT_TREE = '7b6223f3b1c5703e8fadca6d3921b7597f9ced56'
 INPLACE_TEST = 'tool/perf/gperftools_application/test_inplace_elf_contracts.py'
-REVIEWED_IMPLEMENTATION_BLOBS = {'tool/perf/gperftools_application/elf_identity.py': '9d1485df7f6df3c5fa3f225bd1ee6a0016fa3130', 'tool/perf/gperftools_application/run_pair.py': 'fa8aab4a3ea62f6a8e329961ea66af89a0f4c194', 'tool/perf/gperftools_application/dependencies.py': 'ba27279e0ebd60a588b3d9a9e5d1de0b94f30b3e', 'tool/perf/gperftools_application/test_inplace_elf_contracts.py': '9e8e9cc73de632a8c7ec3b418c44f0f4cc0daef8', 'tool/perf/gperftools_application_contracts/application_contract.py': '08b322ffc2dd5918b587cbfd8c1c349986079b68'}
+REVIEWED_IMPLEMENTATION_BLOBS = {'tool/perf/gperftools_application/attribution_coverage.py': '9329db360c1df47ed92640dffae5d64c99ff2455', 'tool/perf/gperftools_application/elf_identity.py': 'ad747cf2a9172da1c1ce22cc3e8a2424b5542910', 'tool/perf/gperftools_application/run_pair.py': 'a85f81ee214ea0bdbce5b50ef213394818a5a9df', 'tool/perf/gperftools_application/test_attribution_coverage.py': '012cf61a0acab8b6977e536c8eaec4603bb924d3', 'tool/perf/gperftools_application/test_deferred_identity_contracts.py': 'b1e3bc5cfa7a9aa5bd1f3ecc4f050fa1de5ab9d8', 'tool/perf/gperftools_application/test_runner_contracts.py': '4057b720385312788ed4e3434a1aab5411dad299'}
+NEW_FILES = frozenset(['tool/perf/gperftools_application/attribution_coverage.py', 'tool/perf/gperftools_application/test_attribution_coverage.py', 'tool/perf/gperftools_application/test_deferred_identity_contracts.py'])
 CORRECTION_PATHS = frozenset(REVIEWED_IMPLEMENTATION_BLOBS) | frozenset({
     'tool/perf/gperftools_application/application_source.py',
-    'tool/perf/gperftools_application/test_runner_contracts.py',
     MANIFEST,
 })
 
@@ -123,19 +123,19 @@ def verify_correction_parent(head, parents, parent_tree_sha, parent, current):
     workload, workflow, package contract, budget, or provenance dependency.
     """
     require(parents == [head, DIRECT_PARENT],
-            'In-place ELF correction must have exactly the fixed diagnostic parent')
+            'Deferred-symbol correction must have exactly the fixed diagnostic parent')
     require(parent_tree_sha == DIRECT_PARENT_TREE, 'Fixed diagnostic parent tree differs')
-    require(set(parent) - set(current) == set(), 'In-place ELF correction cannot delete parent files')
-    require(set(current) - set(parent) == {INPLACE_TEST},
-            'Only the reviewed in-place ELF regression may be added to the fixed parent')
+    require(set(parent) - set(current) == set(), 'Deferred-symbol correction cannot delete parent files')
+    require(set(current) - set(parent) == NEW_FILES,
+            'Only the three reviewed deferred-symbol files may be added to the fixed parent')
     changed = {name for name in parent.keys() | current.keys() if parent.get(name) != current.get(name)}
-    require(changed == CORRECTION_PATHS, 'In-place ELF correction differs outside the exact eight-path delta')
+    require(changed == CORRECTION_PATHS, 'Deferred-symbol correction differs outside the exact eight-path delta')
     for name in CORRECTION_PATHS:
         require(current[name]['mode'] == '100644'
-                and (name == INPLACE_TEST or parent[name]['mode'] == '100644'),
-                'In-place ELF correction paths must remain regular non-executable sources')
+                and (name in NEW_FILES or parent[name]['mode'] == '100644'),
+                'Deferred-symbol correction paths must remain regular non-executable sources')
     for name, blob in REVIEWED_IMPLEMENTATION_BLOBS.items():
-        require(current[name]['blob'] == blob, 'Reviewed in-place implementation bytes differ: ' + name)
+        require(current[name]['blob'] == blob, 'Reviewed deferred-symbol implementation bytes differ: ' + name)
     return sorted(changed)
 
 
@@ -147,7 +147,7 @@ def source_gate(root, base_root, inherited_root, output):
     require(head == os.environ.get('GITHUB_SHA'), 'Checkout head differs from this exact CI event')
     parents = git(root, 'rev-list', '--parents', '-n', '1', head).split()
     require(parents == [head, DIRECT_PARENT],
-            'In-place ELF correction must have exactly the fixed diagnostic parent')
+            'Deferred-symbol correction must have exactly the fixed diagnostic parent')
     parent_tree_sha = git(root, 'rev-parse', DIRECT_PARENT + '^{tree}')
     require(parent_tree_sha == DIRECT_PARENT_TREE, 'Fixed diagnostic parent tree differs')
     require(not git(root, 'status', '--porcelain', '--untracked-files=all'), 'Clean committed source required')
@@ -182,7 +182,7 @@ def source_gate(root, base_root, inherited_root, output):
              'diagnosticOverlay': True, 'shippingRuntimeUsed': False,
              'scheduleSha256': files['tool/perf/memory_ownership_schedule.json']['sha256'],
              'patchBaseCommit': DIRECT_PARENT,
-             'patchScope': 'exact-eight-path-inplace-elf-correction',
+             'patchScope': 'exact-eight-path-deferred-symbol-correction',
              'patchSha256': hashlib.sha256(git(root, 'diff', '--binary', '--full-index', DIRECT_PARENT, head, binary=True)).hexdigest()}
     with Path(output).open('x') as stream:
         json.dump(proof, stream, indent=2, sort_keys=True); stream.write('\n')

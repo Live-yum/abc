@@ -27,6 +27,8 @@ from application_source import BASE, BRANCH, verify_source_proof
 from capture_contract import (CLOCK, CutWatcher, GaugeTail, sidecar_caps,
                               validate_probe_finish, validate_startup)
 from elf_identity import BoundModules, endpoint_delta, file_identity
+from attribution_coverage import (summarize_coverage, verify_coverage_totals,
+                                  require_engine_coverage, with_cut_presence)
 from helper_config import write_config
 from memory_ownership_run import publish_ready, validate_target
 from memory_ownership_validate import validate_arm, validate_group
@@ -399,6 +401,10 @@ class PairRunner:
                 require(time.monotonic() < arm['deadline'], 'OS journal final drain shared timeout')
                 rss.read_new()
             save(self.shared / ('rss-' + name + '.json'), rss.finish(expected_os), new=True)
+            # Preserve completed ACK timing and lazy identity receipts even if
+            # later symbol preparation or official analysis fails.
+            save(self.shared / ('receipts-' + name + '.json'), watcher.records, new=True)
+            save(self.shared / ('lazy-module-bindings-' + name + '.json'), modules.transitions, new=True)
             analysis = []
             for index, (_, _, cut, heap_name) in enumerate(CUTS):
                 for mode in ('inuse_space', 'inuse_objects'):
@@ -407,6 +413,21 @@ class PairRunner:
                         symbol_inputs = modules.prepare_symbols(
                             [item['profile'] for item in watcher.cuts], analysis_deadline)
                         save(self.shared / ('symbol-inputs-' + name + '.json'), symbol_inputs, new=True)
+                        endpoints = endpoint_delta(watcher.cuts[0]['profile'],
+                            watcher.cuts[1]['profile'], modules.records)
+                        save(self.shared / ('endpoints-' + name + '.json'), endpoints, new=True)
+                        application_paths = {path for path in modules.records
+                            if path.startswith(str(self.bundle.resolve()) + '/')
+                            or path in (str(self.args.helper.resolve()), str(self.stack_helper.resolve()))}
+                        engine_path = str((self.bundle / 'lib/libabc_engine.so').resolve())
+                        application_paths.add(engine_path)  # sealed, possibly not yet loaded in control
+                        coverage_endpoints = with_cut_presence(endpoints, watcher.cuts[0]['profile'],
+                            watcher.cuts[1]['profile'], modules.records)
+                        coverage = summarize_coverage(coverage_endpoints, application_paths=application_paths,
+                            engine_path=engine_path)
+                        verify_coverage_totals(coverage, watcher.cuts[0]['profile'],
+                            watcher.cuts[1]['profile'])
+                        save(self.shared / ('coverage-' + name + '.json'), coverage, new=True)
                     def verify_analysis_inputs():
                         modules.rehash(analysis_deadline)
                         check_package(self.package, deadline=analysis_deadline)
@@ -432,10 +453,9 @@ class PairRunner:
                                      'pathFdBindingAtomic': False,
                                      'officialPprofUsesOriginalPaths': True})
             save(self.shared / ('analysis-' + name + '.json'), analysis, new=True)
-            save(self.shared / ('endpoints-' + name + '.json'), endpoint_delta(
-                watcher.cuts[0]['profile'], watcher.cuts[1]['profile'], modules.records), new=True)
-            save(self.shared / ('receipts-' + name + '.json'), watcher.records, new=True)
-            save(self.shared / ('lazy-module-bindings-' + name + '.json'), modules.transitions, new=True)
+            # All raw evidence and official integer comparisons are retained even
+            # when a necessary engine PC has no exact symbol-range proof.
+            require_engine_coverage(coverage)
             verify_source_proof(ROOT, self.source)
             self.caps()
             result = arm_completion(workload_complete=True, heap_files_complete=True,
