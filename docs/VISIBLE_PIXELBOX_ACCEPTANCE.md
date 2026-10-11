@@ -8,6 +8,52 @@ backend. This case mounts the full production app with the production
 system's pick/save dialogs are replaced with a test gateway backed by local
 files. It does not verify an OS file dialog or rendering on a physical device.
 
+## Verified execution
+
+On 2026-10-10, commit `a0caf5b5a8bc964b8f11f459e825219cc5754b5a`
+passed all four jobs in [official run 38075765501](https://github.com/Live-yum/abc/actions/runs/38075765501).
+The real-native UI job passed all four named cases: 1440×1000 OFF and ON,
+390×844 OFF and ON. Its test step completed in about 42 seconds; this is a CI
+execution duration, not a rendering or simulation performance measurement.
+The same run analyzed without issues and formatted 314 Dart files with zero
+changes. The production core and UI were unchanged by the final test correction.
+
+The passing test assertions verified real native pixel frames, the rendered
+PNG centre colour, changed save-file hashes, unchanged original-file hashes,
+new-Workspace reopen, and the cancellation/close checks described below. The
+official [artifact 11678920082](https://github.com/Live-yum/abc/actions/runs/38075765501/artifacts/11678920082)
+contains 12 PNGs, four JSON records and a log. On 2026-10-11, its 985,848-byte ZIP
+was independently checked against SHA-256
+`69034a8571765f0091225fcab2b219cd4521447fba68c5256e718c88a34619ec`,
+and all twelve original captures were visually inspected. Each desktop/mobile
+OFF/ON sequence visibly changes the selected PixelBox from black to white and
+retains white after reopening. The pixel region is fully visible, its labels
+and ordinary controls are readable, and the mobile navigation does not cover it.
+The shared theme is consistent across these two layouts; the wiring area above
+the selected region is partly outside the scrolled capture.
+
+All PNG hashes and dimensions match their four JSON records and the exact
+commit above. The records confirm a changed saved WLD and unchanged original
+hash in each case; the reopened RGBA matches the lit frame, with zero ticks,
+no dirty state and optimization OFF. This inspection covers an original
+synthetic WLD through the real native backend using one Flutter test rasterizer.
+It does not add physical-device, OS file-dialog, FPS or performance evidence.
+
+Earlier failures remain part of the evidence:
+
+- `93487694372f5a254374ad9108b3c0ac6a781227`, run `38073530903`, failed to
+  compile the new test because `Endian` was not imported; no UI cases executed.
+  The explicit import and a JSON string-composition lint were corrected.
+- `6907202f15f1588bae8bd74611d9c8d9d0e27222`, run `38074484596`, passed the
+  core, Web and analysis jobs. The desktop-OFF UI case reached the final dialog
+  dismissal assertion after its visible/save/reopen steps, but asserted before
+  the route's reverse animation settled. Later cases timed out and teardown
+  attempted reentrant `runAsync`. This run is not a UI acceptance pass.
+- The final test waits for route dismissal while retaining the no-dialog
+  assertion, initializes the process-owned native listener outside per-test
+  fake clocks, and drains workspace close with bounded pumping while preserving
+  errors. No functional assertion or test timeout was relaxed.
+
 ## Original fixture and independent expectations
 
 `tool/generate_visible_pixelbox_fixture.py` hand-encodes
@@ -34,7 +80,7 @@ different by design:
 - Either mode, red plus blue: dark becomes lit.
 
 The fixture was probed through the actual native C ABI before writing the UI
-assertions. The test must still run against the final candidate engine in CI.
+assertions. Those probes supplement the executed mounted-app checks above.
 No decompiled source is included in this fixture or test.
 
 ## Mounted application coverage

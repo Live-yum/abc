@@ -204,3 +204,20 @@ lacked the fixed c61 source object required by the provenance test; Native
 success does not imply that the entire run passed.
 Flutter UI/device performance and full game-world parity remain separate
 acceptance work. SDK-dependent checks run in official CI.
+
+## Timer FIFO diagnostic result
+
+[Run 38075765501](https://github.com/Live-yum/abc/actions/runs/38075765501),
+pinned to `a0caf5b5a8bc964b8f11f459e825219cc5754b5a`, passed all four
+diagnostic jobs. It rebuilt and exercised the Native timer/cancellation/gate
+contracts and four ASan/UBSan C contracts, then rebuilt the Web engine and ran
+152 timer fixture configurations plus 36 wired-light cases. The exact 96-file
+TerraWasm source closure and generated runtime provenance were verified.
+
+The separate real-Native Flutter UI job passed desktop/mobile and OFF/ON
+combinations with an original synthetic WLD. It observes a mounted PixelBox
+turning black to white and retaining its changed frame after saving and opening
+the candidate file in a new Workspace. See [the visible acceptance record](VISIBLE_PIXELBOX_ACCEPTANCE.md)
+for the file-dialog seam, screenshots, cancellation checks and test-lifetime
+corrections. These are functional observations in the Flutter test rasterizer;
+they do not establish device FPS, physical input latency or a memory plateau.
