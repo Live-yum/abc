@@ -1,0 +1,702 @@
+{
+  "schema": "abc.memory-ownership-schedule.v1",
+  "source": {
+    "commit": "9d4cd5a0f9db03042a3986689fea374ba92d78b8",
+    "runId": 38125999949,
+    "artifactId": 11698070273,
+    "artifactBytes": 22561972,
+    "artifactSha256": "dd8246ab2b5c2c07c30bd08c5136a19ebefd4b0bc462ccecfea931299c031323",
+    "reportSha256": "8d108ddfc2edef3d4bb2c21f52275213a4aa46f0676e8776edc6b36a86bba287",
+    "rawFiles": {
+      "frames-0.jsonl": {
+        "sha256": "bce0c1189cd114dc93045ec756d07e380d8e5ac29648eaa7d81f0fdf2ab470da",
+        "bytes": 727735
+      },
+      "frames-1.jsonl": {
+        "sha256": "ab2d68791819541758f72ee6ba7351b9490a319984ffaa7fc21b6d58416d8c81",
+        "bytes": 1292
+      },
+      "frames-2.jsonl": {
+        "sha256": "b9fe4a7b9801db93d3380960dd49c94bc710a8fab408b583bd01b68d2ebd6c1d",
+        "bytes": 706021
+      },
+      "frames-3.jsonl": {
+        "sha256": "ec7aeb05394e5bcef37f36989b33f87d2b30cb9e71b9dac1fe5f13eac516e259",
+        "bytes": 1292
+      },
+      "frames-4.jsonl": {
+        "sha256": "598aa96f008f8fa26384be248d1c9763de1b06c3c65a81a97a48f0e40c386292",
+        "bytes": 933093
+      },
+      "frames-5.jsonl": {
+        "sha256": "9f4c70b4216c2878e4f9d67787f8117ed93e4eea2cd8247db581861b41c3ac1f",
+        "bytes": 1295
+      },
+      "frames-6.jsonl": {
+        "sha256": "6b832b243193026932e2265bf15f48e432f97e05b93e69897c33458ebb6fb94e",
+        "bytes": 975269
+      },
+      "frames-7.jsonl": {
+        "sha256": "981ecb332a53f39dff558db9d2322565f797c14de1247d6a48f75a6ed78c8802",
+        "bytes": 1295
+      },
+      "frames-8.jsonl": {
+        "sha256": "d657b579ac19ff690e32d75b560813a64e9b3654f08e61441e2702bc2f26c878",
+        "bytes": 714303
+      },
+      "frames-9.jsonl": {
+        "sha256": "09b935b3361102ef52745cd2d972aeb1409bc464f533a1699643451f084b621f",
+        "bytes": 1302
+      },
+      "frames-10.jsonl": {
+        "sha256": "fefa0939cf483c4ecdb465ccc0baf426b1e6896512224482d3c50ffe98ea6cae",
+        "bytes": 771608
+      },
+      "frames-11.jsonl": {
+        "sha256": "ca41836d3e3a96299d77a89ba378661fdd53d38bc33679f1af0ecea81f864f80",
+        "bytes": 1302
+      },
+      "frames-12.jsonl": {
+        "sha256": "fae5067d9401fef7f7b8a24d0cb0ca9dfa954dd9cdae06d43a63b8f82be95644",
+        "bytes": 932595
+      },
+      "frames-13.jsonl": {
+        "sha256": "da04856825477093b6db4da96eab14754e9c642610882d8f9c2f4d5fa7171c7a",
+        "bytes": 1302
+      },
+      "frames-14.jsonl": {
+        "sha256": "0dddac1388cd950d46438650c81f6ee893988888c79405b1966a68f68d8b1e18",
+        "bytes": 1019082
+      },
+      "frames-15.jsonl": {
+        "sha256": "3a23680c23cb91fee509619b9dfa3f338065c82ee233b7f105b19c858f88c0aa",
+        "bytes": 1302
+      },
+      "frames-16.jsonl": {
+        "sha256": "b35d615ce4d3788690b78dbf3acf411b45112fbf0a8481bac2b27f718c420711",
+        "bytes": 1304
+      },
+      "os-0.jsonl": {
+        "sha256": "a311101dcad9549397162161d1908e4392e0675327d4917bdafe3149c20c2fea",
+        "bytes": 1029123
+      },
+      "os-1.jsonl": {
+        "sha256": "535e403a2bbefd96a7c340a2207df402981ac270de58921f586ef50df421ce21",
+        "bytes": 1010397
+      },
+      "os-2.jsonl": {
+        "sha256": "f11c660ce336f54f71253a0fb6c81b956a84a2180c846deaa52eccb7d61e33ba",
+        "bytes": 1405969
+      },
+      "os-3.jsonl": {
+        "sha256": "8aa1ce5e238461fade014b01f399245dc9e3cce6eda40415109a0f30151594fb",
+        "bytes": 1419969
+      },
+      "os-4.jsonl": {
+        "sha256": "25f551a97016dffe72b9f9f9127cb83bbf0ece22740bf8c50b5a14a5868c91f8",
+        "bytes": 1040907
+      },
+      "os-5.jsonl": {
+        "sha256": "7471a6c79e5d3c2f5b5a5f0326d3e81ef3c456088cc6a6be17b63888bb9564b0",
+        "bytes": 1068607
+      },
+      "os-6.jsonl": {
+        "sha256": "36403e08374f746f3b9262d558cf74c3e945ab7bd5b0fe570f989f708f929b6b",
+        "bytes": 1439355
+      },
+      "os-7.jsonl": {
+        "sha256": "36f460deaf44465cec919ce8714e125bee52994a976ad5a2b2cf790dbef6b2bf",
+        "bytes": 1484027
+      },
+      "os-8.jsonl": {
+        "sha256": "3f98a628b60f00f738cc10a1cc5341eebac531bbc49c8489905bb7c4782b0865",
+        "bytes": 31485
+      }
+    }
+  },
+  "workloadId": "generic-wld-controls-v1",
+  "originTimeUs": 1577990946,
+  "plannedCycles": 8,
+  "plannedCheckpoints": 17,
+  "plannedVmProbes": 17,
+  "plannedGauges": 52,
+  "points": [
+    {
+      "phase": "baseline",
+      "cycle": -1,
+      "offsetUs": 0,
+      "sourceVmDurationUs": 309660,
+      "sourcePointDurationUs": 327580
+    },
+    {
+      "phase": "after-close-retained",
+      "cycle": 0,
+      "offsetUs": 41412327,
+      "sourceVmDurationUs": 211681,
+      "sourcePointDurationUs": 231811
+    },
+    {
+      "phase": "after-close-released",
+      "cycle": 0,
+      "offsetUs": 43019019,
+      "sourceVmDurationUs": 206656,
+      "sourcePointDurationUs": 233826
+    },
+    {
+      "phase": "after-close-retained",
+      "cycle": 1,
+      "offsetUs": 83912329,
+      "sourceVmDurationUs": 230413,
+      "sourcePointDurationUs": 250927
+    },
+    {
+      "phase": "after-close-released",
+      "cycle": 1,
+      "offsetUs": 85518859,
+      "sourceVmDurationUs": 208330,
+      "sourcePointDurationUs": 228330
+    },
+    {
+      "phase": "after-close-retained",
+      "cycle": 2,
+      "offsetUs": 143012319,
+      "sourceVmDurationUs": 231493,
+      "sourcePointDurationUs": 251662
+    },
+    {
+      "phase": "after-close-released",
+      "cycle": 2,
+      "offsetUs": 144636014,
+      "sourceVmDurationUs": 224152,
+      "sourcePointDurationUs": 247260
+    },
+    {
+      "phase": "after-close-retained",
+      "cycle": 3,
+      "offsetUs": 202812246,
+      "sourceVmDurationUs": 231850,
+      "sourcePointDurationUs": 251728
+    },
+    {
+      "phase": "after-close-released",
+      "cycle": 3,
+      "offsetUs": 204436346,
+      "sourceVmDurationUs": 216641,
+      "sourcePointDurationUs": 237489
+    },
+    {
+      "phase": "after-close-retained",
+      "cycle": 4,
+      "offsetUs": 246368190,
+      "sourceVmDurationUs": 241072,
+      "sourcePointDurationUs": 262439
+    },
+    {
+      "phase": "after-close-released",
+      "cycle": 4,
+      "offsetUs": 248003065,
+      "sourceVmDurationUs": 237653,
+      "sourcePointDurationUs": 258752
+    },
+    {
+      "phase": "after-close-retained",
+      "cycle": 5,
+      "offsetUs": 291180297,
+      "sourceVmDurationUs": 232648,
+      "sourcePointDurationUs": 262225
+    },
+    {
+      "phase": "after-close-released",
+      "cycle": 5,
+      "offsetUs": 292805355,
+      "sourceVmDurationUs": 233470,
+      "sourcePointDurationUs": 255160
+    },
+    {
+      "phase": "after-close-retained",
+      "cycle": 6,
+      "offsetUs": 351929333,
+      "sourceVmDurationUs": 245176,
+      "sourcePointDurationUs": 267385
+    },
+    {
+      "phase": "after-close-released",
+      "cycle": 6,
+      "offsetUs": 353569470,
+      "sourceVmDurationUs": 215117,
+      "sourcePointDurationUs": 238694
+    },
+    {
+      "phase": "after-close-retained",
+      "cycle": 7,
+      "offsetUs": 414678327,
+      "sourceVmDurationUs": 229942,
+      "sourcePointDurationUs": 251767
+    },
+    {
+      "phase": "after-close-released",
+      "cycle": 7,
+      "offsetUs": 416318899,
+      "sourceVmDurationUs": 249566,
+      "sourcePointDurationUs": 271921
+    }
+  ],
+  "cycles": [
+    {
+      "cycle": 0,
+      "mode": "standard",
+      "scenario": "reset-original",
+      "startOffsetUs": 327605,
+      "workloadEndOffsetUs": 40115899,
+      "workloadDurationUs": 39788294
+    },
+    {
+      "cycle": 1,
+      "mode": "optimized",
+      "scenario": "reset-original",
+      "startOffsetUs": 43263191,
+      "workloadEndOffsetUs": 82611964,
+      "workloadDurationUs": 39348773
+    },
+    {
+      "cycle": 2,
+      "mode": "standard",
+      "scenario": "save-reopen",
+      "startOffsetUs": 85756571,
+      "workloadEndOffsetUs": 141722201,
+      "workloadDurationUs": 55965630
+    },
+    {
+      "cycle": 3,
+      "mode": "optimized",
+      "scenario": "save-reopen",
+      "startOffsetUs": 144893762,
+      "workloadEndOffsetUs": 201520686,
+      "workloadDurationUs": 56626924
+    },
+    {
+      "cycle": 4,
+      "mode": "standard",
+      "scenario": "reset-original",
+      "startOffsetUs": 204684973,
+      "workloadEndOffsetUs": 245060453,
+      "workloadDurationUs": 40375480
+    },
+    {
+      "cycle": 5,
+      "mode": "optimized",
+      "scenario": "reset-original",
+      "startOffsetUs": 248273035,
+      "workloadEndOffsetUs": 289889069,
+      "workloadDurationUs": 41616034
+    },
+    {
+      "cycle": 6,
+      "mode": "standard",
+      "scenario": "save-reopen",
+      "startOffsetUs": 293071603,
+      "workloadEndOffsetUs": 350641528,
+      "workloadDurationUs": 57569925
+    },
+    {
+      "cycle": 7,
+      "mode": "optimized",
+      "scenario": "save-reopen",
+      "startOffsetUs": 353820144,
+      "workloadEndOffsetUs": 413392903,
+      "workloadDurationUs": 59572759
+    }
+  ],
+  "quietWindows": [
+    {
+      "id": "cycle-0.retained-quiet-end",
+      "cycle": 0,
+      "phase": "retained",
+      "startOffsetUs": 40115911,
+      "endOffsetUs": 41412321
+    },
+    {
+      "id": "cycle-0.released-quiet-end",
+      "cycle": 0,
+      "phase": "released",
+      "startOffsetUs": 41708868,
+      "endOffsetUs": 43012247
+    },
+    {
+      "id": "cycle-1.retained-quiet-end",
+      "cycle": 1,
+      "phase": "retained",
+      "startOffsetUs": 82611969,
+      "endOffsetUs": 83912323
+    },
+    {
+      "id": "cycle-1.released-quiet-end",
+      "cycle": 1,
+      "phase": "released",
+      "startOffsetUs": 84222260,
+      "endOffsetUs": 85512297
+    },
+    {
+      "id": "cycle-2.retained-quiet-end",
+      "cycle": 2,
+      "phase": "retained",
+      "startOffsetUs": 141722206,
+      "endOffsetUs": 143012313
+    },
+    {
+      "id": "cycle-2.released-quiet-end",
+      "cycle": 2,
+      "phase": "released",
+      "startOffsetUs": 143339266,
+      "endOffsetUs": 144629367
+    },
+    {
+      "id": "cycle-3.retained-quiet-end",
+      "cycle": 3,
+      "phase": "retained",
+      "startOffsetUs": 201520691,
+      "endOffsetUs": 202812238
+    },
+    {
+      "id": "cycle-3.released-quiet-end",
+      "cycle": 3,
+      "phase": "released",
+      "startOffsetUs": 203139464,
+      "endOffsetUs": 204429304
+    },
+    {
+      "id": "cycle-4.retained-quiet-end",
+      "cycle": 4,
+      "phase": "retained",
+      "startOffsetUs": 245060457,
+      "endOffsetUs": 246368182
+    },
+    {
+      "id": "cycle-4.released-quiet-end",
+      "cycle": 4,
+      "phase": "released",
+      "startOffsetUs": 246690773,
+      "endOffsetUs": 247996354
+    },
+    {
+      "id": "cycle-5.retained-quiet-end",
+      "cycle": 5,
+      "phase": "retained",
+      "startOffsetUs": 289889081,
+      "endOffsetUs": 291180291
+    },
+    {
+      "id": "cycle-5.released-quiet-end",
+      "cycle": 5,
+      "phase": "released",
+      "startOffsetUs": 291506311,
+      "endOffsetUs": 292796366
+    },
+    {
+      "id": "cycle-6.retained-quiet-end",
+      "cycle": 6,
+      "phase": "retained",
+      "startOffsetUs": 350641533,
+      "endOffsetUs": 351929327
+    },
+    {
+      "id": "cycle-6.released-quiet-end",
+      "cycle": 6,
+      "phase": "released",
+      "startOffsetUs": 352269581,
+      "endOffsetUs": 353562368
+    },
+    {
+      "id": "cycle-7.retained-quiet-end",
+      "cycle": 7,
+      "phase": "retained",
+      "startOffsetUs": 413392910,
+      "endOffsetUs": 414678320
+    },
+    {
+      "id": "cycle-7.released-quiet-end",
+      "cycle": 7,
+      "phase": "released",
+      "startOffsetUs": 415010994,
+      "endOffsetUs": 416312337
+    },
+    {
+      "id": "final-quiet-end",
+      "cycle": 8,
+      "phase": "final",
+      "startOffsetUs": 416602038,
+      "endOffsetUs": 417896362
+    }
+  ],
+  "gaugeSchedule": [
+    {
+      "id": "initialization",
+      "offsetUs": 0,
+      "sourceAnchor": "new-gauge-aligned-to-original-baseline"
+    },
+    {
+      "id": "baseline.before-gc",
+      "offsetUs": 0,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "baseline.after-gc",
+      "offsetUs": 327580,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-0.retained-quiet-end",
+      "offsetUs": 41412321,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-0.after-close-retained.before-gc",
+      "offsetUs": 41412327,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-0.after-close-retained.after-gc",
+      "offsetUs": 41644138,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-0.released-quiet-end",
+      "offsetUs": 43012247,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-0.after-close-released.before-gc",
+      "offsetUs": 43019019,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-0.after-close-released.after-gc",
+      "offsetUs": 43252845,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-1.retained-quiet-end",
+      "offsetUs": 83912323,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-1.after-close-retained.before-gc",
+      "offsetUs": 83912329,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-1.after-close-retained.after-gc",
+      "offsetUs": 84163256,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-1.released-quiet-end",
+      "offsetUs": 85512297,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-1.after-close-released.before-gc",
+      "offsetUs": 85518859,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-1.after-close-released.after-gc",
+      "offsetUs": 85747189,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-2.retained-quiet-end",
+      "offsetUs": 143012313,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-2.after-close-retained.before-gc",
+      "offsetUs": 143012319,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-2.after-close-retained.after-gc",
+      "offsetUs": 143263981,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-2.released-quiet-end",
+      "offsetUs": 144629367,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-2.after-close-released.before-gc",
+      "offsetUs": 144636014,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-2.after-close-released.after-gc",
+      "offsetUs": 144883274,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-3.retained-quiet-end",
+      "offsetUs": 202812238,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-3.after-close-retained.before-gc",
+      "offsetUs": 202812246,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-3.after-close-retained.after-gc",
+      "offsetUs": 203063974,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-3.released-quiet-end",
+      "offsetUs": 204429304,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-3.after-close-released.before-gc",
+      "offsetUs": 204436346,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-3.after-close-released.after-gc",
+      "offsetUs": 204673835,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-4.retained-quiet-end",
+      "offsetUs": 246368182,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-4.after-close-retained.before-gc",
+      "offsetUs": 246368190,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-4.after-close-retained.after-gc",
+      "offsetUs": 246630629,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-4.released-quiet-end",
+      "offsetUs": 247996354,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-4.after-close-released.before-gc",
+      "offsetUs": 248003065,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-4.after-close-released.after-gc",
+      "offsetUs": 248261817,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-5.retained-quiet-end",
+      "offsetUs": 291180291,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-5.after-close-retained.before-gc",
+      "offsetUs": 291180297,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-5.after-close-retained.after-gc",
+      "offsetUs": 291442522,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-5.released-quiet-end",
+      "offsetUs": 292796366,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-5.after-close-released.before-gc",
+      "offsetUs": 292805355,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-5.after-close-released.after-gc",
+      "offsetUs": 293060515,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-6.retained-quiet-end",
+      "offsetUs": 351929327,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-6.after-close-retained.before-gc",
+      "offsetUs": 351929333,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-6.after-close-retained.after-gc",
+      "offsetUs": 352196718,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-6.released-quiet-end",
+      "offsetUs": 353562368,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-6.after-close-released.before-gc",
+      "offsetUs": 353569470,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-6.after-close-released.after-gc",
+      "offsetUs": 353808164,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-7.retained-quiet-end",
+      "offsetUs": 414678320,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-7.after-close-retained.before-gc",
+      "offsetUs": 414678327,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-7.after-close-retained.after-gc",
+      "offsetUs": 414930094,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "cycle-7.released-quiet-end",
+      "offsetUs": 416312337,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    },
+    {
+      "id": "cycle-7.after-close-released.before-gc",
+      "offsetUs": 416318899,
+      "sourceAnchor": "memoryPoint.startUs"
+    },
+    {
+      "id": "cycle-7.after-close-released.after-gc",
+      "offsetUs": 416590820,
+      "sourceAnchor": "memoryPoint.endUs"
+    },
+    {
+      "id": "final-quiet-end",
+      "offsetUs": 417896362,
+      "sourceAnchor": "raw.boundaries.drain-end"
+    }
+  ],
+  "drainPolicy": {
+    "frameBarriers": 3,
+    "barrierDelayMs": 16,
+    "quietMs": 1200,
+    "tailPrefixFlushesPerCycle": 2,
+    "capture": "all-callbacks-received-until-recordingStoppedUs"
+  },
+  "interpretation": "Timing-only idle companion; no historical product work is replayed. Product keeps full work and quiet durations; overruns are retained.",
+  "sourceDurationUs": 417896362
+}

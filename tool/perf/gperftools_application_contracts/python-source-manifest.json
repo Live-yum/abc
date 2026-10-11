@@ -1,0 +1,95 @@
+{
+  "applicationInvocations": 0,
+  "dependencies": {
+    "pprof_raw.py": "3bc28fc584db560c865f7f7aa8e3acc72debfe6e40257e8b861367e320093646",
+    "profile_contract.py": "07cee15d0c0c3f6d3be56b60f2339fd419def81d3fcaea4236660468a9f25d79"
+  },
+  "dependencyLayouts": [
+    "../gperftools-preflight-index",
+    "../gperftools_preflight"
+  ],
+  "files": {
+    "PYTHON_CONTRACTS.md": {
+      "bytes": 9222,
+      "sha256": "f7ed4e1f505e948acc9cb065002d966bca409d0d0a3d38ab173542917cdc2d90"
+    },
+    "application_contract.py": {
+      "bytes": 27424,
+      "sha256": "e898336b9e9e95b7f40711cfa4b8e98326a5d7f66c524a3bb606b1036649ec1d"
+    },
+    "bounded_supervision.py": {
+      "bytes": 15904,
+      "sha256": "fca80de2feda1c8adc7ba1dbbdaafc1323da39ae8f95cf51386d3c76b735f0de"
+    },
+    "fixtures/fixture-manifest.json": {
+      "bytes": 3235,
+      "sha256": "cbdab8824736a3c3138b3a53e81164e938040d4abe455b9cb3ba9c66177d0eb8"
+    },
+    "fixtures/historical-q0.heap": {
+      "bytes": 5877,
+      "sha256": "2fbae7ff7ef72f541b640d0a650a0d1e9a9cbff341f036ac7bca96f64770f76a"
+    },
+    "fixtures/historical-q0.inuse_objects.raw": {
+      "bytes": 957,
+      "sha256": "2152e12c4d7ee9f963e3347f06a21143bbfaa6525163ea2e482765252baf778b"
+    },
+    "fixtures/historical-q0.inuse_space.raw": {
+      "bytes": 957,
+      "sha256": "e6f90d9bc69bb74141f7e6694c1e8ec291548eb54dcad4d81487e6e90cfd8293"
+    },
+    "fixtures/historical-q7.heap": {
+      "bytes": 6483,
+      "sha256": "c8821babf3b9f28493b6a2891defb978c90e975ee862ed6f47d209c8c943a34c"
+    },
+    "fixtures/historical-q7.inuse_objects.raw": {
+      "bytes": 1915,
+      "sha256": "4ed84208655678a44a5d682a509a2421fa4173847f54c3bc91c60c29be8d737e"
+    },
+    "fixtures/historical-q7.inuse_space.raw": {
+      "bytes": 1915,
+      "sha256": "ce821220e7badf1a391265804fc174263a4d59c46dae7091e4674486271c4500"
+    },
+    "fixtures/reconstructed-q0.after.maps": {
+      "bytes": 5494,
+      "sha256": "204ee5fb734c7426b2d53fcc1f7d7e4b93161c9ac404c47bee750de53c3ca1f2"
+    },
+    "fixtures/reconstructed-q0.before.maps": {
+      "bytes": 5494,
+      "sha256": "204ee5fb734c7426b2d53fcc1f7d7e4b93161c9ac404c47bee750de53c3ca1f2"
+    },
+    "fixtures/reconstructed-q7.after.maps": {
+      "bytes": 5494,
+      "sha256": "204ee5fb734c7426b2d53fcc1f7d7e4b93161c9ac404c47bee750de53c3ca1f2"
+    },
+    "fixtures/reconstructed-q7.before.maps": {
+      "bytes": 5494,
+      "sha256": "204ee5fb734c7426b2d53fcc1f7d7e4b93161c9ac404c47bee750de53c3ca1f2"
+    },
+    "fixtures/supervision_stub.py": {
+      "bytes": 1159,
+      "sha256": "4ba175f07e8dd9adff33e004c2544a75f5790340e33d05e7a12661ad63c19942"
+    },
+    "python-test-results.txt": {
+      "bytes": 7063,
+      "sha256": "282c34db1ec46e0990623233d093f056e9f128e05066bee58682016bf8e53a31"
+    },
+    "test_application_contract.py": {
+      "bytes": 18351,
+      "sha256": "855229f2e3789c220005e669e09370c2400a8983515cec35f9684b8ebf0ca9ff"
+    },
+    "test_bounded_supervision.py": {
+      "bytes": 9991,
+      "sha256": "fedb99018a10e8226e522fa9091d8b9211ca32e118aaa3b87709ad8c9fb90f07"
+    }
+  },
+  "flutterInvocations": 0,
+  "focusedOfflineTestsPassed": 45,
+  "networkActions": 0,
+  "profilerInvocations": 0,
+  "realApplicationLaunchProven": false,
+  "realIntegrationHookWired": false,
+  "schema": "abc.gperftools-application-python-source.v1",
+  "scope": "offline contracts and synthetic stub supervision only",
+  "sdkInvocations": 0,
+  "wldOpened": false
+}

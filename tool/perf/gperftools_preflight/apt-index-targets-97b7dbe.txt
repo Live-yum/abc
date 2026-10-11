@@ -1,0 +1,149 @@
+MetaKey: main/binary-amd64/Packages
+ShortDesc: Packages
+Description: https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages
+URI: https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/main/binary-amd64/Packages
+Filename: /var/lib/apt/lists/packages.microsoft.com_ubuntu_24.04_prod_dists_noble_main_binary-amd64_Packages
+Optional: no
+KeepCompressed: no
+Codename: noble
+Label: microsoft-ubuntu-noble-prod noble
+Origin: microsoft-ubuntu-noble-prod noble
+Suite: noble
+Trusted: yes
+Architecture: amd64
+Base-URI: https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/
+By-Hash: yes
+Component: main
+CompressionTypes: xz bz2 lzma gz lz4 zst uncompressed
+Created-By: Packages
+DefaultEnabled: yes
+Fallback-Of: 
+Identifier: Packages
+KeepCompressedAs: lz4 zst gz xz bz2 lzma uncompressed
+PDiffs: yes
+Release: noble
+Repo-URI: https://packages.microsoft.com/ubuntu/24.04/prod/
+Site: https://packages.microsoft.com/ubuntu/24.04/prod
+Sourcesentry: /etc/apt/sources.list.d/microsoft-prod.list:1
+Target-Of: deb
+
+MetaKey: main/binary-amd64/Packages
+ShortDesc: Packages
+Description: mirror+file:/etc/apt/apt-mirrors.txt noble/main amd64 Packages
+URI: mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/main/binary-amd64/Packages
+Filename: /var/lib/apt/lists/_etc_apt_apt-mirrors.txt_dists_noble_main_binary-amd64_Packages
+Optional: no
+KeepCompressed: no
+Codename: noble
+Label: Ubuntu
+Origin: Ubuntu
+Suite: noble
+Trusted: yes
+Version: 24.04
+Architecture: amd64
+Base-URI: mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/
+By-Hash: yes
+Component: main
+CompressionTypes: xz bz2 lzma gz lz4 zst uncompressed
+Created-By: Packages
+DefaultEnabled: yes
+Fallback-Of: 
+Identifier: Packages
+KeepCompressedAs: lz4 zst gz xz bz2 lzma uncompressed
+PDiffs: yes
+Release: noble
+Repo-URI: mirror+file:/etc/apt/apt-mirrors.txt/
+Site: mirror+file:/etc/apt/apt-mirrors.txt
+Sourcesentry: /etc/apt/sources.list.d/ubuntu.sources:1
+Target-Of: deb
+
+MetaKey: universe/binary-amd64/Packages
+ShortDesc: Packages
+Description: mirror+file:/etc/apt/apt-mirrors.txt noble/universe amd64 Packages
+URI: mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/universe/binary-amd64/Packages
+Filename: /var/lib/apt/lists/_etc_apt_apt-mirrors.txt_dists_noble_universe_binary-amd64_Packages
+Optional: no
+KeepCompressed: no
+Codename: noble
+Label: Ubuntu
+Origin: Ubuntu
+Suite: noble
+Trusted: yes
+Version: 24.04
+Architecture: amd64
+Base-URI: mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/
+By-Hash: yes
+Component: universe
+CompressionTypes: xz bz2 lzma gz lz4 zst uncompressed
+Created-By: Packages
+DefaultEnabled: yes
+Fallback-Of: 
+Identifier: Packages
+KeepCompressedAs: lz4 zst gz xz bz2 lzma uncompressed
+PDiffs: yes
+Release: noble
+Repo-URI: mirror+file:/etc/apt/apt-mirrors.txt/
+Site: mirror+file:/etc/apt/apt-mirrors.txt
+Sourcesentry: /etc/apt/sources.list.d/ubuntu.sources:1
+Target-Of: deb
+
+MetaKey: restricted/binary-amd64/Packages
+ShortDesc: Packages
+Description: mirror+file:/etc/apt/apt-mirrors.txt noble/restricted amd64 Packages
+URI: mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/restricted/binary-amd64/Packages
+Filename: /var/lib/apt/lists/_etc_apt_apt-mirrors.txt_dists_noble_restricted_binary-amd64_Packages
+Optional: no
+KeepCompressed: no
+Codename: noble
+Label: Ubuntu
+Origin: Ubuntu
+Suite: noble
+Trusted: yes
+Version: 24.04
+Architecture: amd64
+Base-URI: mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/
+By-Hash: yes
+Component: restricted
+CompressionTypes: xz bz2 lzma gz lz4 zst uncompressed
+Created-By: Packages
+DefaultEnabled: yes
+Fallback-Of: 
+Identifier: Packages
+KeepCompressedAs: lz4 zst gz xz bz2 lzma uncompressed
+PDiffs: yes
+Release: noble
+Repo-URI: mirror+file:/etc/apt/apt-mirrors.txt/
+Site: mirror+file:/etc/apt/apt-mirrors.txt
+Sourcesentry: /etc/apt/sources.list.d/ubuntu.sources:1
+Target-Of: deb
+
+MetaKey: multiverse/binary-amd64/Packages
+ShortDesc: Packages
+Description: mirror+file:/etc/apt/apt-mirrors.txt noble/multiverse amd64 Packages
+URI: mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/multiverse/binary-amd64/Packages
+Filename: /var/lib/apt/lists/_etc_apt_apt-mirrors.txt_dists_noble_multiverse_binary-amd64_Packages
+Optional: no
+KeepCompressed: no
+Codename: noble
+Label: Ubuntu
+Origin: Ubuntu
+Suite: noble
+Trusted: yes
+Version: 24.04
+Architecture: amd64
+Base-URI: mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/
+By-Hash: yes
+Component: multiverse
+CompressionTypes: xz bz2 lzma gz lz4 zst uncompressed
+Created-By: Packages
+DefaultEnabled: yes
+Fallback-Of: 
+Identifier: Packages
+KeepCompressedAs: lz4 zst gz xz bz2 lzma uncompressed
+PDiffs: yes
+Release: noble
+Repo-URI: mirror+file:/etc/apt/apt-mirrors.txt/
+Site: mirror+file:/etc/apt/apt-mirrors.txt
+Sourcesentry: /etc/apt/sources.list.d/ubuntu.sources:1
+Target-Of: deb
+

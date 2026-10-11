@@ -1,0 +1,66 @@
+{
+  "kind": "offline-static-fixtures",
+  "applicationEvidence": false,
+  "files": {
+    "historical-q0.heap": {
+      "source": "memory-ownership-next/gperftools-preflight-evidence-ac4596f/gperftools-preflight/profiles/contract.0001.heap",
+      "sha256": "2fbae7ff7ef72f541b640d0a650a0d1e9a9cbff341f036ac7bca96f64770f76a",
+      "bytes": 5877,
+      "kind": "unchanged historical small-contract evidence"
+    },
+    "historical-q0.inuse_space.raw": {
+      "source": "memory-ownership-next/gperftools-preflight-evidence-ac4596f/gperftools-preflight/official/q0.begin.inuse_space.raw",
+      "sha256": "e6f90d9bc69bb74141f7e6694c1e8ec291548eb54dcad4d81487e6e90cfd8293",
+      "bytes": 957,
+      "kind": "unchanged historical small-contract evidence"
+    },
+    "historical-q0.inuse_objects.raw": {
+      "source": "memory-ownership-next/gperftools-preflight-evidence-ac4596f/gperftools-preflight/official/q0.begin.inuse_objects.raw",
+      "sha256": "2152e12c4d7ee9f963e3347f06a21143bbfaa6525163ea2e482765252baf778b",
+      "bytes": 957,
+      "kind": "unchanged historical small-contract evidence"
+    },
+    "historical-q7.heap": {
+      "source": "memory-ownership-next/gperftools-preflight-evidence-ac4596f/gperftools-preflight/profiles/contract.0004.heap",
+      "sha256": "c8821babf3b9f28493b6a2891defb978c90e975ee862ed6f47d209c8c943a34c",
+      "bytes": 6483,
+      "kind": "unchanged historical small-contract evidence"
+    },
+    "historical-q7.inuse_space.raw": {
+      "source": "memory-ownership-next/gperftools-preflight-evidence-ac4596f/gperftools-preflight/official/q7.end.inuse_space.raw",
+      "sha256": "ce821220e7badf1a391265804fc174263a4d59c46dae7091e4674486271c4500",
+      "bytes": 1915,
+      "kind": "unchanged historical small-contract evidence"
+    },
+    "historical-q7.inuse_objects.raw": {
+      "source": "memory-ownership-next/gperftools-preflight-evidence-ac4596f/gperftools-preflight/official/q7.end.inuse_objects.raw",
+      "sha256": "4ed84208655678a44a5d682a509a2421fa4173847f54c3bc91c60c29be8d737e",
+      "bytes": 1915,
+      "kind": "unchanged historical small-contract evidence"
+    },
+    "reconstructed-q0.before.maps": {
+      "source": "historical-q0.heap",
+      "sha256": "204ee5fb734c7426b2d53fcc1f7d7e4b93161c9ac404c47bee750de53c3ca1f2",
+      "bytes": 5494,
+      "kind": "reconstructed offline proc-maps syntax; NOT captured pre/post snapshots"
+    },
+    "reconstructed-q0.after.maps": {
+      "source": "historical-q0.heap",
+      "sha256": "204ee5fb734c7426b2d53fcc1f7d7e4b93161c9ac404c47bee750de53c3ca1f2",
+      "bytes": 5494,
+      "kind": "reconstructed offline proc-maps syntax; NOT captured pre/post snapshots"
+    },
+    "reconstructed-q7.before.maps": {
+      "source": "historical-q7.heap",
+      "sha256": "204ee5fb734c7426b2d53fcc1f7d7e4b93161c9ac404c47bee750de53c3ca1f2",
+      "bytes": 5494,
+      "kind": "reconstructed offline proc-maps syntax; NOT captured pre/post snapshots"
+    },
+    "reconstructed-q7.after.maps": {
+      "source": "historical-q7.heap",
+      "sha256": "204ee5fb734c7426b2d53fcc1f7d7e4b93161c9ac404c47bee750de53c3ca1f2",
+      "bytes": 5494,
+      "kind": "reconstructed offline proc-maps syntax; NOT captured pre/post snapshots"
+    }
+  }
+}

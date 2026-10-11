@@ -1,0 +1,145 @@
+{
+  "authoredAllocatorOperations": 15,
+  "authoredAllocatorOperationsCap": 32,
+  "automaticPromotionAllowed": false,
+  "bootstrapTrustPremise": "official GitHub runner image and previously reviewed workflow; installed keyring checksum is consistency, not independent authentication",
+  "dumpIds": [
+    "q0.begin",
+    "q0.end",
+    "q7.begin",
+    "q7.end",
+    "cleanup"
+  ],
+  "entrypoint": [
+    "python3",
+    "tool/perf/gperftools_preflight/run_preflight.py",
+    "--output",
+    "build/gperftools-preflight",
+    "--deb-dir",
+    "build/gperftools-packages",
+    "--apt-download-log",
+    "build/gperftools-preflight-evidence/apt-download.log"
+  ],
+  "expectedAuthorCumulativeBlocks": [
+    2,
+    5,
+    6,
+    8,
+    8
+  ],
+  "expectedAuthorCumulativeBytes": [
+    320,
+    1539,
+    2140,
+    3698,
+    3698
+  ],
+  "expectedAuthorLiveBytes": [
+    320,
+    716,
+    1010,
+    1558,
+    0
+  ],
+  "files": {
+    "README.md": {
+      "bytes": 16261,
+      "mode": "100644",
+      "sha256": "db81343b827c2e3f4b70127352ab5df43ab0411ca3eaf0eb321e582493e76ffd"
+    },
+    "apt-index-targets-97b7dbe.txt": {
+      "bytes": 4730,
+      "mode": "100644",
+      "sha256": "61ecf219759260f992be493fbfed4b5d22098b72b9bb87131bf62251b161145c"
+    },
+    "native_contract.c": {
+      "bytes": 9357,
+      "mode": "100644",
+      "sha256": "f182613d780912e60399d4c2650c53c93e41b17e12199cd1d76823ba3ab3c424"
+    },
+    "pprof_raw.py": {
+      "bytes": 7414,
+      "mode": "100644",
+      "sha256": "3bc28fc584db560c865f7f7aa8e3acc72debfe6e40257e8b861367e320093646"
+    },
+    "profile_contract.py": {
+      "bytes": 13340,
+      "mode": "100644",
+      "sha256": "07cee15d0c0c3f6d3be56b60f2339fd419def81d3fcaea4236660468a9f25d79"
+    },
+    "run_preflight.py": {
+      "bytes": 43700,
+      "mode": "100644",
+      "sha256": "89ef2a1f8cdafa0afe1c67d547e2c3e28703113e197347633e561d6dac9b1ea8"
+    },
+    "test_pprof_raw.py": {
+      "bytes": 8062,
+      "mode": "100644",
+      "sha256": "3b548d76d11b621fa6ca4ecfaef694f273c101b8cb9cb54f90afcd41897f83cf"
+    },
+    "test_preflight.py": {
+      "bytes": 23571,
+      "mode": "100644",
+      "sha256": "9bfb6a241b5dc6aab62ca75673cce00ed32e69b72995b260c1f18f1a088ac738"
+    }
+  },
+  "fixedPackageVersion": "2.15-3build1",
+  "localValidation": {
+    "emittedFixtureNegativeChecks": 3,
+    "localAptOrProfilerOrSdkInvocations": 0,
+    "nativeCompilation": "prior sealed revision passed; native source byte-identical, not rerun",
+    "officialGperftoolsRuntime": "first CI stopped at index selection with zero profiler invocations; new CI only",
+    "offlineTests": "passed 57",
+    "unprofiledStubInvocations": 1,
+    "unprofiledStubInvocationsThisRevision": 0,
+    "unprofiledStubSemanticResult": "passed independent operation and cut oracle; default CI reader rejects stub metadata"
+  },
+  "offlineTestCount": 57,
+  "packages": {
+    "google-perftools": {
+      "architecture": "all",
+      "component": "universe"
+    },
+    "libgoogle-perftools-dev": {
+      "architecture": "amd64",
+      "component": "main"
+    },
+    "libgoogle-perftools4t64": {
+      "architecture": "amd64",
+      "component": "main"
+    }
+  },
+  "previousRuns": [
+    {
+      "applicationInvocations": 0,
+      "diagnosis": "unrelated Microsoft noble/main index incorrectly selected before fixed Ubuntu source tuple",
+      "failure": "Package index is not the authenticated fixed Ubuntu source",
+      "head": "97b7dbe5c2744da59864235ef3a896d3f968e144",
+      "id": 38146022836,
+      "profiledFixtureInvocations": 0,
+      "rawIndexFixture": {
+        "bytes": 4730,
+        "file": "apt-index-targets-97b7dbe.txt",
+        "sha256": "61ecf219759260f992be493fbfed4b5d22098b72b9bb87131bf62251b161145c",
+        "transformation": "none; complete original stdout bytes"
+      },
+      "status": "failed-closed"
+    }
+  ],
+  "priorRejectedTool": {
+    "head": "742dd32011146a830907761da7617b9ccfb8f196",
+    "name": "heaptrack",
+    "result": "realloc-zero free omitted; false503-byte residual; preserved unchanged",
+    "version": "1.5.0+dfsg1-2ubuntu3"
+  },
+  "priorSourceManifestSha256": "55f81319e178c5fb74630d2cac0e0a058693a7cf142053bcebb004e6306fac91",
+  "profiledFixtureInvocations": 1,
+  "profiledFixtureSeconds": 10,
+  "provenanceBoundary": "allocator-replacing full tcmalloc cannot reconcile original glibc +72.729 MiB; no product leak/no-leak conclusion",
+  "realApplicationInvocations": 0,
+  "repoDirectory": "tool/perf/gperftools_preflight",
+  "revision": "fixed-ubuntu-source-tuple-index-selector-only",
+  "schema": "abc.gperftools-preflight-source-manifest.v1",
+  "upstreamCommit": "365060c4213a48adb27f63d5dfad41b3dfbdd62e",
+  "upstreamVersion": "2.15"
+}

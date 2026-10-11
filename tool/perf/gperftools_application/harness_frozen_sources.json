@@ -1,0 +1,68 @@
+{
+  "schema": "abc.gperftools-harness-frozen-sources.v1",
+  "baseProductCommit": "9d4cd5a0f9db03042a3986689fea374ba92d78b8",
+  "originalHarnessSha256": "3a9806165d2c5e025122a3118683259c4a42d54c682b7276ab57f5b87096e3d8",
+  "unchanged": [
+    {
+      "path": "integration_test/computer_memory_diagnostic_test.dart",
+      "bytes": 23517,
+      "sha256": "dad7e0c2a8367b64968c568f86e8259203d7eb73d0caaad936c6317ffc5b4ab2"
+    },
+    {
+      "path": "integration_test/support/generic_circuit_profile.dart",
+      "bytes": 1730,
+      "sha256": "a18e70bd519becc6f9cf0144f14848ef78aa111f5c70ef3a0305f4b1d0ad6af8"
+    },
+    {
+      "path": "integration_test/support/memory_ownership_gauges.dart",
+      "bytes": 12176,
+      "sha256": "e75eb59923dddae9ca52bbdf06d41db619d8855dabf599f62492014d33274036"
+    },
+    {
+      "path": "integration_test/support/memory_ownership_retention.dart",
+      "bytes": 5532,
+      "sha256": "ee83513cb3647a462966875c7c494acf5e08121daef248181c3f0adc2b4d78c0"
+    },
+    {
+      "path": "integration_test/support/computer_memory_probe_telemetry.dart",
+      "bytes": 4001,
+      "sha256": "39f29e88d4d29ee4519e1f4a0cb01aec7efdc877bcac92664b7d9552785d905c"
+    },
+    {
+      "path": "integration_test/support/computer_inputs_native.dart",
+      "bytes": 895,
+      "sha256": "ea9e6cd37fd035f587b16114b1b0cb8445f1397cb056b414ebf78a715e5a607c"
+    },
+    {
+      "path": "integration_test/support/computer_memory_journal.dart",
+      "bytes": 12231,
+      "sha256": "4358206dfc1af12a6836a452b65e67178e32538bc509f9ea9a09789b177bc22a"
+    },
+    {
+      "path": "tool/perf/memory_ownership_schedule.json",
+      "bytes": 19133,
+      "sha256": "fd5b0ca2ab01d96923512d6574ffc49c7318ebe1e23e315215251b70669ef5e0"
+    },
+    {
+      "path": "tool/perf/memory_ownership_schedule.py",
+      "bytes": 7746,
+      "sha256": "5fb7d96ca5c74aeb4eb52f603e175f02c33476bbadbf2e82904c0ea29afd1027"
+    },
+    {
+      "path": "tool/perf/memory_ownership_validate.py",
+      "bytes": 72817,
+      "sha256": "8bda08e228fb18f4fc1c317a71cb06f3c8ae07f11f78632db60cd07805189313"
+    },
+    {
+      "path": "tool/perf/native_owner_libc_probe.c",
+      "bytes": 4458,
+      "sha256": "cdedeb679d128bee9c513f2cd0ad92f2941ab74a705d67f9d99b9dc4b8906c03"
+    },
+    {
+      "path": "lib/engine/native_memory_ownership_diagnostics.dart",
+      "bytes": 2872,
+      "sha256": "76d4bb1550df3500d2ce55fb40a9cf3cd4cd0783fdf8f8612c6aca48f608ecf4"
+    }
+  ],
+  "originalDiagnosticCommit": "5a161bf1215361e56358ed6476dbf97a69e53803"
+}

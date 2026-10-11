@@ -1,0 +1,49 @@
+{
+  "approvedDesignSha256": "9f5eadc5e092e1ed49f91415d5835cc14091cbed77218a251b7a00d344ed5dae",
+  "files": {
+    "NATIVE_CONTRACTS.md": {
+      "bytes": 8442,
+      "sha256": "be1e081915c926a2dc1b3aea8da92dbe168dee751eec438786801b3824a964be"
+    },
+    "native_contracts_harness.c": {
+      "bytes": 4570,
+      "sha256": "a4fe4f0379c97ade639ce9dca89a76fd0acc046c744a0799a43ee1ba7668e7e3"
+    },
+    "native_identity.h": {
+      "bytes": 5283,
+      "sha256": "0243b60076724638b6dedd4fdcb23cf95a085968cc36cd69e26aff4bee469150"
+    },
+    "native_io_harness.c": {
+      "bytes": 2767,
+      "sha256": "97803fe61ceb6ef88248d04ce4caf2827495496b8d7ed23c1a9256371daaf334"
+    },
+    "quiet_dump_bridge.c": {
+      "bytes": 4441,
+      "sha256": "22fe4092674c2d5d501f2f235b623befae118f4f871b71c7b2de89918ec4de64"
+    },
+    "quiet_dump_bridge.h": {
+      "bytes": 2793,
+      "sha256": "48b55cb8c26cffe8a8fa1b9a4cf0195fcbb2693ae3fd5ca9b92f367ec5e09cd7"
+    },
+    "quiet_dump_linux.c": {
+      "bytes": 10004,
+      "sha256": "654ec800c85bef45c3b318ee80967a0efd0da9d27669e3e5e88f01e2929c5112"
+    },
+    "target_launcher.c": {
+      "bytes": 3825,
+      "sha256": "5b8fa9f6be2ca3b22eba1901c86fff9e69929bf10f42756d8a98389ec5a5be44"
+    },
+    "test_native_contracts.py": {
+      "bytes": 19708,
+      "sha256": "995d94b03874a0bc3adc8796caf9f09e3dd7cb07da2153d2355441c6bcdc761f"
+    }
+  },
+  "schema": "abc.gperftools-application-native-offline-sources.v1",
+  "validation": {
+    "command": "python -m unittest discover -s memory-ownership-next/gperftools-application-contracts -p test_native_contracts.py -v",
+    "durationSeconds": 3.13,
+    "nativeLibraryMode": "inert compiled fixtures and mock provider only",
+    "passedTests": 23,
+    "realFlutterOrProfilerExecuted": false
+  }
+}
