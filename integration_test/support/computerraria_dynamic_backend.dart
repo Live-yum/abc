@@ -202,7 +202,10 @@ class ComputerrariaDynamicBackend
       });
       return result;
     } catch (error) {
-      event.addAll({'status': 'failed-or-cancelled', 'error': error.toString()});
+      event.addAll({
+        'status': 'failed-or-cancelled',
+        'error': error.toString(),
+      });
       rethrow;
     } finally {
       opening = false;
@@ -220,7 +223,9 @@ class ComputerrariaDynamicBackend
     WorldCircuitCommand command,
   ) async {
     if (clockEnabled && command.words[1] == 3) {
-      throw StateError('Armed fixture ticks require the actual compound pixel path');
+      throw StateError(
+        'Armed fixture ticks require the actual compound pixel path',
+      );
     }
     final result = await _wire(id, command, 'production-or-readonly-probe');
     _completed(command, false, null);
@@ -248,8 +253,11 @@ class ComputerrariaDynamicBackend
       event['externalClockInjectedBeforeOriginalCommand'] = injected;
       final WorldCircuitBatchResult frame;
       if (inner is WorldCircuitBatchBackend) {
-        frame = await (inner as WorldCircuitBatchBackend)
-            .commandAndReadPixels(id, command, pixels);
+        frame = await (inner as WorldCircuitBatchBackend).commandAndReadPixels(
+          id,
+          command,
+          pixels,
+        );
       } else {
         final result = await _wire(id, command, 'production-batch-command');
         final actualPixels = await _wire(id, pixels, 'production-batch-pixels');

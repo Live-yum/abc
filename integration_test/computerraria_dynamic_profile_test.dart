@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:developer' show Timeline;
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
@@ -15,7 +14,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:terraforge/application/workspace.dart';
 import 'package:terraforge/engine/native_engine.dart' as core;
 import 'package:terraforge/engine/world_circuit_backend.dart';
-import 'package:terraforge/engine/world_circuit_factory.dart' as factory;
+import 'package:terraforge/engine/world_circuit_factory.dart' as circuit;
 import 'package:terraforge/engine/world_circuit_session.dart';
 import 'package:terraforge/platform/files.dart';
 import 'package:terraforge/platform/world_circuit_files.dart';
@@ -83,7 +82,7 @@ Future<WorldCircuitSource> _prepare(
 ) async {
   final engine = core.createTerraEngine();
   final backend = ComputerrariaDynamicBackend(
-    factory.createWorldCircuitBackend(engine)! as WorldCircuitSourceBackend,
+    circuit.createWorldCircuitBackend(engine)! as WorldCircuitSourceBackend,
   );
   final session = WorldCircuitSession.fromSource(backend, original);
   WorldCircuitSource? leased;
@@ -97,10 +96,14 @@ Future<WorldCircuitSource> _prepare(
     await driver.loadProgram('pong.bin', program);
     expect(driver.programIncomplete, isFalse);
     final exported = await session.command(WorldCircuitCommand.save());
-    final outputSource = exported.worldSource ??
+    final outputSource =
+        exported.worldSource ??
         (throw StateError('Derived preparation did not export a WLD'));
     leased = outputSource;
-    final retained = await storage.retain(outputSource, 'public-derived-pong.wld');
+    final retained = await storage.retain(
+      outputSource,
+      'public-derived-pong.wld',
+    );
     final digest = await _fileHash(retained);
     expect(digest, outputSource.sha256);
     expect(digest, isNot(ComputerrariaComputer.sourceSha256));
@@ -165,12 +168,14 @@ void main() {
       fail('This bounded diagnostic requires actual Linux Flutter profile');
     }
     binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
-    final outputPath = Platform.environment['TERRA_UI_PROFILE_OUTPUT'] ??
+    final outputPath =
+        Platform.environment['TERRA_UI_PROFILE_OUTPUT'] ??
         (throw StateError('Explicit profile output path required'));
     final standalonePath =
         Platform.environment['TERRA_UI_PROFILE_STANDALONE_OUTPUT'] ??
         (throw StateError('Explicit standalone output path required'));
-    final pongPath = Platform.environment['COMPUTERRARIA_PONG'] ??
+    final pongPath =
+        Platform.environment['COMPUTERRARIA_PONG'] ??
         (throw StateError('Explicit public Pong path required'));
     final observedHz = tester.view.display.refreshRate;
     final knownHz = observedHz.isFinite && observedHz > 0;
@@ -256,7 +261,12 @@ void main() {
       final ownedStorage = await createComputerProfileStorage();
       storage = ownedStorage;
       stage = 'prepare-derived-public-world';
-      final prepared = await _prepare(original, program, ownedStorage, preparation);
+      final prepared = await _prepare(
+        original,
+        program,
+        ownedStorage,
+        preparation,
+      );
       final ramPoints = _passiveRamPoints();
       for (final optimized in [false, true]) {
         final mode = optimized ? 'optimized' : 'standard';
@@ -285,6 +295,7 @@ void main() {
           expect(workspace!.view.error, isEmpty);
           expect(state()['error'], isNull);
         }
+
         Future<void> action(
           String name, [
           Map<String, Object?> args = const {},
@@ -293,6 +304,7 @@ void main() {
           await tester.pump();
           check();
         }
+
         Future<void> measure(String name, Future<void> Function() body) async {
           stage = '$mode.$name';
           await recorder.measure(
@@ -300,10 +312,12 @@ void main() {
             0,
             false,
             body,
-            interaction: 'production Workspace and WorldCircuitPanel with '
+            interaction:
+                'production Workspace and WorldCircuitPanel with '
                 'explicit test external electrical stimulus',
           );
         }
+
         Future<void> disposeWorkspace() async {
           collectUi = false;
           if (observer != null && workspace != null) {
@@ -317,10 +331,11 @@ void main() {
           controller = null;
           workspace = null;
         }
+
         Future<_SourceFiles> mount(WorldCircuitSource source) async {
           final engine = core.createTerraEngine();
           backend = ComputerrariaDynamicBackend(
-            factory.createWorldCircuitBackend(engine)!
+            circuit.createWorldCircuitBackend(engine)!
                 as WorldCircuitSourceBackend,
           );
           expect(backend, isA<WorldCircuitBatchBackend>());
@@ -330,7 +345,7 @@ void main() {
           workspace = Workspace(
             engine: engine,
             files: _NoSmallFiles(),
-            vault: storage!.vault,
+            vault: storage.vault,
             worldCircuitBackend: backend,
             worldCircuitFiles: files,
           );
@@ -390,6 +405,7 @@ void main() {
           );
           return files;
         }
+
         Future<void> selectMonitor() async {
           await action('worldCircuitViewport', _region);
           await action('worldCircuitReadDisplay', _region);
@@ -397,6 +413,7 @@ void main() {
           expect(state()['displayFrame'], hasLength(12288));
           row['actualPixelCount'] = 3072;
         }
+
         String screenHash() =>
             sha256.convert(state()['displayFrame'] as Uint8List).toString();
         Future<String> ramHash() async {
@@ -408,6 +425,7 @@ void main() {
           expect(result.records.length, ramPoints.length * 4);
           return sha256.convert(result.records).toString();
         }
+
         Future<void> stableAfterStop(
           String boundary, {
           bool requireDisarmed = true,
@@ -417,10 +435,14 @@ void main() {
             () => Future<void>.delayed(const Duration(milliseconds: 250)),
           );
           await tester.pump();
-          expect(backend!.physicalPulses, pulses,
-              reason: '$boundary must stop future injected pulses');
+          expect(
+            backend!.physicalPulses,
+            pulses,
+            reason: '$boundary must stop future injected pulses',
+          );
           if (requireDisarmed) expect(backend!.clockEnabled, isFalse);
         }
+
         Future<List<Map<String, Object?>>> fixedTrace(String label) async {
           final start = backend!.frames.length;
           final before = backend!.physicalPulses;
@@ -442,13 +464,21 @@ void main() {
           final frames = backend!.frames.sublist(start);
           expect(frames.length, 12);
           expect(frames.every((f) => f['recordCount'] == 3072), isTrue);
-          expect(backend!.events.where((e) =>
-              e['kind'] == 'production-command-and-pixels' &&
-              e['phase'] == label &&
-              e['externalClockInjectedBeforeOriginalCommand'] == true &&
-              e['status'] == 'completed').length, 12);
+          expect(
+            backend!.events
+                .where(
+                  (e) =>
+                      e['kind'] == 'production-command-and-pixels' &&
+                      e['phase'] == label &&
+                      e['externalClockInjectedBeforeOriginalCommand'] == true &&
+                      e['status'] == 'completed',
+                )
+                .length,
+            12,
+          );
           return frames;
         }
+
         Future<Map<String, Object?>> capture(String label) async {
           final monitor = find.byType(ComputerDisplay);
           expect(monitor, findsOneWidget);
@@ -464,13 +494,18 @@ void main() {
             );
             image = raw.image;
             if (image == null) continue;
-            final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+            final bytes = await image.toByteData(
+              format: ui.ImageByteFormat.rawRgba,
+            );
             if (bytes == null) continue;
             imageHash = sha256.convert(bytes.buffer.asUint8List()).toString();
             if (imageHash == desired) break;
           }
-          expect(imageHash, desired,
-              reason: 'Actual production decoded image must match native pixels');
+          expect(
+            imageHash,
+            desired,
+            reason: 'Actual production decoded image must match native pixels',
+          );
           final rect = tester.getRect(monitor);
           final size = tester.view.physicalSize / tester.view.devicePixelRatio;
           expect(rect.width, greaterThan(0));
@@ -480,13 +515,20 @@ void main() {
           expect(rect.bottom, lessThanOrEqualTo(size.height + 1));
           expect(rect.right, lessThanOrEqualTo(size.width + 1));
           final boundary = tester.renderObject<RenderRepaintBoundary>(
-            find.descendant(of: monitor, matching: find.byType(RepaintBoundary)),
+            find.descendant(
+              of: monitor,
+              matching: find.byType(RepaintBoundary),
+            ),
           );
           final rendered = await boundary.toImage(pixelRatio: 1);
           try {
-            final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
+            final png = await rendered.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
             expect(png, isNotNull);
-            final file = File('${File(outputPath).parent.path}/screenshots/$mode-$label.png');
+            final file = File(
+              '${File(outputPath).parent.path}/screenshots/$mode-$label.png',
+            );
             await file.parent.create(recursive: true);
             final bytes = png!.buffer.asUint8List();
             await file.writeAsBytes(bytes);
@@ -544,19 +586,33 @@ void main() {
         captures.add(await capture('prepared'));
         final fixed = await fixedTrace('fixed-1536-clock');
         row['fixedTrace'] = fixed;
-        expect(await ramHash(), isNot(initialRam),
-            reason: 'Equal halted CPUs cannot satisfy physical liveness');
+        expect(
+          await ramHash(),
+          isNot(initialRam),
+          reason: 'Equal halted CPUs cannot satisfy physical liveness',
+        );
         final fixedDistinct = fixed.map((f) => f['rgbaSha256']).toSet().length;
         row['fixedDistinctFrames'] = fixedDistinct;
         if (optimized) {
           expect(fixedDistinct, greaterThanOrEqualTo(3));
-          expect(fixed.where((f) => (f['litPixels']! as int) > 0 &&
-              (f['litPixels']! as int) < 3072)
-              .map((f) => f['rgbaSha256']).toSet().length,
-              greaterThanOrEqualTo(3));
+          expect(
+            fixed
+                .where(
+                  (f) =>
+                      (f['litPixels']! as int) > 0 &&
+                      (f['litPixels']! as int) < 3072,
+                )
+                .map((f) => f['rgbaSha256'])
+                .toSet()
+                .length,
+            greaterThanOrEqualTo(3),
+          );
         } else {
-          expect(fixed.every((f) => f['litPixels'] == 0), isTrue,
-              reason: 'OFF bounded trace retains explicit dark compatibility');
+          expect(
+            fixed.every((f) => f['litPixels'] == 0),
+            isTrue,
+            reason: 'OFF bounded trace retains explicit dark compatibility',
+          );
           row['fixedTraceExpectedDark'] = true;
         }
         captures.add(await capture('fixed-trace'));
@@ -566,7 +622,8 @@ void main() {
           final beforeDynamicPixels = screenHash();
           final visible = <Map<String, Object?>>[];
           row['visibleImageSamples'] = visible;
-          row['dynamicWorkloadKind'] = 'observed-dynamic-with-bounded-image-readback';
+          row['dynamicWorkloadKind'] =
+              'observed-dynamic-with-bounded-image-readback';
           var observingVisible = true;
           var probeBusy = false;
           var lastProbeUs = 0;
@@ -577,8 +634,11 @@ void main() {
             if (!observingVisible) return;
             binding.addPostFrameCallback(probeVisible);
             final now = Timeline.now;
-            if (probeBusy || now - lastProbeUs < 250000 ||
-                state()['running'] != true) return;
+            if (probeBusy ||
+                now - lastProbeUs < 250000 ||
+                state()['running'] != true) {
+              return;
+            }
             try {
               final monitor = find.byType(ComputerDisplay);
               final raw = tester.widget<RawImage>(
@@ -586,38 +646,58 @@ void main() {
               );
               if (raw.image == null) return;
               final rect = tester.getRect(monitor);
-              final viewport = tester.view.physicalSize / tester.view.devicePixelRatio;
-              if (rect.width <= 0 || rect.height <= 0 || rect.left < -1 ||
-                  rect.top < -1 || rect.right > viewport.width + 1 ||
+              final viewport =
+                  tester.view.physicalSize / tester.view.devicePixelRatio;
+              if (rect.width <= 0 ||
+                  rect.height <= 0 ||
+                  rect.left < -1 ||
+                  rect.top < -1 ||
+                  rect.right > viewport.width + 1 ||
                   rect.bottom > viewport.height + 1) {
-                throw StateError('Running production monitor is outside the viewport');
+                throw StateError(
+                  'Running production monitor is outside the viewport',
+                );
               }
               // Own a clone across the asynchronous read; production may
               // dispose its previous image when the next frame is decoded.
               final image = raw.image!.clone();
               probeBusy = true;
               lastProbeUs = now;
-              final sample = <String, Object?>{'atUs': now, 'status': 'pending'};
+              final sample = <String, Object?>{
+                'atUs': now,
+                'status': 'pending',
+              };
               visible.add(sample);
               pendingProbe = (() async {
                 try {
-                  final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+                  final bytes = await image.toByteData(
+                    format: ui.ImageByteFormat.rawRgba,
+                  );
                   if (bytes == null || bytes.lengthInBytes != 12288) {
-                    throw StateError('Running production RawImage has no actual monitor pixels');
+                    throw StateError(
+                      'Running production RawImage has no actual monitor pixels',
+                    );
                   }
                   if (visible.length > 64) {
-                    throw StateError('Bounded visible-image probe capacity exceeded');
+                    throw StateError(
+                      'Bounded visible-image probe capacity exceeded',
+                    );
                   }
                   sample.addAll({
                     'status': 'completed',
-                    'rgbaSha256': sha256.convert(bytes.buffer.asUint8List()).toString(),
+                    'rgbaSha256': sha256
+                        .convert(bytes.buffer.asUint8List())
+                        .toString(),
                     'width': image.width,
                     'height': image.height,
                     'monitorFullyVisible': true,
                     'source': 'actual-production-RawImage-clone-readback',
                   });
                 } catch (error) {
-                  sample.addAll({'status': 'failed', 'error': error.toString()});
+                  sample.addAll({
+                    'status': 'failed',
+                    'error': error.toString(),
+                  });
                   probeFailure = error;
                   observingVisible = false;
                 } finally {
@@ -636,10 +716,13 @@ void main() {
               observingVisible = false;
             }
           }
+
           finishVisibleProbe = () async {
             observingVisible = false;
             await pendingProbe;
-            if (probeFailure != null) throw StateError('Visible probe failed: $probeFailure');
+            if (probeFailure != null) {
+              throw StateError('Visible probe failed: $probeFailure');
+            }
           };
           binding.addPostFrameCallback(probeVisible);
           backend!.arm('timed-dynamic-15s');
@@ -663,7 +746,8 @@ void main() {
           final nativeFrames = backend!.frames.sublist(nativeStart);
           final nativeChanges =
               nativeFrames.map((f) => f['rgbaSha256']).toSet().length - 1;
-          final widgetChanges = uiChanges
+          final widgetChanges =
+              uiChanges
                   .sublist(uiStart)
                   .map((f) => f['rgbaSha256'])
                   .toSet()
@@ -672,26 +756,35 @@ void main() {
           row['dynamicFrames'] = nativeFrames;
           final nativeHashes = nativeFrames.map((f) => f['rgbaSha256']).toSet();
           final visibleHashes = visible.map((f) => f['rgbaSha256']).toSet();
-          expect(visibleHashes.difference({...nativeHashes, beforeDynamicPixels}), isEmpty,
-              reason: 'Every actual decoded image must belong to this electrical trace');
+          expect(
+            visibleHashes.difference({...nativeHashes, beforeDynamicPixels}),
+            isEmpty,
+            reason: 'Every actual decoded image must belong to this electrical trace',
+          );
           final matchedVisible = visibleHashes.intersection(nativeHashes);
-          expect(matchedVisible.length, greaterThanOrEqualTo(3),
-              reason: 'Running RawImage must display three distinct actual native frames');
+          expect(
+            matchedVisible.length,
+            greaterThanOrEqualTo(3),
+            reason: 'Running RawImage must display three distinct actual native frames',
+          );
           row['visibleDistinctMatchedNativeFrames'] = matchedVisible.length;
           row['dynamicChangedFrames'] = math.min(
-            math.min(nativeChanges, widgetChanges), matchedVisible.length - 1,
+            math.min(nativeChanges, widgetChanges),
+            matchedVisible.length - 1,
           );
           row['dynamicHostStages'] = workspace!.hostStages.snapshot();
           expect(row['dynamicChangedFrames'], greaterThanOrEqualTo(2));
           captures.add(await capture('dynamic-paused'));
         } else {
           row['dynamicChangedFrames'] = 0;
-          row['dynamicDisplayCoverage'] = 'unsupported-expected-dark-fixed-trace';
+          row['dynamicDisplayCoverage'] =
+              'unsupported-expected-dark-fixed-trace';
         }
         final savedPixels = screenHash();
         final savedRam = await ramHash();
         await measure('save-changed-derived', () => action('worldCircuitSave'));
-        final saved = files.saved ??
+        final saved =
+            files.saved ??
             (throw StateError('Production save did not retain a changed WLD'));
         final savedHash = await _fileHash(saved);
         expect(savedHash, saved.sha256);
@@ -707,30 +800,43 @@ void main() {
         final liveFinalRam = await ramHash();
         expect(liveFinalRam, isNot(savedRam));
         row['liveContinuation'] = liveContinuation;
-        await measure('reset-prepared-source', () => action('worldCircuitReset'));
+        await measure(
+          'reset-prepared-source',
+          () => action('worldCircuitReset'),
+        );
         await selectMonitor();
         expect(screenHash(), preparedPixels);
         expect(state()['optimizationEnabled'], isFalse);
-        expect(backend!.physicalPulses,
-            1536 * 2 + (optimized
-                ? (row['dynamicFrames']! as List).length * 128
-                : 0));
+        expect(
+          backend!.physicalPulses,
+          1536 * 2 +
+              (optimized ? (row['dynamicFrames']! as List).length * 128 : 0),
+        );
         row['resetRestoredPreparedPixels'] = true;
-        await measure('close-before-reopen',
-            () => action('worldCircuitClose', {'discard': true}));
+        await measure(
+          'close-before-reopen',
+          () => action('worldCircuitClose', {'discard': true}),
+        );
         await stableAfterStop('close-before-reopen');
         await disposeWorkspace();
 
         files = await mount(saved);
         await action('worldCircuitChooseWorld');
-        await measure('reopen-changed-derived', () => action('worldCircuitImport'));
+        await measure(
+          'reopen-changed-derived',
+          () => action('worldCircuitImport'),
+        );
         expect(backend!.latest!.sourceSha256, savedHash);
         await selectMonitor();
         expect(backend!.physicalPulses, 0);
-        expect(backend!.events.where((e) {
-          final words = e['words'];
-          return words is List<int> && [2, 3, 5].contains(words[1]);
-        }), isEmpty, reason: 'Reopen cannot inject ROM, reset or clock commands');
+        expect(
+          backend!.events.where((e) {
+            final words = e['words'];
+            return words is List<int> && [2, 3, 5].contains(words[1]);
+          }),
+          isEmpty,
+          reason: 'Reopen cannot inject ROM, reset or clock commands',
+        );
         expect(screenHash(), savedPixels);
         expect(await ramHash(), savedRam);
         row['reopenPreservedPixels'] = true;
@@ -759,8 +865,10 @@ void main() {
         expect(state()['running'], isTrue);
         expect(backend!.clockEnabled, isTrue);
         row['closeBeganWhileClockArmed'] = true;
-        await measure('close-running',
-            () => action('worldCircuitClose', {'discard': true}));
+        await measure(
+          'close-running',
+          () => action('worldCircuitClose', {'discard': true}),
+        );
         expect(backend!.activeSession, isNull);
         expect(backend!.physicalPulses, greaterThan(closePulsesBefore));
         row['closePhysicalPulsesBeforeRun'] = closePulsesBefore;
@@ -810,7 +918,8 @@ void main() {
         try {
           final finalHash = await _fileHash(originalForCleanup);
           report['originalSourceSha256AfterCleanup'] = finalHash;
-          report['originalSourceHashPreserved'] = finalHash == originalHashBefore;
+          report['originalSourceHashPreserved'] =
+              finalHash == originalHashBefore;
           if (finalHash != originalHashBefore) report['status'] = 'failed';
         } catch (error) {
           report['sourcePreservationCheckFailure'] = error.toString();
@@ -834,7 +943,9 @@ void main() {
       binding.reportData = report;
       final file = File(standalonePath);
       await file.parent.create(recursive: true);
-      await file.writeAsString(const JsonEncoder.withIndent('  ').convert(report));
+      await file.writeAsString(
+        const JsonEncoder.withIndent('  ').convert(report),
+      );
     }
   }, timeout: const Timeout(Duration(minutes: 18)));
 }
