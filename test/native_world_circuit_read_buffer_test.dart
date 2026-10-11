@@ -7,6 +7,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terraforge/engine/engine.dart';
 import 'package:terraforge/engine/native_world_circuit_bindings.dart';
+import 'package:terraforge/engine/native_memory_ownership_diagnostics.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 
 const _window = 1024 * 1024;
@@ -76,6 +77,24 @@ void main() {
           });
         },
       );
+
+      if (memoryOwnershipDiagnosticsEnabled) {
+        test('$mode reports uncertainty when allocator free throws', () async {
+          await _withFixture(stub, mode, (fixture) async {
+            final failure = StateError('injected read free failure');
+            fixture.allocator.freeFailure = failure;
+            await expectLater(fixture.open(), throwsA(same(failure)));
+            expect(fixture.allocator.live, isEmpty);
+            expect(fixture.allocator.frees, 1);
+            final row = fixture.api.diagnosticOwnerSnapshot();
+            expect(row['ffiReadWindowAllocatedBytes'], _window);
+            expect(row['ffiReadWindowFreedBytes'], 0);
+            expect(row['ffiReadWindowOutstandingBytes'], _window);
+            expect(row['ffiReadWindowCleanupFailures'], 1);
+            expect(row['ffiReadWindowAccountingCertain'], isFalse);
+          });
+        });
+      }
 
       for (final failure in ['short', 'read', 'supply', 'allocation', 'null']) {
         test('$mode releases its window after $failure failure', () async {
@@ -295,6 +314,15 @@ class _Fixture {
   void expectReleased() {
     expect(allocator.live, isEmpty);
     expect(allocator.frees, allocator.allocations.length);
+    if (memoryOwnershipDiagnosticsEnabled) {
+      final row = api.diagnosticOwnerSnapshot();
+      final allocated = allocator.allocations.fold<int>(0, (a, b) => a + b);
+      expect(row['ffiReadWindowAllocatedBytes'], allocated);
+      expect(row['ffiReadWindowFreedBytes'], allocated);
+      expect(row['ffiReadWindowOutstandingBytes'], 0);
+      expect(row['ffiReadWindowCleanupFailures'], 0);
+      expect(row['ffiReadWindowAccountingCertain'], isTrue);
+    }
   }
 
   void dispose() {
@@ -310,7 +338,7 @@ class _ReadAllocator implements Allocator {
   final allocations = <int>[];
   final live = <int>{};
   int frees = 0, peakLive = 0;
-  Object? failure;
+  Object? failure, freeFailure;
   bool returnNull = false;
   void Function()? onAllocate;
   @override
@@ -331,6 +359,8 @@ class _ReadAllocator implements Allocator {
     expect(live.remove(pointer.address), isTrue, reason: 'Free exactly once.');
     calloc.free(pointer);
     frees++;
+    final failure = freeFailure;
+    if (failure != null) throw failure;
   }
 }
 
