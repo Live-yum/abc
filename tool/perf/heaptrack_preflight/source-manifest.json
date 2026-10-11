@@ -1,0 +1,66 @@
+{
+  "schema": "abc.heaptrack-preflight-source-manifest.v1",
+  "repoDirectory": "tool/perf/heaptrack_preflight",
+  "files": {
+    "README.md": {
+      "sha256": "3dac857d14e23a8a39acaf230efbbb4c583c8ae8a9e05b29bf94f70a56952ee6",
+      "bytes": 11400,
+      "mode": "100644"
+    },
+    "native_contract.c": {
+      "sha256": "3bebeaeb3dd7e7355c79627c155abe8e2e6e79c32936e70257adb2f1ec671904",
+      "bytes": 19610,
+      "mode": "100644"
+    },
+    "trace_contract.py": {
+      "sha256": "9a1d4d935a9d28cfab2e0a46b8a80ac68ceeef096ced746aed10fffb3a769298",
+      "bytes": 18932,
+      "mode": "100644"
+    },
+    "run_preflight.py": {
+      "sha256": "05015a05bb998052dc2575dc27589e49937905b7b0078bb2b5f2abb039bb4340",
+      "bytes": 37446,
+      "mode": "100644"
+    },
+    "test_preflight.py": {
+      "sha256": "d97fe4df1b661c53a88d83c0dad60e2c5856b1411ec09222992ec9aef75eeff5",
+      "bytes": 21739,
+      "mode": "100644"
+    }
+  },
+  "fixedPackageVersion": "1.5.0+dfsg1-2ubuntu3",
+  "upstreamVersion": "1.5.0",
+  "rawFormatVersion": 3,
+  "profiledFixtureInvocations": 1,
+  "profiledFixtureSeconds": 10,
+  "authoredAllocatorOperations": 23,
+  "authoredAllocatorOperationsCap": 32,
+  "realApplicationInvocations": 0,
+  "offlineTestCount": 33,
+  "localValidation": {
+    "offlineTests": "passed",
+    "nativeCompilation": "previous revision passed; native source unchanged, not rerun",
+    "unprofiledNativeSemanticInvocations": 1,
+    "unprofiledNativeSemanticResult": "passed",
+    "officialHeaptrackRuntime": "not-run; prior CI failed before profiler; next CI only",
+    "unprofiledNativeSemanticInvocationsThisRevision": 0
+  },
+  "entrypoint": [
+    "python3",
+    "tool/perf/heaptrack_preflight/run_preflight.py",
+    "--output",
+    "build/heaptrack-preflight",
+    "--deb-dir",
+    "build/heaptrack-packages",
+    "--apt-download-log",
+    "build/heaptrack-preflight-evidence/apt-download.log"
+  ],
+  "revision": "fixed-mirror-policy-representation-only",
+  "previousRun": {
+    "id": 38140930189,
+    "head": "2a4fefc6b34acafeca622f54b5f08fe6e0808f50",
+    "status": "failed-closed",
+    "profiledFixtureInvocations": 0,
+    "mirrorListContents": "not captured; unknown"
+  }
+}
