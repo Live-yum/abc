@@ -1,0 +1,55 @@
+{
+  "schema": "abc.heaptrack-preflight-source-manifest.v1",
+  "repoDirectory": "tool/perf/heaptrack_preflight",
+  "files": {
+    "README.md": {
+      "sha256": "c4f14e40e55393d699bf195c15b8d81fece5c85ff3816e21986e90e7ca2404ac",
+      "bytes": 7362,
+      "mode": "100644"
+    },
+    "native_contract.c": {
+      "sha256": "3bebeaeb3dd7e7355c79627c155abe8e2e6e79c32936e70257adb2f1ec671904",
+      "bytes": 19610,
+      "mode": "100644"
+    },
+    "trace_contract.py": {
+      "sha256": "9a1d4d935a9d28cfab2e0a46b8a80ac68ceeef096ced746aed10fffb3a769298",
+      "bytes": 18932,
+      "mode": "100644"
+    },
+    "run_preflight.py": {
+      "sha256": "a8eeb86cd7ce4710282792022c85d70e3fbc0d471c37a2e5faebd178d32c6a3e",
+      "bytes": 26683,
+      "mode": "100644"
+    },
+    "test_preflight.py": {
+      "sha256": "50392b931c66669b6238bdfa9d294d106d6ce8ddaf1dc7a6316a6030bab87054",
+      "bytes": 14697,
+      "mode": "100644"
+    }
+  },
+  "fixedPackageVersion": "1.5.0+dfsg1-2ubuntu3",
+  "upstreamVersion": "1.5.0",
+  "rawFormatVersion": 3,
+  "profiledFixtureInvocations": 1,
+  "profiledFixtureSeconds": 10,
+  "authoredAllocatorOperations": 23,
+  "authoredAllocatorOperationsCap": 32,
+  "realApplicationInvocations": 0,
+  "offlineTestCount": 26,
+  "localValidation": {
+    "offlineTests": "passed",
+    "nativeCompilation": "passed",
+    "unprofiledNativeSemanticInvocations": 1,
+    "unprofiledNativeSemanticResult": "passed",
+    "officialHeaptrackRuntime": "not-run; CI only"
+  },
+  "entrypoint": [
+    "python3",
+    "tool/perf/heaptrack_preflight/run_preflight.py",
+    "--output",
+    "build/heaptrack-preflight",
+    "--deb-dir",
+    "build/heaptrack-packages"
+  ]
+}
