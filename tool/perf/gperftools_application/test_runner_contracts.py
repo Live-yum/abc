@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import resource
+import select
 import shutil
 import subprocess
 import sys
@@ -18,12 +19,17 @@ from application_contract import ContractError, MAX_SIDECAR, map_key
 from bounded_supervision import PairBudget, TargetProcessIdentity, cleanup_owned_group
 from application_process import clean_environment, read_json, run_command
 from application_source import (BASE, BASE_TREE, INHERITED, PACKAGE_GATE, BRANCH,
-    MANIFEST, TARGET, NEW_WORKFLOW, DIRECT_PARENT, DIRECT_PARENT_TREE, PREFIX_TEST,
-    CORRECTION_PATHS, verify_correction_parent, verify_layers)
+    MANIFEST, TARGET, NEW_WORKFLOW, DIRECT_PARENT, DIRECT_PARENT_TREE, INPLACE_TEST,
+    CORRECTION_PATHS, REVIEWED_IMPLEMENTATION_BLOBS, verify_correction_parent, verify_layers)
 from capture_contract import CLOCK, CutWatcher, GaugeTail, validate_startup, sidecar_caps
 from elf_identity import BoundModules, elf_metadata, endpoint_delta, file_identity, load_bias
 from run_pair import (KNOWN_IMAGE_FAILURE, actual_ci_guard, exact_profile_files,
                       runtime_environment)
+
+
+# The unchanged workflow discovers test_runner_*.py; include the reviewed
+# in-place ELF contracts through that existing entry point.
+from test_inplace_elf_contracts import InplaceElfContracts
 
 
 class ProcessContracts(unittest.TestCase):
@@ -185,7 +191,7 @@ class ElfContracts(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix='abc-elf-identity-stub-')
         cls.root=Path(cls.tmp.name); cls.binary=cls.root/'inert-elf'
-        source=cls.root/'inert.c'; source.write_text('#include <unistd.h>\nint main(void){sleep(30);return 0;}\n')
+        source=cls.root/'inert.c'; source.write_text('#include <unistd.h>\nint main(void){if(write(1,"READY\\n",6)!=6)return 2;sleep(30);return 0;}\n')
         subprocess.run(['cc','-g','-O0','-Wl,--build-id','-o',str(cls.binary),str(source)],check=True,timeout=20,
                        env=clean_environment(os.environ),capture_output=True)
     @classmethod
@@ -219,9 +225,11 @@ class ElfContracts(unittest.TestCase):
         self.assertFalse(unknown['crossArmSubtraction'])
 
     def test_real_inert_process_maps_bind_modules_and_detect_new_maps(self):
-        process=subprocess.Popen([str(self.binary)],start_new_session=True,env=clean_environment(os.environ))
+        process=subprocess.Popen([str(self.binary)],start_new_session=True,stdout=subprocess.PIPE,env=clean_environment(os.environ))
         identity=modules=None
         try:
+            self.assertTrue(select.select([process.stdout],[],[],5)[0], 'Inert main did not become ready')
+            self.assertEqual(process.stdout.readline(), b'READY\n')
             expected=file_identity(self.binary)
             identity=TargetProcessIdentity(process.pid,owned_pgid=process.pid,expected_executable=self.binary,expected_sha256=expected['sha256'])
             with tempfile.TemporaryDirectory() as temporary:
@@ -236,6 +244,7 @@ class ElfContracts(unittest.TestCase):
             if modules:modules.close()
             if identity:identity.close()
             self.assertTrue(cleanup_owned_group(process,deadline=time.monotonic()+2)['groupGone'])
+            if process.stdout: process.stdout.close()
 
 
     def test_presealed_lazy_module_binds_without_preloading_and_rejects_changed_or_unknown(self):
@@ -245,9 +254,11 @@ class ElfContracts(unittest.TestCase):
         lazy = self.root / 'lazy.so'
         subprocess.run(['cc','-g','-shared','-fPIC','-Wl,--build-id','-o',str(lazy),str(source)],
                        check=True,timeout=20,capture_output=True,env=clean_environment(os.environ))
-        process = subprocess.Popen([str(binary)],start_new_session=True,env=clean_environment(os.environ))
+        process = subprocess.Popen([str(binary)],start_new_session=True,stdout=subprocess.PIPE,env=clean_environment(os.environ))
         identity = modules = None
         try:
+            self.assertTrue(select.select([process.stdout],[],[],5)[0], 'Inert main did not become ready')
+            self.assertEqual(process.stdout.readline(), b'READY\n')
             expected, delayed = file_identity(binary), file_identity(lazy)
             identity = TargetProcessIdentity(process.pid,owned_pgid=process.pid,
                 expected_executable=binary,expected_sha256=expected['sha256'])
@@ -281,6 +292,7 @@ class ElfContracts(unittest.TestCase):
             if modules:modules.close()
             if identity:identity.close()
             self.assertTrue(cleanup_owned_group(process,deadline=time.monotonic()+2)['groupGone'])
+            if process.stdout: process.stdout.close()
 
 
 class SourceContracts(unittest.TestCase):
@@ -311,7 +323,7 @@ class CorrectionSourceContracts(unittest.TestCase):
         head='e'*40
         old={'mode':'100644','blob':'a'*40}
         new={'mode':'100644','blob':'b'*40}
-        parent={name:dict(old) for name in CORRECTION_PATHS if name != PREFIX_TEST}
+        parent={name:dict(old) for name in CORRECTION_PATHS if name != INPLACE_TEST}
         parent.update({name:dict(old) for name in (
             'lib/main.dart', 'native/abc_owner_diagnostics.c',
             'integration_test/computer_memory_ownership_test.dart',
@@ -321,6 +333,8 @@ class CorrectionSourceContracts(unittest.TestCase):
             'tool/perf/gperftools_application/run_pair.py')})
         current=copy.deepcopy(parent)
         current.update({name:dict(new) for name in CORRECTION_PATHS})
+        for name, blob in REVIEWED_IMPLEMENTATION_BLOBS.items():
+            current[name]['blob'] = blob
         return head,[head,DIRECT_PARENT],DIRECT_PARENT_TREE,parent,current
 
     def test_accepts_only_exact_correction_on_fixed_parent_and_tree(self):
@@ -350,7 +364,13 @@ class CorrectionSourceContracts(unittest.TestCase):
                      'tool/perf/memory_ownership_schedule.json',NEW_WORKFLOW,
                      'tool/perf/gperftools_application/run_pair.py'):
             values=self.fixture();values[4][name]['blob']='d'*40
-            with self.subTest(name=name),self.assertRaisesRegex(ValueError,'exact five-path'):
+            with self.subTest(name=name),self.assertRaises(ValueError):
+                verify_correction_parent(*values)
+
+    def test_reviewed_implementation_bytes_are_exactly_pinned(self):
+        for name in REVIEWED_IMPLEMENTATION_BLOBS:
+            values=self.fixture();values[4][name]['blob']='d'*40
+            with self.subTest(name=name),self.assertRaisesRegex(ValueError,'implementation bytes differ'):
                 verify_correction_parent(*values)
 
     def test_correction_mode_or_symlink_changes_rejected(self):

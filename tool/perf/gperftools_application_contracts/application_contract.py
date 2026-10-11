@@ -48,7 +48,25 @@ MAX_HEAP = 1 << 20  # exclusive, the upstream fixed buffer
 MAX_MAPS = 1 << 20  # inclusive, each of eight raw snapshots
 MAX_RAW = 16 << 20  # inclusive; NEVER the child's 64 MiB RLIMIT_FSIZE
 MAX_SIDECAR = 256 << 20
-MAX_MODULE = 64 << 20
+MAX_MODULE = 64 << 20  # unchanged built application/tool artifact limit
+# Explicit in-place SYSTEM ELF input contract; never application acceptance.
+MAX_SYSTEM_ELF = 256 << 20
+MAX_ARM_ELF_INPUT = 1 << 30  # unique device/inode inputs, including debug files
+MAX_ELF_METADATA = 64 << 20  # per-module extracted table bytes, not whole ELF
+MAX_ELF_READ = 1 << 20
+INPLACE_ELF_LIMITS = {
+    'schema': 'abc.inplace-elf-limits.v1',
+    'systemElfInputBytesMaximum': MAX_SYSTEM_ELF,
+    'builtArtifactInputBytesMaximum': MAX_MODULE,
+    'uniqueElfInputBytesPerArmMaximum': MAX_ARM_ELF_INPUT,
+    'elfReadChunkBytesMaximum': MAX_ELF_READ,
+    'extractedMetadataBytesPerFileMaximum': MAX_ELF_METADATA,
+    'singleJsonBytesMaximum': 4 << 20,
+    'sidecarBytesMaximum': MAX_SIDECAR,
+    'completeElfCopiesRetained': False,
+    'originalApplicationAcceptanceChanged': False,
+    'originalTimeBudgetsChanged': False,
+}
 MAX_LINE = 1 << 16
 MAX_RECEIPT = 512
 RSS_STOP = 2 << 30  # observed stop line, not a kernel RSS limit
@@ -197,7 +215,9 @@ def validate_module_records(bracket, records):
     require(set(records) == required, 'Missing/extra executable module identity')
     for path, row in records.items():
         require(row.get('path') == path and type(row.get('bytes')) is int
-                and 0 < row['bytes'] <= MAX_MODULE, 'Necessary ELF byte cap/identity missing')
+                and 0 < row['bytes'] <= (MAX_SYSTEM_ELF if row.get('inputPolicy') == 'inplace-system-elf'
+                    and any(path.startswith(root) for root in ('/usr/lib/', '/usr/lib64/', '/lib/', '/lib64/')) else MAX_MODULE),
+                'Necessary ELF byte cap/identity missing')
         require(re.fullmatch('[0-9a-f]{64}', row.get('sha256', '')) is not None
                 and re.fullmatch('[0-9a-f]{8,128}', row.get('buildId', '')) is not None,
                 'ELF SHA/build ID missing')

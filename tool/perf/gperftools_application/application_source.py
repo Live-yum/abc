@@ -26,12 +26,11 @@ TARGET = 'integration_test/computer_memory_ownership_test.dart'
 OLD_WORKFLOW = '.github/workflows/memory-ownership.yml'
 NEW_WORKFLOW = '.github/workflows/gperftools-application.yml'
 ROOT = Path(__file__).resolve().parents[3]
-DIRECT_PARENT = '2c14f3fad066fd1046f6db874c98331ce6d6e630'
-DIRECT_PARENT_TREE = 'b87a69b8a5f601a1f1015b10040a71f5ee36e4c0'
-PREFIX_TEST = 'tool/perf/gperftools_application_contracts/test_prefix_marker_contracts.py'
-CORRECTION_PATHS = frozenset({
-    'tool/perf/gperftools_application_contracts/quiet_dump_linux.c',
-    PREFIX_TEST,
+DIRECT_PARENT = 'bed5893ae53a7bf740ba6f0e000ae71eda4241f4'
+DIRECT_PARENT_TREE = '2d927a130f036350116101a420e409c0f81352d6'
+INPLACE_TEST = 'tool/perf/gperftools_application/test_inplace_elf_contracts.py'
+REVIEWED_IMPLEMENTATION_BLOBS = {'tool/perf/gperftools_application/elf_identity.py': '9d1485df7f6df3c5fa3f225bd1ee6a0016fa3130', 'tool/perf/gperftools_application/run_pair.py': 'fa8aab4a3ea62f6a8e329961ea66af89a0f4c194', 'tool/perf/gperftools_application/dependencies.py': 'ba27279e0ebd60a588b3d9a9e5d1de0b94f30b3e', 'tool/perf/gperftools_application/test_inplace_elf_contracts.py': '9e8e9cc73de632a8c7ec3b418c44f0f4cc0daef8', 'tool/perf/gperftools_application_contracts/application_contract.py': '08b322ffc2dd5918b587cbfd8c1c349986079b68'}
+CORRECTION_PATHS = frozenset(REVIEWED_IMPLEMENTATION_BLOBS) | frozenset({
     'tool/perf/gperftools_application/application_source.py',
     'tool/perf/gperftools_application/test_runner_contracts.py',
     MANIFEST,
@@ -117,24 +116,26 @@ def verify_layers(manifest, base, inherited, current):
 
 
 def verify_correction_parent(head, parents, parent_tree_sha, parent, current):
-    """Only the five reviewed correction paths may differ from the pinned parent.
+    """Only the eight reviewed correction paths may differ from the pinned parent.
 
     The independent 9d4/5a checks still run in verify_layers. This additional gate
     prevents a follow-up commit from modifying any already-reviewed application,
     workload, workflow, package contract, budget, or provenance dependency.
     """
     require(parents == [head, DIRECT_PARENT],
-            'Prefix correction must have exactly the fixed diagnostic parent')
+            'In-place ELF correction must have exactly the fixed diagnostic parent')
     require(parent_tree_sha == DIRECT_PARENT_TREE, 'Fixed diagnostic parent tree differs')
-    require(set(parent) - set(current) == set(), 'Prefix correction cannot delete parent files')
-    require(set(current) - set(parent) == {PREFIX_TEST},
-            'Only the reviewed prefix regression may be added to the fixed parent')
+    require(set(parent) - set(current) == set(), 'In-place ELF correction cannot delete parent files')
+    require(set(current) - set(parent) == {INPLACE_TEST},
+            'Only the reviewed in-place ELF regression may be added to the fixed parent')
     changed = {name for name in parent.keys() | current.keys() if parent.get(name) != current.get(name)}
-    require(changed == CORRECTION_PATHS, 'Prefix correction differs outside the exact five-path delta')
+    require(changed == CORRECTION_PATHS, 'In-place ELF correction differs outside the exact eight-path delta')
     for name in CORRECTION_PATHS:
         require(current[name]['mode'] == '100644'
-                and (name == PREFIX_TEST or parent[name]['mode'] == '100644'),
-                'Prefix correction paths must remain regular non-executable sources')
+                and (name == INPLACE_TEST or parent[name]['mode'] == '100644'),
+                'In-place ELF correction paths must remain regular non-executable sources')
+    for name, blob in REVIEWED_IMPLEMENTATION_BLOBS.items():
+        require(current[name]['blob'] == blob, 'Reviewed in-place implementation bytes differ: ' + name)
     return sorted(changed)
 
 
@@ -146,7 +147,7 @@ def source_gate(root, base_root, inherited_root, output):
     require(head == os.environ.get('GITHUB_SHA'), 'Checkout head differs from this exact CI event')
     parents = git(root, 'rev-list', '--parents', '-n', '1', head).split()
     require(parents == [head, DIRECT_PARENT],
-            'Prefix correction must have exactly the fixed diagnostic parent')
+            'In-place ELF correction must have exactly the fixed diagnostic parent')
     parent_tree_sha = git(root, 'rev-parse', DIRECT_PARENT + '^{tree}')
     require(parent_tree_sha == DIRECT_PARENT_TREE, 'Fixed diagnostic parent tree differs')
     require(not git(root, 'status', '--porcelain', '--untracked-files=all'), 'Clean committed source required')
@@ -181,7 +182,7 @@ def source_gate(root, base_root, inherited_root, output):
              'diagnosticOverlay': True, 'shippingRuntimeUsed': False,
              'scheduleSha256': files['tool/perf/memory_ownership_schedule.json']['sha256'],
              'patchBaseCommit': DIRECT_PARENT,
-             'patchScope': 'exact-five-path-prefix-marker-correction',
+             'patchScope': 'exact-eight-path-inplace-elf-correction',
              'patchSha256': hashlib.sha256(git(root, 'diff', '--binary', '--full-index', DIRECT_PARENT, head, binary=True)).hexdigest()}
     with Path(output).open('x') as stream:
         json.dump(proof, stream, indent=2, sort_keys=True); stream.write('\n')

@@ -17,7 +17,7 @@ import time
 
 import dependencies
 from dependencies import ROOT, HERE, CONTRACTS
-from application_contract import (CUTS, MAX_RAW, OsJournalTail, arm_completion,
+from application_contract import (CUTS, MAX_RAW, INPLACE_ELF_LIMITS, OsJournalTail, arm_completion,
     bounded_bytes, check_sidecar_caps, inspect_sidecar, require, validate_official_raw)
 from bounded_supervision import PairBudget, TargetProcessIdentity
 from prebuilt_contract import (ARMS, SDK_COMMIT, SDK_VERSION, TARGET, bind_runtime_entry,
@@ -55,7 +55,7 @@ def actual_ci_guard(environment):
             'Verified shared Linux native/Python monotonic clock required; Dart clock stays separate')
 
 
-def check_package(proof):
+def check_package(proof, *, deadline=float('inf')):
     require(proof.get('status') == 'official-package-identity-only'
             and proof.get('packageIdentityPassed') is True
             and proof.get('applicationInvocations') == proof.get('profiledFixtureInvocations') == 0,
@@ -64,7 +64,7 @@ def check_package(proof):
     require(paths['preload'] == '/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4.5.16'
             and paths['pprof'] == '/usr/bin/google-pprof', 'Official tool paths differ')
     for role, package in (('preload', 'libgoogle-perftools4t64'), ('pprof', 'google-perftools')):
-        observed = file_identity(Path(paths[role]))
+        observed = file_identity(Path(paths[role]), deadline=deadline)
         expected = proof['packageIdentity'][package]['installedFiles'][paths[role]]
         require({key: observed[key] for key in ('sha256', 'bytes')} == expected,
                 'Official installed file changed after package gate')
@@ -96,6 +96,55 @@ def exact_profile_files(directory, *, final=False):
     require(actual <= allowed and (not final or actual == allowed), 'Unexpected/missing application sidecar including extra exit dump')
     check_sidecar_caps(directory, max_heaps=2)
     return allowed
+
+
+def verified_analysis(stage, verify, evidence):
+    """Same-budget pre/post checks, including failed command/cleanup paths.
+
+    Preserve the first exception. A failed or expired post-check is independent
+    evidence, never a fresh budget or a replacement success/failure result.
+    """
+    record = {'beforeCompleted': False, 'commandAttempted': False,
+              'afterAttempted': False, 'afterCompleted': False,
+              'commandError': None, 'beforeError': None, 'afterError': None,
+              'pathFdBindingAtomic': False}
+    result = primary = after_error = None
+    save(evidence, record, new=True)
+    try:
+        try:
+            verify()
+            record.update(beforeCompleted=True, beforeVerifiedMonotonicNs=time.monotonic_ns())
+        except BaseException as error:
+            primary = error
+            record['beforeError'] = str(error) or type(error).__name__
+        if primary is None:
+            try:
+                record['commandAttempted'] = True
+                result = stage()
+            except BaseException as error:
+                primary = error
+                record['commandError'] = str(error) or type(error).__name__
+            finally:
+                record['afterAttempted'] = True
+                try:
+                    verify()
+                    record.update(afterCompleted=True, afterVerifiedMonotonicNs=time.monotonic_ns())
+                except BaseException as error:
+                    after_error = error
+                    record['afterError'] = str(error) or type(error).__name__
+    finally:
+        try:
+            save(evidence, record)
+        except BaseException as error:
+            if primary is None and after_error is None:
+                raise
+            # Preserve first failure even if writing its evidence also fails.
+            (primary or after_error).add_note('Verification evidence write failed: ' + str(error))
+    if primary is not None:
+        raise primary
+    if after_error is not None:
+        raise after_error
+    return result, record
 
 
 class PairRunner:
@@ -131,6 +180,7 @@ class PairRunner:
                             'sourceCommit': self.head, 'buildInvocations': 0,
                             'actualArmOrder': [], 'arms': self.sidecar_results,
                             'originalAcceptanceOverridden': False, 'automaticRetryAllowed': False,
+                            'inplaceElfLimits': INPLACE_ELF_LIMITS,
                             'crossArmSubtraction': False, 'knownHistoricalImageFailurePreserved': True,
                             'hookWatchdog': {'source': 'original flushed ownership-gauges.jsonl',
                                 'secondsFromObservedGauge': 10, 'pollIntervalSeconds': .01,
@@ -168,6 +218,19 @@ class PairRunner:
         version = self.stage('sdk-version', [str(self.flutter), '--no-version-check', '--suppress-analytics', '--version', '--machine'], deadline=deadline)
         require(json.loads(Path(version['stdout']['path']).read_text())['frameworkVersion'] == SDK_VERSION,
                 'Actual Flutter version differs')
+        self.symbol_tools = {}
+        for name in ('addr2line', 'objdump', 'nm', 'c++filt'):
+            path = Path('/usr/bin') / name
+            canonical = path.resolve()
+            identity = file_identity(canonical, deadline=deadline)
+            result = self.stage('symbol-tool-' + name, [str(canonical), '--version'], deadline=deadline)
+            require(result['returnCode'] == 0, 'Installed binutils version command failed: ' + name)
+            self.symbol_tools[name] = {'invocationPath': str(path), 'identity': identity,
+                'version': Path(result['stdout']['path']).read_text(),
+                'provenance': 'existing official runner installation; no new install/trust root'}
+        self.pprof_tools = '--tools=' + ','.join(name + ':' + row['identity']['path']
+            for name, row in self.symbol_tools.items())
+        save(self.shared / 'symbol-tools.json', self.symbol_tools, new=True)
         verify_source_proof(ROOT, self.source)
         self.launcher, self.stack_helper = self.shared / 'sealed-launcher', self.shared / 'libabc_quiet_dump.so'
         self.argv = commands(str(self.flutter), str(self.launcher), self.head, os.environ['TERRA_PERF_RENDERER'])
@@ -331,7 +394,6 @@ class PairRunner:
             require(summary.get('evidenceValid') is True or name == ARMS[1] and summary.get('errors') == [KNOWN_IMAGE_FAILURE],
                     'Original workload/identity validator failed beyond preserved image coverage: ' + repr(summary.get('errors')))
             workload_complete = True
-            modules.rehash(min(self.budget.deadline, arm['deadline']))
             expected_os = sorted((path.name for path in (folder / 'raw').glob('os-*.jsonl')), key=lambda n: int(n[3:-6]))
             while rss.tail.offset < rss.tail.path.stat().st_size or len(rss.closed_files) + 1 < len(expected_os):
                 require(time.monotonic() < arm['deadline'], 'OS journal final drain shared timeout')
@@ -341,16 +403,34 @@ class PairRunner:
             for index, (_, _, cut, heap_name) in enumerate(CUTS):
                 for mode in ('inuse_space', 'inuse_objects'):
                     analysis_deadline = self.budget.profile_analysis_deadline(cut, mode)
-                    check_package(self.package)
+                    if index == 0 and mode == 'inuse_space':
+                        symbol_inputs = modules.prepare_symbols(
+                            [item['profile'] for item in watcher.cuts], analysis_deadline)
+                        save(self.shared / ('symbol-inputs-' + name + '.json'), symbol_inputs, new=True)
+                    def verify_analysis_inputs():
+                        modules.rehash(analysis_deadline)
+                        check_package(self.package, deadline=analysis_deadline)
+                        for tool in self.symbol_tools.values():
+                            require(str(Path(tool['invocationPath']).resolve()) == tool['identity']['path']
+                                    and file_identity(Path(tool['identity']['path']), deadline=analysis_deadline) == tool['identity'],
+                                    'Installed binutils identity changed around analysis')
                     raw = self.shared / f'{name}-{cut}.{mode}.raw'
-                    result = self.stage(f'pprof-{name}-{cut}-{mode}',
-                        [self.paths['pprof'], '--raw', '--' + mode, str(self.target), str(sidecar / heap_name)],
-                        deadline=analysis_deadline, stdout=raw, stdout_cap=MAX_RAW)
+                    result, verified = verified_analysis(
+                        lambda: self.stage(f'pprof-{name}-{cut}-{mode}',
+                            [self.paths['pprof'], self.pprof_tools, '--raw', '--' + mode,
+                             str(self.target), str(sidecar / heap_name)],
+                            deadline=analysis_deadline, stdout=raw, stdout_cap=MAX_RAW),
+                        verify_analysis_inputs,
+                        self.shared / f'{name}-{cut}.{mode}.input-checks.json')
                     check_official_diagnostics(Path(result['stderr']['path']).read_text())
                     validated = validate_official_raw(raw, self.target, watcher.cuts[index]['profile'], mode)
                     analysis.append({'cut': cut, 'mode': mode, 'total': validated['total'],
                                      'rawSha256': sha(raw), 'rawBytes': raw.stat().st_size,
-                                     'wholeIntegerStacksMatched': True})
+                                     'wholeIntegerStacksMatched': True,
+                                     'modulePathFdShaCheckedBeforeNs': verified['beforeVerifiedMonotonicNs'],
+                                     'modulePathFdShaCheckedAfterNs': verified['afterVerifiedMonotonicNs'],
+                                     'pathFdBindingAtomic': False,
+                                     'officialPprofUsesOriginalPaths': True})
             save(self.shared / ('analysis-' + name + '.json'), analysis, new=True)
             save(self.shared / ('endpoints-' + name + '.json'), endpoint_delta(
                 watcher.cuts[0]['profile'], watcher.cuts[1]['profile'], modules.records), new=True)
