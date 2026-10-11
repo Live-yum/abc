@@ -1,0 +1,142 @@
+name: Fixed 9d4 bounded memory ownership diagnostic
+
+on:
+  push:
+    branches: [codex/memory-ownership-lint-9d4]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: memory-ownership-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  LIBGL_ALWAYS_SOFTWARE: '1'
+  ABC_PERF_COMMIT: ${{ github.sha }}
+  TERRA_PERF_RUNNER: ubuntu-24.04-xvfb
+
+jobs:
+  bounded-ownership:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/memory-ownership-lint-9d4' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Check out immutable shipping product for its original verifier
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          path: build/memory-owner-base
+          persist-credentials: false
+      - name: Verify shipping sources and separately identify the diagnostic overlay
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          mkdir -p build/memory-owner-evidence
+          (cd build/memory-owner-base && python3 tool/verify_authorized_sources.py) > build/memory-owner-evidence/base-source-verification.log 2>&1
+          python3 tool/perf/memory_ownership_preflight.py source --base-root build/memory-owner-base --output build/memory-owner-evidence/source-provenance.json
+          python3 tool/perf/memory_ownership_test_gate.py
+      - name: Install ordinary Linux Profile dependencies
+        timeout-minutes: 8
+        run: sudo apt-get update && sudo apt-get install -y build-essential binutils clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev zlib1g-dev xvfb mesa-utils
+      - uses: ./.github/actions/setup-flutter
+      - name: Resolve unchanged lockfile and archive official formatter output
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          flutter pub get --enforce-lockfile
+          python3 tool/perf/memory_ownership_preflight.py format --output build/memory-owner-evidence/format
+      - name: Analyze all application and diagnostic Dart sources
+        timeout-minutes: 4
+        run: flutter analyze --no-pub
+      - name: Native OFF equivalence, option rejection, scalar and helper contracts
+        timeout-minutes: 8
+        run: python3 tool/perf/memory_ownership_native_contracts.py prepare --base-root build/memory-owner-base --output build/memory-owner-evidence/native
+      - name: Explicit Profile options and real Profile image-hook smoke
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          mkdir -p build/linux/x64/profile
+          test ! -e build/linux/x64/profile/CMakeCache.txt
+          printf 'ABC_OWNER_DIAGNOSTICS:BOOL=ON\nABC_PERF_COUNTERS:BOOL=ON\n' > build/linux/x64/profile/CMakeCache.txt
+          xvfb-run -a -s '-screen 0 1440x1000x24' python3 tool/perf/memory_ownership_profile_smoke.py build/memory-owner-evidence/profile-smoke
+          python3 tool/perf/memory_ownership_native_contracts.py profile --bundle build/linux/x64/profile/bundle --output build/memory-owner-evidence/native
+          python3 tool/perf/memory_ownership_preflight.py native --bundle build/linux/x64/profile/bundle --helper "$RUNNER_TEMP/memory-owner-helper/libabc_native_owner_libc.so" --helper-build "$RUNNER_TEMP/memory-owner-helper/helper-build.json" --output build/memory-owner-evidence/native-preflight.json
+      - name: Focused ownership, transport, image and existing VM probe contracts
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          export TERRAFORGE_ENGINE_LIBRARY="$PWD/build/linux/x64/profile/bundle/lib/libabc_engine.so"
+          export ABC_OWNER_LIBC_HELPER="$RUNNER_TEMP/memory-owner-helper/libabc_native_owner_libc.so"
+          flutter test --no-pub --concurrency=1 test/memory_ownership_gauges_test.dart test/memory_ownership_worker_test.dart test/profile_memory_test.dart test/computer_display_test.dart test/native_world_circuit_read_buffer_test.dart test/native_world_circuit_hash_test.dart test/native_world_circuit_ownership_test.dart test/native_world_circuit_close_test.dart test/memory_ownership_retention_test.dart
+          flutter test --no-pub --concurrency=1 --dart-define=ABC_MEMORY_OWNERSHIP=true test/memory_ownership_gauges_test.dart test/memory_ownership_worker_test.dart test/native_world_circuit_read_buffer_test.dart test/native_world_circuit_hash_test.dart test/native_world_circuit_ownership_test.dart test/native_world_circuit_close_test.dart test/memory_ownership_retention_test.dart
+      - name: Resolve fixed public WLD after all preflight gates
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          python3 tool/computerraria_inputs.py
+          mkdir -p build/memory-owner-tmp
+          echo "TMPDIR=$PWD/build/memory-owner-tmp" >> "$GITHUB_ENV"
+          echo "COMPUTERRARIA_WLD=$PWD/build/public-computerraria/computerraria.wld" >> "$GITHUB_ENV"
+          xvfb-run -a -s '-screen 0 1440x1000x24' glxinfo -B > build/memory-owner-evidence/glxinfo.txt
+          renderer="$(sed -n 's/^OpenGL renderer string: //p' build/memory-owner-evidence/glxinfo.txt)"
+          test -n "$renderer"
+          echo "TERRA_PERF_RENDERER=$renderer" >> "$GITHUB_ENV"
+      - name: Exactly one probe-only and one product eight-cycle process
+        timeout-minutes: 34
+        run: >-
+          xvfb-run -a -s '-screen 0 1440x1000x24'
+          python3 tool/perf/memory_ownership_run.py build/memory-owner-runs
+          --source-proof build/memory-owner-evidence/source-provenance.json
+          --native-proof build/memory-owner-evidence/native-preflight.json
+          --helper "$RUNNER_TEMP/memory-owner-helper/libabc_native_owner_libc.so"
+      - name: Preserve small reports, failed preflight and official formatting
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: memory-ownership-summary-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            build/memory-owner-evidence/**/*.json
+            build/memory-owner-evidence/**/*.log
+            build/memory-owner-evidence/native/helper-build/*
+            build/memory-owner-evidence/glxinfo.txt
+            build/memory-owner-evidence/format/*.patch
+            build/memory-owner-evidence/format/*.tar.gz
+            build/memory-owner-runs/*.json
+            build/memory-owner-runs/*/*.json
+            build/memory-owner-runs/*/*.log
+      - name: Preserve probe-only raw observations
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-ownership-probe-raw-${{ github.sha }}
+          if-no-files-found: ignore
+          path: build/memory-owner-runs/probe-only/raw
+      - name: Preserve product raw observations
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-ownership-product-raw-${{ github.sha }}
+          if-no-files-found: ignore
+          path: build/memory-owner-runs/product-with-ownership/raw
+      - name: Preserve actual probe-only code and helper
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-ownership-probe-code-${{ github.sha }}
+          if-no-files-found: ignore
+          path: build/memory-owner-runs/probe-only/code
+      - name: Preserve actual product code and helper
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: memory-ownership-product-code-${{ github.sha }}
+          if-no-files-found: ignore
+          path: build/memory-owner-runs/product-with-ownership/code
