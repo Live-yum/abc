@@ -1,0 +1,82 @@
+{
+  "schema": "abc.gperftools-sampled-runtime.v1",
+  "abi": 1,
+  "mode": "sampled",
+  "pid": 12345,
+  "initialized": true,
+  "initializationStatus": 0,
+  "q0Calls": 0,
+  "closeCalls": 0,
+  "closed": false,
+  "failure": 0,
+  "q0TransportAccepted": false,
+  "estimationOnly": true,
+  "transportOnly": true,
+  "mapsAccepted": false,
+  "fullRunCompleted": false,
+  "provider": {
+    "path": "/offline/synthetic-provider.so",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "device": 1,
+    "inode": 2,
+    "publicInstanceAddressChecked": true,
+    "allocationOwnershipChecked": true,
+    "checks": 1
+  },
+  "target": {
+    "path": "/offline/inert-target",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "device": 1,
+    "inode": 3
+  },
+  "output": {
+    "path": "/offline/private-output",
+    "device": 1,
+    "inode": 4
+  },
+  "observer": {
+    "fdOpened": 4,
+    "fdCloseAttempts": 1,
+    "fdClosed": 1,
+    "heldFds": 3,
+    "cleanupErrno": 0,
+    "ioErrno": 0,
+    "preallocatedMapsBytes": 2097152,
+    "preallocatedRuntimeBytes": 2114000,
+    "retainedOwnershipProbeBytes": 1
+  },
+  "cut": {
+    "gaugeDartUs": 0,
+    "enterNs": 0,
+    "ackEndNs": 0,
+    "exitNs": 0,
+    "beforeBytes": 0,
+    "afterBytes": 0,
+    "beforeComplete": false,
+    "afterComplete": false,
+    "receiptPublished": false,
+    "ackAccepted": false
+  },
+  "sample": {
+    "abi": 1,
+    "status": 0,
+    "accepted": 0,
+    "api_calls": 0,
+    "provider_checks": 0,
+    "output_opened": 0,
+    "output_close_attempts": 0,
+    "output_closed": 0,
+    "cleanup_errno": 0,
+    "io_errno": 0,
+    "published": 0,
+    "api_returned": 0,
+    "hook_start_ns": 0,
+    "api_start_ns": 0,
+    "api_end_ns": 0,
+    "api_elapsed_ns": 0,
+    "hook_end_ns": 0,
+    "returned_bytes": 0,
+    "returned_capacity_bytes": 0,
+    "written_bytes": 0
+  }
+}

@@ -1,0 +1,158 @@
+name: Official sampled contract and single q0 feasibility
+
+on:
+  push:
+    branches: [codex/sampled-q0-feasibility-9d4]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gperftools-sampled-q0-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  LIBGL_ALWAYS_SOFTWARE: '1'
+  ABC_PERF_COMMIT: ${{ github.sha }}
+  TERRA_PERF_RUNNER: ubuntu-24.04-xvfb
+  GPERFTOOLS_VERSION: 2.15-3build1
+
+jobs:
+  single-sampled-q0:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/sampled-q0-feasibility-9d4' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Independent fixed shipping tree
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          path: build/memory-owner-base
+          persist-credentials: false
+      - name: Independent reviewed original diagnostic tree
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 5a161bf1215361e56358ed6476dbf97a69e53803
+          path: build/memory-owner-inherited
+          persist-credentials: false
+      - name: Independent frozen full-profiler diagnostic parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 2b6397da3279926d91280d9a32f4b19d3488f349
+          fetch-depth: 2
+          path: build/sampled-parent
+          persist-credentials: false
+      - name: Verify unchanged product, original workload and additive sampled overlay
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          mkdir -p build/gperftools-application-evidence
+          (cd build/memory-owner-base && python3 tool/verify_authorized_sources.py) > build/gperftools-application-evidence/shipping-verifier.log 2>&1
+          python3 tool/perf/gperftools_sampled/sampled_source.py --parent-root build/sampled-parent --base-root build/memory-owner-base --inherited-root build/memory-owner-inherited --output build/gperftools-application-evidence/source-proof.json
+      - name: Resolve exact official packages and ordinary Linux build dependencies
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::http::AllowRedirect=false -o Acquire::https::AllowRedirect=false -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowWeakRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false update 2>&1 | tee build/gperftools-application-evidence/apt-update.log
+          sudo apt-get -o Acquire::http::AllowRedirect=false -o Acquire::https::AllowRedirect=false -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowWeakRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false install -y --no-install-recommends "libgoogle-perftools4t64=$GPERFTOOLS_VERSION" "libgoogle-perftools-dev=$GPERFTOOLS_VERSION" "google-perftools=$GPERFTOOLS_VERSION" build-essential binutils gzip zstd clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev zlib1g-dev xvfb mesa-utils 2>&1 | tee build/gperftools-application-evidence/apt-install.log
+          mkdir -p build/gperftools-packages
+          (cd build/gperftools-packages && apt-get -o Acquire::http::AllowRedirect=false -o Acquire::https::AllowRedirect=false -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowWeakRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false download "libgoogle-perftools4t64=$GPERFTOOLS_VERSION" "libgoogle-perftools-dev=$GPERFTOOLS_VERSION" "google-perftools=$GPERFTOOLS_VERSION") 2>&1 | tee build/gperftools-application-evidence/apt-download.log
+      - name: Offline parser, native ABI, launcher and application failure contracts
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tool/perf/gperftools_sampled -p 'test_*.py' -v 2>&1 | tee build/gperftools-application-evidence/sampled-offline-contracts.log
+          python3 tool/perf/gperftools_application/test_dart_source_contract.py 2>&1 | tee build/gperftools-application-evidence/harness-contracts.log
+          python3 -m unittest discover -s tool/perf/gperftools_preflight -p 'test_*.py' -v 2>&1 | tee build/gperftools-application-evidence/package-contracts.log
+          python3 -m unittest discover -s tool/perf/gperftools_application_contracts -p 'test_*.py' -v 2>&1 | tee build/gperftools-application-evidence/capture-contracts.log
+          python3 -m unittest discover -s tool/perf/gperftools_application -p 'test_runner_*.py' -v 2>&1 | tee build/gperftools-application-evidence/runner-contracts.log
+      - name: Verify unchanged official package identity without a synthetic capture
+        timeout-minutes: 12
+        run: python3 tool/perf/gperftools_application/official_package_gate.py --output build/gperftools-official-package --deb-dir build/gperftools-packages --apt-download-log build/gperftools-application-evidence/apt-download.log
+      - uses: ./.github/actions/setup-flutter
+      - name: Resolve original lockfile and inspect Dart without changing sealed sources
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          flutter pub get --enforce-lockfile
+          dart format --output=show integration_test/computer_memory_sampled_q0_test.dart integration_test/support/memory_sampled_q0_probe.dart > build/gperftools-application-evidence/official-format.txt
+          flutter analyze --no-pub 2>&1 | tee build/gperftools-application-evidence/flutter-analyze.log
+      - name: Original native OFF equivalence and isolated libc helper
+        timeout-minutes: 8
+        run: python3 tool/perf/memory_ownership_native_contracts.py prepare --base-root build/memory-owner-base --output build/gperftools-application-evidence/native
+      - name: Capture renderer without fetching a WLD
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          mkdir -p build/gperftools-application-tmp
+          echo "TMPDIR=$PWD/build/gperftools-application-tmp" >> "$GITHUB_ENV"
+          xvfb-run -a -s '-screen 0 1440x1000x24' glxinfo -B > build/gperftools-application-evidence/glxinfo.txt
+          renderer="$(sed -n 's/^OpenGL renderer string: //p' build/gperftools-application-evidence/glxinfo.txt)"
+          test -n "$renderer"
+          echo "TERRA_PERF_RENDERER=$renderer" >> "$GITHUB_ENV"
+      - name: Official small contract then at most one original control prefix to q0
+        timeout-minutes: 34
+        run: >-
+          xvfb-run -a -s '-screen 0 1440x1000x24'
+          python3 tool/perf/gperftools_sampled/run_sampled_q0.py build/gperftools-sampled-runs
+          --source-proof build/gperftools-application-evidence/source-proof.json
+          --package-proof build/gperftools-official-package/manifest.json
+          --helper "$RUNNER_TEMP/memory-owner-helper/libabc_native_owner_libc.so"
+          --helper-build "$RUNNER_TEMP/memory-owner-helper/helper-build.json"
+      - name: Preserve sampled status and provenance
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sampled-q0-summary-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            build/gperftools-application-evidence/*.json
+            build/gperftools-official-package/manifest.json
+            build/gperftools-sampled-runs/*.json
+            build/gperftools-sampled-runs/evidence/*.json
+            build/gperftools-sampled-runs/probe-only/*.json
+            build/gperftools-sampled-runs/probe-only/driver-command/command.json
+      - name: Preserve full bounded raw captures and command logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sampled-q0-raw-${{ github.sha }}
+          if-no-files-found: ignore
+          retention-days: 30
+          path: |
+            build/gperftools-application-evidence/*.log
+            build/gperftools-application-evidence/official-format.txt
+            build/gperftools-sampled-runs/small-captures/**
+            build/gperftools-sampled-runs/evidence/commands/**
+            build/gperftools-sampled-runs/evidence/loaded-probe/**
+            build/gperftools-sampled-runs/evidence/modules/**
+            build/gperftools-sampled-runs/evidence/*.raw
+            build/gperftools-sampled-runs/probe-only/raw/**
+            build/gperftools-sampled-runs/probe-only/driver-command/**
+            build/gperftools-sampled-runs/probe-only/q0.sample.*
+            build/gperftools-sampled-runs/probe-only/launch.once
+      - name: Preserve exact diagnostic code and built identities
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sampled-q0-code-${{ github.sha }}
+          if-no-files-found: ignore
+          retention-days: 30
+          path: |
+            tool/perf/gperftools_sampled/**
+            integration_test/computer_memory_sampled_q0_test.dart
+            integration_test/support/memory_sampled_q0_probe.dart
+            build/gperftools-sampled-runs/evidence/*config.h
+            build/gperftools-sampled-runs/evidence/official-headers/**
+            build/gperftools-sampled-runs/evidence/official-small-contract
+            build/gperftools-sampled-runs/evidence/libabc_sample_runtime.so
+            build/gperftools-sampled-runs/evidence/sampled-target-launcher
+            build/gperftools-sampled-runs/probe-only/code/**

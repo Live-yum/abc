@@ -1,0 +1,141 @@
+{
+  "addedFiles": {
+    ".github/workflows/gperftools-sampled-q0.yml": {
+      "bytes": 9773,
+      "sha256": "6fcacf0e7bdb112ce8b3a2242349da6f1ad56c1aec424032b918ea9096b40eea"
+    },
+    "integration_test/computer_memory_sampled_q0_test.dart": {
+      "bytes": 22521,
+      "sha256": "c105e4bde34a0a9dc640af0d993d979b8ea0fa5db169b313febc35ead5dc8a60"
+    },
+    "integration_test/support/memory_sampled_q0_probe.dart": {
+      "bytes": 12335,
+      "sha256": "725acfcbab27a400c10bdbe04c6d0694de0143d4e1528c0476ce99e880d602f7"
+    },
+    "tool/perf/gperftools_sampled/SAMPLED_NATIVE_RUNTIME.md": {
+      "bytes": 7383,
+      "sha256": "82ca563fa803ca309b92d490521cc1ab29fad60d367c4b88c61b289861318832"
+    },
+    "tool/perf/gperftools_sampled/native_identity.h": {
+      "bytes": 5283,
+      "sha256": "0243b60076724638b6dedd4fdcb23cf95a085968cc36cd69e26aff4bee469150"
+    },
+    "tool/perf/gperftools_sampled/native_runtime_stub_faults.cc": {
+      "bytes": 536,
+      "sha256": "74c8b3970917c655013330e1b4b0d33a0db177ec9b976f03a5700f28049b5cca"
+    },
+    "tool/perf/gperftools_sampled/native_runtime_stub_provider.cc": {
+      "bytes": 1575,
+      "sha256": "5809ff82cdcbd1fd951f4f231496c031919d8997ff9dc5af5475e9491cc4ea3d"
+    },
+    "tool/perf/gperftools_sampled/native_runtime_stub_target.cc": {
+      "bytes": 1941,
+      "sha256": "27a59bd596e23c401046d2b7369a774126236acf488997733a18f205a274dae6"
+    },
+    "tool/perf/gperftools_sampled/native_wrapper_stub_test.cc": {
+      "bytes": 7945,
+      "sha256": "877717ac46e0539ada4b32e46433513f9033b1d019b8bd4bcc45efc2e9c95a3d"
+    },
+    "tool/perf/gperftools_sampled/run_sampled_q0.py": {
+      "bytes": 30841,
+      "sha256": "6b37621c24fdbfcbd4af36ab2d9b4c210c130d5c743163c9db905c252c18677c"
+    },
+    "tool/perf/gperftools_sampled/sample_runtime.cc": {
+      "bytes": 21751,
+      "sha256": "ce0090a6297171940f925f0b10eb9c7a1d787aa79467b32bc85ce01375e45a3a"
+    },
+    "tool/perf/gperftools_sampled/sample_runtime.h": {
+      "bytes": 1667,
+      "sha256": "09a1da94d7d5ac0a5337b8a14d7785bcab13794ed7db44df2202958755105511"
+    },
+    "tool/perf/gperftools_sampled/sample_runtime_metadata.example.json": {
+      "bytes": 1951,
+      "sha256": "648837da3f98f27ede9cc69324341d46cf8f0fcdfdfc3c653b2215a1dddde700"
+    },
+    "tool/perf/gperftools_sampled/sample_runtime_metadata.startup.example.json": {
+      "bytes": 1886,
+      "sha256": "0677c0e48a8603b2bd949ad8dd1708c366db6fa76a00b528b2d18bb8efbc3ee9"
+    },
+    "tool/perf/gperftools_sampled/sample_wrapper.cc": {
+      "bytes": 9237,
+      "sha256": "6064eb1e6fc2ee530f9ac7b1e878640d90a0d01bd498cbb80d5e6c6b189bb578"
+    },
+    "tool/perf/gperftools_sampled/sample_wrapper.h": {
+      "bytes": 3902,
+      "sha256": "459f2cd2aa0f94ff71df55b3c78d0076e50d4446799044db929d9fafb53397ff"
+    },
+    "tool/perf/gperftools_sampled/sampled_contract.py": {
+      "bytes": 6658,
+      "sha256": "04acaa9afa77ae71211160b645e2f5cd803909c98648246aa5dfe416ece6014a"
+    },
+    "tool/perf/gperftools_sampled/sampled_pprof.py": {
+      "bytes": 3715,
+      "sha256": "887cbc200a2f341e70f52862ac074e406b02972f90e59368227055a0e2dcc79f"
+    },
+    "tool/perf/gperftools_sampled/sampled_seal_config.py": {
+      "bytes": 4751,
+      "sha256": "d2b004827ca63a0aaa79c11afda1040e61ef8cff4033efd62a6ba0a0c66c2a17"
+    },
+    "tool/perf/gperftools_sampled/sampled_source.py": {
+      "bytes": 7477,
+      "sha256": "32352fa5d87853b915ddb1d88b6cca9e1b83b408796df9dc093c727baf226baf"
+    },
+    "tool/perf/gperftools_sampled/sampled_supervision.py": {
+      "bytes": 38788,
+      "sha256": "e3536c1c7e99976d816187cb56d16ce0c2c4009e21aa6e098201ba5a2c68dc47"
+    },
+    "tool/perf/gperftools_sampled/sampled_target_launcher.c": {
+      "bytes": 4805,
+      "sha256": "de38fb10853f3b32033fb765a95b1c0872674719cd0a9c82714403babc8881da"
+    },
+    "tool/perf/gperftools_sampled/small_contract_stub_test.cc": {
+      "bytes": 9040,
+      "sha256": "7c8c10bc35268f316cab541d7774471fe2042347da3e5556865d430e9bae546b"
+    },
+    "tool/perf/gperftools_sampled/small_sample_contract.cc": {
+      "bytes": 7728,
+      "sha256": "efb70a66d95572dd12e9ce647428ad6f809da8ea42e0962758bc3ff398365c3e"
+    },
+    "tool/perf/gperftools_sampled/small_target_exec.py": {
+      "bytes": 4659,
+      "sha256": "8af54691f5d201d055b9ef94a231997838b583b176b743cadb99b367e04f32b0"
+    },
+    "tool/perf/gperftools_sampled/test_native_wrapper.py": {
+      "bytes": 14323,
+      "sha256": "38362ecb7014ee5d0f84515cb7039b3e81fb2d50660121b9adfba8178558cc6f"
+    },
+    "tool/perf/gperftools_sampled/test_sample_runtime.py": {
+      "bytes": 12622,
+      "sha256": "c504cba761dd890203d72d8a42ba71e8348e924023f81b1833345bf1492b0fc8"
+    },
+    "tool/perf/gperftools_sampled/test_sampled_contract.py": {
+      "bytes": 8230,
+      "sha256": "060069508de03ba52839d00e3a78b9f6f6553c20a7a7a84894d29c7d5e279206"
+    },
+    "tool/perf/gperftools_sampled/test_sampled_dart_source.py": {
+      "bytes": 14387,
+      "sha256": "b87a7cf2acb30d0bc2421461056d947c5179a67a53c8301a0a961d7706b57b81"
+    },
+    "tool/perf/gperftools_sampled/test_sampled_runner.py": {
+      "bytes": 15299,
+      "sha256": "de199a17fedd3c49f665a65dcc68bccadc4d345afd0bc1d27b57fc8b6f68b0e4"
+    },
+    "tool/perf/gperftools_sampled/test_sampled_supervision.py": {
+      "bytes": 23101,
+      "sha256": "c5d7c640cb3900eb741db3b96dfac6191233b3bff9631a6afc428312fc118b9a"
+    },
+    "tool/perf/gperftools_sampled/test_sampled_transport_integration.py": {
+      "bytes": 1468,
+      "sha256": "cc3a42dfd0387a1423e14aea657c3626fc95e434b9ec609b22d494ec10ae883b"
+    },
+    "tool/perf/gperftools_sampled/test_small_sample_contract.py": {
+      "bytes": 15024,
+      "sha256": "eb4a75d6193ae41dd9656f444ac589352982ffb4b698da2f87ad3b9e4bec88c9"
+    }
+  },
+  "branch": "refs/heads/codex/sampled-q0-feasibility-9d4",
+  "parentCommit": "2b6397da3279926d91280d9a32f4b19d3488f349",
+  "parentTree": "01b1dadab0cde210d61c560c4137b4a942a09f1d",
+  "schema": "abc.sampled-source-manifest.v1",
+  "selfHashPolicy": "Self omitted from addedFiles; Git blob and independently enumerated current tree bind manifest bytes."
+}
