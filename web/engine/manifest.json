@@ -6,7 +6,7 @@
     "persistent-allocation-lifetime",
     "native-zlib-bridge",
     "abc-host-integration",
-    "full-world-pixels-v7-timer-fifo-order"
+    "full-world-pixels-v8-viewport-source-cache"
   ],
   "artifacts": {
     "world.js": {
@@ -14,8 +14,8 @@
       "sha256": "50bb9a182ac1c596d5c67b84ced4d77c69a29d6bf41a4346807d46920962b47d"
     },
     "world.wasm": {
-      "bytes": 414898,
-      "sha256": "6ad549936e141495fc02b79a456d844edf5783442fc4766cda4db8e004107405"
+      "bytes": 416015,
+      "sha256": "6c6590fece42d857e1d37c8b8a1f324a0bc58d1e54dfee6bc4450d140eb50bda"
     },
     "player.js": {
       "bytes": 64516,
@@ -26,5 +26,5 @@
       "sha256": "0ffbcb5a3a9c075f34751ee51fa23762cce369f3500f98ae710f8d756130461b"
     }
   },
-  "sourceManifestSha256": "d8102b109c9e0f77c7ec75ac118cefaded33a10f726038d9722c03a2ad9aaffa"
+  "sourceManifestSha256": "8fe9e685b4e49e344ffcb12b3483bff7570db313511647f082bd471c74fb5d5a"
 }

@@ -12,6 +12,8 @@
 #define CX_CHECK_COLUMNS 64u
 #define CX_CACHE_PAGES 64u
 #define CX_NONE UINT32_MAX
+#define CX_VIEWPORT_CELLS 4096u
+#define CX_READ_VIEWPORT_PROBE 2u
 enum CxPhase {
     CX_TOPOLOGY=1, CX_ROOTS, CX_NUMBER, CX_REMAP, CX_MAP_SIZE, CX_MAP_ENCODE,
     CX_COUNT, CX_LAYOUT, CX_ZERO, CX_WRITE, CX_FLUSH, CX_INTERN, CX_IDLE,
@@ -45,6 +47,8 @@ typedef struct CxPixel { uint32_t x,y,h[4],v[4],cell_word; uint8_t state,initial
 typedef struct CxPort { uint32_t net,pixel; uint8_t axis,colour; uint16_t reserved; } CxPort;
 typedef struct CxFragments CxFragments;
 typedef struct CxTimerOrder CxTimerOrder;
+/* Original source values only. Live circuit state is projected at every read. */
+typedef struct CxViewportCell { TxTile tile; uint32_t gate,nets[4]; } CxViewportCell;
 typedef struct CxWorld {
     uint32_t id, world_handle, maximum, bytes, peak, phase, error;
     TxWorld* world;
@@ -98,6 +102,9 @@ typedef struct CxWorld {
     CxInputPoint* points; uint32_t point_count,point_index;
     uint32_t* result; uint32_t result_count,result_capacity;
     uint32_t query_x0,query_x1,query_y0,query_y1,query_stride,query_point;
+    CxViewportCell* viewport_cells;
+    uint32_t viewport_x,viewport_y,viewport_width,viewport_height,viewport_stride;
+    uint32_t viewport_count,viewport_valid,viewport_pinned,viewport_building,viewport_hit,viewport_probe;
     uint32_t* trigger_nets; uint32_t trigger_count,trigger_capacity,trigger_remaining;
     uint32_t seed_lamps;
     uint32_t eval_group,eval_offset,eval_member,eval_gate,eval_valid;
@@ -115,6 +122,10 @@ typedef struct CxWorld {
 
 void* cx_alloc(CxWorld*,uint32_t);
 void* cx_optional_alloc(CxWorld*,uint32_t);
+int cx_viewport_cache_reclaim(CxWorld*);
+void cx_viewport_cache_cancel(CxWorld*);
+/* Private owner reclamation; no change to TerraVmCallbacks or public exports. */
+void cx_vm_set_reclaim(TerraCircuitVm*,int (*)(void*),void*);
 void cx_timer_order_prepare(CxWorld*);
 void cx_timer_order_cell(CxWorld*,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
 void cx_timer_order_gates(CxWorld*);

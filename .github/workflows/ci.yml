@@ -64,6 +64,32 @@ jobs:
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           ABC_WEB_OUTPUT="$PWD/web/engine" bash tool/build_web_engine.sh
+      - name: Check out the frozen uncached viewport reference
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: b3f2b22312d1369681fc9110a6957e57999a4e94
+          path: build/viewport-cache-reference
+          persist-credentials: false
+      - name: Actual WASM viewport cache differential against frozen b3
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/viewport-cache-reference"
+          test "$(git -C "$reference" rev-parse HEAD)" = b3f2b22312d1369681fc9110a6957e57999a4e94
+          test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          ABC_WEB_OUTPUT="$PWD/build/viewport-cache-reference-web" \
+            ABC_WEB_BUILD_ROOT="$PWD/build/viewport-cache-reference-wasm-build" \
+            bash "$reference/tool/build_web_engine.sh" \
+            2>&1 | tee build/viewport-cache-reference-web-build.log
+          python3 tool/export_viewport_cache_fixture.py build/viewport-cache-fixtures
+          node test/web/world_circuit_viewport_cache_actual.cjs \
+            "$PWD/build/viewport-cache-reference-web/world.js" \
+            "$PWD/build/viewport-cache-reference-web/world.wasm" \
+            "$PWD/web/engine/world.js" "$PWD/web/engine/world.wasm" \
+            "$PWD/build/viewport-cache-fixtures" "$PWD/build/viewport-cache-actual-wasm.json" \
+            2>&1 | tee build/viewport-cache-actual-wasm.log
+          node test/web/world_circuit_viewport_probe_contract.cjs \
+            2>&1 | tee build/viewport-cache-web-host-probe.log
       - name: Real Web engine contracts with synthetic fixtures
         run: |
           mkdir -p build
@@ -123,6 +149,29 @@ jobs:
           name: terraforge-web-${{ github.event.pull_request.head.sha || github.sha }}
           path: build/terraforge-web.tar.gz
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify and remove only the temporary viewport reference checkout
+        if: always()
+        run: |
+          set -euo pipefail
+          if test -d build/viewport-cache-reference/.git; then
+            test "$(git -C build/viewport-cache-reference rev-parse HEAD)" = b3f2b22312d1369681fc9110a6957e57999a4e94
+            test -z "$(git -C build/viewport-cache-reference status --porcelain --untracked-files=normal)"
+            rm -rf -- build/viewport-cache-reference
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: viewport-cache-web-contracts-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/viewport-cache-actual-wasm.json
+            build/viewport-cache-actual-wasm.log
+            build/viewport-cache-web-host-probe.log
+            build/viewport-cache-reference-web-build.log
+            build/viewport-cache-reference-web/manifest.json
+            build/viewport-cache-fixtures/manifest.json
+          if-no-files-found: warn
           retention-days: 14
 
   native-contract:
@@ -185,6 +234,47 @@ jobs:
           quickjs="$PUB_CACHE/hosted/pub.dev/flutter_js-0.8.7/linux/shared/libquickjs_c_bridge_plugin.so"
           test -f "$quickjs"
           echo "LIBQUICKJSC_TEST_PATH=$quickjs" >> "$GITHUB_ENV"
+      - name: Check out the frozen uncached viewport reference
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: b3f2b22312d1369681fc9110a6957e57999a4e94
+          path: build/viewport-cache-reference
+          persist-credentials: false
+      - name: Native viewport cache differential and actual host source guards
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/viewport-cache-reference"
+          test "$(git -C "$reference" rev-parse HEAD)" = b3f2b22312d1369681fc9110a6957e57999a4e94
+          test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+          cmake -S "$reference/native" -B build/viewport-cache-reference-native \
+            -DCMAKE_BUILD_TYPE=Release -DABC_PERF_COUNTERS=OFF \
+            2>&1 | tee build/viewport-cache-reference-native-configure.log
+          cmake --build build/viewport-cache-reference-native --parallel 2 \
+            2>&1 | tee build/viewport-cache-reference-native-build.log
+          python3 tool/test_viewport_cache.py \
+            "$PWD/build/viewport-cache-reference-native/libabc_engine.so" \
+            "$PWD/build/native-release/libabc_engine.so" \
+            --output build/viewport-cache-native-semantics.json \
+            2>&1 | tee build/viewport-cache-native-semantics.log
+          python3 tool/export_viewport_cache_fixture.py build/viewport-cache-fixtures
+          TERRAFORGE_ENGINE_LIBRARY="$PWD/build/native-release/libabc_engine.so" \
+            ABC_VIEWPORT_CACHE_FIXTURE="$PWD/build/viewport-cache-fixtures/original.wld" \
+            ABC_EXPECT_VIEWPORT_CACHE=1 flutter test --no-pub \
+            test/native_viewport_cache_source_guard_test.dart \
+            2>&1 | tee build/viewport-cache-native-source-guard.log
+      - name: Viewport cache allocation and reclamation under ASan and UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -euo pipefail
+          cc -std=c17 -g -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/vendor/TerraWasm/include -I native/vendor/TerraWasm/src \
+            native/circuit_viewport_cache_contract.c build/native/terra/libterrax_world_static.a \
+            -Wl,--wrap=tx_persistent_alloc,--wrap=tx_persistent_free -lm -lz \
+            -o build/viewport-cache-memory-contract
+          build/viewport-cache-memory-contract \
+            2>&1 | tee build/viewport-cache-memory-contract.log
       - name: Native sparse lamp checkpoints, cancellation and source paths
         run: >-
           python3 tool/test_sparse_lamp_queries.py
@@ -208,6 +298,30 @@ jobs:
             native/circuit_rules_runtime_smoke_test.dart \
             native/circuit_rules_bundle_test.dart \
             native/circuit_rules_corpus_test.dart
+
+      - name: Verify and remove only the temporary viewport reference checkout
+        if: always()
+        run: |
+          set -euo pipefail
+          if test -d build/viewport-cache-reference/.git; then
+            test "$(git -C build/viewport-cache-reference rev-parse HEAD)" = b3f2b22312d1369681fc9110a6957e57999a4e94
+            test -z "$(git -C build/viewport-cache-reference status --porcelain --untracked-files=normal)"
+            rm -rf -- build/viewport-cache-reference
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: viewport-cache-native-contracts-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/viewport-cache-native-semantics.json
+            build/viewport-cache-native-semantics.log
+            build/viewport-cache-native-source-guard.log
+            build/viewport-cache-memory-contract.log
+            build/viewport-cache-reference-native-configure.log
+            build/viewport-cache-reference-native-build.log
+            build/viewport-cache-fixtures/manifest.json
+          if-no-files-found: warn
+          retention-days: 14
 
   android:
     name: Android unsigned release build

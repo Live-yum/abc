@@ -50,20 +50,33 @@ struct TerraCircuitVm {
     TerraVmGateRef trip_gate;
     TerraVmStats counters;
     int32_t allocation_error;
+    int (*owner_reclaim)(void*);
+    void* owner_reclaim_context;
+    uint32_t reclaiming;
 };
 
+/* Private registration, intentionally absent from the public VM callback ABI. */
+void cx_vm_set_reclaim(TerraCircuitVm* vm,int (*reclaim)(void*),void* context){
+    if(!vm)return;vm->owner_reclaim=reclaim;vm->owner_reclaim_context=context;
+}
+static int vm_reclaim(TerraCircuitVm* vm){
+    if(!vm->owner_reclaim||vm->reclaiming)return 0;
+    vm->reclaiming=1;int freed=vm->owner_reclaim(vm->owner_reclaim_context);vm->reclaiming=0;return freed;
+}
 static void* vm_allocate(TerraCircuitVm* vm, uint32_t bytes) {
     uint64_t requested = (uint64_t)bytes + sizeof(VmAllocation);
     uint64_t charged = requested + VM_ALLOC_OVERHEAD;
-    if (requested > UINT32_MAX || vm->allocated > vm->maximum ||
-        charged > (uint64_t)vm->maximum - vm->allocated) {
-        vm->allocation_error = TERRA_VM_LIMIT;
-        return NULL;
-    }
-    VmAllocation* block = (VmAllocation*)tx_persistent_alloc((uint32_t)requested);
-    if (!block) {
-        vm->allocation_error = TERRA_VM_OOM;
-        return NULL;
+    if(requested>UINT32_MAX||charged>UINT32_MAX){vm->allocation_error=TERRA_VM_LIMIT;return NULL;}
+    VmAllocation* block=NULL;
+    for(uint32_t attempt=0;attempt<2u;attempt++){
+        if(vm->allocated>vm->maximum||charged>(uint64_t)vm->maximum-vm->allocated){
+            if(!attempt&&vm_reclaim(vm))continue;
+            vm->allocation_error=TERRA_VM_LIMIT;return NULL;
+        }
+        block=(VmAllocation*)tx_persistent_alloc((uint32_t)requested);
+        if(block)break;
+        if(!attempt&&vm_reclaim(vm))continue;
+        vm->allocation_error=TERRA_VM_OOM;return NULL;
     }
     block->value.charged = (uint32_t)charged;
     vm->allocated += (uint32_t)charged;

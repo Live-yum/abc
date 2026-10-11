@@ -39,10 +39,30 @@ static int reserve_result(CxWorld* w,uint32_t count){
     uint32_t* p=(uint32_t*)cx_alloc(w,(count?count:1u)*16u);if(!p)return TCW_MEMORY;cx_free(w,w->result);w->result=p;w->result_capacity=count;return TCW_OK;
 }
 #include "terra_circuit_fragments.inc"
+static void viewport_begin(CxWorld* w){
+    const TerraCircuitWorldCommand* cmd=&w->command;
+    /* Admission counts the whole rectangle, including unsampled coordinates. */
+    if((uint64_t)cmd->width*cmd->height>CX_VIEWPORT_CELLS)return;
+    if(w->viewport_valid&&w->viewport_x==cmd->x&&w->viewport_y==cmd->y&&
+       w->viewport_width==cmd->width&&w->viewport_height==cmd->height&&w->viewport_stride==w->query_stride){
+        w->viewport_hit=w->viewport_pinned=1;
+        w->viewport_probe=w->world_source?1u:0u;return;
+    }
+    w->viewport_valid=w->viewport_count=0;
+    if(!w->viewport_cells)w->viewport_cells=(CxViewportCell*)cx_optional_alloc(w,CX_VIEWPORT_CELLS*sizeof(CxViewportCell));
+    if(!w->viewport_cells)return;
+    w->viewport_x=cmd->x;w->viewport_y=cmd->y;w->viewport_width=cmd->width;
+    w->viewport_height=cmd->height;w->viewport_stride=w->query_stride;
+    w->viewport_building=w->viewport_pinned=1;
+}
 int cx_query_begin(CxWorld* w){
     w->point_index=0;w->query_point=0;w->result_count=0;w->trigger_count=0;
+    w->viewport_building=w->viewport_hit=w->viewport_probe=w->viewport_pinned=0;
     if(w->command.kind==TCW_VIEWPORT){w->query_x0=w->command.x;w->query_x1=w->command.x+w->command.width;w->query_y0=w->command.y;w->query_y1=w->command.y+w->command.height;w->query_stride=w->command.stride?w->command.stride:1u;
         uint64_t count=((uint64_t)w->command.width+w->query_stride-1u)/w->query_stride*(((uint64_t)w->command.height+w->query_stride-1u)/w->query_stride);if(count>65536u)return TCW_INVALID;int s=reserve_result(w,(uint32_t)count);if(s)return s;
+        /* Required storage is reserved before any cache entry can be borrowed. */
+        viewport_begin(w);
+        if(w->viewport_hit){w->x=w->query_x0;w->phase=CX_QUERY;return TCW_OK;}
     }else{
         if(!w->point_count)return cx_command_complete(w);
         w->query_x0=w->points[0].x;w->query_x1=w->points[w->point_count-1u].x+1u;w->query_y0=0;w->query_y1=w->height;w->query_stride=1;
@@ -52,13 +72,41 @@ int cx_query_begin(CxWorld* w){
     }
     seek_checkpoint(w,w->query_x0);w->phase=CX_QUERY;return TCW_OK;
 }
-static void pack_cell(CxWorld* w,uint32_t x,uint32_t y,uint32_t* out){
-    if(w->command.flags&2u){const TxTile* t=w->column+y;uint32_t flags=(t->wall?1u:0u)|32u|(t->invisible_wall?64u:0u)|(t->fullbright_wall?128u:0u);out[0]=x;out[1]=y;out[2]=t->wall|(flags<<16);out[3]=t->wall_color;return;}
-    TxTile t=w->column[y];uint32_t gate=point_gate(w,y);cx_current_tile(w,x,y,gate,&t,w->ids+y*4u);
+static void pack_tile(CxWorld* w,uint32_t x,uint32_t y,const TxTile* original,uint32_t gate,const uint32_t* nets,uint32_t* out){
+    if(w->command.flags&2u){const TxTile* t=original;uint32_t flags=(t->wall?1u:0u)|32u|(t->invisible_wall?64u:0u)|(t->fullbright_wall?128u:0u);out[0]=x;out[1]=y;out[2]=t->wall|(flags<<16);out[3]=t->wall_color;return;}
+    TxTile t=*original;cx_current_tile(w,x,y,gate,&t,nets);
     uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);
     out[0]=x;out[1]=y;out[2]=t.type|(flags<<16)|(cx_wire_mask(&t)<<24);out[3]=(uint16_t)t.frame_x|((uint32_t)(uint16_t)t.frame_y<<16);
 }
+static void pack_cell(CxWorld* w,uint32_t x,uint32_t y,uint32_t* out){
+    uint32_t gate=(w->viewport_building||!(w->command.flags&2u))?point_gate(w,y):0;
+    if(w->viewport_building){
+        CxViewportCell* cell=w->viewport_cells+w->viewport_count++;
+        cell->tile=w->column[y];cell->gate=gate;memcpy(cell->nets,w->ids+y*4u,sizeof(cell->nets));
+    }
+    pack_tile(w,x,y,w->column+y,gate,w->ids+y*4u,out);
+}
+static int viewport_step(CxWorld* w,uint32_t* work){
+    if(w->viewport_probe==1u){
+        /* Preserve the host's immutable-source checks even on a warm query.
+         * Supply consumes this validation probe without changing scan state. */
+        w->viewport_probe=2;w->read_target=CX_READ_VIEWPORT_PROBE;--*work;
+        return cx_emit(w,TCW_READ,w->world_source,w->tile_start,1u,NULL);
+    }
+    if(w->viewport_probe)return TCW_STATE;
+    uint32_t rows=(w->viewport_height-1u)/w->query_stride+1u;
+    while(*work&&w->query_point<w->viewport_count){
+        uint32_t i=w->query_point,x=w->query_x0+(i/rows)*w->query_stride,y=w->query_y0+(i%rows)*w->query_stride;
+        const CxViewportCell* cell=w->viewport_cells+i;
+        pack_tile(w,x,y,&cell->tile,cell->gate,cell->nets,w->result+w->result_count*4u);
+        ++w->query_point;++w->result_count;--*work;w->x=x;
+    }
+    if(w->query_point<w->viewport_count)return TCW_CONTINUE;
+    w->x=w->query_x1;w->viewport_hit=w->viewport_pinned=0;
+    return cx_command_complete(w);
+}
 int cx_query_step(CxWorld* w,uint32_t* work){
+    if(w->viewport_hit)return viewport_step(w,work);
     while(*work&&w->x<w->query_x1){
         /* READ_LAMPS needs only requested columns. Resume from the next
          * checkpoint only at a completed-column boundary, never while a
@@ -84,7 +132,12 @@ int cx_query_step(CxWorld* w,uint32_t* work){
         }
         ++w->x;w->y=0;w->col_stage=0;w->emit_y=0;
     }
-    if(w->x<w->query_x1)return TCW_CONTINUE;return cx_command_complete(w);
+    if(w->x<w->query_x1)return TCW_CONTINUE;
+    if(w->viewport_building){
+        w->viewport_valid=w->viewport_count==w->result_count;
+        w->viewport_building=w->viewport_pinned=0;
+    }
+    return cx_command_complete(w);
 }
 int cx_command_complete(CxWorld* w){
     if(w->command.kind==TCW_VIEWPORT){cx_emit(w,TCW_RESULT,0,0,w->result_count*16u,w->result);w->event.result_kind=TCW_VIEWPORT;w->event.result_count=w->result_count;return TCW_CONTINUE;}
