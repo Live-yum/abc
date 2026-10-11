@@ -115,6 +115,7 @@ void cx_operation_rollback(CxWorld* w){
     else terra_vm_cancel(w->vm);
     w->interaction_pending=0;w->eval_valid=0;
 }
+static int reclaim_viewport(void* context){return cx_viewport_cache_reclaim((CxWorld*)context);}
 int cx_create_vm(CxWorld* w){
     w->general_snapshot=(uint8_t*)cx_alloc(w,w->general_count?w->general_count:1u);if(!w->general_snapshot)return TCW_MEMORY;
     random_seed(w,(int32_t)w->world->worldId);TerraVmCallbacks cb;memset(&cb,0,sizeof(cb));cb.next_candidate=next_candidate;cb.evaluate=evaluate;cb.transaction_begin=transaction_begin;cb.transaction_rollback=transaction_rollback;
@@ -122,6 +123,7 @@ int cx_create_vm(CxWorld* w){
     uint32_t maximum=cx_vm_available(w);if(!maximum&&w->timer_order){cx_timer_order_free(w);maximum=cx_vm_available(w);}if(!maximum)return TCW_MEMORY;
     int s=terra_vm_create(w->networks,maximum,&cb,w,&w->vm);
     if(s<0&&w->timer_order){cx_timer_order_free(w);s=terra_vm_create(w->networks,cx_vm_available(w),&cb,w,&w->vm);}
+    if(s>=0)cx_vm_set_reclaim(w->vm,reclaim_viewport,w);
     return s<0?cx_fail(w,TCW_MEMORY,"native wiring VM does not fit the remaining memory budget"):TCW_OK;
 }
 uint32_t cx_true_lamp(CxWorld* w,const CxBinding* b){

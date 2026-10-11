@@ -468,7 +468,7 @@
 +            uint32_t n=(uint32_t)__builtin_popcount((unsigned)p->hit_h);
 +            p->state^=(uint8_t)((n*(n-1u)/2u)&1u);
 +        }else if(p->hit_h&&p->hit_v)p->state^=1u;
-@@ -81,3 +169,17 @@
+@@ -81,3 +169,18 @@
 -int cx_trip_end(void* context){CxWorld* w=(CxWorld*)context;return w->twld_state?0:pixel_pass(w);}
 -int cx_wave_begin(void* context){(void)context;return 0;}
 -int cx_wave_end(void* context){CxWorld* w=(CxWorld*)context;return w->twld_state?pixel_pass(w):0;}
@@ -482,6 +482,7 @@
 +        return TCW_UNSUPPORTED;
 +    }
 +    if(w->optimization!=enabled){
++        cx_viewport_cache_cancel(w);
 +        cx_timer_order_reset(w);
 +        for(uint32_t i=0;i<w->device_count;i++){w->devices[i].wire_hit_mask=0;w->devices[i].wire_hit_epoch=0;}
 +        for(uint32_t i=0;i<w->pixel_count;i++)w->pixels[i].hit_h=w->pixels[i].hit_v=w->pixels[i].marked=0;
@@ -489,10 +490,10 @@
 +    }
 +    return TCW_OK;
 +}
-@@ -87 +189 @@
+@@ -87 +190 @@
 -    if(type==144u){if(toggle_timer(w,d)<0)return -1;return 0;}
 +    if(type==144u){if(cx_toggle_timer(w,d)<0)return -1;return 0;}
-@@ -114 +216 @@
+@@ -114 +217 @@
 -        if(w->tick_stage==2){int s=terra_vm_step(w->vm,*work);*work=0;if(s<0)return cx_fail(w,TCW_STATE,"timer circuit pulse failed and was rolled back");if(s==TERRA_VM_MORE)return TCW_CONTINUE;w->tick_stage=1;continue;}
 +        if(w->tick_stage==2){int s=terra_vm_step(w->vm,*work);*work=0;if(s<0)return w->error?-(int)w->error:cx_fail(w,TCW_STATE,"timer circuit pulse failed and was rolled back");if(s==TERRA_VM_MORE)return TCW_CONTINUE;w->tick_stage=1;continue;}
 --- a/src/terra_circuit_fragments.inc
@@ -530,11 +531,69 @@
 +    }
 +    const int dx[4]={0,0,1,-1},dy[4]={1,-1,0,0};int r=routing(&b->tile);
 +    for(uint32_t d=0;d<4u;d++){if(r>=0&&d!=(r==1?3u:r==2?2u:0u))continue;int64_t x=(int64_t)b->x+dx[d],y=(int64_t)b->y+dy[d];if(x<0||y<0||!cx_inside_wiring(w,(uint32_t)x,(uint32_t)y))continue;CxBinding* inside=find_binding(w,(uint32_t)x,(uint32_t)y);if(inside)return entering_net(inside,colour,d);}
-@@ -52 +58 @@
--    uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);if(t.type==0xfffeu)flags|=8u;
+@@ -35,0 +42,16 @@
++static void viewport_begin(CxWorld* w){
++    const TerraCircuitWorldCommand* cmd=&w->command;
++    /* Admission counts the whole rectangle, including unsampled coordinates. */
++    if((uint64_t)cmd->width*cmd->height>CX_VIEWPORT_CELLS)return;
++    if(w->viewport_valid&&w->viewport_x==cmd->x&&w->viewport_y==cmd->y&&
++       w->viewport_width==cmd->width&&w->viewport_height==cmd->height&&w->viewport_stride==w->query_stride){
++        w->viewport_hit=w->viewport_pinned=1;
++        w->viewport_probe=w->world_source?1u:0u;return;
++    }
++    w->viewport_valid=w->viewport_count=0;
++    if(!w->viewport_cells)w->viewport_cells=(CxViewportCell*)cx_optional_alloc(w,CX_VIEWPORT_CELLS*sizeof(CxViewportCell));
++    if(!w->viewport_cells)return;
++    w->viewport_x=cmd->x;w->viewport_y=cmd->y;w->viewport_width=cmd->width;
++    w->viewport_height=cmd->height;w->viewport_stride=w->query_stride;
++    w->viewport_building=w->viewport_pinned=1;
++}
+@@ -37,0 +60 @@
++    w->viewport_building=w->viewport_hit=w->viewport_probe=w->viewport_pinned=0;
+@@ -39,0 +63,3 @@
++        /* Required storage is reserved before any cache entry can be borrowed. */
++        viewport_begin(w);
++        if(w->viewport_hit){w->x=w->query_x0;w->phase=CX_QUERY;return TCW_OK;}
+@@ -48,0 +75,6 @@
++static void pack_tile(CxWorld* w,uint32_t x,uint32_t y,const TxTile* original,uint32_t gate,const uint32_t* nets,uint32_t* out){
++    if(w->command.flags&2u){const TxTile* t=original;uint32_t flags=(t->wall?1u:0u)|32u|(t->invisible_wall?64u:0u)|(t->fullbright_wall?128u:0u);out[0]=x;out[1]=y;out[2]=t->wall|(flags<<16);out[3]=t->wall_color;return;}
++    TxTile t=*original;cx_current_tile(w,x,y,gate,&t,nets);
 +    uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);
-@@ -56 +62,14 @@
++    out[0]=x;out[1]=y;out[2]=t.type|(flags<<16)|(cx_wire_mask(&t)<<24);out[3]=(uint16_t)t.frame_x|((uint32_t)(uint16_t)t.frame_y<<16);
++}
+@@ -50,4 +82,25 @@
+-    if(w->command.flags&2u){const TxTile* t=w->column+y;uint32_t flags=(t->wall?1u:0u)|32u|(t->invisible_wall?64u:0u)|(t->fullbright_wall?128u:0u);out[0]=x;out[1]=y;out[2]=t->wall|(flags<<16);out[3]=t->wall_color;return;}
+-    TxTile t=w->column[y];uint32_t gate=point_gate(w,y);cx_current_tile(w,x,y,gate,&t,w->ids+y*4u);
+-    uint32_t flags=t.active|(t.actuator<<1)|(t.inactive<<2)|(t.wall?16u:0u);if(t.type==0xfffeu)flags|=8u;
+-    out[0]=x;out[1]=y;out[2]=t.type|(flags<<16)|(cx_wire_mask(&t)<<24);out[3]=(uint16_t)t.frame_x|((uint32_t)(uint16_t)t.frame_y<<16);
++    uint32_t gate=(w->viewport_building||!(w->command.flags&2u))?point_gate(w,y):0;
++    if(w->viewport_building){
++        CxViewportCell* cell=w->viewport_cells+w->viewport_count++;
++        cell->tile=w->column[y];cell->gate=gate;memcpy(cell->nets,w->ids+y*4u,sizeof(cell->nets));
++    }
++    pack_tile(w,x,y,w->column+y,gate,w->ids+y*4u,out);
++}
++static int viewport_step(CxWorld* w,uint32_t* work){
++    if(w->viewport_probe==1u){
++        /* Preserve the host's immutable-source checks even on a warm query.
++         * Supply consumes this validation probe without changing scan state. */
++        w->viewport_probe=2;w->read_target=CX_READ_VIEWPORT_PROBE;--*work;
++        return cx_emit(w,TCW_READ,w->world_source,w->tile_start,1u,NULL);
++    }
++    if(w->viewport_probe)return TCW_STATE;
++    uint32_t rows=(w->viewport_height-1u)/w->query_stride+1u;
++    while(*work&&w->query_point<w->viewport_count){
++        uint32_t i=w->query_point,x=w->query_x0+(i/rows)*w->query_stride,y=w->query_y0+(i%rows)*w->query_stride;
++        const CxViewportCell* cell=w->viewport_cells+i;
++        pack_tile(w,x,y,&cell->tile,cell->gate,cell->nets,w->result+w->result_count*4u);
++        ++w->query_point;++w->result_count;--*work;w->x=x;
++    }
++    if(w->query_point<w->viewport_count)return TCW_CONTINUE;
++    w->x=w->query_x1;w->viewport_hit=w->viewport_pinned=0;
++    return cx_command_complete(w);
+@@ -56 +109,15 @@
 -    while(*work&&w->x<w->query_x1){int status=cx_scan_step(w,work);if(status<0||w->event.kind)return status;if(status!=2)return TCW_CONTINUE;
++    if(w->viewport_hit)return viewport_step(w,work);
 +    while(*work&&w->x<w->query_x1){
 +        /* READ_LAMPS needs only requested columns. Resume from the next
 +         * checkpoint only at a completed-column boundary, never while a
@@ -549,7 +608,15 @@
 +            }
 +        }
 +        int status=cx_scan_step(w,work);if(status<0||w->event.kind)return status;if(status!=2)return TCW_CONTINUE;
-@@ -101,0 +121,17 @@
+@@ -68 +135,6 @@
+-    if(w->x<w->query_x1)return TCW_CONTINUE;return cx_command_complete(w);
++    if(w->x<w->query_x1)return TCW_CONTINUE;
++    if(w->viewport_building){
++        w->viewport_valid=w->viewport_count==w->result_count;
++        w->viewport_building=w->viewport_pinned=0;
++    }
++    return cx_command_complete(w);
+@@ -101,0 +174,17 @@
 +static int query_pixels(CxWorld* w,const TerraCircuitWorldCommand* cmd){
 +    if(!cmd->width||!cmd->height||cmd->x>=w->width||cmd->y>=w->height||cmd->width>w->width-cmd->x||cmd->height>w->height-cmd->y||(uint64_t)cmd->width*cmd->height>65536u||cmd->data_count||cmd->flags)return TCW_INVALID;
 +    uint32_t lo=0,hi=w->pixel_count;
@@ -567,20 +634,20 @@
 +    }
 +    w->command=*cmd;cx_emit(w,TCW_RESULT,0,0,w->result_count*16u,w->result);w->event.result_kind=TCW_PIXELS;w->event.result_count=w->result_count;return TCW_CONTINUE;
 +}
-@@ -104 +140 @@
+@@ -104 +193 @@
 -    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=1||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_EXTRACT||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
 +    TerraCircuitWorldCommand cmd=*input;if(cmd.abi_version!=TERRA_CIRCUIT_WORLD_ABI||cmd.kind<TCW_VIEWPORT||cmd.kind>TCW_OPTIMIZATION||cmd.reserved1||cmd.reserved2||(cmd.flags&~(cmd.kind==TCW_TRIGGER||cmd.kind==TCW_EXTRACT?1u:cmd.kind==TCW_VIEWPORT?2u:0u)))return TCW_INVALID;
-@@ -106,0 +143,6 @@
+@@ -106,0 +196,6 @@
 +    if(cmd.kind==TCW_OPTIMIZATION){
 +        if(cmd.mask>1u||cmd.data_count||cmd.flags)return TCW_INVALID;
 +        int status=cx_set_optimization(w,cmd.mask);if(status)return status;
 +        w->command=cmd;return TCW_OK;
 +    }
 +    if(cmd.kind==TCW_PIXELS)return query_pixels(w,&cmd);
-@@ -111 +153 @@
+@@ -111 +206 @@
 -    if(cmd.kind==TCW_SAVE){if(!cmd.source_id||cmd.source_id==w->world_source||cmd.source_id==w->scratch_source||cmd.source_id==w->twld_source)return TCW_INVALID;if(w->twld&&(!cmd.aux_source_id||cmd.aux_source_id==cmd.source_id||cmd.aux_source_id==w->world_source||cmd.aux_source_id==w->scratch_source||cmd.aux_source_id==w->twld_source))return TCW_INVALID;w->command=cmd;w->output_source=cmd.source_id;w->output_offset=0;w->output_length=0;w->save_cursor=0;w->twld_saved_size=0;w->phase=CX_SAVE_PREFIX;w->input_length=0;return TCW_OK;}
 +    if(cmd.kind==TCW_SAVE){if(!cmd.source_id||cmd.source_id==w->world_source||cmd.source_id==w->scratch_source||cmd.aux_source_id)return TCW_INVALID;w->command=cmd;w->output_source=cmd.source_id;w->output_offset=0;w->output_length=0;w->save_cursor=0;w->phase=CX_SAVE_PREFIX;w->input_length=0;return TCW_OK;}
-@@ -141 +183 @@
+@@ -141 +236 @@
 -            while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y;TxTile t=w->column[y];cx_current_tile(w,w->x,y,point_gate(w,y),&t,w->ids+y*4u);if(t.type==0xfffeu&&!cx_mod_vanilla(w,w->x,y,&t))return TCW_FORMAT;t.same=0;
 +            while(*work&&w->emit_y<w->height){uint32_t y=w->emit_y;TxTile t=w->column[y];cx_current_tile(w,w->x,y,point_gate(w,y),&t,w->ids+y*4u);t.same=0;
 --- a/src/terra_circuit_rules.c
@@ -598,7 +665,9 @@
 +    s=terra_vm_batch_begin(w->vm);
 +    if((s==TERRA_VM_OOM||s==TERRA_VM_LIMIT)&&w->timer_order){cx_timer_order_free(w);available=cx_vm_available(w);if(available&&terra_vm_set_budget(w->vm,available)==0)s=terra_vm_batch_begin(w->vm);}
 +    if(s<0)return s==TERRA_VM_OOM||s==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE;
-@@ -116,3 +121,5 @@
+@@ -112,0 +118 @@
++static int reclaim_viewport(void* context){return cx_viewport_cache_reclaim((CxWorld*)context);}
+@@ -116,3 +122,6 @@
 -    cb.trip_begin=cx_trip_begin;cb.net_hit=cx_net_hit;cb.trip_end=cx_trip_end;cb.wave_begin=cx_wave_begin;cb.wave_end=cx_wave_end;
 -    uint32_t maximum=cx_vm_available(w);if(!maximum)return TCW_MEMORY;
 -    int s=terra_vm_create(w->networks,maximum,&cb,w,&w->vm);return s<0?cx_fail(w,TCW_MEMORY,"native wiring VM does not fit the remaining memory budget"):TCW_OK;
@@ -606,10 +675,11 @@
 +    uint32_t maximum=cx_vm_available(w);if(!maximum&&w->timer_order){cx_timer_order_free(w);maximum=cx_vm_available(w);}if(!maximum)return TCW_MEMORY;
 +    int s=terra_vm_create(w->networks,maximum,&cb,w,&w->vm);
 +    if(s<0&&w->timer_order){cx_timer_order_free(w);s=terra_vm_create(w->networks,cx_vm_available(w),&cb,w,&w->vm);}
++    if(s>=0)cx_vm_set_reclaim(w->vm,reclaim_viewport,w);
 +    return s<0?cx_fail(w,TCW_MEMORY,"native wiring VM does not fit the remaining memory budget"):TCW_OK;
-@@ -120,0 +128 @@
+@@ -120,0 +130 @@
 +    if(cx_wired_light_height(b->tile.type)){CxDevice* d=cx_device_find(w,b->x,b->y);return (d?d->tile.frame_x:b->tile.frame_x)==0;}
-@@ -132,2 +140,2 @@
+@@ -132,2 +142,2 @@
 -    else if(t->active&&(t->type==445u||t->type==0xfffeu)){uint32_t i=cx_pixel_find(w,x,y);if(i!=CX_NONE){CxPixel* p=w->pixels+i;t->frame_x=(int16_t)(18u*(p->custom?p->state&3u:p->state));if(p->custom)t->frame_y=(int16_t)(18u*((p->state>>2)&3u));}}
 -    else if(t->active&&(t->type==132u||t->type==136u||t->type==144u||t->type==411u)){CxDevice* d=cx_device_find(w,x,y);if(d){t->frame_x=d->tile.frame_x;t->frame_y=d->tile.frame_y;}}
 +    else if(t->active&&t->type==445u){uint32_t i=cx_pixel_find(w,x,y);if(i!=CX_NONE)t->frame_x=(int16_t)(18u*w->pixels[i].state);}
@@ -1440,13 +1510,47 @@
 -}
 --- a/src/terra_circuit_vm.c
 +++ b/src/terra_circuit_vm.c
-@@ -340,2 +340,3 @@
+@@ -52,0 +53,3 @@
++    int (*owner_reclaim)(void*);
++    void* owner_reclaim_context;
++    uint32_t reclaiming;
+@@ -54,0 +58,8 @@
++/* Private registration, intentionally absent from the public VM callback ABI. */
++void cx_vm_set_reclaim(TerraCircuitVm* vm,int (*reclaim)(void*),void* context){
++    if(!vm)return;vm->owner_reclaim=reclaim;vm->owner_reclaim_context=context;
++}
++static int vm_reclaim(TerraCircuitVm* vm){
++    if(!vm->owner_reclaim||vm->reclaiming)return 0;
++    vm->reclaiming=1;int freed=vm->owner_reclaim(vm->owner_reclaim_context);vm->reclaiming=0;return freed;
++}
+@@ -58,9 +69,11 @@
+-    if (requested > UINT32_MAX || vm->allocated > vm->maximum ||
+-        charged > (uint64_t)vm->maximum - vm->allocated) {
+-        vm->allocation_error = TERRA_VM_LIMIT;
+-        return NULL;
+-    }
+-    VmAllocation* block = (VmAllocation*)tx_persistent_alloc((uint32_t)requested);
+-    if (!block) {
+-        vm->allocation_error = TERRA_VM_OOM;
+-        return NULL;
++    if(requested>UINT32_MAX||charged>UINT32_MAX){vm->allocation_error=TERRA_VM_LIMIT;return NULL;}
++    VmAllocation* block=NULL;
++    for(uint32_t attempt=0;attempt<2u;attempt++){
++        if(vm->allocated>vm->maximum||charged>(uint64_t)vm->maximum-vm->allocated){
++            if(!attempt&&vm_reclaim(vm))continue;
++            vm->allocation_error=TERRA_VM_LIMIT;return NULL;
++        }
++        block=(VmAllocation*)tx_persistent_alloc((uint32_t)requested);
++        if(block)break;
++        if(!attempt&&vm_reclaim(vm))continue;
++        vm->allocation_error=TERRA_VM_OOM;return NULL;
+@@ -340,2 +353,3 @@
 -            if (vm->callbacks.trip_end && vm->callbacks.trip_end(vm->context) < 0)
 -                return vm_fail(vm, TERRA_VM_CALLBACK);
 +            status = vm->callbacks.trip_end ? vm->callbacks.trip_end(vm->context) : 0;
 +            if (status < 0) return vm_fail(vm, TERRA_VM_CALLBACK);
 +            if (status > 0) break;
-@@ -431,0 +433,7 @@
+@@ -431,0 +446,7 @@
 +int32_t terra_vm_set_owner_budget(TerraCircuitVm* vm, uint32_t max_bytes) {
 +    if (!vm || !max_bytes) return TERRA_VM_INVALID;
 +    if (max_bytes < vm->allocated) return TERRA_VM_LIMIT;
@@ -1459,110 +1563,150 @@
 @@ -1 +1 @@
 -/* Streaming, bounded-memory WLD circuit session. See docs/CIRCUIT_WORLD_ABI_V1.md. */
 +/* Streaming, bounded-memory WLD circuit session, circuit-world ABI 2. */
-@@ -23,2 +23,3 @@
+@@ -23,2 +23,16 @@
 -static uint32_t vm_bytes(CxWorld* w) { uint32_t bytes=0;TerraVmStats s;if(w->vm){terra_vm_stats(w->vm,&s);bytes=s.allocated_bytes;}TerraTwldStats t;if(w->twld){terra_twld_stats(w->twld,&t);bytes+=t.allocated_bytes;}return bytes; }
 -uint32_t cx_vm_available(CxWorld* w){uint64_t used=w->bytes;TerraTwldStats t;if(w->twld){terra_twld_stats(w->twld,&t);used+=t.allocated_bytes;}return used<w->maximum?w->maximum-(uint32_t)used:0u;}
 +static uint32_t vm_bytes(CxWorld* w) { uint32_t bytes=0;TerraVmStats s;if(w->vm){terra_vm_stats(w->vm,&s);bytes=s.allocated_bytes;}return bytes; }
 +static int optional_index_evictable(CxWorld* w){TerraVmStats s={0};if(w->vm)terra_vm_stats(w->vm,&s);return !w->operation_active&&!s.active;}
 +uint32_t cx_vm_available(CxWorld* w){uint64_t used=w->bytes;return used<w->maximum?w->maximum-(uint32_t)used:0u;}
-@@ -26,0 +28 @@
++int cx_viewport_cache_reclaim(CxWorld* w){
++    if(!w->viewport_cells||w->viewport_pinned)return 0;
++    cx_free(w,w->viewport_cells);w->viewport_cells=NULL;
++    w->viewport_valid=w->viewport_count=w->viewport_building=w->viewport_hit=w->viewport_probe=0;
++    /* Release only charged owner bytes; the world's total ceiling is unchanged. */
++    if(w->vm)terra_vm_set_owner_budget(w->vm,cx_vm_available(w));
++    return 1;
++}
++void cx_viewport_cache_cancel(CxWorld* w){
++    w->viewport_pinned=0;cx_viewport_cache_reclaim(w);
++    w->viewport_valid=w->viewport_count=w->viewport_building=w->viewport_hit=w->viewport_probe=0;
++    if(w->read_target==CX_READ_VIEWPORT_PROBE)w->read_target=0;
++}
+@@ -26,0 +41,2 @@
++    if(n<=UINT32_MAX&&(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum)cx_viewport_cache_reclaim(w);
 +    if(n<=UINT32_MAX&&(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum&&optional_index_evictable(w))cx_timer_order_free(w);
-@@ -30,0 +33 @@
+@@ -30,0 +47,2 @@
++    if(!p&&cx_viewport_cache_reclaim(w))p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));
 +    if(!p&&w->timer_order&&optional_index_evictable(w)){cx_timer_order_free(w);p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));}
-@@ -35,0 +39,10 @@
+@@ -32,0 +51 @@
++    if(w->vm)terra_vm_set_owner_budget(w->vm,cx_vm_available(w));
+@@ -35,0 +55,12 @@
 +/* Optional traversal indexes must never make an otherwise loadable world fail. */
 +void* cx_optional_alloc(CxWorld* w,uint32_t bytes) {
 +    uint64_t n=(uint64_t)bytes+sizeof(CxAllocation)+32u;
++    if(n<=UINT32_MAX&&(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum)cx_viewport_cache_reclaim(w);
 +    if(n>UINT32_MAX||(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum)return NULL;
 +    CxAllocation* p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));
++    if(!p&&cx_viewport_cache_reclaim(w))p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));
 +    if(!p)return NULL;p->v.bytes=(uint32_t)n;w->bytes+=(uint32_t)n;
 +    if(w->bytes+vm_bytes(w)>w->peak)w->peak=w->bytes+vm_bytes(w);
 +    if(w->vm)terra_vm_set_owner_budget(w->vm,cx_vm_available(w));
 +    return p+1;
 +}
-@@ -41 +54 @@
+@@ -41 +72 @@
 -    tx_set_error(status==TCW_MEMORY?"TERRAX_CIRCUIT_MEMORY":status==TCW_FORMAT?"TERRAX_CIRCUIT_FORMAT":"TERRAX_CIRCUIT_STATE",message);
 +    tx_set_error(status==TCW_MEMORY?"TERRAX_CIRCUIT_MEMORY":status==TCW_FORMAT?"TERRAX_CIRCUIT_FORMAT":status==TCW_UNSUPPORTED?"TERRAX_CIRCUIT_UNSUPPORTED":"TERRAX_CIRCUIT_STATE",message);
-@@ -82 +95 @@
+@@ -82 +113 @@
 -    memset(&w->event,0,sizeof(w->event));w->event.abi_version=1;w->event.kind=kind;
 +    memset(&w->event,0,sizeof(w->event));w->event.abi_version=TERRA_CIRCUIT_WORLD_ABI;w->event.kind=kind;
-@@ -133 +146 @@
+@@ -133 +164,2 @@
 -    if(!w)return;terra_vm_destroy(w->vm);w->vm=NULL;terra_twld_destroy(w->twld);w->twld=NULL;
 +    if(!w)return;terra_vm_destroy(w->vm);w->vm=NULL;
-@@ -134,0 +148 @@
++    cx_viewport_cache_cancel(w);
+@@ -134,0 +167 @@
 +    cx_timer_order_free(w);
-@@ -138,0 +153 @@
+@@ -138,0 +172 @@
 +    RELEASE(compile_rows);
-@@ -141 +156 @@
+@@ -141 +175 @@
 -    RELEASE(points);RELEASE(result);RELEASE(output);RELEASE(general_snapshot);RELEASE(mods);RELEASE(ports);RELEASE(pixel_touched);RELEASE(pixel_snapshot);
 +    RELEASE(points);RELEASE(result);RELEASE(output);RELEASE(general_snapshot);RELEASE(ports);RELEASE(pixel_touched);RELEASE(pixel_snapshot);
-@@ -148 +163 @@
+@@ -148 +182 @@
 -int32_t terra_circuit_world_begin(uint32_t world_handle,uint32_t scratch_source_id,uint32_t twld_source_id,uint32_t twld_size,uint32_t max_bytes,uint32_t* out_handle){
 +int32_t terra_circuit_world_begin(uint32_t world_handle,uint32_t scratch_source_id,uint32_t max_bytes,uint32_t* out_handle){
-@@ -151 +166 @@
+@@ -151 +185 @@
 -    if(!world||!scratch_source_id||scratch_source_id==world->stream_source_id||scratch_source_id==twld_source_id||(!twld_source_id&&twld_size))return TCW_INVALID;
 +    if(!world||!scratch_source_id||scratch_source_id==world->stream_source_id)return TCW_INVALID;
-@@ -158 +173 @@
+@@ -158 +192 @@
 -    w->id=next_session++;w->world_handle=world_handle;w->world=world;w->scratch_source=scratch_source_id;w->twld_source=twld_source_id;w->twld_size=twld_size;
 +    w->id=next_session++;w->world_handle=world_handle;w->world=world;w->scratch_source=scratch_source_id;
-@@ -170 +184,0 @@
+@@ -170 +203,0 @@
 -    if(twld_source_id){int status=cx_twld_begin(w);if(status<0){destroy(w);return status;}}
-@@ -190,2 +204 @@
+@@ -179 +212,5 @@
+-    if(w->read_target==1){memcpy(w->cache+w->read_slot*CX_PAGE_SIZE,data,length);}
++    if(w->read_target==CX_READ_VIEWPORT_PROBE){
++        /* A host validation read must not replace the scan's input window. */
++        if(!w->viewport_hit||w->viewport_probe!=2u)return TCW_STATE;
++        w->viewport_probe=0;w->read_target=0;
++    }else if(w->read_target==1){memcpy(w->cache+w->read_slot*CX_PAGE_SIZE,data,length);}
+@@ -190,2 +227 @@
 -        else if(w->phase==CX_SAVE_PATCH){int s=cx_twld_save_begin(w);if(s<0)return s;if(!w->twld)w->phase=CX_IDLE;}
 -        else if(w->phase==CX_TWLD&&w->twld_mode==2u){w->twld_output_offset+=w->event.length;w->output_length=0;}
 +        else if(w->phase==CX_SAVE_PATCH)w->phase=CX_IDLE;
-@@ -209 +222 @@
+@@ -209 +245 @@
 -            if(status<0)status=cx_fail(w,status==TERRA_VM_OOM||status==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE,"native circuit execution failed and was rolled back");
 +            if(status<0)status=w->error?-(int)w->error:cx_fail(w,status==TERRA_VM_OOM||status==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE,"native circuit execution failed and was rolled back");
-@@ -215 +227,0 @@
+@@ -215 +250,0 @@
 -        else if(w->phase==CX_TWLD)status=cx_twld_step(w,&work);
-@@ -219 +231 @@
+@@ -219 +254 @@
 -        if(status<0){cx_fragments_cancel(w);if(w->vm){cx_twld_cancel_save(w);cx_operation_rollback(w);w->phase=CX_IDLE;memset(&w->event,0,sizeof(w->event));}else w->phase=CX_FAILED;return status;}
-+        if(status<0){cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;memset(&w->event,0,sizeof(w->event));}else w->phase=CX_FAILED;return status;}
-@@ -223,2 +235,2 @@
++        if(status<0){cx_viewport_cache_cancel(w);cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;memset(&w->event,0,sizeof(w->event));}else w->phase=CX_FAILED;return status;}
+@@ -223,2 +258,2 @@
 -    memset(out,0,sizeof(*out));out->abi_version=1;out->kind=w->phase==CX_IDLE?TCW_READY:TCW_MORE;out->phase=w->phase;out->completed=w->x;out->total=w->width;
 -    if(w->phase==CX_IDLE){out->result_kind=w->command.kind;out->reserved=w->twld_state&1u;if(w->command.kind==TCW_SAVE){out->source_id=w->output_source;out->result_count=w->save_result_size;out->reserved=w->twld_saved_size;}else if(w->command.kind==TCW_FRAGMENTS||w->command.kind==TCW_EXTRACT)out->result_count=cx_fragments_result_count(w);}
 +    memset(out,0,sizeof(*out));out->abi_version=TERRA_CIRCUIT_WORLD_ABI;out->kind=w->phase==CX_IDLE?TCW_READY:TCW_MORE;out->phase=w->phase;out->completed=w->x;out->total=w->width;
 +    if(w->phase==CX_IDLE){out->result_kind=w->command.kind;out->reserved=(w->optimization?10u:0u)|(w->pixel_compat_unsupported?0u:4u);if(w->command.kind==TCW_SAVE){out->source_id=w->output_source;out->result_count=w->save_result_size;out->reserved=0;}else if(w->command.kind==TCW_FRAGMENTS||w->command.kind==TCW_EXTRACT)out->result_count=cx_fragments_result_count(w);}
-@@ -230 +242 @@
+@@ -230 +265 @@
 -    *out=(TerraCircuitWorldStats){1,w->phase,w->width,w->height,(uint32_t)w->world->spawnTileX,(uint32_t)w->world->spawnTileY,
 +    *out=(TerraCircuitWorldStats){TERRA_CIRCUIT_WORLD_ABI,w->phase,w->width,w->height,(uint32_t)w->world->spawnTileX,(uint32_t)w->world->spawnTileY,
-@@ -234 +246 @@
+@@ -234 +269 @@
 -int32_t terra_circuit_world_cancel(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;cx_fragments_cancel(w);if(w->vm){cx_twld_cancel_save(w);cx_operation_rollback(w);w->phase=CX_IDLE;}else w->phase=CX_CANCELLED;memset(&w->event,0,sizeof(w->event));w->tick_remaining=w->tick_stage=w->trigger_remaining=0;return TCW_OK;}
-+int32_t terra_circuit_world_cancel(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;}else w->phase=CX_CANCELLED;memset(&w->event,0,sizeof(w->event));w->tick_remaining=w->tick_stage=w->trigger_remaining=0;return TCW_OK;}
++int32_t terra_circuit_world_cancel(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;cx_viewport_cache_cancel(w);cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;}else w->phase=CX_CANCELLED;memset(&w->event,0,sizeof(w->event));w->tick_remaining=w->tick_stage=w->trigger_remaining=0;return TCW_OK;}
 --- a/src/terra_circuit_world_internal.h
 +++ b/src/terra_circuit_world_internal.h
 @@ -5 +4,0 @@
 -#include "terra_circuit_twld.h"
-@@ -20 +19 @@
+@@ -15,0 +15,2 @@
++#define CX_VIEWPORT_CELLS 4096u
++#define CX_READ_VIEWPORT_PROBE 2u
+@@ -20 +21 @@
 -    CX_FAILED, CX_CANCELLED, CX_TWLD, CX_TICKS, CX_FRAGMENTS
 +    CX_FAILED, CX_CANCELLED, CX_TICKS, CX_FRAGMENTS
-@@ -43 +42 @@
+@@ -43 +44 @@
 -typedef struct CxDevice { uint32_t x,y,nets[4],pulse_nets[4],gate; TxTile tile,initial; uint32_t cooldown,saved_cooldown,wire_hit_mask; int32_t can_deactivate; } CxDevice;
 +typedef struct CxDevice { uint32_t x,y,nets[4],pulse_nets[4],gate; TxTile tile,initial; uint32_t cooldown,saved_cooldown,wire_hit_mask,wire_hit_epoch; int32_t can_deactivate; } CxDevice;
-@@ -45,2 +44 @@
+@@ -45,2 +46 @@
 -typedef struct CxPixel { uint32_t x,y,h[4],v[4]; uint8_t state,initial,hit_h,hit_v,custom,marked; uint8_t reserved[2]; } CxPixel;
 -typedef struct CxModTile { TerraTwldTile tile; TxTile vanilla; } CxModTile;
 +typedef struct CxPixel { uint32_t x,y,h[4],v[4],cell_word; uint8_t state,initial,hit_h,hit_v,marked; uint8_t connected_h,connected_v,reserved; } CxPixel;
-@@ -48,0 +47 @@
+@@ -48,0 +49,3 @@
 +typedef struct CxTimerOrder CxTimerOrder;
-@@ -53,3 +51,0 @@
++/* Original source values only. Live circuit state is projected at every read. */
++typedef struct CxViewportCell { TxTile tile; uint32_t gate,nets[4]; } CxViewportCell;
+@@ -53,3 +55,0 @@
 -    uint32_t twld_source, twld_size, twld_state;
 -    TerraTwld* twld; uint32_t twld_cursor,twld_mode,twld_output_offset,twld_saved_size;
 -    CxModTile* mods; uint32_t mod_count,mod_capacity,mod_cursor;
-@@ -61,0 +58,2 @@
+@@ -61,0 +62,2 @@
 +    /* Compile-only sparse row lists: four wire colours, followed by gates. */
 +    uint32_t* compile_rows; uint32_t compile_wire_count[4],compile_gate_count;
-@@ -88,0 +87 @@
+@@ -88,0 +91 @@
 +    uint32_t pixel_column_first,pixel_compat_unsupported;
-@@ -92 +91 @@
+@@ -92 +95 @@
 -    uint32_t vm_trip_index;
 +    uint32_t vm_trip_index,wire_trip_epoch,optimization;
-@@ -93,0 +93,2 @@
+@@ -93,0 +97,2 @@
 +    CxTimerOrder* timer_order;
 +    uint32_t timer_hit_count,timer_first,timer_hit_colours,timer_order_unsupported,timer_hit_events;
-@@ -115,0 +117,12 @@
+@@ -99,0 +105,3 @@
++    CxViewportCell* viewport_cells;
++    uint32_t viewport_x,viewport_y,viewport_width,viewport_height,viewport_stride;
++    uint32_t viewport_count,viewport_valid,viewport_pinned,viewport_building,viewport_hit,viewport_probe;
+@@ -115,0 +124,16 @@
 +void* cx_optional_alloc(CxWorld*,uint32_t);
++int cx_viewport_cache_reclaim(CxWorld*);
++void cx_viewport_cache_cancel(CxWorld*);
++/* Private owner reclamation; no change to TerraVmCallbacks or public exports. */
++void cx_vm_set_reclaim(TerraCircuitVm*,int (*)(void*),void*);
 +void cx_timer_order_prepare(CxWorld*);
 +void cx_timer_order_cell(CxWorld*,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
 +void cx_timer_order_gates(CxWorld*);
@@ -1574,21 +1718,21 @@
 +int cx_timer_order_step(CxWorld*);
 +int cx_toggle_timer(CxWorld*,CxDevice*);
 +uint32_t cx_bound_wire_mask(CxWorld*,uint32_t,uint32_t);
-@@ -153,5 +165,0 @@
+@@ -153,5 +176,0 @@
 -int cx_twld_begin(CxWorld*);
 -int cx_twld_step(CxWorld*,uint32_t*);
 -int cx_twld_save_begin(CxWorld*);
 -void cx_twld_cancel_save(CxWorld*);
 -int cx_mod_column(CxWorld*);
-@@ -165,2 +173,3 @@
+@@ -165,2 +184,3 @@
 -int cx_wave_begin(void*);
 -int cx_wave_end(void*);
 +int cx_pixel_wave_end(void*);
 +int cx_set_optimization(CxWorld*,uint32_t);
 +int cx_pixel_topology_supported(const CxPixel*);
-@@ -177 +185,0 @@
+@@ -177 +196,0 @@
 -int cx_mod_vanilla(CxWorld*,uint32_t,uint32_t,TxTile*);
-@@ -179,0 +188 @@
+@@ -179,0 +199 @@
 +uint32_t cx_wired_light_height(uint32_t);
 --- a/src/terra_wld.c
 +++ b/src/terra_wld.c

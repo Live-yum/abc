@@ -176,6 +176,7 @@ int cx_set_optimization(CxWorld* w,uint32_t enabled){
         return TCW_UNSUPPORTED;
     }
     if(w->optimization!=enabled){
+        cx_viewport_cache_cancel(w);
         cx_timer_order_reset(w);
         for(uint32_t i=0;i<w->device_count;i++){w->devices[i].wire_hit_mask=0;w->devices[i].wire_hit_epoch=0;}
         for(uint32_t i=0;i<w->pixel_count;i++)w->pixels[i].hit_h=w->pixels[i].hit_v=w->pixels[i].marked=0;
