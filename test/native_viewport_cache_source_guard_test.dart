@@ -85,8 +85,9 @@ void main() {
             source.writeAsBytesSync([0], mode: FileMode.append);
             source.setLastModifiedSync(originalStat.modified);
           }
-          if (failure == 'mtime')
+          if (failure == 'mtime') {
             source.setLastModifiedSync(DateTime.utc(2001));
+          }
           // Replacing a real file with a directory changes type and may also
           // change size/mtime. This tests that actual replacement is rejected,
           // not independent coverage of each metadata predicate.
