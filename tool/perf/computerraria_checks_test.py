@@ -146,6 +146,137 @@ def profile_report():
     }
 
 
+def generic_profile_report():
+    report = profile_report()
+    report.update(schema=checks.GENERIC_PROFILE_SCHEMA, workloadId=checks.GENERIC_WORKLOAD,
+                  dispatcherCoverageSchema=1, loadingOperationCoverage='generic-initial-reimport-reset-v1')
+    del report['clockBatchPulses']; del report['traceTotalPulses']
+    report['inputLatencies'] = []
+    operations = []
+    for mode in checks.MODES:
+        names = list(checks.GENERIC_CORE_OPERATIONS)
+        if mode == 'standard': names.append('cancel-import')
+        else: names.append('enable-optimization')
+        for action in names:
+            count = 1 if action == 'cancel-import' else 2
+            samples = [{'cycle': cycle, 'success': True, 'latencyMs': 30100,
+                        'rssBeforeBytes': 200, 'rssAfterBytes': 210,
+                        'uiUs': [1000, 2000], 'rasterUs': [1500, 20000],
+                        'totalSpanUs': [2000, 22000]} for cycle in range(count)]
+            operations.append({'id': f'circuit.{action}.{mode}', 'samples': samples,
+                               'iterations': count, 'warmup': 0, 'frameCount': count * 2, 'status': 'passed'})
+    report['operations'] = operations
+    mapping = {
+        'choose-world': ['worldCircuitChooseWorld'], 'import': ['worldCircuitImport'],
+        'select-display': ['worldCircuitViewport', 'worldCircuitReadDisplay'],
+        'trigger': ['worldCircuitTrigger'], 'single-tick': ['worldCircuitStep'],
+        'run-pause': ['worldCircuitToggle', 'worldCircuitPause'], 'save': ['worldCircuitSave'],
+        'reset-original': ['worldCircuitReset'], 'close-exported': ['worldCircuitClose'],
+        'reselect-exported-world': ['worldCircuitChooseWorld'], 'reimport': ['worldCircuitImport'],
+        'close': ['worldCircuitClose'], 'cancel-import': ['worldCircuitImport', 'worldCircuitCancel'],
+        'enable-optimization': ['worldCircuitOptimization'],
+    }
+    grouped = {}
+    for operation in operations:
+        _, macro, mode = operation['id'].split('.')
+        for sample in operation['samples']:
+            for action in mapping[macro]:
+                grouped.setdefault((action, mode), []).append({'cycle': sample['cycle'],
+                    'macroScope': operation['id'], 'durationMs': 1, 'completion': 'returned', 'warmup': False})
+    for cycle in range(2):
+        for mode in checks.MODES:
+            for action in ('worldCircuitViewport', 'worldCircuitReadDisplay'):
+                grouped[action, mode] += [{'cycle': cycle, 'macroScope': None, 'durationMs': 1,
+                                          'completion': 'returned', 'warmup': False} for _ in range(2)]
+    report['controllerOperations'] = [{'action': action, 'id': 'dispatch.' + action,
+         'variant': {'profileMode': mode}, 'sampleCount': len(samples), 'warmupSampleCount': 0,
+         'samples': samples} for (action, mode), samples in grouped.items()]
+    report['observations'] = [
+        {'cycle': cycle, 'mode': mode, 'worldWidth': 120, 'worldHeight': 90,
+         'displayRegion': {'x': 17, 'y': 29, 'width': 23, 'height': 11},
+         'trigger': {'x': 19, 'y': 31, 'mask': 4, 'direct': True},
+         'tickBefore': 5, 'tickAfter': 6, 'singleTickDelta': 1,
+         'steadyTickDelta': 1800, 'nativeSteadyTickDelta': 1800, 'steadyWindowMs': 30000,
+         'optimizationEnabled': mode == 'optimized', 'nativeOptimizationEnabled': mode == 'optimized',
+         'savedWldSha256': HASH, 'reopenPreservedSelectedPixels': True,
+         'resetRestoredOriginal': True, 'closed': True}
+        for cycle in range(2) for mode in checks.MODES]
+    loading = loading_memory_report(include_resets=True)
+    for row in loading['windows']:
+        row['kind'] = {'exported-reimport': 'reset-original', 'reset-original': 'saved-reimport'}.get(row['kind'], row['kind'])
+        row['sessionSource'] = 'exported-reimport-session-source' if row['kind'] == 'saved-reimport' else 'pinned-public-original-source'
+        if row['outcome'] == 'ready':
+            row['readyEvidence'] = {'completeWldVerified': True, 'genericViewportInitialized': True,
+                                    'worldWidth': 120, 'worldHeight': 90}
+    for row in loading['closeSamples']:
+        if row['phase'] == 'after-cycle-close': row['phase'] = 'after-final-close'
+        else:
+            window = next(w for w in loading['windows'] if
+                          (w['cycle'], w['mode'], w['kind']) == (row['cycle'], row['mode'], 'reset-original'))
+            delta = window['terminal']['timeUs'] + 1000 - row['sample']['timeUs']
+            row['sample']['timeUs'] += delta; row['sample']['smapsTimeUs'] += delta
+    report['loadingOsMemory'] = loading
+    return report
+
+
+class GenericProfileEvidenceTests(unittest.TestCase):
+    def test_generic_raw_metrics_and_uncalibrated_display_are_distinct(self):
+        report = generic_profile_report()
+        report.update(displayRefreshRateHz=0, frameBudgetSource='explicit-60hz-fallback')
+        state, metrics = checks.validate_profile(report, COMMIT)
+        self.assertEqual(state['workloadId'], checks.GENERIC_WORKLOAD)
+        self.assertEqual(metrics['frames'][0]['virtualTicks'], 1800)
+        self.assertEqual(metrics['frames'][0]['frameCount'], 2)
+        self.assertEqual(metrics['frames'][0]['uiP95Us'], 1950)
+        self.assertIsNone(metrics['frames'][0]['overBudgetFrames'])
+        self.assertEqual(metrics['targetDeviceFluencyStatus'], 'not-established')
+        self.assertEqual(len(metrics['loadingOsMemory']['windows']), 13)
+        self.assertEqual(len(metrics['loadingOsMemory']['closeSamples']), 8)
+        legacy, _ = checks.validate_profile(profile_report(), COMMIT)
+        self.assertNotEqual(state, legacy)
+
+    def test_missing_failed_changed_or_cpu_action_cannot_pass(self):
+        for case in ('missing-action', 'duplicate-action', 'failed-action', 'legacy-action', 'wrong-mode',
+                     'bad-roi', 'bad-trigger', 'bad-ticks', 'bad-native-ticks', 'no-frames',
+                     'wrong-frame-count', 'failed-run', 'cpu-pulses', 'cpu-inputs', 'missing-load',
+                     'wrong-ready', 'wrong-close', 'unknown-schema'):
+            report = generic_profile_report()
+            if case == 'missing-action': report['operations'].pop()
+            elif case == 'duplicate-action': report['operations'].append(copy.deepcopy(report['operations'][0]))
+            elif case == 'failed-action': report['operations'][0]['samples'][0]['success'] = False
+            elif case == 'legacy-action': report['operations'][0]['id'] = 'computer.choose-world.standard'
+            elif case == 'wrong-mode': report['observations'][1]['nativeOptimizationEnabled'] = False
+            elif case == 'bad-roi': report['observations'][0]['displayRegion']['width'] = 65537
+            elif case == 'bad-trigger': report['observations'][0]['trigger']['mask'] = 0
+            elif case == 'bad-ticks': report['observations'][0]['tickAfter'] = 7
+            elif case == 'bad-native-ticks': report['observations'][0]['nativeSteadyTickDelta'] = 1799
+            elif case == 'no-frames':
+                row = next(r for r in report['operations'] if r['id'] == 'circuit.run-pause.standard')
+                for sample in row['samples']:
+                    for key in ('uiUs', 'rasterUs', 'totalSpanUs'): sample[key] = []
+                row['frameCount'] = 0
+            elif case == 'wrong-frame-count': report['operations'][0]['frameCount'] += 1
+            elif case == 'failed-run': report.update(status='failed', failure='original failure')
+            elif case == 'cpu-pulses': report['clockBatchPulses'] = 128
+            elif case == 'cpu-inputs': report['inputLatencies'] = [{'input': 'up'}]
+            elif case == 'missing-load': report['loadingOsMemory']['windows'].pop()
+            elif case == 'wrong-ready': report['loadingOsMemory']['windows'][1]['readyEvidence']['genericViewportInitialized'] = False
+            elif case == 'wrong-close': report['observations'][0]['closed'] = False
+            elif case == 'unknown-schema': report['schema'] = 'abc.generic-world-profile.v2'
+            with self.assertRaises(ValueError, msg=case): checks.validate_profile(report, COMMIT)
+
+    def test_dispatch_counts_scopes_and_source_are_not_self_certification(self):
+        for case in ('missing-dispatch', 'duplicate-dispatch', 'wrong-scope', 'wrong-cycle', 'threw', 'dirty'):
+            report = generic_profile_report(); row = report['controllerOperations'][0]
+            if case == 'missing-dispatch': report['controllerOperations'].pop()
+            elif case == 'duplicate-dispatch': row['samples'].append(copy.deepcopy(row['samples'][0])); row['sampleCount'] += 1
+            elif case == 'wrong-scope': row['samples'][0]['macroScope'] = None
+            elif case == 'wrong-cycle': row['samples'][0]['cycle'] = 99
+            elif case == 'threw': row['samples'][0]['completion'] = 'threw'
+            elif case == 'dirty': report['runtime']['workingTreeDirty'] = True
+            with self.assertRaises(ValueError, msg=case): checks.validate_profile(report, COMMIT)
+
+
 class ProfileEvidenceTests(unittest.TestCase):
     def test_extended_loading_memory_requires_every_reset_window(self):
         report = loading_memory_report(include_resets=True)

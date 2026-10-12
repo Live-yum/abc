@@ -21,16 +21,47 @@ CxWorld* cx_lookup(uint32_t id) {
     return NULL;
 }
 static uint32_t vm_bytes(CxWorld* w) { uint32_t bytes=0;TerraVmStats s;if(w->vm){terra_vm_stats(w->vm,&s);bytes=s.allocated_bytes;}return bytes; }
+static int optional_index_evictable(CxWorld* w){TerraVmStats s={0};if(w->vm)terra_vm_stats(w->vm,&s);return !w->operation_active&&!s.active;}
 uint32_t cx_vm_available(CxWorld* w){uint64_t used=w->bytes;return used<w->maximum?w->maximum-(uint32_t)used:0u;}
+int cx_viewport_cache_reclaim(CxWorld* w){
+    if(!w->viewport_cells||w->viewport_pinned)return 0;
+    cx_free(w,w->viewport_cells);w->viewport_cells=NULL;
+    w->viewport_valid=w->viewport_count=w->viewport_building=w->viewport_hit=w->viewport_probe=0;
+    /* Release only charged owner bytes; the world's total ceiling is unchanged. */
+    if(w->vm)terra_vm_set_owner_budget(w->vm,cx_vm_available(w));
+    return 1;
+}
+void cx_viewport_cache_cancel(CxWorld* w){
+    w->viewport_pinned=0;cx_viewport_cache_reclaim(w);
+    w->viewport_valid=w->viewport_count=w->viewport_building=w->viewport_hit=w->viewport_probe=0;
+    if(w->read_target==CX_READ_VIEWPORT_PROBE)w->read_target=0;
+}
 void* cx_alloc(CxWorld* w,uint32_t bytes) {
     uint64_t n=(uint64_t)bytes+sizeof(CxAllocation)+32u;
+    if(n<=UINT32_MAX&&(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum)cx_viewport_cache_reclaim(w);
+    if(n<=UINT32_MAX&&(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum&&optional_index_evictable(w))cx_timer_order_free(w);
     if(n>UINT32_MAX||(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum) {
         cx_fail(w,TCW_MEMORY,"circuit allocation exceeds the available process memory budget");return NULL;
     }
     CxAllocation* p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));
+    if(!p&&cx_viewport_cache_reclaim(w))p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));
+    if(!p&&w->timer_order&&optional_index_evictable(w)){cx_timer_order_free(w);p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));}
     if(!p){cx_fail(w,TCW_MEMORY,"circuit allocation failed");return NULL;}
     p->v.bytes=(uint32_t)n;w->bytes+=(uint32_t)n;
+    if(w->vm)terra_vm_set_owner_budget(w->vm,cx_vm_available(w));
     if(w->bytes+vm_bytes(w)>w->peak)w->peak=w->bytes+vm_bytes(w);
+    return p+1;
+}
+/* Optional traversal indexes must never make an otherwise loadable world fail. */
+void* cx_optional_alloc(CxWorld* w,uint32_t bytes) {
+    uint64_t n=(uint64_t)bytes+sizeof(CxAllocation)+32u;
+    if(n<=UINT32_MAX&&(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum)cx_viewport_cache_reclaim(w);
+    if(n>UINT32_MAX||(uint64_t)w->bytes+vm_bytes(w)+n>w->maximum)return NULL;
+    CxAllocation* p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));
+    if(!p&&cx_viewport_cache_reclaim(w))p=(CxAllocation*)tx_persistent_alloc(bytes+(uint32_t)sizeof(CxAllocation));
+    if(!p)return NULL;p->v.bytes=(uint32_t)n;w->bytes+=(uint32_t)n;
+    if(w->bytes+vm_bytes(w)>w->peak)w->peak=w->bytes+vm_bytes(w);
+    if(w->vm)terra_vm_set_owner_budget(w->vm,cx_vm_available(w));
     return p+1;
 }
 void cx_free(CxWorld* w,void* pointer) {
@@ -38,7 +69,7 @@ void cx_free(CxWorld* w,void* pointer) {
 }
 int cx_fail(CxWorld* w,int status,const char* message) {
     if(w)w->error=(uint32_t)-status;
-    tx_set_error(status==TCW_MEMORY?"TERRAX_CIRCUIT_MEMORY":status==TCW_FORMAT?"TERRAX_CIRCUIT_FORMAT":"TERRAX_CIRCUIT_STATE",message);
+    tx_set_error(status==TCW_MEMORY?"TERRAX_CIRCUIT_MEMORY":status==TCW_FORMAT?"TERRAX_CIRCUIT_FORMAT":status==TCW_UNSUPPORTED?"TERRAX_CIRCUIT_UNSUPPORTED":"TERRAX_CIRCUIT_STATE",message);
     return status;
 }
 static int grow_pages(CxWorld* w,void*** pages,uint32_t* capacity,uint32_t needed) {
@@ -86,8 +117,7 @@ int cx_emit(CxWorld* w,uint32_t kind,uint32_t source,uint32_t offset,uint32_t le
 int cx_world_tile(CxWorld* w,TxTile* out){
     if(w->cursor>=w->tile_end)return cx_fail(w,TCW_FORMAT,"circuit tile stream ended before the world columns");
     if(!w->world_source){uint32_t p=w->cursor;if(!read_tile_at(w->world,&p,w->tile_end,out))return cx_fail(w,TCW_FORMAT,"invalid circuit tile record");w->cursor=p;return TCW_OK;}
-    uint32_t need=w->tile_end-w->cursor;if(need>32u)need=32u;
-    if(w->cursor<w->input_offset||w->cursor-w->input_offset>w->input_length||need>w->input_length-(w->cursor-w->input_offset)){
+    if(!cx_world_window_ready(w)){
         uint32_t n=w->tile_end-w->cursor;if(n>TERRA_CIRCUIT_WORLD_WINDOW)n=TERRA_CIRCUIT_WORLD_WINDOW;
         w->read_target=0;return cx_emit(w,TCW_READ,w->world_source,w->cursor,n,NULL);
     }
@@ -131,7 +161,9 @@ int cx_cache_flush(CxWorld* w){
 }
 static void destroy(CxWorld* w){
     if(!w)return;terra_vm_destroy(w->vm);w->vm=NULL;
+    cx_viewport_cache_cancel(w);
     cx_fragments_free(w);
+    cx_timer_order_free(w);
     cx_words_free(w,&w->parents);cx_words_free(w,&w->code_ends);cx_words_free(w,&w->member_ends);cx_words_free(w,&w->previous_gate);
     cx_bytes_free(w,&w->map);cx_bytes_free(w,&w->checkpoints);cx_bytes_free(w,&w->code);cx_bytes_free(w,&w->members);
 #define RELEASE(field) cx_free(w,w->field)
@@ -176,7 +208,11 @@ int32_t terra_circuit_world_supply(uint32_t handle,uint32_t source_id,uint32_t o
 #ifdef __wasm__
     if(!tx_bridge_range_is_valid((uint32_t)(uintptr_t)data,length))return TCW_INVALID;
 #endif
-    if(w->read_target==1){memcpy(w->cache+w->read_slot*CX_PAGE_SIZE,data,length);}
+    if(w->read_target==CX_READ_VIEWPORT_PROBE){
+        /* A host validation read must not replace the scan's input window. */
+        if(!w->viewport_hit||w->viewport_probe!=2u)return TCW_STATE;
+        w->viewport_probe=0;w->read_target=0;
+    }else if(w->read_target==1){memcpy(w->cache+w->read_slot*CX_PAGE_SIZE,data,length);}
     else{memcpy(w->input,data,length);w->input_offset=offset;w->input_length=length;}
     memset(&w->event,0,sizeof(w->event));return TCW_OK;
 }
@@ -205,7 +241,7 @@ int32_t terra_circuit_world_step(uint32_t handle,uint32_t work_units,TerraCircui
         else if(w->phase==CX_QUERY)status=cx_query_step(w,&work);
         else if(w->phase==CX_RUN){
             uint32_t n=work;work=0;status=terra_vm_step(w->vm,n);
-            if(status<0)status=cx_fail(w,status==TERRA_VM_OOM||status==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE,"native circuit execution failed and was rolled back");
+            if(status<0)status=w->error?-(int)w->error:cx_fail(w,status==TERRA_VM_OOM||status==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE,"native circuit execution failed and was rolled back");
             else if(status==TERRA_VM_OK){
                 if(w->trigger_remaining>1u){--w->trigger_remaining;status=terra_vm_begin(w->vm,w->trigger_nets,w->trigger_count);if(status<0)status=cx_fail(w,TCW_MEMORY,"native circuit pulse allocation failed");}
                 else status=cx_command_complete(w);
@@ -214,7 +250,7 @@ int32_t terra_circuit_world_step(uint32_t handle,uint32_t work_units,TerraCircui
         else if(w->phase==CX_TICKS)status=cx_ticks_step(w,&work);
         else if(w->phase==CX_FRAGMENTS)status=cx_fragments_step(w,&work);
         else status=cx_fail(w,TCW_STATE,"unknown circuit session phase");
-        if(status<0){cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;memset(&w->event,0,sizeof(w->event));}else w->phase=CX_FAILED;return status;}
+        if(status<0){cx_viewport_cache_cancel(w);cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;memset(&w->event,0,sizeof(w->event));}else w->phase=CX_FAILED;return status;}
         if(w->event.kind){*out=w->event;return TCW_CONTINUE;}
         if(status==TCW_CONTINUE&&!work)break;
     }
@@ -229,5 +265,5 @@ int32_t terra_circuit_world_stats(uint32_t handle,TerraCircuitWorldStats* out){
         w->min_x,w->min_y,w->max_x,w->max_y,w->wire_cells,w->devices_count,w->gates,w->networks,w->vm?w->width:w->x,w->phase,bytes,peak,
         (uint32_t)w->ticks,(uint32_t)(w->ticks>>32),(uint32_t)s.net_pulses,(uint32_t)(s.net_pulses>>32),(uint32_t)s.gates_fired,(uint32_t)(s.gates_fired>>32)};return TCW_OK;
 }
-int32_t terra_circuit_world_cancel(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;}else w->phase=CX_CANCELLED;memset(&w->event,0,sizeof(w->event));w->tick_remaining=w->tick_stage=w->trigger_remaining=0;return TCW_OK;}
+int32_t terra_circuit_world_cancel(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;cx_viewport_cache_cancel(w);cx_fragments_cancel(w);if(w->vm){cx_operation_rollback(w);w->phase=CX_IDLE;}else w->phase=CX_CANCELLED;memset(&w->event,0,sizeof(w->event));w->tick_remaining=w->tick_stage=w->trigger_remaining=0;return TCW_OK;}
 int32_t terra_circuit_world_close(uint32_t handle){CxWorld* w=cx_lookup(handle);if(!w)return TCW_HANDLE;for(uint32_t i=0;i<4;i++)if(sessions[i]==w){sessions[i]=NULL;break;}destroy(w);return TCW_OK;}

@@ -37,6 +37,27 @@ def verify_exact_files(root, expected):
         raise ValueError(f"Unexpected source closure: extra={actual - expected}, missing={expected - actual}")
 
 
+def verify_created_source_records(root, records, existing_paths):
+    """New local implementation files have no upstream before-file identity."""
+    seen = set(existing_paths)
+    for record in records:
+        path = record["path"]
+        commit = record.get("introducedAfterCommit", "")
+        digest = record.get("afterSha256", "")
+        if (path in seen or record.get("beforeExists") is not False
+                or record.get("origin") != "original-abc-implementation"
+                or len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit)
+                or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest)
+                or "beforeSha256" in record or "beforeBytes" in record
+                or type(record.get("afterBytes")) is not int
+                or record["afterBytes"] <= 0):
+            raise ValueError("Created source omits or contradicts its local origin")
+        seen.add(path)
+        data = read_file(root, path)
+        if len(data) != record["afterBytes"] or sha256(data) != digest:
+            raise ValueError(f"Reviewed created source differs: {path}")
+
+
 def main():
     # Bundled data is the attributed RV32I Pong ROM, never a world file or host
     # emulator. Keep program/source identity independent of the WLD fixture.
@@ -45,10 +66,10 @@ def main():
     if computer["source_commit"] != "0379d5b0d89dbb7fd4342b3afff9c3be5e1ab9d8":
         raise ValueError("Unexpected Computerraria source revision")
     verify_sha_records(computer_root, computer["files"])
-    pong = read_file(ROOT, "assets/computer/pong.bin")
+    pong = read_file(ROOT, "test/fixtures/computerraria/pong.bin")
     if len(pong) != 2288 or sha256(pong) != "d2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d":
         raise ValueError("Bundled Pong program identity mismatch")
-    if read_file(ROOT, "assets/computer/LICENSE") != read_file(computer_root, "LICENSE"):
+    if read_file(ROOT, "test/fixtures/computerraria/LICENSE") != read_file(computer_root, "LICENSE"):
         raise ValueError("Bundled Pong MIT notice differs from its source")
 
     # These two allowlisted WLD assets must be exact original synthetic output,
@@ -84,6 +105,10 @@ def main():
                 raise ValueError("Removed source omits its original identity")
             if (terra_root / removed["path"]).exists():
                 raise ValueError(f"Removed source unexpectedly present: {removed['path']}")
+        verify_created_source_records(
+            terra_root, patch.get("createdFiles", []),
+            {entry["path"] for entry in patch["files"] + patch.get("removedFiles", [])},
+        )
         for change in patch["files"]:
             if len(change["beforeSha256"]) != 64 or not change["beforeBytes"]:
                 raise ValueError("Local patch omits its original source identity")

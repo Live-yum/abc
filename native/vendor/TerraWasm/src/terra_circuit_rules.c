@@ -98,10 +98,15 @@ static int32_t transaction_begin(void* context){
 }
 int cx_operation_begin(CxWorld* w){
     if(w->operation_active)return TCW_STATE;
+    TerraVmStats current;terra_vm_stats(w->vm,&current);if(current.active)return TCW_STATE;
     if(w->override_capacity>w->override_snapshot_capacity){CxOverride* p=(CxOverride*)cx_alloc(w,w->override_capacity*sizeof(CxOverride));if(!p)return TCW_MEMORY;cx_free(w,w->override_snapshot);w->override_snapshot=p;w->override_snapshot_capacity=w->override_capacity;}
-    uint32_t available=cx_vm_available(w);if(!available)return TCW_MEMORY;
-    int s=terra_vm_set_budget(w->vm,available);if(s<0)return TCW_MEMORY;
-    s=terra_vm_batch_begin(w->vm);if(s<0)return s==TERRA_VM_OOM||s==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE;
+    uint32_t available=cx_vm_available(w);
+    int s=available?terra_vm_set_budget(w->vm,available):TERRA_VM_LIMIT;
+    if((s==TERRA_VM_LIMIT||s==TERRA_VM_OOM)&&w->timer_order){cx_timer_order_free(w);available=cx_vm_available(w);s=available?terra_vm_set_budget(w->vm,available):TERRA_VM_LIMIT;}
+    if(s<0)return TCW_MEMORY;
+    s=terra_vm_batch_begin(w->vm);
+    if((s==TERRA_VM_OOM||s==TERRA_VM_LIMIT)&&w->timer_order){cx_timer_order_free(w);available=cx_vm_available(w);if(available&&terra_vm_set_budget(w->vm,available)==0)s=terra_vm_batch_begin(w->vm);}
+    if(s<0)return s==TERRA_VM_OOM||s==TERRA_VM_LIMIT?TCW_MEMORY:TCW_STATE;
     snapshot(w);w->operation_active=1;return TCW_OK;
 }
 void cx_operation_commit(CxWorld* w){if(w->operation_active){terra_vm_batch_commit(w->vm);w->operation_active=0;}w->interaction_pending=0;}
@@ -110,14 +115,19 @@ void cx_operation_rollback(CxWorld* w){
     else terra_vm_cancel(w->vm);
     w->interaction_pending=0;w->eval_valid=0;
 }
+static int reclaim_viewport(void* context){return cx_viewport_cache_reclaim((CxWorld*)context);}
 int cx_create_vm(CxWorld* w){
     w->general_snapshot=(uint8_t*)cx_alloc(w,w->general_count?w->general_count:1u);if(!w->general_snapshot)return TCW_MEMORY;
     random_seed(w,(int32_t)w->world->worldId);TerraVmCallbacks cb;memset(&cb,0,sizeof(cb));cb.next_candidate=next_candidate;cb.evaluate=evaluate;cb.transaction_begin=transaction_begin;cb.transaction_rollback=transaction_rollback;
     cb.trip_begin=cx_trip_begin;cb.net_hit=cx_net_hit;cb.trip_end=cx_trip_end;cb.wave_end=cx_pixel_wave_end;
-    uint32_t maximum=cx_vm_available(w);if(!maximum)return TCW_MEMORY;
-    int s=terra_vm_create(w->networks,maximum,&cb,w,&w->vm);return s<0?cx_fail(w,TCW_MEMORY,"native wiring VM does not fit the remaining memory budget"):TCW_OK;
+    uint32_t maximum=cx_vm_available(w);if(!maximum&&w->timer_order){cx_timer_order_free(w);maximum=cx_vm_available(w);}if(!maximum)return TCW_MEMORY;
+    int s=terra_vm_create(w->networks,maximum,&cb,w,&w->vm);
+    if(s<0&&w->timer_order){cx_timer_order_free(w);s=terra_vm_create(w->networks,cx_vm_available(w),&cb,w,&w->vm);}
+    if(s>=0)cx_vm_set_reclaim(w->vm,reclaim_viewport,w);
+    return s<0?cx_fail(w,TCW_MEMORY,"native wiring VM does not fit the remaining memory budget"):TCW_OK;
 }
 uint32_t cx_true_lamp(CxWorld* w,const CxBinding* b){
+    if(cx_wired_light_height(b->tile.type)){CxDevice* d=cx_device_find(w,b->x,b->y);return (d?d->tile.frame_x:b->tile.frame_x)==0;}
     int on=b->tile.frame_x==18;
     if(b->tile.type==33u)on=b->tile.frame_x==0;
     on^=cx_override_value(w,b->gate,b->x,b->y);
@@ -130,7 +140,7 @@ void cx_current_tile(CxWorld* w,uint32_t x,uint32_t y,uint32_t gate,TxTile* t,co
     if(t->active&&t->type==419u&&t->frame_x!=36){if(flip)t->frame_x=t->frame_x==18?0:18;}
     else if(t->active&&t->type==420u){uint32_t lo=0,hi=w->general_count;while(lo<hi){uint32_t m=lo+(hi-lo)/2;if(w->general[m].id<gate)lo=m+1;else hi=m;}if(lo<w->general_count&&w->general[lo].id==gate)t->frame_x=(int16_t)(18*w->general[lo].frame);}
     else if(t->active&&t->type==445u){uint32_t i=cx_pixel_find(w,x,y);if(i!=CX_NONE)t->frame_x=(int16_t)(18u*w->pixels[i].state);}
-    else if(t->active&&(t->type==132u||t->type==136u||t->type==144u||t->type==411u)){CxDevice* d=cx_device_find(w,x,y);if(d){t->frame_x=d->tile.frame_x;t->frame_y=d->tile.frame_y;}}
+    else if(t->active&&(t->type==132u||t->type==136u||t->type==144u||t->type==411u||cx_wired_light_height(t->type))){CxDevice* d=cx_device_find(w,x,y);if(d){t->frame_x=d->tile.frame_x;t->frame_y=d->tile.frame_y;}}
     else if(flip&&t->active){if(t->type>=255u&&t->type<=268u&&!t->actuator)t->type=(uint16_t)(t->type>=262u?t->type-7u:t->type+7u);else switch(t->type){case 33:case 49:case 174:case 372:case 646:t->frame_x=(int16_t)(t->frame_x==0?18:0);break;case 4:t->frame_x=(int16_t)(t->frame_x>=66?t->frame_x-66:t->frame_x+66);break;case 421:if(!t->actuator)t->type=422;break;case 422:if(!t->actuator)t->type=421;break;default:break;}}
     if(t->actuator||t->type==130u||t->type==131u){CxDevice* d=cx_device_find(w,x,y);if(d){t->inactive=d->tile.inactive;if(t->type==130u||t->type==131u)t->type=d->tile.type;}}
 }

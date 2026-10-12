@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fail closed on incomplete full-world evidence; compare states, not timings."""
 import argparse
+from collections import Counter
 import hashlib
 import json
 import math
@@ -388,7 +389,7 @@ def validate_os_intervals(intervals, sample_count, duration=None):
                     'Status intervals do not span the declared loading window')
 
 
-def validate_loading_os_memory(data, cycles, *, include_resets=False):
+def validate_loading_os_memory(data, cycles, *, include_resets=False, generic=False):
     require(isinstance(data, dict) and data.get('schema') == LOADING_MEMORY_SCHEMA
             and data.get('status') == 'observed', 'Complete observed Flutter loading OS memory is required')
     integer(data.get('hostPid'), 'Flutter application PID', 1)
@@ -402,8 +403,9 @@ def validate_loading_os_memory(data, cycles, *, include_resets=False):
     require(data.get('errors') == [], 'OS loading sampler reported errors')
     windows, closes = data.get('windows'), data.get('closeSamples')
     expected = [('cancelled-import', 0, 'standard')]
-    kinds = ('initial-import', 'exported-reimport', 'reset-original') if include_resets else (
-             'initial-import', 'exported-reimport')
+    kinds = ('initial-import', 'reset-original', 'saved-reimport') if generic else (
+        ('initial-import', 'exported-reimport', 'reset-original') if include_resets else (
+            'initial-import', 'exported-reimport'))
     expected += [(kind, cycle, mode) for cycle in range(cycles) for mode in MODES
                  for kind in kinds]
     require(isinstance(windows, list) and len(windows) == len(expected),
@@ -414,8 +416,8 @@ def validate_loading_os_memory(data, cycles, *, include_resets=False):
                 and integer(window.get('hostLoadAttempt'), 'host load attempt') == attempt,
                 'Loading windows are missing, duplicated or reordered')
         if include_resets:
-            source = ('exported-reimport-session-source' if identity[0] in
-                      ('exported-reimport', 'reset-original') else 'pinned-public-original-source')
+            exported = identity[0] == 'saved-reimport' if generic else identity[0] in ('exported-reimport', 'reset-original')
+            source = 'exported-reimport-session-source' if exported else 'pinned-public-original-source'
             require(window.get('sessionSource') == source,
                     'Loading window does not identify the actual original/exported session source')
         cancelled = attempt == 0
@@ -439,13 +441,21 @@ def validate_loading_os_memory(data, cycles, *, include_resets=False):
         else:
             require(window.get('ready') == terminal, 'Ready sample differs from load terminal sample')
             evidence = window.get('readyEvidence', {})
-            require(evidence.get('completeWldVerified') is True
-                    and evidence.get('monoDisplayInitialized') is True
-                    and evidence.get('monoRgbaBytes') == 12288,
-                    'Load readiness requires the verified complete WLD and actual monochrome RGBA plane')
-            if include_resets and identity[0] in ('exported-reimport', 'reset-original'):
-                require(evidence.get('restoredFromExport') is True,
-                        'Reimport/reset must restore the actual saved session source')
+            if generic:
+                require(evidence.get('completeWldVerified') is True and
+                        evidence.get('genericViewportInitialized') is True,
+                        'generic readiness needs a complete WLD and actual viewport')
+                integer(evidence['worldWidth'], 'loaded world width', 1)
+                integer(evidence['worldHeight'], 'loaded world height', 1)
+                require('monoRgbaBytes' not in evidence, 'generic load cannot inherit a fixed monitor')
+            else:
+                require(evidence.get('completeWldVerified') is True
+                        and evidence.get('monoDisplayInitialized') is True
+                        and evidence.get('monoRgbaBytes') == 12288,
+                        'Load readiness requires the verified complete WLD and actual monochrome RGBA plane')
+                if include_resets and identity[0] in ('exported-reimport', 'reset-original'):
+                    require(evidence.get('restoredFromExport') is True,
+                            'Reimport/reset must restore the actual saved session source')
         status_count = integer(window.get('statusSampleCount'), 'status sample count', 2)
         periodic = integer(window.get('periodicStatusSampleCount'), 'periodic status sample count')
         require(periodic == status_count - 2 and (cancelled or periodic > 0),
@@ -481,15 +491,16 @@ def validate_loading_os_memory(data, cycles, *, include_resets=False):
                 and terminal['processVmHwmBytes'] >= baseline['processVmHwmBytes'],
                 'Lifetime cumulative VmHWM disagrees with its boundaries or moves backwards')
     expected_closes = [(phase, cycle, mode) for cycle in range(cycles) for mode in MODES
-                       for phase in ('after-export-close', 'after-cycle-close')]
+                       for phase in ('after-export-close', 'after-final-close' if generic else 'after-cycle-close')]
     require(isinstance(closes, list) and len(closes) == len(expected_closes),
             'Missing independent post-close OS memory samples')
     for index, (close, identity) in enumerate(zip(closes, expected_closes)):
         require((close.get('phase'), close.get('cycle'), close.get('mode')) == identity,
                 'Post-close OS memory samples are missing, duplicated or reordered')
         sample = validate_os_memory_sample(close.get('sample'))
-        preceding_kind = ('initial-import' if close['phase'] == 'after-export-close' else
-                          'reset-original' if include_resets else 'exported-reimport')
+        preceding_kind = (('reset-original' if close['phase'] == 'after-export-close' else 'saved-reimport') if generic else
+                          ('initial-import' if close['phase'] == 'after-export-close' else
+                           'reset-original' if include_resets else 'exported-reimport'))
         preceding_index = next(i for i, window in enumerate(windows)
             if (window['kind'], window['cycle'], window['mode']) ==
                (preceding_kind, close['cycle'], close['mode']))
@@ -535,7 +546,198 @@ def validate_display_calibration(report):
             'reason': None if refresh > 0 else 'Display reports 0 Hz; nominal 60 Hz is a reference only.'}
 
 
+GENERIC_PROFILE_SCHEMA = 'abc.generic-world-profile.v1'
+GENERIC_WORKLOAD = 'generic-wld-controls-v1'
+GENERIC_CORE_OPERATIONS = (
+    'choose-world', 'import', 'select-display', 'trigger', 'single-tick',
+    'run-pause', 'save', 'close-exported', 'reselect-exported-world',
+    'reimport', 'reset-original', 'close',
+)
+GENERIC_DISPATCHES = {
+    'worldCircuitChooseWorld', 'worldCircuitImport', 'worldCircuitCancel',
+    'worldCircuitViewport', 'worldCircuitReadDisplay', 'worldCircuitTrigger',
+    'worldCircuitStep', 'worldCircuitToggle', 'worldCircuitPause',
+    'worldCircuitSave', 'worldCircuitReset', 'worldCircuitClose',
+    'worldCircuitOptimization',
+}
+
+
+def validate_generic_profile(report, commit, cycles=2):
+    from computer_memory_validate import validate_generic_region, validate_generic_trigger
+    require(report['schema'] == GENERIC_PROFILE_SCHEMA and
+            report.get('workloadId') == GENERIC_WORKLOAD, 'wrong generic profile workload')
+    require(report['status'] == 'passed' and report.get('failure') is None and
+            report.get('failureStack') is None, 'failed or partial generic profile')
+    require(report['inputFormat'] == 'wld-only' and report['circuitAbi'] == 2 and
+            report['buildMode'] == 'profile', 'generic profile requires real WLD ABI2')
+    require(report['cycles'] == cycles and report['modes'] == list(MODES) and
+            report['steadySecondsPerMode'] == 30 and report['excludedWarmupCycles'] == 0,
+            'generic profile protocol or retained lifecycle count changed')
+    require(not any(key in report for key in ('clockBatchPulses', 'traceTotalPulses')) and
+            report.get('inputLatencies', []) == [],
+            'generic profile must not inherit a CPU/key workload')
+    runtime = report['runtime']
+    validate_source({'commit': runtime['commit'], 'checkedOutHead': runtime['checkedOutHead'],
+                     'dirty': runtime['workingTreeDirty']}, commit)
+    require(runtime['platform'] == 'linux' and runtime['flutterVersion'] == '3.47.6' and
+            report['toolchain']['flutterRevisionPin'] == FLUTTER_REVISION, 'wrong profile platform/toolchain')
+    require(runtime['heapMeasurementMethod'] == HEAP_MEASUREMENT_METHOD, 'wrong generic heap method')
+    for key in ('renderer', 'runner', 'dartVersion', 'osVersion'):
+        require(runtime.get(key) not in (None, '', 'unspecified'), f'missing runtime {key}')
+    for key in ('physicalWidth', 'physicalHeight', 'devicePixelRatio'):
+        number(report['viewport'][key], key, .001)
+    fixture = report['fixture']
+    sha(fixture['wldSha256']); integer(fixture['wldBytes'], 'world input bytes', 1)
+    require('pongSha256' not in fixture, 'generic fixture cannot carry a program requirement')
+    calibration = validate_display_calibration(report)
+    budget = calibration['observedFrameBudgetUs']
+    operations = {row['id']: row for row in report['operations']}
+    expected = {f'circuit.{action}.{mode}' for mode in MODES for action in GENERIC_CORE_OPERATIONS}
+    expected |= {'circuit.cancel-import.standard', 'circuit.enable-optimization.optimized'}
+    require(len(operations) == len(report['operations']) and set(operations) == expected,
+            'missing, duplicate or unknown generic action')
+    for operation_id, row in operations.items():
+        cancelled = operation_id == 'circuit.cancel-import.standard'
+        count = 1 if cancelled else cycles
+        samples = row['samples']
+        require(len(samples) == count and [s['cycle'] for s in samples] == list(range(count)),
+                f'{operation_id}: missing, duplicate or reordered lifecycle samples')
+        require(row['iterations'] == count and row['warmup'] == 0 and
+                row['status'] in ('passed', 'missing-frames'), 'failed/excluded generic action summary')
+        for sample in samples:
+            require(sample['success'] is True, f'{operation_id}: failed action')
+            number(sample['latencyMs'], 'generic action latency')
+            for key in ('rssBeforeBytes', 'rssAfterBytes'):
+                number(sample[key], key, 1)
+            require(all(isinstance(sample[key], list) for key in ('uiUs', 'rasterUs', 'totalSpanUs')) and
+                    len(sample['uiUs']) == len(sample['rasterUs']) == len(sample['totalSpanUs']),
+                    'raw frame timing arrays differ')
+            for key in ('uiUs', 'rasterUs', 'totalSpanUs'):
+                for value in sample[key]: number(value, 'raw ' + key)
+        require(row['frameCount'] == sum(len(s['uiUs']) for s in samples), 'generic raw/summary frame count differs')
+    controllers = report['controllerOperations']
+    require(report.get('dispatcherCoverageSchema') == 1 and controllers, 'actual generic dispatch samples missing')
+    require({row.get('action') for row in controllers} == GENERIC_DISPATCHES,
+            'missing or unknown generic production dispatch')
+    identities = [(row['action'], row['variant']['profileMode']) for row in controllers]
+    require(len(identities) == len(set(identities)), 'duplicate generic dispatcher summaries')
+    for row in controllers:
+        require(row['variant']['profileMode'] in MODES and row['sampleCount'] == len(row['samples']) and
+                row['sampleCount'] > 0, 'invalid generic dispatcher sample count/mode')
+        for sample in row['samples']:
+            require(sample['completion'] == 'returned', 'generic dispatcher failed')
+            integer(sample['cycle'], 'dispatch cycle')
+            require(sample['cycle'] < cycles, 'dispatch cycle outside planned workload')
+            scope = sample.get('macroScope')
+            require(scope in operations or (scope is None and row['action'] in
+                    ('worldCircuitViewport', 'worldCircuitReadDisplay')), 'dispatch lacks its exact generic scope')
+            number(sample['durationMs'], 'generic dispatch duration')
+    dispatch_counts = Counter((sample['cycle'], row['variant']['profileMode'], row['action'], sample.get('macroScope'))
+                              for row in controllers for sample in row['samples'])
+    expected_dispatches = Counter()
+    macros = {
+        'choose-world': ('worldCircuitChooseWorld',), 'import': ('worldCircuitImport',),
+        'select-display': ('worldCircuitViewport', 'worldCircuitReadDisplay'),
+        'trigger': ('worldCircuitTrigger',), 'single-tick': ('worldCircuitStep',),
+        'run-pause': ('worldCircuitToggle', 'worldCircuitPause'), 'save': ('worldCircuitSave',),
+        'reset-original': ('worldCircuitReset',), 'close-exported': ('worldCircuitClose',),
+        'reselect-exported-world': ('worldCircuitChooseWorld',), 'reimport': ('worldCircuitImport',),
+        'close': ('worldCircuitClose',),
+    }
+    for cycle in range(cycles):
+        for mode in MODES:
+            for macro, actions in macros.items():
+                expected_dispatches.update((cycle, mode, action, f'circuit.{macro}.{mode}') for action in actions)
+            for action in ('worldCircuitViewport', 'worldCircuitReadDisplay'):
+                expected_dispatches[(cycle, mode, action, None)] += 2
+            if mode == 'optimized':
+                expected_dispatches[(cycle, mode, 'worldCircuitOptimization', 'circuit.enable-optimization.optimized')] += 1
+    for action in ('worldCircuitImport', 'worldCircuitCancel'):
+        expected_dispatches[(0, 'standard', action, 'circuit.cancel-import.standard')] += 1
+    require(dispatch_counts == expected_dispatches, 'generic actual dispatcher action/scope/cycle counts differ')
+    observations = report['observations']
+    indexed = {(row['cycle'], row['mode']): row for row in observations}
+    require(len(observations) == len(indexed) == cycles * 2 and
+            set(indexed) == {(cycle, mode) for cycle in range(cycles) for mode in MODES},
+            'missing or duplicate generic lifecycle observation')
+    projection, frames = [], []
+    for cycle in range(cycles):
+        for mode in MODES:
+            row = indexed[cycle, mode]
+            width, height = row['worldWidth'], row['worldHeight']
+            validate_generic_region(row['displayRegion'], width, height)
+            validate_generic_trigger(row['trigger'], width, height)
+            require(row['singleTickDelta'] == 1 and type(row['singleTickDelta']) is int,
+                    'single generic tick was not observed')
+            before = integer(row['tickBefore'], 'ticks before')
+            after = integer(row['tickAfter'], 'ticks after')
+            delta = integer(row['steadyTickDelta'], 'steady ticks', 1)
+            require(after - before == 1 and integer(row['nativeSteadyTickDelta'], 'native steady ticks', 1) == delta,
+                    'generic single/steady native tick interval differs')
+            duration = number(row['steadyWindowMs'], 'generic steady duration', 30000)
+            require(duration <= 45000, 'generic window exceeded its bounded schedule')
+            sha(row['savedWldSha256'])
+            for field in ('reopenPreservedSelectedPixels', 'resetRestoredOriginal', 'closed'):
+                require(row[field] is True, 'generic lifecycle missing ' + field)
+            require(row['optimizationEnabled'] is (mode == 'optimized') and
+                    row['nativeOptimizationEnabled'] is (mode == 'optimized'), 'generic active mode differs')
+            sample = next(s for s in operations[f'circuit.run-pause.{mode}']['samples'] if s['cycle'] == cycle)
+            ui, raster, total = sample['uiUs'], sample['rasterUs'], sample['totalSpanUs']
+            require(ui, 'generic steady window has no received engine frames')
+            frames.append({'mode': mode, 'cycle': cycle, 'workloadId': GENERIC_WORKLOAD,
+                           'windowMs': duration, 'virtualTicks': delta,
+                           'ticksPerSecond': delta * 1000 / duration,
+                           'frameCount': len(ui), 'displayCalibrationStatus': calibration['status'],
+                           'frameBudgetUs': budget, 'frameBudgetSource': calibration['frameBudgetSource'],
+                           'referenceFrameBudgetUs': calibration['referenceFrameBudgetUs'],
+                           'uiMedianUs': statistics.median(ui), 'uiP95Us': percentile(ui, .95),
+                           'rasterMedianUs': statistics.median(raster), 'rasterP95Us': percentile(raster, .95),
+                           'overBudgetFrames': None if budget is None else sum(a > budget or b > budget for a, b in zip(ui, raster))})
+            # Steady elapsed time, tick count and resulting saved bytes vary.
+            # Equality covers the declared controls and lifecycle assertions,
+            # not a invented cross-run physical CPU/display signature.
+            projection.append({'cycle': cycle, 'mode': mode, 'worldWidth': width, 'worldHeight': height,
+                               'displayRegion': row['displayRegion'], 'trigger': row['trigger'],
+                               'singleTickDelta': 1, 'reopenPreservedSelectedPixels': True,
+                               'resetRestoredOriginal': True, 'closed': True})
+    memory = report['memory']
+    expected_memory = {('baseline', None, None)} | {(phase, cycle, mode) for phase in
+                       ('paused-after-steady-run', 'after-close') for cycle in range(cycles) for mode in MODES}
+    require(len(memory) == len(expected_memory) and
+            {(r['phase'], r.get('cycle'), r.get('mode')) for r in memory} == expected_memory,
+            'generic baseline/paused/close memory observations missing')
+    for row in memory:
+        for key in ('rssBytes', 'maxRssBytes', 'heapUsedBytes', 'heapCapacityBytes', 'externalBytes'):
+            number(row[key], 'observed ' + key)
+        isolates = integer(row['sampledIsolates'], 'VM isolate count', 1)
+        groups = integer(row['sampledIsolateGroups'], 'VM isolate-group count', 1)
+        require(groups <= isolates and row['heapMeasurementMethod'] == HEAP_MEASUREMENT_METHOD and
+                row['gc'] == 'requested-all-isolate-groups', 'generic heap observation method differs')
+    require(report.get('loadingOperationCoverage') == 'generic-initial-reimport-reset-v1',
+            'generic loading memory protocol missing')
+    loading_memory = validate_loading_os_memory(report.get('loadingOsMemory'), cycles,
+                                               include_resets=True, generic=True)
+    for window in loading_memory['windows']:
+        if window['outcome'] == 'ready':
+            observed = indexed[window['cycle'], window['mode']]
+            ready = window['readyEvidence']
+            require((ready['worldWidth'], ready['worldHeight']) ==
+                    (observed['worldWidth'], observed['worldHeight']),
+                    'loading and observed world dimensions differ')
+    return {'schema': GENERIC_PROFILE_SCHEMA, 'workloadId': GENERIC_WORKLOAD,
+            'fixture': fixture, 'protocol': projection}, {
+                'workloadId': GENERIC_WORKLOAD, 'profileSchema': GENERIC_PROFILE_SCHEMA,
+                'displayCalibration': calibration, 'frames': frames, 'memory': memory,
+                'observations': observations, 'loadingOsMemory': loading_memory,
+                'operationLatencies': {key: [s['latencyMs'] for s in row['samples']] for key, row in operations.items()},
+                'historicalComparability': 'generic-schema-and-identical-workload-only',
+                'targetDeviceFluencyStatus': 'not-established',
+                'unmeasured': ['OS input-to-display presentation latency']}
+
+
 def validate_profile(report, commit, cycles=2):
+    if report.get('schema') == GENERIC_PROFILE_SCHEMA:
+        return validate_generic_profile(report, commit, cycles)
     require(report['schema'] == 2 and report.get('inputFormat') == 'wld-only'
             and report.get('circuitAbi') == 2 and report['status'] == 'passed'
             and report['buildMode'] == 'profile', 'Actual successful Flutter profile report required')
@@ -822,6 +1024,10 @@ def compare(reports, commit, require_jobs=False):
         web = states.get(f'computerraria-web-{mode}.run-1.json')
         if native and web and native != {k:v for k,v in web.items() if k != 'idleModeFlipStates'}:
             errors.append(f'{mode}: Native/Web same-mode complete deterministic projections differ')
+    ui_workloads = {value.get('workloadId', 'legacy-computerraria-ui-v2')
+                    for name, value in measurements.items() if name.startswith('computerraria-ui.')}
+    if len(ui_workloads) > 1:
+        errors.append('UI reports use different workload/schema identities; legacy CPU and generic controls cannot be compared')
     reference = states.get('computerraria-ui.run-1.json')
     for run in (2, 3):
         name = f'computerraria-ui.run-{run}.json'
@@ -857,8 +1063,30 @@ def compare(reports, commit, require_jobs=False):
                        'Memory deltas are observations, not a calibrated leak/regression threshold.']}
 
 
+def generic_markdown(result):
+    lines = ['# Generic world controls and separate fixture evidence', '',
+             f"Report validity: {result['status']}; accepted reports: {result['acceptedReports']}/15.",
+             f"Commit: {result['commit']}", '',
+             'Generic UI workload: generic-wld-controls-v1. Historical CPU UI reports are not a baseline.',
+             'Native/Web CPU fixture evidence remains separate. Successful commands do not establish display fluency or leak freedom.', '']
+    lines += [f"- {error}" for error in result['errors']]
+    for name, value in result['measurements'].items():
+        if value.get('workloadId') != GENERIC_WORKLOAD:
+            lines += [f"- {name}: separate CPU fixture evidence; complete values remain in JSON."]
+            continue
+        lines += ['', f'## {name}', '',
+                  '| Mode | Cycle | Virtual ticks | Received frames | UI p95 µs | Raster p95 µs | Refresh calibration |',
+                  '|---|---:|---:|---:|---:|---:|---|']
+        for row in value['frames']:
+            lines.append(f"| {row['mode']} | {row['cycle']} | {row['virtualTicks']} | {row['frameCount']} | {row['uiP95Us']:.1f} | {row['rasterP95Us']:.1f} | {row['displayCalibrationStatus']} |")
+        lines += ['', 'Operation samples, failures, all memory observations and actual selected coordinates remain in JSON. No report or outlier is excluded.']
+    return '\n'.join(lines) + '\n'
+
+
 def markdown(result):
     data = result['measurements']
+    if any(value.get('workloadId') == GENERIC_WORKLOAD for value in data.values()):
+        return generic_markdown(result)
     performance = performance_summary(data)
     calibration = performance['displayCalibration']
     lines = ['# Complete Computerraria acceptance', '',

@@ -16,6 +16,14 @@ import '../resources/online_resource_service.dart';
 abstract class TerraController extends ChangeNotifier {
   final HostStageTimings hostStages = HostStageTimings();
   TerraViewState get view;
+
+  /// Ordinary workspace changes. Controllers without scoped updates keep the
+  /// original notification and one-snapshot rendering path.
+  Listenable get workspaceChanges => this;
+  Listenable? get worldCircuitChanges => null;
+  Map<String, Object?> get worldCircuitView => Map<String, Object?>.from(
+    view.result['worldCircuit'] as Map? ?? const {},
+  );
   Future<void> dispatch(String action, [Map<String, Object?> args = const {}]);
 }
 

@@ -1,6 +1,7 @@
+// Test-only physical computer fixture. Never import into production lib.
 import 'dart:typed_data';
 
-import '../engine/world_circuit_backend.dart';
+import 'package:terraforge/engine/world_circuit_backend.dart';
 
 /// Physical layout of the source-verified 2026-08-03 Computerraria world.
 /// These are wiring controls and lamp coordinates, not a host CPU emulator.

@@ -23,6 +23,19 @@ def sanitize(text):
     return LOCAL_SERVICE.sub('[redacted-local-service-url]', text)
 
 
+def validate_target_identity(report, head):
+    """Associate only an exact diagnostic target, never a stale bundled app."""
+    schema = report.get('schema')
+    generic = schema == 'abc.generic-world-memory.v1'
+    if (schema not in ('abc.computer-memory-diagnostic.v1', 'abc.generic-world-memory.v1') or
+            (generic and report.get('workloadId') != 'generic-wld-controls-v1') or
+            (not generic and report.get('workloadId') not in (None, 'legacy-computerraria-memory-v1')) or
+            report.get('runtime', {}).get('commit') != head or
+            type(report.get('hostPid')) is not int or report['hostPid'] < 1):
+        raise ValueError('Target identity is unverified; skip build/report association')
+    return schema
+
+
 def digest(path):
     result = hashlib.sha256()
     with Path(path).open('rb') as source:
@@ -143,10 +156,7 @@ def main():
         if not launch_report.exists():
             raise ValueError('No diagnostic target report: prior bundle must not be attributed to this invocation')
         launch_evidence = json.loads(launch_report.read_text())
-        if (launch_evidence.get('schema') != 'abc.computer-memory-diagnostic.v1'
-                or launch_evidence.get('runtime', {}).get('commit') != head
-                or not isinstance(launch_evidence.get('hostPid'), int)):
-            raise ValueError('Target identity is unverified; skip build/report association')
+        validate_target_identity(launch_evidence, head)
         record['applicationHostPid'] = launch_evidence['hostPid']
         record['diagnosticTargetReported'] = True
         bundle = Path('build/linux/x64/profile/bundle')
@@ -161,6 +171,9 @@ def main():
             if not path.exists():
                 continue
             payload = json.loads(path.read_text())
+            validate_target_identity(payload, head)
+            if payload['hostPid'] != launch_evidence['hostPid'] or payload['schema'] != launch_evidence['schema']:
+                raise ValueError('Diagnostic report copies name different target processes or schemas')
             payload['runtime'].update({
                 'buildProvenanceSha256': digest(related['build']),
                 'sourceTreeSha256': build['sourceTreeSha256'],

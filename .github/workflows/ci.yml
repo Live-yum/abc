@@ -24,6 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The frozen painter provenance contract reads the exact c61 source.
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-flutter
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -31,6 +33,8 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run verify:sources
+      - name: Verify new source-file provenance and rejection cases
+        run: python3 -m unittest discover -s tool -p 'authorized_source_additions_test.py'
       - name: Verify the bundled offline CJK font and public fixture downloader
         run: |
           python3 -m venv "$RUNNER_TEMP/font-tools"
@@ -60,6 +64,75 @@ jobs:
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           ABC_WEB_OUTPUT="$PWD/web/engine" bash tool/build_web_engine.sh
+      - name: Check out the frozen batched-reader reference
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          path: build/batched-reader-reference
+          persist-credentials: false
+      - name: Actual WASM reader differential against frozen 9d4
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/batched-reader-reference"
+          test "$(git -C "$reference" rev-parse HEAD)" = 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          test "$(emcc -dumpversion)" = 5.0.7
+          emcmake cmake -S "$reference/native/vendor/TerraWasm" -B build/batched-reader-reference-wasm \
+            -DCMAKE_BUILD_TYPE=Release -DABC_HOST_WRAPPERS="$reference/native" \
+            -DTERRAWASM_FEATURE_SET=wld -DTERRAX_BUILD_COMMIT=e2c3c817b2b482a535763695d19945971e19e41c \
+            -DTERRAX_BUILD_DIRTY=true -DTERRAX_BUILD_COMPILER=emscripten-5.0.7 \
+            -DTERRAX_WEB_MAXIMUM_MEMORY=268435456
+          cmake --build build/batched-reader-reference-wasm --target terrax_world_wasm_web --parallel 4
+          python3 tool/test_batched_reader.py --mode wasm \
+            --reference-source "$reference/native/vendor/TerraWasm" \
+            --candidate-source native/vendor/TerraWasm \
+            --reference-web-build build/batched-reader-reference-wasm \
+            --candidate-web-build build/wasm-wld \
+            --output build/batched-reader-contracts/wasm
+      - name: Verify and remove only the temporary batched-reader reference checkout
+        if: always()
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/batched-reader-reference"
+          if [[ -d "$reference/.git" ]]; then
+            test "$(git -C "$reference" rev-parse HEAD)" = 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+            test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+            rm -rf -- "$reference"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: batched-reader-wasm-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/batched-reader-contracts/wasm/report.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Check out the frozen uncached viewport reference
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: b3f2b22312d1369681fc9110a6957e57999a4e94
+          path: build/viewport-cache-reference
+          persist-credentials: false
+      - name: Actual WASM viewport cache differential against frozen b3
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/viewport-cache-reference"
+          test "$(git -C "$reference" rev-parse HEAD)" = b3f2b22312d1369681fc9110a6957e57999a4e94
+          test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          ABC_WEB_OUTPUT="$PWD/build/viewport-cache-reference-web" \
+            ABC_WEB_BUILD_ROOT="$PWD/build/viewport-cache-reference-wasm-build" \
+            bash "$reference/tool/build_web_engine.sh" \
+            2>&1 | tee build/viewport-cache-reference-web-build.log
+          python3 tool/export_viewport_cache_fixture.py build/viewport-cache-fixtures
+          node test/web/world_circuit_viewport_cache_actual.cjs \
+            "$PWD/build/viewport-cache-reference-web/world.js" \
+            "$PWD/build/viewport-cache-reference-web/world.wasm" \
+            "$PWD/web/engine/world.js" "$PWD/web/engine/world.wasm" \
+            "$PWD/build/viewport-cache-fixtures" "$PWD/build/viewport-cache-actual-wasm.json" \
+            2>&1 | tee build/viewport-cache-actual-wasm.log
+          node test/web/world_circuit_viewport_probe_contract.cjs \
+            2>&1 | tee build/viewport-cache-web-host-probe.log
       - name: Real Web engine contracts with synthetic fixtures
         run: |
           mkdir -p build
@@ -92,6 +165,10 @@ jobs:
           node tool/test_web_binary_map.mjs
           node test/web/world_circuit_smoke.cjs web/engine/world.js web/engine/world.wasm build/circuit.wld
           node test/web/world_circuit_fragments_smoke.cjs web/engine/world.js web/engine/world.wasm build/fragments.wld
+          python3 tool/test_wired_lights.py --export-fixtures build/light-fixtures
+          node test/web/world_circuit_lights_contract.cjs web/engine/world.js web/engine/world.wasm build/light-fixtures
+          python3 tool/test_timer_fifo.py --export-fixtures build/timer-fixtures
+          node test/web/world_circuit_timer_contract.cjs web/engine/world.js web/engine/world.wasm build/timer-fixtures
       - name: Actual binary MAP worker lifecycle contracts
         run: |
           dart run tool/perf/write_map_fixture.dart build/synthetic.map
@@ -115,6 +192,29 @@ jobs:
           name: terraforge-web-${{ github.event.pull_request.head.sha || github.sha }}
           path: build/terraforge-web.tar.gz
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify and remove only the temporary viewport reference checkout
+        if: always()
+        run: |
+          set -euo pipefail
+          if test -d build/viewport-cache-reference/.git; then
+            test "$(git -C build/viewport-cache-reference rev-parse HEAD)" = b3f2b22312d1369681fc9110a6957e57999a4e94
+            test -z "$(git -C build/viewport-cache-reference status --porcelain --untracked-files=normal)"
+            rm -rf -- build/viewport-cache-reference
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: viewport-cache-web-contracts-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/viewport-cache-actual-wasm.json
+            build/viewport-cache-actual-wasm.log
+            build/viewport-cache-web-host-probe.log
+            build/viewport-cache-reference-web-build.log
+            build/viewport-cache-reference-web/manifest.json
+            build/viewport-cache-fixtures/manifest.json
+          if-no-files-found: warn
           retention-days: 14
 
   native-contract:
@@ -142,12 +242,13 @@ jobs:
           python3 native/generate_circuit_fixture.py build/circuit.wld
           python3 native/generate_circuit_fragment_fixture.py build/fragments.wld
           python3 native/generate_region_object_fixture.py build/objects.wld
+          python3 tool/generate_visible_pixelbox_fixture.py --check test/fixtures/generic-circuit/synthetic-visible-pixelbox.wld
           dart run native/generate_player_fixture.dart build/synthetic-player.json
       - name: Build instrumented C engine
         run: |
           cmake -S native -B build/native -DABC_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
           cmake --build build/native --parallel 2
-          for contract in circuit_device_epoch_contract circuit_wld_pixel_contract; do
+          for contract in circuit_device_epoch_contract circuit_wld_pixel_contract circuit_wired_light_contract circuit_timer_order_contract; do
             cc -g -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer -I native/vendor/TerraWasm/include -I native/vendor/TerraWasm/src "native/$contract.c" build/native/terra/libterrax_world_static.a -lm -lz -o "build/$contract"
           done
           cc -g -fsanitize=address,undefined -fno-omit-frame-pointer -I native native/native_contract.c -L build/native -labc_engine -Wl,-rpath,"$PWD/build/native" -o build/native_contract
@@ -160,17 +261,111 @@ jobs:
           build/native_contract build/synthetic.wld build/synthetic-player.json
           build/circuit_device_epoch_contract
           build/circuit_wld_pixel_contract
+          build/circuit_wired_light_contract
+          build/circuit_timer_order_contract
           build/region_contract build/objects.wld
       - name: Build complete native application engine
         run: |
           cmake -S native -B build/native-release -DCMAKE_BUILD_TYPE=Release
           cmake --build build/native-release --parallel 2
+          python3 tool/test_wired_lights.py build/native-release/libabc_engine.so --output build/native-wired-lights.json
+          python3 tool/test_timer_fifo.py build/native-release/libabc_engine.so --output build/native-timers.json
+          python3 tool/test_timer_gate_origins.py build/native-release/libabc_engine.so --output build/native-timer-gates.json
           echo "TERRAFORGE_ENGINE_LIBRARY=$PWD/build/native-release/libabc_engine.so" >> "$GITHUB_ENV"
           echo "TERRAFORGE_WORLD_FIXTURE=$PWD/build/synthetic.wld" >> "$GITHUB_ENV"
           echo "TERRAFORGE_CIRCUIT_FIXTURE=$PWD/build/circuit.wld" >> "$GITHUB_ENV"
           quickjs="$PUB_CACHE/hosted/pub.dev/flutter_js-0.8.7/linux/shared/libquickjs_c_bridge_plugin.so"
           test -f "$quickjs"
           echo "LIBQUICKJSC_TEST_PATH=$quickjs" >> "$GITHUB_ENV"
+      - name: Check out the frozen batched-reader reference
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          path: build/batched-reader-reference
+          persist-credentials: false
+      - name: Frozen-reference reader differential in Release and ASan/UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/batched-reader-reference"
+          test "$(git -C "$reference" rev-parse HEAD)" = 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+          cmake -S "$reference/native" -B build/batched-reader-reference-release -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/batched-reader-reference-release --target terrax_world_static --parallel 2
+          cmake -S "$reference/native" -B build/batched-reader-reference-asan -DABC_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/batched-reader-reference-asan --target terrax_world_static --parallel 2
+          python3 tool/test_batched_reader.py --mode release \
+            --reference-source "$reference/native/vendor/TerraWasm" \
+            --candidate-source native/vendor/TerraWasm \
+            --reference-archive build/batched-reader-reference-release/terra/libterrax_world_static.a \
+            --candidate-archive build/native-release/terra/libterrax_world_static.a \
+            --output build/batched-reader-contracts/release
+          python3 tool/test_batched_reader.py --mode sanitized \
+            --reference-source "$reference/native/vendor/TerraWasm" \
+            --candidate-source native/vendor/TerraWasm \
+            --reference-archive build/batched-reader-reference-asan/terra/libterrax_world_static.a \
+            --candidate-archive build/native/terra/libterrax_world_static.a \
+            --output build/batched-reader-contracts/sanitized
+      - name: Verify and remove only the temporary batched-reader reference checkout
+        if: always()
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/batched-reader-reference"
+          if [[ -d "$reference/.git" ]]; then
+            test "$(git -C "$reference" rev-parse HEAD)" = 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+            test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+            rm -rf -- "$reference"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: batched-reader-native-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/batched-reader-contracts/*/report.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Check out the frozen uncached viewport reference
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: b3f2b22312d1369681fc9110a6957e57999a4e94
+          path: build/viewport-cache-reference
+          persist-credentials: false
+      - name: Native viewport cache differential and actual host source guards
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/viewport-cache-reference"
+          test "$(git -C "$reference" rev-parse HEAD)" = b3f2b22312d1369681fc9110a6957e57999a4e94
+          test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+          cmake -S "$reference/native" -B build/viewport-cache-reference-native \
+            -DCMAKE_BUILD_TYPE=Release -DABC_PERF_COUNTERS=OFF \
+            2>&1 | tee build/viewport-cache-reference-native-configure.log
+          cmake --build build/viewport-cache-reference-native --parallel 2 \
+            2>&1 | tee build/viewport-cache-reference-native-build.log
+          python3 tool/test_viewport_cache.py \
+            "$PWD/build/viewport-cache-reference-native/libabc_engine.so" \
+            "$PWD/build/native-release/libabc_engine.so" \
+            --output build/viewport-cache-native-semantics.json \
+            2>&1 | tee build/viewport-cache-native-semantics.log
+          python3 tool/export_viewport_cache_fixture.py build/viewport-cache-fixtures
+          TERRAFORGE_ENGINE_LIBRARY="$PWD/build/native-release/libabc_engine.so" \
+            ABC_VIEWPORT_CACHE_FIXTURE="$PWD/build/viewport-cache-fixtures/original.wld" \
+            ABC_EXPECT_VIEWPORT_CACHE=1 flutter test --no-pub \
+            test/native_viewport_cache_source_guard_test.dart \
+            2>&1 | tee build/viewport-cache-native-source-guard.log
+      - name: Viewport cache allocation and reclamation under ASan and UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -euo pipefail
+          cc -std=c17 -g -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/vendor/TerraWasm/include -I native/vendor/TerraWasm/src \
+            native/circuit_viewport_cache_contract.c build/native/terra/libterrax_world_static.a \
+            -Wl,--wrap=tx_persistent_alloc,--wrap=tx_persistent_free -lm -lz \
+            -o build/viewport-cache-memory-contract
+          build/viewport-cache-memory-contract \
+            2>&1 | tee build/viewport-cache-memory-contract.log
       - name: Native sparse lamp checkpoints, cancellation and source paths
         run: >-
           python3 tool/test_sparse_lamp_queries.py
@@ -194,6 +389,30 @@ jobs:
             native/circuit_rules_runtime_smoke_test.dart \
             native/circuit_rules_bundle_test.dart \
             native/circuit_rules_corpus_test.dart
+
+      - name: Verify and remove only the temporary viewport reference checkout
+        if: always()
+        run: |
+          set -euo pipefail
+          if test -d build/viewport-cache-reference/.git; then
+            test "$(git -C build/viewport-cache-reference rev-parse HEAD)" = b3f2b22312d1369681fc9110a6957e57999a4e94
+            test -z "$(git -C build/viewport-cache-reference status --porcelain --untracked-files=normal)"
+            rm -rf -- build/viewport-cache-reference
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: viewport-cache-native-contracts-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/viewport-cache-native-semantics.json
+            build/viewport-cache-native-semantics.log
+            build/viewport-cache-native-source-guard.log
+            build/viewport-cache-memory-contract.log
+            build/viewport-cache-reference-native-configure.log
+            build/viewport-cache-reference-native-build.log
+            build/viewport-cache-fixtures/manifest.json
+          if-no-files-found: warn
+          retention-days: 14
 
   android:
     name: Android unsigned release build

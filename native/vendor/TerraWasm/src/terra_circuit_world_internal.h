@@ -12,6 +12,8 @@
 #define CX_CHECK_COLUMNS 64u
 #define CX_CACHE_PAGES 64u
 #define CX_NONE UINT32_MAX
+#define CX_VIEWPORT_CELLS 4096u
+#define CX_READ_VIEWPORT_PROBE 2u
 enum CxPhase {
     CX_TOPOLOGY=1, CX_ROOTS, CX_NUMBER, CX_REMAP, CX_MAP_SIZE, CX_MAP_ENCODE,
     CX_COUNT, CX_LAYOUT, CX_ZERO, CX_WRITE, CX_FLUSH, CX_INTERN, CX_IDLE,
@@ -44,6 +46,9 @@ typedef struct CxActuationPolicy { uint32_t device,x,y; uint32_t valid; TxTile a
 typedef struct CxPixel { uint32_t x,y,h[4],v[4],cell_word; uint8_t state,initial,hit_h,hit_v,marked; uint8_t connected_h,connected_v,reserved; } CxPixel;
 typedef struct CxPort { uint32_t net,pixel; uint8_t axis,colour; uint16_t reserved; } CxPort;
 typedef struct CxFragments CxFragments;
+typedef struct CxTimerOrder CxTimerOrder;
+/* Original source values only. Live circuit state is projected at every read. */
+typedef struct CxViewportCell { TxTile tile; uint32_t gate,nets[4]; } CxViewportCell;
 typedef struct CxWorld {
     uint32_t id, world_handle, maximum, bytes, peak, phase, error;
     TxWorld* world;
@@ -89,12 +94,17 @@ typedef struct CxWorld {
     uint8_t* pixel_snapshot;
     uint32_t vm_trip_index,wire_trip_epoch,optimization;
     uint32_t vm_source_gate;
+    CxTimerOrder* timer_order;
+    uint32_t timer_hit_count,timer_first,timer_hit_colours,timer_order_unsupported,timer_hit_events;
     CxOverride* overrides; uint32_t override_count,override_capacity;
     CxOverride* override_snapshot; uint32_t override_snapshot_capacity,override_saved_count;
     CxBinding* bindings; uint32_t binding_count,binding_capacity;
     CxInputPoint* points; uint32_t point_count,point_index;
     uint32_t* result; uint32_t result_count,result_capacity;
     uint32_t query_x0,query_x1,query_y0,query_y1,query_stride,query_point;
+    CxViewportCell* viewport_cells;
+    uint32_t viewport_x,viewport_y,viewport_width,viewport_height,viewport_stride;
+    uint32_t viewport_count,viewport_valid,viewport_pinned,viewport_building,viewport_hit,viewport_probe;
     uint32_t* trigger_nets; uint32_t trigger_count,trigger_capacity,trigger_remaining;
     uint32_t seed_lamps;
     uint32_t eval_group,eval_offset,eval_member,eval_gate,eval_valid;
@@ -111,6 +121,22 @@ typedef struct CxWorld {
 } CxWorld;
 
 void* cx_alloc(CxWorld*,uint32_t);
+void* cx_optional_alloc(CxWorld*,uint32_t);
+int cx_viewport_cache_reclaim(CxWorld*);
+void cx_viewport_cache_cancel(CxWorld*);
+/* Private owner reclamation; no change to TerraVmCallbacks or public exports. */
+void cx_vm_set_reclaim(TerraCircuitVm*,int (*)(void*),void*);
+void cx_timer_order_prepare(CxWorld*);
+void cx_timer_order_cell(CxWorld*,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
+void cx_timer_order_gates(CxWorld*);
+void cx_timer_order_finish(CxWorld*);
+void cx_timer_order_free(CxWorld*);
+void cx_timer_order_reset(CxWorld*);
+void cx_timer_order_begin(CxWorld*);
+void cx_timer_order_hit(CxWorld*,CxDevice*,uint32_t,uint32_t);
+int cx_timer_order_step(CxWorld*);
+int cx_toggle_timer(CxWorld*,CxDevice*);
+uint32_t cx_bound_wire_mask(CxWorld*,uint32_t,uint32_t);
 void cx_free(CxWorld*,void*);
 int cx_fail(CxWorld*,int,const char*);
 int cx_bytes_append(CxWorld*,CxBytes*,const void*,uint32_t);
@@ -128,6 +154,11 @@ uint32_t cx_var_size(uint32_t);
 uint32_t cx_var_put(uint8_t*,uint32_t);
 uint32_t cx_var_read(const CxBytes*,uint32_t*);
 int cx_emit(CxWorld*,uint32_t,uint32_t,uint32_t,uint32_t,const void*);
+/* Shared streamed-reader readiness policy; caller first checks cursor < tile_end. */
+static inline int cx_world_window_ready(const CxWorld* w){
+    uint32_t need=w->tile_end-w->cursor;if(need>32u)need=32u;
+    return !(w->cursor<w->input_offset||w->cursor-w->input_offset>w->input_length||need>w->input_length-(w->cursor-w->input_offset));
+}
 int cx_world_tile(CxWorld*,TxTile*);
 int cx_scan_step(CxWorld*,uint32_t*);
 void cx_scan_reset(CxWorld*);
@@ -170,6 +201,7 @@ void cx_operation_rollback(CxWorld*);
 int cx_seed_reserve(CxWorld*,uint32_t);
 int cx_override_reserve(CxWorld*,uint32_t);
 int cx_lazy_toggle(const TxTile*);
+uint32_t cx_wired_light_height(uint32_t);
 int cx_seed_contains(const CxWorld*,uint32_t,uint32_t);
 int cx_inside_wiring(const CxWorld*,uint32_t,uint32_t);
 int cx_devices_prepare(CxWorld*);

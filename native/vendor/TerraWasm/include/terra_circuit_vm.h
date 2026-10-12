@@ -40,6 +40,8 @@ typedef struct TerraVmCallbacks {
      * gate output. Pixel intersection and colour state must use this boundary. */
     int32_t (*trip_begin)(void* context);
     int32_t (*net_hit)(void* context, uint32_t net);
+    /* trip_end may return positive to yield one bounded adapter transition;
+     * it is called again before any gate evaluation or transaction commit. */
     int32_t (*trip_end)(void* context);
     void (*smoke)(void* context, TerraVmGateRef identity);
     /* Optional transaction hooks own any state changed by callbacks (gate frame,
@@ -79,6 +81,9 @@ int32_t terra_vm_set_parity(TerraCircuitVm* vm, uint32_t net, uint32_t value);
  * LIMIT; subsequent begin calls remain blocked until memory is released or the
  * caller restores sufficient budget. Destroy and stats always remain available. */
 int32_t terra_vm_set_budget(TerraCircuitVm* vm, uint32_t max_bytes);
+/* Owner callbacks may reserve memory while active. Change only the allocation
+ * ceiling, never VM state; reject a ceiling below existing allocations. */
+int32_t terra_vm_set_owner_budget(TerraCircuitVm* vm, uint32_t max_bytes);
 /* Optional outer parity transaction for a command containing several complete
  * TripWires. Begin/commit require an idle VM; nesting is rejected. Cancel first
  * rolls back an active pulse, then restores the parity preceding the batch.

@@ -48,6 +48,7 @@ set(WLD_SOURCES
     "${SRC_DIR}/terra_circuit_rules.c"
     "${SRC_DIR}/terra_circuit_query.c"
     "${SRC_DIR}/terra_circuit_devices.c"
+    "${SRC_DIR}/terra_circuit_timer_order.c"
     "${SRC_DIR}/terra_circuit_actuation.c"
     "${SRC_DIR}/terra_legacy_npc.c"
     "${SRC_DIR}/terra_wld_legacy.c"

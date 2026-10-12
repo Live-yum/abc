@@ -51,6 +51,6 @@ for name, file in [('Workspace', 'lib/application/workspace.dart'), ('CircuitRul
         else:
             reason = 'Direct dispatcher action not yet included in native measured workload; functional tests alone are not performance coverage.'
         rows.append({'controller': name, 'action': action, 'operationIds': measured, 'status': 'declared' if measured else 'gap', 'availability': 'unsupported-service' if action == 'generate' else 'qa-only' if action == 'openSynthetic' else 'available', 'reason': reason})
-out = {'schema': 'abc.performance-action-gaps.v1', 'note': 'Source-complete dispatcher inventory. Declared is not executed. Join IDs with passed per-runtime reports; preserve gaps and parameter variants.', 'actions': rows}
+out = {'schema': 'abc.performance-action-gaps.v1', 'worldCircuitWorkloadId': 'generic-wld-controls-v1', 'note': 'Source-complete dispatcher inventory. Declared is not executed. Join IDs with passed per-runtime reports; preserve gaps and parameter variants.', 'actions': rows}
 (root / 'tool/perf/action_gaps.json').write_text(json.dumps(out, indent=2, ensure_ascii=False) + '\n')
 print(f"{len(rows)} dispatcher actions; {sum(bool(row['operationIds']) for row in rows)} declared direct paths")

@@ -63,15 +63,15 @@ async function main(args){
   const begin=performance.now(),mode=activeOptimization;let result,milliseconds;
   if(compound){
    const pixels=displayPacket();
-   const frame=await bridge.computerFrame(id,JSON.stringify(clock(128).words),JSON.stringify(pixels.words)),roundTripMilliseconds=performance.now()-begin;
-   assert.equal(frame.displayError,null,'Compound display must succeed after accepted physical clocks');assert.ok(frame.display,'Compound returns selected actual pixels');
-   result=frame.clock;assert.equal(result.session,id,'Compound clock remaps public session');assert.equal(frame.display.session,id,'Compound display remaps same session');
-   assert.equal(frame.display.resultKind,9);assert.equal(frame.display.records.length,3072*16,'Only selected monitor records are returned');
-   assert.deepEqual(frame.display.stats.slice(18,24),result.stats.slice(18,24),'Compound display read adds no electrical work');
+   const frame=await bridge.commandAndReadPixels(id,JSON.stringify(clock(128).words),JSON.stringify(pixels.words)),roundTripMilliseconds=performance.now()-begin;
+   assert.equal(frame.readError,null,'Compound display must succeed after accepted physical clocks');assert.ok(frame.pixels,'Compound returns selected actual pixels');
+   result=frame.command;assert.equal(result.session,id,'Compound clock remaps public session');assert.equal(frame.pixels.session,id,'Compound display remaps same session');
+   assert.equal(frame.pixels.resultKind,9);assert.equal(frame.pixels.records.length,3072*16,'Only selected monitor records are returned');
+   assert.deepEqual(frame.pixels.stats.slice(18,24),result.stats.slice(18,24),'Compound display read adds no electrical work');
    milliseconds=result.hostStagesUs?.commandWallUs/1000;assert.ok(Number.isFinite(milliseconds)&&milliseconds>=0,'Separate clock-only host timing is available');
-   const ordinary=await display();assert.deepEqual(frame.display.records,ordinary.records,'Compound selected pixels exactly equal separate read');
-   lastCompoundDisplay=frame.display;
-   compoundSamples.push({phase,optimized:mode,monitor:'mono',recordsBytes:frame.display.records.length,recordsSha256:hash(frame.display.records),clockCommandMilliseconds:milliseconds,roundTripMilliseconds,hostStagesUs:frame.hostStagesUs});
+   const ordinary=await display();assert.deepEqual(frame.pixels.records,ordinary.records,'Compound selected pixels exactly equal separate read');
+   lastCompoundDisplay=frame.pixels;
+   compoundSamples.push({phase,optimized:mode,monitor:'mono',recordsBytes:frame.pixels.records.length,recordsSha256:hash(frame.pixels.records),clockCommandMilliseconds:milliseconds,roundTripMilliseconds,hostStagesUs:frame.hostStagesUs});
   }else{result=await command(clock(128));milliseconds=performance.now()-begin;}
   assert.equal(result.reserved&2,mode?2:0,'Clock batch retains selected mode');clockSamples.push({phase,optimized:mode,milliseconds});return result;
  }

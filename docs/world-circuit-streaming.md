@@ -47,16 +47,14 @@ in the existing 16-byte coordinate/type/flags/frame format; non-pixel cells are
 absent. Existing `TCW_VIEWPORT` behavior is unchanged. Circuit logic and program
 stores, never a host framebuffer emulator, determine every returned state.
 
-Computerraria clock controls pulse the real yellow wire at `(3194,153)`, with
-`hitSwitch:false`. A batched trigger waits for each complete activation before
-starting the next. One pulse is not necessarily one instruction. Automatic
-training-dummy NPC motion is not simulated.
+Production uses one generic tick runner and explicit device/line-pulse
+controls. It does not select CPU layouts or inject programs from source hashes.
+Pixel regions are user-selected bounded rectangles, with transparent gaps.
+Timers require explicit activation; automatic NPC motion is not simulated.
 
-The verified ROM maps and program loader operate on ordinary physical logic
-lamps. The application does not decode RISC-V instructions. The standalone
-acceptance images and expected RAM words are test fixtures, not runtime output
-providers. The matching complete published WLD is initially empty of program
-data; the actual upstream Pong image boots at address zero.
+Computerraria ROM maps and clock controls exist only in explicit test harnesses,
+which exercise generic physical lamp and wire operations. They never provide
+runtime pixels or hidden application behavior. See [fixture scope](COMPUTERRARIA.md).
 
 ## Reproduction and evidence
 
@@ -72,17 +70,17 @@ The complete public-world runner requires external input paths and records the
 exact binary hashes. It never substitutes a cropped world or software CPU:
 The input-probe path may be `-` to use the reviewable 40-byte image in
 `native/fixtures/computerraria/programs.json`; the distributed upstream Pong
-image is `assets/computer/pong.bin` with its adjacent MIT license/provenance.
+image is `test/fixtures/computerraria/pong.bin` with its adjacent MIT license/provenance.
 
 ```sh
 ABC_COMPUTERRARIA_SAVE=1 \
   dart native/computerraria_acceptance.dart /path/libabc_engine.so \
   /path/computerraria.wld \
-  - assets/computer/pong.bin /path/report-standard.json
+  - test/fixtures/computerraria/pong.bin /path/report-standard.json
 ABC_COMPUTERRARIA_OPTIMIZED=1 ABC_COMPUTERRARIA_SAVE=1 \
   dart native/computerraria_acceptance.dart /path/libabc_engine.so \
   /path/computerraria.wld \
-  - assets/computer/pong.bin /path/report-optimized.json
+  - test/fixtures/computerraria/pong.bin /path/report-optimized.json
 ```
 
 `test/web/computerraria_file_acceptance.cjs` runs the exact Web Wasm artifact in

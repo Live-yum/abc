@@ -31,7 +31,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/computer/
+    - assets/computer/WIREHEAD_LICENSE.txt
     - assets/qa/
     - assets/private/
     - assets/fonts/LICENSE.txt

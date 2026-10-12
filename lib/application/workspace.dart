@@ -6,11 +6,12 @@ import 'package:crypto/crypto.dart';
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
-import 'package:flutter/foundation.dart' show compute;
+import 'package:flutter/foundation.dart'
+    show ChangeNotifier, Listenable, compute;
 import 'package:flutter/services.dart' show rootBundle;
 
 import '../domain/image_import.dart';
-import '../domain/computer_provenance.dart';
+import '../domain/circuit_display.dart';
 import '../platform/world_circuit_files.dart';
 import '../domain/terraria_map.dart';
 import '../engine/world_map_backend.dart';
@@ -57,6 +58,11 @@ import '../platform/resource_store.dart';
 import '../ui/terra_contract.dart';
 
 class Workspace extends TerraController {
+  final ChangeNotifier _workspaceChanges = ChangeNotifier();
+  @override
+  Listenable get workspaceChanges => _workspaceChanges;
+  @override
+  Listenable get worldCircuitChanges => this;
   CircuitRulesWorkspace? _rules;
   CircuitRulesWorkspace get _rulesWorkspace {
     if (_rules != null) return _rules!;
@@ -75,8 +81,6 @@ class Workspace extends TerraController {
   final TerraEngine engine;
   final FileGateway files;
   final WorldCircuitFileGateway worldCircuitFiles;
-  final ComputerProvenanceStore _computerProvenance;
-  bool _computerProvenanceLoaded = false;
   final LocalVault? vault;
   final CircuitBackend? circuitBackend;
   final WorldCircuitBackend? worldCircuitBackend;
@@ -118,6 +122,7 @@ class Workspace extends TerraController {
   WorldCircuitGeometry? _worldGeometry;
   Map<String, Object?> _circuitWorldMetadata = {};
   Map<String, int> _circuitViewport = {};
+  Map<String, int>? _pendingCircuitViewport;
   Uint8List _worldCircuitRecords = Uint8List(0);
   FusionDocument _fusion = FusionDocument(40, 24);
   CircuitDocument _circuit = CircuitDocument(width: 32, height: 20);
@@ -155,7 +160,6 @@ class Workspace extends TerraController {
     this.playerProjectionBackend,
     MapBackend? mapBackend,
   }) : mapBackend = mapBackend ?? createMapBackend(),
-       _computerProvenance = ComputerProvenanceStore(vault: vault),
        worldCircuitFiles = worldCircuitFiles ?? createWorldCircuitFiles() {
     onlineResources?.addListener(_onlineResourcesChanged);
   }
@@ -173,7 +177,6 @@ class Workspace extends TerraController {
       for (final e in await vault!.list()) {
         _vaultEntries[e.id] = e;
       }
-      await _ensureComputerProvenance();
       final markerEntries =
           _vaultEntries.values.where(_isMarkerPreference).toList()
             ..sort((a, b) => b.id.compareTo(a.id));
@@ -323,7 +326,8 @@ class Workspace extends TerraController {
   bool _isInternalPreference(VaultEntry entry) =>
       _isMarkerPreference(entry) ||
       _isWorldRulePreference(entry) ||
-      ComputerProvenanceStore.isEntry(entry) ||
+      // Retain legacy internal records without restoring fixture-specific state.
+      entry.id.startsWith('preferences-computer-provenance-') ||
       entry.id.startsWith('preferences-schemes-');
 
   bool _isMarkerPreference(VaultEntry entry) =>
@@ -340,6 +344,71 @@ class Workspace extends TerraController {
   bool _busy = false;
   String _status = '选择存档，或从空白画布开始。', _error = '', _activeCanvas = 'pixel';
   Map<String, Object?> _result = {};
+  @override
+  Map<String, Object?> get worldCircuitView => {
+    'open': _worldCircuit?.result != null,
+    'streamingAvailable': worldCircuitBackend is WorldCircuitSourceBackend,
+    'sourceName': _circuitSource?.name,
+    'sourceBytes': _circuitSource?.length,
+    'importing': _circuitImporting,
+    'cancelling': _circuitCancelling,
+    'streamed': _worldCircuit?.streamed ?? false,
+    'displayRegion': _worldCircuit?.displayRegion == null
+        ? null
+        : {
+            'name': _worldCircuit!.displayRegion!.name,
+            'x': _worldCircuit!.displayRegion!.x,
+            'y': _worldCircuit!.displayRegion!.y,
+            'width': _worldCircuit!.displayRegion!.width,
+            'height': _worldCircuit!.displayRegion!.height,
+          },
+    'displayFrame': _worldCircuit?.displayFrame,
+    'displayPixelCount': _worldCircuit?.displayPixelCount ?? 0,
+    'displayIdentity': _worldCircuit?.displayIdentity,
+    'progress': _worldCircuit?.progress,
+    'loadProgress': _circuitLoadProgress,
+    'loadError': _circuitLoadError,
+    'busy': _busy || (_worldCircuit?.busy ?? false),
+    'running': _worldCircuit?.running ?? false,
+    'optimizationEnabled': _worldCircuit?.optimizationEnabled ?? false,
+    'optimizationSupported': _worldCircuit?.optimizationSupported ?? false,
+    'wireHeadPixelRulesEnabled':
+        _worldCircuit?.wireHeadPixelRulesEnabled ?? false,
+    'dirty': _worldCircuit?.dirty ?? false,
+    'error': _worldCircuit?.error?.toString() ?? _circuitLoadError,
+    'width': _worldCircuit?.result?.width,
+    'height': _worldCircuit?.result?.height,
+    'ticks': _worldCircuit?.result?.ticks ?? 0,
+    'devices': _worldCircuit?.result?.devices ?? 0,
+    'networks': _worldCircuit?.result?.networks ?? 0,
+    'wireCells': _worldCircuit?.result?.stats[10] ?? 0,
+    'netPulses': _worldCircuit?.result?.netPulses ?? 0,
+    'records': _worldCircuitRecords,
+    'viewport': _circuitViewport,
+    if (_worldFragments != null)
+      'fragments': {
+        'offset': _worldFragments!.offset,
+        'total': _worldFragments!.total,
+        'hasMore': _worldFragments!.hasMore,
+        'items': [
+          for (final f in _worldFragments!.fragments)
+            {
+              'id': f.id,
+              'x': f.x,
+              'y': f.y,
+              'width': f.width,
+              'height': f.height,
+              'cells': f.cells,
+              'wireCells': f.wireCells,
+              'canStamp': f.canStamp,
+              'complete': f.completeFootprint,
+              'modded': f.isModded,
+              'missingSupport': f.missingSupport,
+            },
+        ],
+      },
+  };
+
   @override
   TerraViewState get view => hostStages.measure(
     'workspace.view',
@@ -496,75 +565,7 @@ class Workspace extends TerraController {
             'y': _placementWorldY,
             'stale': !_placementIsCurrent,
           },
-        'worldCircuit': {
-          'open': _worldCircuit?.result != null,
-          'streamingAvailable':
-              worldCircuitBackend is WorldCircuitSourceBackend,
-          'sourceName': _circuitSource?.name,
-          'sourceBytes': _circuitSource?.length,
-          'importing': _circuitImporting,
-          'cancelling': _circuitCancelling,
-          'streamed': _worldCircuit?.streamed ?? false,
-          'computerVerified': _worldCircuit?.computerVerified ?? false,
-          'canRunComputer': _worldCircuit?.canRunComputer ?? false,
-          'programName': _worldCircuit?.programName,
-          'programIncomplete': _worldCircuit?.programIncomplete ?? false,
-          'programBaselineKnown': _worldCircuit?.programBaselineKnown ?? true,
-          'restoredFromExport': _worldCircuit?.restoredFromExport ?? false,
-          'provenanceWarning':
-              _computerProvenanceLoaded && !_computerProvenance.available
-              ? '本地计算机续跑记录无法核验；派生文件暂按通用世界载入。'
-              : null,
-          'physicalPulses': _worldCircuit?.physicalPulses ?? 0,
-          'clockHz': _worldCircuit?.physicalClockHz ?? 0,
-          'displayHz': _worldCircuit?.displayPollHz ?? 0,
-          'displayedFrames': _worldCircuit?.displayedFrames ?? 0,
-          'displayFrames': _worldCircuit?.displayFrames ?? const {},
-          'displayIdentity': _worldCircuit?.displayIdentity,
-          'progress': _worldCircuit?.progress,
-          'loadProgress': _circuitLoadProgress,
-          'loadError': _circuitLoadError,
-          'keyboardVerified': _worldCircuit?.computerVerified ?? false,
-          'heldKeys': _worldCircuit?.heldKeys.toList() ?? const <String>[],
-          'busy': _busy || (_worldCircuit?.busy ?? false),
-          'running': _worldCircuit?.running ?? false,
-          'optimizationEnabled': _worldCircuit?.optimizationEnabled ?? false,
-          'optimizationSupported':
-              _worldCircuit?.optimizationSupported ?? false,
-          'wireHeadPixelRulesEnabled':
-              _worldCircuit?.wireHeadPixelRulesEnabled ?? false,
-          'dirty': _worldCircuit?.dirty ?? false,
-          'error': _worldCircuit?.error?.toString() ?? _circuitLoadError,
-          'width': _worldCircuit?.result?.width,
-          'height': _worldCircuit?.result?.height,
-          'ticks': _worldCircuit?.result?.ticks ?? 0,
-          'devices': _worldCircuit?.result?.devices ?? 0,
-          'networks': _worldCircuit?.result?.networks ?? 0,
-          'records': _worldCircuitRecords,
-          'viewport': _circuitViewport,
-          if (_worldFragments != null)
-            'fragments': {
-              'offset': _worldFragments!.offset,
-              'total': _worldFragments!.total,
-              'hasMore': _worldFragments!.hasMore,
-              'items': [
-                for (final f in _worldFragments!.fragments)
-                  {
-                    'id': f.id,
-                    'x': f.x,
-                    'y': f.y,
-                    'width': f.width,
-                    'height': f.height,
-                    'cells': f.cells,
-                    'wireCells': f.wireCells,
-                    'canStamp': f.canStamp,
-                    'complete': f.completeFootprint,
-                    'modded': f.isModded,
-                    'missingSupport': f.missingSupport,
-                  },
-              ],
-            },
-        },
+        'worldCircuit': worldCircuitView,
         'history': _vaultEntries.values
             .where((e) => !_isInternalPreference(e))
             .map(
@@ -618,22 +619,6 @@ class Workspace extends TerraController {
     Map<String, Object?> args = const {},
   ]) async {
     if (_disposed) return;
-    if (action == 'worldCircuitInput') {
-      try {
-        _worldCircuit?.setComputerKey(
-          args['direction'] as String,
-          args['pressed'] == true,
-        );
-      } catch (e) {
-        _error = e.toString();
-        notifyListeners();
-      }
-      return;
-    }
-    if (action == 'worldCircuitReleaseKeys') {
-      _worldCircuit?.releaseComputerKeys();
-      return;
-    }
     if (action == 'worldCircuitCancel') {
       _circuitImportGeneration++;
       _circuitCancelling = true;
@@ -643,7 +628,7 @@ class Workspace extends TerraController {
       return;
     }
     if (action == 'worldCircuitPause') {
-      await _worldCircuit?.pauseAndRefreshDisplays();
+      await _pauseWorldCircuit();
       return;
     }
     if (action.startsWith('rules')) {
@@ -774,38 +759,10 @@ class Workspace extends TerraController {
           await _chooseCircuitSource();
         case 'worldCircuitImport':
           await _importCircuitSource();
-        case 'worldCircuitLoadPong':
-          final session = _worldCircuit;
-          if (session == null || !session.computerVerified) {
-            throw const EngineException('请先核验完整 WLD 计算机。');
-          }
-          session.pause();
-          final asset = await rootBundle.load('assets/computer/pong.bin');
-          final bytes = asset.buffer.asUint8List(
-            asset.offsetInBytes,
-            asset.lengthInBytes,
-          );
-          if (sha256.convert(bytes).toString() !=
-              'd2a7d5a26eb168a55c80ae60b32205957d8f2ae215cbdce7c5d50acc2049946d') {
-            throw const EngineException('内置 Pong 程序完整性校验失败。');
-          }
-          if (identical(session, _worldCircuit)) {
-            await session.loadProgram('Pong (upstream RV32I).bin', bytes);
-            _status = '已将原版 Pong 程序写入真实 ROM，点击运行物理时钟后读取实际显示器。';
-          }
-        case 'worldCircuitLoadProgram':
-          final session = _worldCircuit;
-          if (session == null || !session.computerVerified) {
-            throw const EngineException('请先核验完整 WLD 计算机。');
-          }
-          session.pause();
-          final program = await files.pick('computerProgram');
-          if (program != null && identical(session, _worldCircuit)) {
-            await session.loadProgram(program.name, program.bytes);
-            _status = '已将 ${program.name} 写入实际 ROM 灯位，并通过物理控制复位到地址 0。';
-          }
+        case 'worldCircuitReadDisplay':
+          await _readCircuitDisplay(args);
         case 'worldCircuitRefreshDisplay':
-          await _worldCircuit?.refreshComputerDisplays();
+          await _worldCircuit?.refreshDisplay();
         case 'worldCircuitOpen':
           await _openWorldCircuit();
         case 'worldCircuitFragments':
@@ -817,6 +774,8 @@ class Workspace extends TerraController {
             geometry: _worldGeometry?.records ?? const [],
           );
           _status = '已读取真实电路片段；选择片段可提取完整图层与伴随对象。';
+        case 'worldCircuitLocateFragment':
+          await _locateWorldCircuitFragment(args['id'] as int);
         case 'worldCircuitExtract':
           await _extractWorldCircuitFragment(args['id'] as int);
         case 'worldCircuitToggle':
@@ -825,7 +784,7 @@ class Workspace extends TerraController {
             throw const EngineException('请先载入世界电路。');
           }
           if (session.running) {
-            await session.pauseAndRefreshDisplays();
+            await _pauseWorldCircuit();
           } else {
             session.run();
           }
@@ -834,22 +793,17 @@ class Workspace extends TerraController {
           if (session == null) throw const EngineException('请先载入世界电路。');
           await session.setOptimization(args['enabled'] == true);
           _status = session.optimizationEnabled
-              ? '电路优化已开启：设备去重与 WireHead 式像素规则。当前 ROM 和帧保留，后续运行结果可能不同。'
-              : '电路优化已关闭：使用原版像素规则。当前 ROM 和帧保留，后续运行结果可能不同。';
+              ? '电路优化已开启：设备去重与 WireHead 式像素规则。现有电路状态保留，后续运行结果可能不同。'
+              : '电路优化已关闭：使用原版像素规则。现有电路状态保留，后续运行结果可能不同。';
         case 'worldCircuitStep':
-          if (_worldCircuit?.computerVerified == true) {
-            await _worldCircuit!.stepComputer(
-              _bounded(args, 'pulses', 1, 128, fallback: 1),
-            );
-          } else {
-            await _worldCircuitCommand(WorldCircuitCommand.ticks(1));
-          }
+          await _worldCircuitCommand(WorldCircuitCommand.ticks(1));
         case 'worldCircuitTrigger':
           await _worldCircuitCommand(
             WorldCircuitCommand.trigger(
-              _bounded(args, 'x', 0, 32767),
-              _bounded(args, 'y', 0, 32767),
+              _bounded(args, 'x', 0, (_worldCircuit?.result?.width ?? 1) - 1),
+              _bounded(args, 'y', 0, (_worldCircuit?.result?.height ?? 1) - 1),
               mask: _bounded(args, 'mask', 1, 15, fallback: 15),
+              hitSwitch: args['direct'] != true,
             ),
           );
         case 'worldCircuitViewport':
@@ -880,15 +834,8 @@ class Workspace extends TerraController {
             }
             rethrow;
           }
-          if (session.streamed) await session.verifyComputer();
-          if (_circuitViewport.isNotEmpty) {
-            await _viewWorldCircuit(_circuitViewport);
-          }
-          _status = session.computerVerified
-              ? session.restoredFromExport
-                    ? '已恢复导入时保存的计算机状态，可继续运行。'
-                    : '已重新导入原始计算机，ROM 恢复为空；请重新加载程序。'
-              : '已从原始世界重新加载电路。';
+          await _locateInitialCircuitViewport();
+          _status = '已从原始 WLD 重新加载实际电路，优化默认关闭。';
         case 'worldCircuitSave':
           await _saveWorldCircuit();
         case 'worldCircuitClose':
@@ -2423,12 +2370,14 @@ class Workspace extends TerraController {
       _circuitLoadProgress = progress;
     }
     final records = _worldCircuit?.result?.records;
-    if (records != null &&
-        records.isNotEmpty &&
-        (_worldCircuit?.result?.resultKind ?? 0) != 9) {
+    if (_pendingCircuitViewport == null &&
+        records != null &&
+        _worldCircuit?.result?.resultKind == 1) {
       _worldCircuitRecords = records;
     }
-    notifyListeners();
+    _publishListeners(
+      includeWorkspace: _worldCircuit?.isRuntimeFramePublication != true,
+    );
   }
 
   void _clearCircuitLoadDiagnostics() {
@@ -2446,16 +2395,6 @@ class Workspace extends TerraController {
     _status = '已选择 ${source.name}；导入时读取实际文件内容。';
   }
 
-  Future<void> _ensureComputerProvenance() async {
-    if (_computerProvenanceLoaded) return;
-    _computerProvenanceLoaded = true;
-    try {
-      await _computerProvenance.load();
-    } catch (_) {
-      /* Original known worlds still work; derived worlds fail closed. */
-    }
-  }
-
   Future<void> _importCircuitSource() async {
     if (_worldCircuit != null) throw const EngineException('请先关闭当前电路会话。');
     _clearCircuitLoadDiagnostics();
@@ -2466,7 +2405,6 @@ class Workspace extends TerraController {
     final generation = ++_circuitImportGeneration;
     _circuitImporting = true;
     _circuitCancelling = false;
-    await _ensureComputerProvenance();
     _circuitWorldMetadata = Map.of(_worldView);
     await _release('wld');
     final session = WorldCircuitSession.fromSource(
@@ -2479,26 +2417,9 @@ class Workspace extends TerraController {
     try {
       await session.open();
       if (generation != _circuitImportGeneration) return;
-      final opened = session.result!;
-      await session.verifyComputer(
-        provenance: _computerProvenance.find(opened.sourceSha256 ?? ''),
-      );
+      await _locateInitialCircuitViewport();
       if (generation != _circuitImportGeneration) return;
-      if (session.computerVerified) {
-        _status = session.restoredFromExport
-            ? '已核验本机导出的 WLD，恢复实际 ROM、CPU、显示器状态，可继续运行。'
-            : '已核验完整 Computerraria WLD。原始 ROM 为空，请加载 RV32I 程序。';
-        _circuitViewport = {};
-      } else {
-        final result = session.result!;
-        await _viewWorldCircuit({
-          'x': 0,
-          'y': 0,
-          'width': result.width < 48 ? result.width : 48,
-          'height': result.height < 32 ? result.height : 32,
-        });
-        _status = '已载入完整 WLD 原版电路；该文件不匹配已核验的计算机布局，可查看实际电路。';
-      }
+      _status = '已解析完整 WLD 的实际接线与设备；可选择区域操作电路。';
     } catch (error) {
       if (generation == _circuitImportGeneration) {
         _circuitLoadError = error.toString().replaceFirst(
@@ -2547,21 +2468,147 @@ class Workspace extends TerraController {
     session.addListener(_worldCircuitChanged);
     try {
       await session.open();
-      final result = session.result!;
-      final w = result.width < 64 ? result.width : 64,
-          h = result.height < 48 ? result.height : 48;
-      final sx = (_circuitWorldMetadata['spawnTileX'] as num?)?.toInt() ?? 0,
-          sy = (_circuitWorldMetadata['spawnTileY'] as num?)?.toInt() ?? 0;
-      await _viewWorldCircuit({
-        'x': (sx - w ~/ 2).clamp(0, result.width - w),
-        'y': (sy - h ~/ 2).clamp(0, result.height - h),
-        'width': w,
-        'height': h,
-      });
+      await _locateInitialCircuitViewport();
       _status = '真实世界电路已载入；原始 WLD 保持不变。';
     } catch (_) {
       await _closeWorldCircuit();
       rethrow;
+    }
+  }
+
+  Future<void> _locateInitialCircuitViewport() async {
+    final session = _worldCircuit, result = session?.result;
+    if (session == null ||
+        result == null ||
+        result.width < 1 ||
+        result.height < 1) {
+      throw const EngineException('世界电路没有有效尺寸。');
+    }
+    _worldFragments = null;
+    _circuitViewport = {};
+    _worldCircuitRecords = Uint8List(0);
+    final stats = result.stats;
+    final minX = stats[6], minY = stats[7], maxX = stats[8], maxY = stats[9];
+    if (stats[10] > 0 &&
+        minX <= maxX &&
+        minY <= maxY &&
+        maxX < result.width &&
+        maxY < result.height) {
+      final width = maxX - minX + 1, height = maxY - minY + 1;
+      if (width <= 256 && height <= 256) {
+        await _viewCircuitBounds(minX, minY, width, height);
+        return;
+      }
+      // The leftmost wired column must contain a real wire cell, even when
+      // the bounding-box corner is empty (diagonal or U-shaped circuits).
+      // Read one column only; never materialize the whole circuit rectangle.
+      final generation = _circuitImportGeneration;
+      final probe = {'x': minX, 'y': minY, 'width': 1, 'height': height};
+      _pendingCircuitViewport = probe;
+      var anchorY = minY;
+      try {
+        var found = false;
+        for (var top = minY; top <= maxY && !found; top += 65536) {
+          final remaining = maxY - top + 1;
+          final count = remaining < 65536 ? remaining : 65536;
+          final column = await session.command(
+            WorldCircuitCommand.viewport(minX, top, 1, count),
+          );
+          if (generation != _circuitImportGeneration ||
+              !identical(_worldCircuit, session)) {
+            return;
+          }
+          final data = ByteData.sublistView(column.records);
+          for (
+            var offset = 0;
+            offset + 16 <= column.records.length;
+            offset += 16
+          ) {
+            if ((data.getUint32(offset + 8, Endian.little) >> 24) != 0) {
+              anchorY = data.getUint32(offset + 4, Endian.little);
+              found = true;
+              break;
+            }
+          }
+        }
+        if (!found) throw const EngineException('实际接线边界与记录不一致，请重新导入。');
+      } finally {
+        if (identical(_pendingCircuitViewport, probe)) {
+          _pendingCircuitViewport = null;
+        }
+      }
+      final viewHeight = height < 256 ? height : 256;
+      final viewY = (anchorY - viewHeight ~/ 2)
+          .clamp(minY, maxY - viewHeight + 1)
+          .toInt();
+      await _viewCircuitBounds(minX, viewY, width, viewHeight);
+      return;
+    }
+    // A supported world without wiring is still a valid imported WLD.
+    final width = result.width < 48 ? result.width : 48;
+    final height = result.height < 32 ? result.height : 32;
+    await _viewCircuitBounds(
+      stats[4] - width ~/ 2,
+      stats[5] - height ~/ 2,
+      width,
+      height,
+    );
+  }
+
+  Future<void> _viewCircuitBounds(int x, int y, int width, int height) async {
+    final result = _worldCircuit?.result;
+    if (result == null) throw const EngineException('世界电路尚未就绪。');
+    final w = width.clamp(1, result.width < 256 ? result.width : 256).toInt();
+    final h = height
+        .clamp(1, result.height < 256 ? result.height : 256)
+        .toInt();
+    await _viewWorldCircuit({
+      'x': x.clamp(0, result.width - w).toInt(),
+      'y': y.clamp(0, result.height - h).toInt(),
+      'width': w,
+      'height': h,
+    });
+  }
+
+  Future<void> _locateWorldCircuitFragment(int id) async {
+    final fragments = _worldFragments?.fragments.where((f) => f.id == id);
+    if (fragments == null || fragments.isEmpty) {
+      throw const EngineException('片段不在当前列表，请重新读取。');
+    }
+    final fragment = fragments.first;
+    await _viewCircuitBounds(
+      fragment.x,
+      fragment.y,
+      fragment.width,
+      fragment.height,
+    );
+    _status = fragment.width > 256 || fragment.height > 256
+        ? '片段 $id 大于单个视口，当前显示其左上区域；可移动视口查看其余接线。'
+        : '已定位片段 $id 的实际电路区域。';
+  }
+
+  Future<void> _readCircuitDisplay(Map<String, Object?> args) async {
+    final session = _worldCircuit, result = session?.result;
+    if (session == null || result == null) {
+      throw const EngineException('世界电路尚未就绪。');
+    }
+    final x = _bounded(args, 'x', 0, result.width - 1);
+    final y = _bounded(args, 'y', 0, result.height - 1);
+    final width = _bounded(args, 'width', 1, 256);
+    final height = _bounded(args, 'height', 1, 256);
+    await session.readDisplay(
+      CircuitDisplayRegion('选区像素', x, y, width, height),
+    );
+    _status = '已读取所选区域内的实际像素盒；运行时随电路状态刷新。';
+  }
+
+  Future<void> _pauseWorldCircuit() async {
+    final session = _worldCircuit;
+    if (session == null) return;
+    session.pause();
+    await session.refreshDisplay();
+    if (identical(_worldCircuit, session) && _circuitViewport.isNotEmpty) {
+      await _viewWorldCircuit(_circuitViewport);
     }
   }
 
@@ -2608,6 +2655,7 @@ class Workspace extends TerraController {
     if (_circuitViewport.isNotEmpty) {
       await _viewWorldCircuit(_circuitViewport);
     }
+    await session.refreshDisplay();
   }
 
   Future<void> _viewWorldCircuit(Map<String, Object?> args) async {
@@ -2617,13 +2665,31 @@ class Workspace extends TerraController {
     }
     final x = _bounded(args, 'x', 0, result.width - 1),
         y = _bounded(args, 'y', 0, result.height - 1),
-        w = _bounded(args, 'width', 1, 256, fallback: 64),
-        h = _bounded(args, 'height', 1, 256, fallback: 48);
+        w = _bounded(args, 'width', 1, 256),
+        h = _bounded(args, 'height', 1, 256);
     if (x + w > result.width || y + h > result.height) {
       throw const FormatException('电路视口越过世界边界。');
     }
-    _circuitViewport = {'x': x, 'y': y, 'width': w, 'height': h};
-    await session.command(WorldCircuitCommand.viewport(x, y, w, h));
+    final generation = _circuitImportGeneration;
+    final requested = {'x': x, 'y': y, 'width': w, 'height': h};
+    _pendingCircuitViewport = requested;
+    try {
+      final reply = await session.command(
+        WorldCircuitCommand.viewport(x, y, w, h),
+      );
+      if (generation == _circuitImportGeneration &&
+          identical(_worldCircuit, session)) {
+        // Publish the rectangle and its records together. Intermediate busy,
+        // progress or runtime events keep the previous completed viewport.
+        _circuitViewport = requested;
+        _worldCircuitRecords = reply.records;
+      }
+    } finally {
+      if (identical(_pendingCircuitViewport, requested)) {
+        _pendingCircuitViewport = null;
+      }
+    }
+    notifyListeners();
   }
 
   Future<void> _closeWorldCircuit({bool reopen = true}) =>
@@ -2647,6 +2713,8 @@ class Workspace extends TerraController {
     _worldFragments = null;
     _worldGeometry = null;
     _worldCircuitRecords = Uint8List(0);
+    _circuitViewport = {};
+    _pendingCircuitViewport = null;
     _circuitWorldMetadata = {};
     if (reopen && !_closingWorkspace && _activeWorld != null) {
       await _activate(_activeWorld!);
@@ -2734,32 +2802,7 @@ class Workspace extends TerraController {
         protectedSources: [session.source!],
       );
       _status = saved ? '已导出模拟世界 WLD 副本。' : '已取消 WLD 导出，模拟状态仍保留。';
-      if (saved && session.computerVerified) {
-        if (session.programIncomplete || !session.programBaselineKnown) {
-          _status += ' 程序状态未完整核验，本次文件未登记为可续跑计算机。';
-        } else {
-          try {
-            if (output.sha256 == null) {
-              throw const EngineException('引擎未提供已导出 WLD 的完整性标识。');
-            }
-            await _computerProvenance.register(
-              ComputerProvenanceRecord(
-                wldSha256: output.sha256!,
-                programName: session.programName,
-                programImage: session.programImage,
-                physicalPulses: session.physicalPulses,
-              ),
-            );
-            session.markSaved();
-            _status += ' 已保留本机续跑来源，可重新导入此 WLD 继续运行。';
-          } catch (e) {
-            _status = 'WLD 已导出，但本机续跑记录未保存。';
-            throw EngineException('WLD 已保存；续跑来源登记失败：$e');
-          }
-        }
-      } else if (saved) {
-        session.markSaved();
-      }
+      if (saved) session.markSaved();
     } catch (_) {
       failed = true;
       rethrow;
@@ -2772,7 +2815,7 @@ class Workspace extends TerraController {
         try {
           await _releasePendingCircuitSources();
         } catch (_) {
-          // Keep the export/provenance error authoritative when both fail.
+          // Keep the export error authoritative when cleanup also fails.
           if (!failed) rethrow;
         }
       }
@@ -2831,10 +2874,14 @@ class Workspace extends TerraController {
   }
 
   @override
-  void notifyListeners() {
-    if (!_disposed) {
-      hostStages.measure('workspace.publishListeners', super.notifyListeners);
-    }
+  void notifyListeners() => _publishListeners(includeWorkspace: true);
+
+  void _publishListeners({required bool includeWorkspace}) {
+    if (_disposed) return;
+    hostStages.measure('workspace.publishListeners', () {
+      super.notifyListeners();
+      if (includeWorkspace && !_disposed) _workspaceChanges.notifyListeners();
+    });
   }
 
   @override
@@ -2847,6 +2894,7 @@ class Workspace extends TerraController {
     _stopCircuit();
     _rules?.removeListener(notifyListeners);
     _rules?.dispose();
+    _workspaceChanges.dispose();
     super.dispose();
   }
 

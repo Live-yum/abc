@@ -49,7 +49,7 @@ jobs:
           --timeout-seconds 1200 --output-dir build/computerraria/raw/native --
           dart run native/computerraria_acceptance.dart build/computerraria/native/libabc_engine.so
           build/public-computerraria/computerraria.wld
-          - assets/computer/pong.bin {report}
+          - test/fixtures/computerraria/pong.bin {report}
       - name: Three ON lifecycles with the identical program, input and physical pulses
         if: ${{ !cancelled() }}
         env:
@@ -60,7 +60,7 @@ jobs:
           --timeout-seconds 1200 --output-dir build/computerraria/raw/native --
           dart run native/computerraria_acceptance.dart build/computerraria/native/libabc_engine.so
           build/public-computerraria/computerraria.wld
-          - assets/computer/pong.bin {report}
+          - test/fixtures/computerraria/pong.bin {report}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -102,7 +102,7 @@ jobs:
           node test/web/computerraria_file_acceptance.cjs
           build/computerraria/engine-web/world.js build/computerraria/engine-web/world.wasm
           build/public-computerraria/computerraria.wld
-          {report} --pong assets/computer/pong.bin --input - --save --compound-frame
+          {report} --pong test/fixtures/computerraria/pong.bin --input - --save --compound-frame
       - name: Three ON compound RPC lifecycles with identical physical inputs
         if: ${{ !cancelled() }}
         run: >-
@@ -111,7 +111,7 @@ jobs:
           node test/web/computerraria_file_acceptance.cjs
           build/computerraria/engine-web/world.js build/computerraria/engine-web/world.wasm
           build/public-computerraria/computerraria.wld
-          {report} --pong assets/computer/pong.bin --input - --save --optimized --compound-frame
+          {report} --pong test/fixtures/computerraria/pong.bin --input - --save --optimized --compound-frame
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

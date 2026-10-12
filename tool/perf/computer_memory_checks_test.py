@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 import computer_memory_validate as checks
-from computer_memory_run import sanitize
+from computer_memory_run import sanitize, validate_target_identity
 
 
 COMMIT = 'a' * 40
@@ -27,10 +27,11 @@ def write_rows(root, descriptor, rows):
                            'writeBytes': len(payload), 'readBytes': len(payload)})
 
 
-def fixture(root):
+def fixture(root, generic=False):
     root.mkdir(exist_ok=True)
-    source_files = {name: 'b' * 64 for name in checks.REQUIRED_SOURCES}
-    source_files['assets/computer/pong.bin'] = checks.PONG_SHA
+    source_files = {name: 'b' * 64 for name in (checks.GENERIC_REQUIRED_SOURCES if generic else checks.REQUIRED_SOURCES)}
+    if not generic:
+        source_files['assets/computer/pong.bin'] = checks.PONG_SHA
     source_files['.flutter-version'] = hashlib.sha256(b'3.35.0\n').hexdigest()
     tree = hashlib.sha256(json.dumps(source_files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     build = {'schema': 'abc.computerraria.build.v1',
@@ -135,6 +136,23 @@ def fixture(root):
             cycle_row['cancelledImportObserved'] = True
             cycle_row['cancelRequestedAfterNativeOpenStarted'] = True
             cycle_row['cancelledImportNativeOutcome'] = 'failed-or-cancelled'
+        if generic:
+            for key in ('physicalPulseDelta', 'nativeClockDelta', 'modelPhysicalPulseDelta',
+                        'pulseBatchCount', 'pulseBatchSize', 'distinctMonoStates',
+                        'optimizationEnabledDuringPulse', 'nativeOptimizationEnabledDuringPulse',
+                        'nativeWireHeadPixelRulesDuringPulse', 'programName', 'pausedMonoSha256'):
+                cycle_row.pop(key)
+            cycle_row.update(tickDelta=32, nativeTickDelta=32, modelTickDelta=32,
+                             tickBatchCount=32, tickBatchSize=1, distinctPixelStates=1,
+                             maximumLitPixels=0, pausedPixelSha256='e' * 64,
+                             optimizationEnabledDuringTicks=bool(cycle % 2),
+                             nativeOptimizationEnabledDuringTicks=bool(cycle % 2),
+                             nativeWireHeadPixelRulesDuringTicks=bool(cycle % 2),
+                             worldWidth=120, worldHeight=90,
+                             displayRegion={'x': 17, 'y': 29, 'width': 23, 'height': 11},
+                             trigger={'x': 19, 'y': 31, 'mask': 4, 'direct': True})
+            if 'reopenPreservedPausedState' in cycle_row:
+                cycle_row['reopenPreservedSelectedPixels'] = cycle_row.pop('reopenPreservedPausedState')
         cycles.append(cycle_row)
         actions = ['worldCircuitChooseWorld', 'worldCircuitImport', 'worldCircuitLoadPong',
                    *(['worldCircuitStep'] * 32), 'worldCircuitPause', 'worldCircuitClose']
@@ -144,12 +162,22 @@ def fixture(root):
             actions.append('worldCircuitOptimization')
         actions += (['worldCircuitReset'] if scenario == 'reset-original' else
                     ['worldCircuitSave', 'worldCircuitClose', 'worldCircuitChooseWorld', 'worldCircuitImport'])
+        if generic:
+            actions = [entry for action in actions for entry in
+                       (['worldCircuitViewport', 'worldCircuitReadDisplay', 'worldCircuitTrigger']
+                        if action == 'worldCircuitLoadPong' else [action])]
+            actions.extend(['worldCircuitViewport', 'worldCircuitReadDisplay'])
         records = {kind: [] for kind in checks.RECORD_TYPES}
         records['viewportSnapshot'] = [
             {'cycle': cycle, 'mode': mode, 'batch': batch, 'physicalPulses': (batch + 1) * 128,
              'nativeClockDelta': (batch + 1) * 128, 'modelPhysicalPulseDelta': (batch + 1) * 128,
              'monoSha256': 'f' * 64 if cycle % 2 and batch % 2 == 0 else 'e' * 64,
              'monoLitPixels': 10 if cycle % 2 else 0} for batch in range(32)]
+        if generic:
+            records['viewportSnapshot'] = [
+                {'cycle': cycle, 'mode': mode, 'batch': batch, 'ticks': batch + 1,
+                 'nativeTickDelta': batch + 1, 'modelTickDelta': batch + 1,
+                 'pixelSha256': 'e' * 64, 'litPixels': 0} for batch in range(32)]
         for index, action in enumerate(actions):
             records['window'].append({'id': f'{action}.{mode}', 'cycle': cycle, 'warmup': False,
                                       'success': True, 'startUs': (start + 100 + index * 30) * SCALE,
@@ -166,7 +194,7 @@ def fixture(root):
         records['dispatch'].extend({'action': 'worldCircuitReleaseKeys', 'cycle': cycle, 'warmup': False,
                                     'variant': {'profileMode': mode}, 'macroScope': None,
                                     'durationMs': 0.1, 'completion': 'returned'}
-                                   for _ in range(1 if scenario == 'reset-original' else 2))
+                                   for _ in range(0 if generic else 1 if scenario == 'reset-original' else 2))
         for kind in checks.RECORD_TYPES:
             all_records[kind].extend(records[kind])
         cycle_frames = [frame(cycle * 2, start + 200, start + 300),
@@ -248,7 +276,89 @@ def fixture(root):
               'drainPolicy': {'frameBarriers': 3, 'barrierDelayMs': 16, 'quietMs': 1200,
                               'tailPrefixFlushesPerCycle': 2, 'capture': 'all-callbacks-received-until-recordingStoppedUs'},
               'failure': None, 'failureStack': None}
+    if generic:
+        report['schema'] = checks.GENERIC_SCHEMA
+        report['workloadId'] = checks.GENERIC_WORKLOAD
+        report['ticksPerCycle'] = 32
+        del report['physicalPulsesPerCycle']
+        del report['fixture']['pongSha256']
     return report, build, build_sha
+
+
+class GenericMemoryChecksTest(unittest.TestCase):
+    def test_runner_only_associates_exact_schema_workload_and_process(self):
+        for schema in ('abc.computer-memory-diagnostic.v1', checks.GENERIC_SCHEMA):
+            report = {'schema': schema, 'hostPid': 12, 'runtime': {'commit': COMMIT}}
+            if schema == checks.GENERIC_SCHEMA: report['workloadId'] = checks.GENERIC_WORKLOAD
+            self.assertEqual(validate_target_identity(report, COMMIT), schema)
+            for key, value in (('hostPid', True), ('hostPid', 0), ('schema', 'unknown'), ('workloadId', 'wrong')):
+                broken = {**report, key: value}
+                with self.assertRaises(ValueError): validate_target_identity(broken, COMMIT)
+            with self.assertRaises(ValueError): validate_target_identity(report, 'f' * 40)
+
+    def test_complete_static_or_empty_display_is_valid_but_not_fluency(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report, build, build_sha = fixture(root, generic=True)
+            result = checks.validate(report, root, build, COMMIT, build_sha)
+            self.assertTrue(result['evidenceValid'], result['errors'])
+            self.assertFalse(result['plateauEstablished'])
+            self.assertEqual(result['targetDeviceFluencyStatus'], 'not-established')
+            self.assertEqual(result['workloadId'], checks.GENERIC_WORKLOAD)
+            self.assertEqual(result['raw']['receivedFrameCount'], 16)
+
+    def test_generic_missing_wrong_or_legacy_evidence_fails(self):
+        import copy
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report, build, build_sha = fixture(root, generic=True)
+            cases = {
+                'workload': lambda r: r.update(workloadId='legacy-cpu'),
+                'partial': lambda r: r.update(completedCycles=7),
+                'failed': lambda r: r.update(status='failed', failure='retained failure'),
+                'ticks': lambda r: r['cycles'][0].update(nativeTickDelta=31),
+                'mode': lambda r: r['cycles'][1].update(nativeOptimizationEnabledDuringTicks=False),
+                'bounds': lambda r: r['cycles'][0]['displayRegion'].update(x=120),
+                'mask': lambda r: r['cycles'][0]['trigger'].update(mask=0),
+                'program': lambda r: r['cycles'][0].update(programName='Pong'),
+                'reopen': lambda r: r['cycles'][2].update(reopenPreservedSelectedPixels=False),
+                'close': lambda r: r['cycles'][0]['events'][-1].update(outcome='failed'),
+                'raw-sha': lambda r: r['raw']['frameChunks'][0].update(sha256='0' * 64),
+                'drop-cycle': lambda r: r['cycles'].pop(),
+            }
+            for name, mutate in cases.items():
+                broken = copy.deepcopy(report); mutate(broken)
+                result = checks.validate(broken, root, build, COMMIT, build_sha)
+                self.assertFalse(result['evidenceValid'], name)
+                if name == 'failed': self.assertEqual(result['reportedFailure'], 'retained failure')
+
+    def test_generic_protocol_records_cannot_drop_or_substitute_actions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report, build, build_sha = fixture(root, generic=True)
+            validator = checks.Validator(report, root, build, COMMIT, build_sha)
+            validator.validate_header(); validator.validate_boundaries(); validator.validate_frames()
+            validator.validate_generic_records()
+            for action in ('worldCircuitViewport', 'worldCircuitReadDisplay', 'worldCircuitTrigger', 'worldCircuitStep'):
+                item = next(row for row in validator.records['dispatch'] if row['action'] == action)
+                item['action'] = 'worldCircuitLoadPong'
+                with self.assertRaises(ValueError): validator.validate_generic_records()
+                item['action'] = action
+
+    def test_legacy_artifact_after_fixture_relocation_remains_readable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report, build, _ = fixture(root)
+            files = build['sourceFilesSha256']
+            files['test/support/computerraria/layout.dart'] = files.pop('lib/domain/computerraria_computer.dart')
+            files['test/fixtures/computerraria/pong.bin'] = files.pop('assets/computer/pong.bin')
+            tree = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+            build['sourceTreeSha256'] = tree
+            build_sha = hashlib.sha256(encoded(build)).hexdigest()
+            report['runtime'].update(sourceTreeSha256=tree, buildProvenanceSha256=build_sha)
+            result = checks.validate(report, root, build, COMMIT, build_sha)
+            self.assertTrue(result['evidenceValid'], result['errors'])
+            self.assertEqual(result['workloadId'], 'legacy-computerraria-memory-v1')
 
 
 class MemoryChecksTest(unittest.TestCase):

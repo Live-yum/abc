@@ -55,7 +55,8 @@ def record(artifacts, output, cmake_cache, ninja_build=None):
     if head != expected or dirty:
         raise ValueError('Acceptance build requires the requested clean committed snapshot')
     paths = git('ls-files', '--', 'native', 'lib', 'linux', 'integration_test',
-                'test_driver', 'test/web', 'tool', 'assets/computer',
+                'test_driver', 'test/web', 'test/support/computerraria',
+                'test/fixtures/computerraria', 'tool', 'assets/computer',
                 'pubspec.lock', '.flutter-version').splitlines()
     source_files = {path: digest(path) for path in sorted(paths)}
     result = {

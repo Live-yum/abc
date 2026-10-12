@@ -328,6 +328,7 @@ function createWorldCircuitBridge(loadModule, options = {}) {
    const records = chunks.length === 1 ? chunks[0] : new Uint8Array(resultBytes); let at = 0; if (chunks.length !== 1) for (const chunk of chunks) { records.set(chunk, at); at += chunk.length; } hostStagesUs.resultCopyUs += (now() - copyAt) * 1000;
    const objects = withObjects ? await materialize(files.get(6), command[4]) : null; if (objects) validateObjects(objects, command[4], command[5]);
    check(M._terra_circuit_world_stats(handle, stats)); const statWords = Array.from(M.HEAPU32.subarray(stats >>> 2, (stats >>> 2) + 24)); refreshMemory(M, storage, statWords);
+   session.width = statWords[2]; session.height = statWords[3];
    let world = null, worldSource = null;
    if (save) {
     if (files.get(3).size !== resultCount || reserved !== 0) throw new Error('Incomplete circuit saved files');
@@ -377,21 +378,31 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   }
   finally { if (p) M._tx_free(p); if (r) M._tx_free(r); if (!preserveOperation) operation = null; refreshMemory(M, storage); }
  }
- function computerFrame(id, clockJson, pixelsJson) { return serial(async () => {
-  const clockWords = JSON.parse(clockJson), pixels = JSON.parse(pixelsJson);
-  const expectedClock = [2,2,3194,153,1,1,1,8,128,0,0,0,0,0,0,0];
-  const monitor = [6485,800,64,48];
-  const expectedPixels = [2,9,...monitor,1,0,0,0,0,0,0,0,0,0];
-  if (!Array.isArray(clockWords) || clockWords.length !== 16 || !Number.isInteger(clockWords[8]) || clockWords[8] < 32 || clockWords[8] > 128 || clockWords.some((v,i) => i !== 8 && v !== expectedClock[i]) || !Array.isArray(pixels) || pixels.length !== 16 || pixels.some((v,i) => v !== expectedPixels[i])) throw new Error('Invalid physical computer frame');
+ // One owner slot prevents interleaving; a completed mutation is not rolled
+ // back or replayed if the following bounded read fails.
+ function commandAndReadPixels(id, commandJson, pixelsJson) { return serial(async () => {
+  if (!session || session.closing || id !== session.handle) throw new Error('Circuit session is closed');
+  const commandWords = JSON.parse(commandJson), pixelWords = JSON.parse(pixelsJson);
+  const packet = words => Array.isArray(words) && words.length === 16 && words[0] === 2 &&
+   words.every(v => Number.isInteger(v) && v >= 0 && v <= 0xffffffff) &&
+   words[9] === 0 && words[10] === 0 && words[13] === 0 && words[14] === 0 && words[15] === 0;
+  const rectangle = words => words[4] > 0 && words[5] > 0 && words[2] < session.width && words[3] < session.height &&
+   words[4] <= session.width - words[2] && words[5] <= session.height - words[3];
+  // Validate both packets before accepting any mutation. In particular, an
+  // invalid viewport must not advance a circuit and only then fail its read.
+  if (!packet(commandWords) || ![2,3].includes(commandWords[1]) ||
+      (commandWords[1] === 2 ? !rectangle(commandWords) || commandWords[7] < 1 || commandWords[7] > 15 || commandWords[12] > 1 : commandWords[12] !== 0) ||
+      !packet(pixelWords) || pixelWords[1] !== 9 || !rectangle(pixelWords) || pixelWords[4] * pixelWords[5] > 65536 || pixelWords[12] !== 0) {
+   throw new Error('Invalid circuit command and pixels batch');
+  }
   operation = {cancelled:false}; const started = now();
   try {
-   const clock = await commandImpl(id, clockJson, '[]', true);
+   const command = await commandImpl(id, commandJson, '[]', true);
    try {
-    cancelled(); const display = await commandImpl(id, pixelsJson, '[]', true);
-    return {clock, display, displayError:null, hostStagesUs:{commandWallUs:(now()-started)*1000}};
+    cancelled(); const pixels = await commandImpl(id, pixelsJson, '[]', true);
+    return {command, pixels, readError:null, hostStagesUs:{commandWallUs:(now()-started)*1000}};
    } catch (error) {
-    // The accepted physical clock cannot be replayed if the read fails.
-    return {clock, display:null, displayError:String(error.message || error).slice(0,2048), hostStagesUs:{commandWallUs:(now()-started)*1000}};
+    return {command, pixels:null, readError:String(error.message || error).slice(0,2048), hostStagesUs:{commandWallUs:(now()-started)*1000}};
    }
   } finally { operation = null; }
  }); }
@@ -407,7 +418,7 @@ function createWorldCircuitBridge(loadModule, options = {}) {
   if (!session || session.closing) await cleanupImpl();
  }); }
  const open = (world,streaming) => serial(async () => { operation={cancelled:false}; try { return await openImpl(world,streaming); } finally { operation=null; } });
- return {open:world => open(world,false), openSource:world => open(world,true), command, computerFrame, close, releaseSource, cleanup:() => serial(cleanupImpl),
+ return {open:world => open(world,false), openSource:world => open(world,true), command, commandAndReadPixels, close, releaseSource, cleanup:() => serial(cleanupImpl),
   progress:async () => ({...progressState, diagnostics:{...progressState}}), cancelOperation:async () => { if (operation) operation.cancelled = true; },
  };
 }

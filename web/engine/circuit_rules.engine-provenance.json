@@ -41,8 +41,8 @@
     },
     {
       "path": "web/engine/world.wasm",
-      "bytes": 406930,
-      "sha256": "a9af2ce7aed0b4304c21f59e4500fd9116221588840e39af1e453459d8bf4a08"
+      "bytes": 415729,
+      "sha256": "908af51654108412fc0c828a1defe597a1ad007d83a06a5ce5be412fd24c9d41"
     },
     {
       "path": "web/engine/player.js",
@@ -57,6 +57,6 @@
   ],
   "sourceManifest": {
     "path": "native/vendor/TerraWasm/SOURCE_MANIFEST.json",
-    "sha256": "a74ae0de4b2a94300d7d0b639261845e8c6a6d2e18638cc38441b948696d46ad"
+    "sha256": "d2a0c9520f6dd2c9bde0118a652220ab17e007015c1b71b798039d8747a20d4c"
   }
 }

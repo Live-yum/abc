@@ -19,9 +19,9 @@ extension type _Bridge(JSObject _) implements JSObject {
     JSString words,
     JSString records,
   );
-  external JSPromise<_ComputerFrame> computerFrame(
+  external JSPromise<_BatchResult> commandAndReadPixels(
     JSNumber session,
-    JSString clockWords,
+    JSString commandWords,
     JSString pixelWords,
   );
   external JSPromise<JSAny?> close(JSNumber session);
@@ -93,15 +93,15 @@ extension type _Result(JSObject _) implements JSObject {
   );
 }
 
-extension type _ComputerFrame(JSObject _) implements JSObject {
-  external _Result get clock;
-  external _Result? get display;
-  external JSString? get displayError;
+extension type _BatchResult(JSObject _) implements JSObject {
+  external _Result get command;
+  external _Result? get pixels;
+  external JSString? get readError;
   external JSObject? get hostStagesUs;
-  WorldCircuitComputerFrame convert() => WorldCircuitComputerFrame(
-    clock: clock.convert(),
-    display: display?.convert(),
-    displayError: displayError?.toDart,
+  WorldCircuitBatchResult convert() => WorldCircuitBatchResult(
+    command: command.convert(),
+    pixels: pixels?.convert(),
+    readError: readError?.toDart,
     hostStagesUs: Map<String, num>.from(
       hostStagesUs?.dartify() as Map? ?? const {},
     ),
@@ -114,21 +114,28 @@ class WebWorldCircuitBackend
         WorldCircuitExternalOwnerBackend,
         WorldCircuitIdleCleanupBackend {
   @override
-  bool get completesComputerBatchFromExternalEvent => true;
+  bool get completesCircuitBatchFromExternalEvent => true;
   @override
-  Future<WorldCircuitComputerFrame> clockAndReadDisplay(
+  Future<WorldCircuitBatchResult> commandAndReadPixels(
     int session,
-    WorldCircuitCommand clock,
+    WorldCircuitCommand command,
     WorldCircuitCommand pixels,
-  ) async =>
-      (await _bridge
-              .computerFrame(
-                session.toJS,
-                jsonEncode(clock.words).toJS,
-                jsonEncode(pixels.words).toJS,
-              )
-              .toDart)
-          .convert();
+  ) async {
+    if ((command.words[1] != 2 && command.words[1] != 3) ||
+        pixels.words[1] != 9 ||
+        command.records.isNotEmpty ||
+        pixels.records.isNotEmpty) {
+      throw const FormatException('Invalid circuit command and pixels batch');
+    }
+    return (await _bridge
+            .commandAndReadPixels(
+              session.toJS,
+              jsonEncode(command.words).toJS,
+              jsonEncode(pixels.words).toJS,
+            )
+            .toDart)
+        .convert();
+  }
 
   @override
   Future<WorldCircuitResult> openWorldCircuit(Uint8List world) async =>

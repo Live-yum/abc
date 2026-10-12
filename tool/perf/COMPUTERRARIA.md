@@ -13,9 +13,11 @@ and streams out exactly the complete 405,983,441-byte format-279 WLD. The world
 has dimensions 15,200 × 7,200, 72,939,714 wired cells and 13,641,575 gates.
 Only that WLD is opened by the application. No personal-file discovery occurs.
 
-The application imports actual wires, gates, ROM/RAM lamps, sensors and
-monochrome pixel boxes. The unchanged upstream Pong binary executes through
-those circuits. There is no runtime instruction decoder or supplied framebuffer.
+The generic application imports actual wires, gates, lamps, sensors and pixel
+boxes. Independent test-only Native and Node drivers apply the public fixture
+layout and execute unchanged upstream Pong through those circuits. Production
+has no CPU/program controls or fixture coordinates. There is no runtime
+instruction decoder or supplied framebuffer.
 The native world-circuit ABI is 2; reports record the ABI from actual imported
 circuit statistics. Optimization defaults OFF. OFF applies the original game's
 per-TripWire horizontal/vertical PixelBox crossing rule. ON adds generation-based
@@ -66,14 +68,15 @@ and the actual Flutter profile app bundle, never full input or saved worlds.
    worker threading or rendering performance. Single-WLD save/reopen and zero
    native/bridge/file owners are also required.
 3. Flutter UI: three independent Linux `flutter drive --profile` processes run
-   under Xvfb. Each retains two import/run/reset/close cycles per mode, including
-   the first. One cancelled import is retained. Each cycle compares the same
-   5,120 physical pulses and fixed UP/DOWN trace, hashing actual monochrome and
-   physical RAM state every 512 pulses. The exported WLD is reopened without
-   resetting its CPU. Keyboard and touch exercise production controls. A separate
-   30-second Pong window records actual UI/raster `FrameTiming`, physical pulses,
-   display reads and changing monitor states. VM-service heap and OS process
-   memory observations are kept separately.
+   under Xvfb using schema `abc.generic-world-profile.v1`, workload
+   `generic-wld-controls-v1`. Two cycles per mode retain import, real wire-mask
+   direct trigger, one tick, a 30-second generic run/pause, explicitly selected
+   sparse PixelBox ROI, save, original-source reset and export reopen/close.
+   One cancelled import and all 13 load/reset/reimport OS windows are retained.
+   The ROI and trigger come from actual viewport records, without CPU coordinates
+   or a 64 by 48 assumption. FrameTiming, VM heap and OS observations remain
+   separate. Unknown display calibration cannot establish smoothness. No ROM,
+   fixture keyboard or Pong action is dispatched through the application.
 
 Each process is bounded at 20 minutes and each lane at 90 minutes. Timeouts,
 failed or incomplete display behavior remain failures, never passing partial
@@ -84,8 +87,9 @@ report, stdout/stderr and profile bundle are retained.
 
 The gate requires all 15 process reports, exact source HEAD, a clean checkout,
 source/build artifact hashes, pinned WLD identity, observed ABI 2 and explicit
-`inputFormat: wld-only`. Report schema 2 prevents older evidence from satisfying
-this contract. Linux Profile builds must prove actual generated `-O3 -DNDEBUG`
+`inputFormat: wld-only`. Native/Node fixture reports retain schema 2; the current
+Flutter UI has its own generic schema and workload identity. Historical CPU UI
+reports cannot satisfy current generic action coverage or direct comparisons. Linux Profile builds must prove actual generated `-O3 -DNDEBUG`
 flags for the world bridge and circuit VM.
 
 The 48 arithmetic/control-flow/memory results come from the authored physical
@@ -178,13 +182,13 @@ mkdir -p build/computerraria/tmp
 export TMPDIR="$PWD/build/computerraria/tmp"
 ABC_COMPUTERRARIA_SAVE=1 dart run native/computerraria_acceptance.dart \
   build/native-wld-only/libabc_engine.so \
-  build/public-computerraria/computerraria.wld - assets/computer/pong.bin \
+  build/public-computerraria/computerraria.wld - test/fixtures/computerraria/pong.bin \
   build/computerraria/native-standard.json
 node test/web/computerraria_file_acceptance.cjs \
   web/engine/world.js web/engine/world.wasm \
   build/public-computerraria/computerraria.wld \
   build/computerraria/web-standard.json \
-  --pong assets/computer/pong.bin --input - --save --compound-frame
+  --pong test/fixtures/computerraria/pong.bin --input - --save --compound-frame
 ```
 
 For ON, set `ABC_COMPUTERRARIA_OPTIMIZED=1` for Native or add `--optimized` for
@@ -215,7 +219,7 @@ Liveness requires changing CPU/RAM/monitor state and held-UP paddle motion.
 ```sh
 node test/web/computerraria_continuation_probe.cjs \
   web/engine/world.js web/engine/world.wasm \
-  build/public-computerraria/computerraria.wld assets/computer/pong.bin \
+  build/public-computerraria/computerraria.wld test/fixtures/computerraria/pong.bin \
   build/computerraria/continuation.json
 ```
 

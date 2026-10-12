@@ -95,13 +95,15 @@ abstract interface class WorldCircuitIdleCleanupBackend
   Future<void> cleanupWorldCircuit();
 }
 
-/// Optional transport coalescing. Both commands still execute in order in the
-/// retained circuit engine; this does not implement any CPU instruction.
-abstract interface class WorldCircuitComputerBackend
+/// Optional transport coalescing for a trigger or tick command followed by a
+/// bounded PixelBox read. Both execute in one owner queue slot without another
+/// command interleaving. This is not rollback atomicity: a successful command
+/// remains committed when the subsequent read fails.
+abstract interface class WorldCircuitBatchBackend
     implements WorldCircuitBackend {
-  Future<WorldCircuitComputerFrame> clockAndReadDisplay(
+  Future<WorldCircuitBatchResult> commandAndReadPixels(
     int session,
-    WorldCircuitCommand clock,
+    WorldCircuitCommand command,
     WorldCircuitCommand pixels,
   );
 }
@@ -112,19 +114,19 @@ abstract interface class WorldCircuitComputerBackend
 /// Wrappers must forward the wrapped owner's actual capability. Test doubles
 /// and native backends retain timer scheduling unless explicitly supported.
 abstract interface class WorldCircuitExternalOwnerBackend
-    implements WorldCircuitComputerBackend {
-  bool get completesComputerBatchFromExternalEvent;
+    implements WorldCircuitBatchBackend {
+  bool get completesCircuitBatchFromExternalEvent;
 }
 
-class WorldCircuitComputerFrame {
-  final WorldCircuitResult clock;
-  final WorldCircuitResult? display;
-  final String? displayError;
+class WorldCircuitBatchResult {
+  final WorldCircuitResult command;
+  final WorldCircuitResult? pixels;
+  final String? readError;
   final Map<String, num> hostStagesUs;
-  const WorldCircuitComputerFrame({
-    required this.clock,
-    this.display,
-    this.displayError,
+  const WorldCircuitBatchResult({
+    required this.command,
+    this.pixels,
+    this.readError,
     this.hostStagesUs = const {},
   });
 }

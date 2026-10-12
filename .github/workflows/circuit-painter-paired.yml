@@ -1,0 +1,93 @@
+name: Visible generic circuit painter paired profile
+
+on:
+  push:
+    branches: [codex/circuit-painter-paired-c61]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: circuit-painter-paired-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  PYTHONDONTWRITEBYTECODE: '1'
+  LIBGL_ALWAYS_SOFTWARE: '1'
+  GDK_BACKEND: x11
+  GDK_SCALE: '1'
+  GDK_DPI_SCALE: '1'
+
+jobs:
+  paired:
+    name: Two visible layouts / one build / BAABBA fresh processes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Linux renderer and owned-window tools
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+          libstdc++-12-dev zlib1g-dev xvfb mesa-utils xdotool
+      - uses: ./.github/actions/setup-performance
+      - name: Format and preserve the exact official-SDK sources
+        run: |
+          set -euo pipefail
+          mkdir -p build/circuit-painter-review
+          dart format \
+            integration_test/circuit_painter_profile_test.dart \
+            test_driver/circuit_painter_profile_driver.dart
+          git diff --binary -- '*.dart' > build/circuit-painter-review/format.patch
+          tar -czf build/circuit-painter-review/profile-sources.tar.gz \
+            lib/ui/world_circuit_panel.dart \
+            test/support/circuit_painter_c61_reference.dart \
+            test/world_circuit_painter_test.dart \
+            test/world_circuit_confirmation_lifecycle_test.dart \
+            integration_test/circuit_painter_profile_test.dart \
+            test_driver/circuit_painter_profile_driver.dart \
+            tool/perf/circuit_painter_paired.py \
+            tool/perf/circuit_painter_paired_test.py \
+            .github/workflows/circuit-painter-paired.yml
+      - name: Reject malformed, missing or incomparable observations
+        run: python3 -m unittest discover -s tool/perf -p 'circuit_painter_paired_test.py'
+      - name: Analyze official profile and product sources
+        run: flutter analyze --no-pub
+      - name: Exact pixels and stale-confirmation regressions
+        timeout-minutes: 5
+        env:
+          ABC_CIRCUIT_PAINTER_DIR: build/circuit-painter-review/pixel-equivalence
+        run: >-
+          flutter test --no-pub --concurrency=1
+          test/world_circuit_painter_test.dart
+          test/world_circuit_confirmation_lifecycle_test.dart
+          test/world_circuit_panel_test.dart
+      - name: Observe the actual software renderer
+        run: |
+          set -euo pipefail
+          xvfb-run -a -s '-screen 0 1600x1200x24' glxinfo -B > build/circuit-painter-review/glxinfo.txt
+          renderer="$(sed -n 's/^OpenGL renderer string: //p' build/circuit-painter-review/glxinfo.txt)"
+          test -n "$renderer"
+          echo "TERRA_PERF_RENDERER=$renderer" >> "$GITHUB_ENV"
+      - name: One profile build / two actual window sizes / twelve bounded processes
+        timeout-minutes: 26
+        run: >-
+          xvfb-run -a -s '-screen 0 1600x1200x24'
+          python3 tool/perf/circuit_painter_paired.py
+          "${{ runner.temp }}/circuit-painter-paired-results"
+      - name: Preserve compact source, pixel and timing evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: circuit-painter-paired-${{ github.sha }}
+          path: |
+            build/circuit-painter-review/
+            ${{ runner.temp }}/circuit-painter-paired-results/*.json
+            ${{ runner.temp }}/circuit-painter-paired-results/*.log
+          if-no-files-found: error
+          retention-days: 14

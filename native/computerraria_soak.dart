@@ -6,7 +6,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:terraforge/domain/computerraria_computer.dart';
+
+import '../test/support/computerraria/layout.dart';
+
 import 'package:terraforge/engine/native_world_circuit_bindings.dart';
 import 'package:terraforge/engine/world_circuit_backend.dart';
 
@@ -70,7 +72,7 @@ Future<void> main(List<String> args) async {
     }
   }
   final expected = checks.map((v) => v['expected'] as int).toList();
-  final pong = File('assets/computer/pong.bin').readAsBytesSync();
+  final pong = File('test/fixtures/computerraria/pong.bin').readAsBytesSync();
   final acceptanceBytes = [
     File(args[2]).readAsBytesSync(),
     File(args[3]).readAsBytesSync(),
