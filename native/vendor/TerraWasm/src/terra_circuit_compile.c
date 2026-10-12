@@ -7,6 +7,14 @@
 #include <limits.h>
 #include <string.h>
 
+extern int read_tile_at(TxWorld*,uint32_t*,uint32_t,TxTile*);
+
+/* Stack-only binding: the original allocation and its metadata aliases stay alive. */
+typedef struct CxCompileWindow { uint8_t* file; uint32_t length; int bound; } CxCompileWindow;
+static inline void compile_window_restore(CxWorld* w,CxCompileWindow* window){
+    if(window->bound){w->world->file=window->file;w->world->file_len=window->length;window->bound=0;}
+}
+
 /* Private hot-loop accessors preserve the paged layout and its allocation
  * contract. Avoid crossing a translation-unit boundary for every DSU edge. */
 static inline uint32_t compile_word(const CxWords* words,uint32_t i){return words->pages[i/CX_WORDS][i&(CX_WORDS-1u)];}
@@ -103,10 +111,24 @@ int cx_scan_step(CxWorld* w,uint32_t* work){
         }
         w->col_stage=1;
     }
+    CxCompileWindow window={0};int column_complete=0;
     while(*work&&w->col_stage==1){
-        TxTile t;int s=cx_world_tile(w,&t);if(s)return s;uint32_t run=(uint32_t)t.same+1u;
+        TxTile t;
+        if(compiling&&w->world_source){
+            /* Restore before the ordinary reader emits READ or reports EOF. */
+            if(w->cursor>=w->tile_end||!cx_world_window_ready(w)){
+                compile_window_restore(w,&window);return cx_world_tile(w,&t);
+            }
+            if(!window.bound){window.file=w->world->file;window.length=w->world->file_len;window.bound=1;w->world->file=w->input;w->world->file_len=w->input_length;}
+            uint32_t p=w->cursor-w->input_offset;
+            if(!read_tile_at(w->world,&p,w->input_length,&t)){
+                compile_window_restore(w,&window);return cx_fail(w,TCW_FORMAT,"invalid circuit tile window");
+            }
+            w->cursor=w->input_offset+p;
+        }else{int s=cx_world_tile(w,&t);if(s)return s;}
+        uint32_t run=(uint32_t)t.same+1u;
         uint32_t mask=compiling?compile_wire_mask(&t):0;
-        if(run>w->height-w->y)return cx_fail(w,TCW_FORMAT,"circuit RLE run crosses a world column");
+        if(run>w->height-w->y){compile_window_restore(w,&window);return cx_fail(w,TCW_FORMAT,"circuit RLE run crosses a world column");}
         for(uint32_t i=0;i<run;i++)w->column[w->y+i]=t;
         if(w->phase==CX_TOPOLOGY){uint32_t wires=mask;if(wires){w->wire_cells+=run;if(w->x<w->min_x)w->min_x=w->x;if(w->x>w->max_x)w->max_x=w->x;if(w->y<w->min_y)w->min_y=w->y;if(w->y+run-1u>w->max_y)w->max_y=w->y+run-1u;}
             if(important_tile(&t))w->devices_count+=run;
@@ -128,8 +150,10 @@ int cx_scan_step(CxWorld* w,uint32_t* work){
                 w->compile_rows[w->height*4u+w->compile_gate_count++]=y;
             }
         }
-        w->y+=run;--*work;if(w->y==w->height){memset(w->pixel_at_y,0,w->height*4u);if(w->phase==CX_COUNT){int s=cx_devices_column(w);if(s)return s;}w->col_stage=2;w->col_colour=0;w->col_row=0;w->up=0;}
+        w->y+=run;--*work;if(w->y==w->height){column_complete=1;break;}
     }
+    compile_window_restore(w,&window);
+    if(column_complete){memset(w->pixel_at_y,0,w->height*4u);if(w->phase==CX_COUNT){int s=cx_devices_column(w);if(s)return s;}w->col_stage=2;w->col_colour=0;w->col_row=0;w->up=0;}
     if(compiling&&w->col_stage==2)return sparse_wires(w,work);
     while(*work&&w->col_stage==2){
         uint32_t c=w->col_colour,y=w->col_row;TxTile* t=w->column+y;

@@ -1,0 +1,104 @@
+#include "terra_circuit_world_internal.h"
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+extern void buf_init(TxBuf*,uint32_t);
+extern void write_tile(TxWorld*,TxBuf*,const TxTile*,uint32_t);
+extern void tx_internal_free(void*);
+static TxWorld source;
+TxWorld* __wrap_tx_get_world(uint32_t id){return id==123?&source:NULL;}
+static uint8_t metadata[256],*original;
+static uint32_t original_len;
+static uint64_t hash=1469598103934665603ULL;
+static void digest(const void*p,size_t n){const uint8_t*b=p;while(n--){hash^=*b++;hash*=1099511628211ULL;}}
+static void word(uint64_t n){digest(&n,sizeof n);}
+extern void __real_tx_set_error(const char*,const char*);
+void __wrap_tx_set_error(const char*a,const char*b){digest(a,strlen(a));digest(b,strlen(b));__real_tx_set_error(a,b);}
+static void restored(void){assert(source.file==original&&source.file_len==original_len);assert(source.important==original+32);assert(source.important[144/8]&(1u<<(144%8)));}
+static void setup(void){memset(&source,0,sizeof source);memset(metadata,0,sizeof metadata);original=metadata;original_len=sizeof metadata;source.file=original;source.file_len=original_len;source.important=original+32;source.important_len=128;source.tile_type_count=1024;source.version=279;source.maxTilesX=9;source.maxTilesY=37;source.important[144/8]|=1u<<(144%8);source.important[135/8]|=1u<<(135%8);source.important[419/8]|=1u<<(419%8);source.important[420/8]|=1u<<(420%8);}
+static void state(CxWorld*w,int status,uint32_t work){restored();word(status);word(work);word(w->phase);word(w->cursor);word(w->x);word(w->y);word(w->col_stage);word(w->col_colour);word(w->col_row);word(w->error);word(w->wire_cells);word(w->devices_count);word(source.tile_decode_calls);digest(w->column,w->height*sizeof(TxTile));}
+
+#ifdef __wasm__
+/* Match the public Web ABI: internal/native-domain buffers are not JS-owned
+ * bridge allocations. Keep the original source alive until supply copies it. */
+extern uint32_t tx_malloc(uint32_t);
+extern void tx_free(uint32_t);
+extern int tx_bridge_range_is_valid(uintptr_t,uint32_t);
+extern uint32_t tx_bridge_heap_used(void);
+static uint32_t bridge_full_checks,bridge_subrange_checks,bridge_rejections;
+
+static void rejected_bridge_supply(uint32_t id,const TerraCircuitWorldEvent* event,
+                                   const uint8_t* data){
+    CxWorld* w=cx_lookup(id);
+    uint8_t before[sizeof(CxWorld)];memcpy(before,w,sizeof before);
+    uint64_t before_hash=hash;
+    assert(!tx_bridge_range_is_valid((uintptr_t)data,event->length));
+    assert(terra_circuit_world_supply(id,event->source_id,event->offset,data,event->length)==TCW_INVALID);
+    assert(memcmp(before,w,sizeof before)==0&&hash==before_hash);
+    TerraCircuitWorldEvent repeated={0};
+    assert(terra_circuit_world_step(id,1,&repeated)==TCW_CONTINUE);
+    assert(memcmp(&repeated,event,sizeof repeated)==0);
+    assert(memcmp(before,w,sizeof before)==0&&hash==before_hash);
+    restored();++bridge_rejections;
+}
+
+static int supply_from_host(uint32_t id,uint32_t source_id,uint32_t offset,
+                            const uint8_t* data,uint32_t length){
+    CxWorld* w=cx_lookup(id);assert(w&&w->event.kind==TCW_READ);
+    assert(source_id==w->event.source_id&&offset==w->event.offset&&length==w->event.length);
+    uint32_t live=tx_bridge_heap_used();
+    if(!bridge_full_checks){
+        assert(length>0);
+        TerraCircuitWorldEvent pending=w->event;
+        /* Correct event metadata isolates each rejection to the pointer guard. */
+        rejected_bridge_supply(id,&pending,data);
+        uint32_t freed=tx_malloc(length);assert(freed);tx_free(freed);
+        rejected_bridge_supply(id,&pending,(const uint8_t*)(uintptr_t)freed);
+        uint32_t owned=tx_malloc(length);assert(owned);
+        assert((uint64_t)owned+length<=UINT32_MAX);
+        rejected_bridge_supply(id,&pending,(const uint8_t*)(uintptr_t)(owned+length));
+        tx_free(owned);assert(tx_bridge_heap_used()==live);
+    }
+    uint32_t subrange=bridge_full_checks&&!bridge_subrange_checks;
+    assert(length<=UINT32_MAX-2u);
+    uint32_t allocation=length+(subrange?2u:0u);if(!allocation)allocation=1;
+    uint32_t base=tx_malloc(allocation);assert(base);
+    uint32_t supplied=base+(subrange?1u:0u);
+    uint8_t* bytes=(uint8_t*)(uintptr_t)supplied;
+    assert(tx_bridge_range_is_valid((uintptr_t)bytes,length));
+    if(length)memcpy(bytes,data,length);
+    uint32_t target=w->read_target,slot=w->read_slot;
+    int status=terra_circuit_world_supply(id,source_id,offset,bytes,length);
+    /* Free even on error, then preserve the original return-value assertion. */
+    tx_free(base);assert(tx_bridge_heap_used()==live);
+    assert(!tx_bridge_range_is_valid((uintptr_t)supplied,length));
+    restored();
+    if(status==TCW_OK){
+        assert(w->event.kind==0);
+        if(target==0){assert(w->input_offset==offset&&w->input_length==length);assert(memcmp(w->input,data,length)==0);}
+        else if(target==1)assert(memcmp(w->cache+slot*CX_PAGE_SIZE,data,length)==0);
+        if(!bridge_full_checks)++bridge_full_checks;
+        else if(subrange)++bridge_subrange_checks;
+    }
+    return status;
+}
+#else
+#define supply_from_host terra_circuit_world_supply
+#endif
+
+static uint32_t rng;
+static uint32_t random32(void){rng=rng*1664525u+1013904223u;return rng;}
+static TxBuf fixture(uint32_t seed,uint32_t timers){TxBuf b;buf_init(&b,4096);rng=seed;for(uint32_t x=0;x<(uint32_t)source.maxTilesX;x++)for(uint32_t y=0;y<(uint32_t)source.maxTilesY;){TxTile t={0};uint32_t r=random32(),run=1+(r%(seed==99?300:7));if(run>(uint32_t)source.maxTilesY-y)run=(uint32_t)source.maxTilesY-y;t.active=1;t.type=1;t.wire_red=!!(r&8);t.wire_blue=!!(r&16);t.wire_green=!!(r&32);t.wire_yellow=!!(r&64);t.wall=(r>>8)%600;t.wall_color=(r>>16)%31;t.tile_color=(r>>21)%31;t.liquid_type=1+(r%4);t.liquid_amount=100;t.invisible_block=!!(r&128);t.fullbright_wall=!!(r&256);if(timers&&x>=2&&x<=6&&y>=2&&y<32&&(timers==2||x==2)){t.type=144;t.frame_x=(r%5)*18;t.wire_red=1;run=1;}else if(r%11==0){t.type=135;t.frame_x=0;t.frame_y=18;}write_tile(&source,&b,&t,run-1);y+=run;}assert(b.ok);return b;}
+static int drive(uint32_t id,TxBuf*b,uint32_t budget,uint32_t tiny,uint8_t*scratch,size_t cap,int stop){for(uint32_t n=0;n<1000000;n++){TerraCircuitWorldEvent e={0};int s=terra_circuit_world_step(id,budget,&e);CxWorld*w=cx_lookup(id);state(w,s,budget);word(e.kind);word(e.source_id);word(e.offset);word(e.length);word(e.phase);word(e.result_count);word(e.reserved);if(s<0)return s;if(stop&&n==(uint32_t)stop)return 99;if(e.kind==TCW_READ){const uint8_t*p;size_t len;if(e.source_id==7){p=b->data;len=b->len;}else{assert(e.source_id==8);p=scratch;len=cap;}assert(e.offset<=len&&e.length<=len-e.offset);assert(supply_from_host(id,e.source_id,e.offset,p+e.offset,e.length)==0);if(tiny&&e.source_id==7&&w->input_length>tiny)w->input_length=tiny;restored();}else if(e.kind==TCW_WRITE){assert(e.source_id==8&&e.offset<=cap&&e.length<=cap-e.offset);memcpy(scratch+e.offset,(void*)e.data_ptr,e.length);digest((void*)e.data_ptr,e.length);assert(terra_circuit_world_ack(id)==0);}else if(e.kind==TCW_RESULT){digest((void*)e.data_ptr,e.length);assert(terra_circuit_world_ack(id)==0);}else if(s==0)return 0;}assert(0);return -99;}
+static void session(uint32_t seed,uint32_t timers,uint32_t budget,uint32_t tiny,int stop){setup();if(seed==99)source.maxTilesY=700;TxBuf b=fixture(seed,timers);uint32_t columns[9]={0};source.stream_source_id=7;source.stream_source_size=b.len;source.stream_tile_start=0;source.stream_tile_end=b.len;source.stream_columns=columns;uint32_t id;assert(terra_circuit_world_begin(123,8,64*1024*1024,&id)==0);CxWorld*w=cx_lookup(id);memset(w->column,0,w->height*sizeof(TxTile));uint8_t*scratch=calloc(1,4*1024*1024);assert(scratch);int s=drive(id,&b,budget,tiny,scratch,4*1024*1024,stop);assert(s==(stop?99:0));if(!stop){TerraCircuitWorldStats stats;assert(terra_circuit_world_stats(id,&stats)==0);digest(&stats,sizeof stats);word(w->timer_order!=NULL);for(uint32_t opt=0;opt<2;opt++){TerraCircuitWorldCommand c={0};c.abi_version=2;c.kind=TCW_OPTIMIZATION;c.mask=opt;assert(terra_circuit_world_command(id,&c)==0);restored();c.kind=TCW_VIEWPORT;c.x=2;c.y=2;c.width=5;c.height=31;c.stride=1;assert(terra_circuit_world_command(id,&c)==0);assert(drive(id,&b,budget,tiny,scratch,4*1024*1024,0)==0);restored();}}if(!stop){TerraCircuitWorldCommand q={0};q.abi_version=2;q.kind=TCW_VIEWPORT;q.width=9;q.height=37;q.stride=1;assert(terra_circuit_world_command(id,&q)==0);TerraCircuitWorldEvent e;word(terra_circuit_world_step(id,1,&e));restored();}assert(terra_circuit_world_cancel(id)==0);restored();word(terra_circuit_world_close(id));restored();tx_internal_free(b.data);free(scratch);}
+/* Direct production scan calls isolate malformed record/cursor precedence and
+ * exact 31/32-byte readiness boundaries, without changing the decoder. */
+static void edge(uint32_t which,uint32_t budget){setup();source.maxTilesX=9;source.maxTilesY=37;source.stream_source_id=7;source.stream_tile_end=128;uint32_t cols[9]={0};source.stream_columns=cols;uint32_t id;assert(terra_circuit_world_begin(123,8,8*1024*1024,&id)==0);CxWorld*w=cx_lookup(id);memset(w->column,0,37*sizeof(TxTile));memset(w->input,0,128);w->input_offset=0;w->input_length=128;w->tile_end=128;w->col_stage=1;
+ switch(which){case 0:w->input_length=31;break;case 1:w->input_length=32;break;case 2:w->cursor=128;w->input_offset=200;break;case 3:w->input_offset=1;break;case 4:w->cursor=40;w->input_length=39;break;case 5:w->input[0]=0x40;w->input[1]=37;break;case 6:w->input[0]=0x80;w->input[1]=0;w->input[2]=128;break;case 7:w->input[0]=0x22;w->input[1]=144;w->input[2]=0;w->tile_end=w->input_length=5;break;case 8:w->input[0]=0x40;w->input[1]=36;break;case 9:w->tile_end=w->input_length=1;break;case 10:w->cursor=97;break;case 11:w->cursor=96;break;case 12:w->input_length=0;break;case 13:w->tile_end=0;break;case 14:w->input[0]=0x40;w->input[1]=35;w->input[2]=0x22;w->input[3]=144;w->tile_end=w->input_length=5;break;case 15:case 16:w->input_length=TERRA_CIRCUIT_WORLD_WINDOW;w->tile_end=w->input_length+20;w->cursor=w->input_length-(which==15?34:32);memset(w->input+w->cursor,0,w->input_length-w->cursor);break;case 17:w->input[0]=0xc0;w->input[1]=36;break;case 18:w->input[0]=0x80;w->input[1]=0xff;w->input[2]=0x7f;break;case 19:w->input[0]=0x22;w->input[1]=0xff;w->input[2]=0x7f;break;}
+ uint32_t work=budget;int s=cx_scan_step(w,&work);if(which==2||which==5||which==6||which==7||which==13||which==18)assert(s==TCW_FORMAT);if(which==0||which==3||which==4||which==12)assert(s==TCW_CONTINUE&&w->event.kind==TCW_READ);state(w,s,work);word(w->event.kind);word(w->event.offset);word(w->event.length);if(which%2){assert(terra_circuit_world_cancel(id)==0);restored();}assert(terra_circuit_world_close(id)==0);restored();}
+int main(void){for(uint32_t budget=1;budget<=4096;budget*=4096){for(uint32_t e=0;e<20;e++)edge(e,budget);for(uint32_t seed=1;seed<=8;seed++)for(uint32_t timers=0;timers<3;timers++)for(uint32_t tiny=0;tiny<2;tiny++)session(seed,timers,budget,tiny?32:0,0);session(99,0,budget,32,0);session(42,2,budget,32,1);session(43,2,budget,32,3);}
+#ifdef __wasm__
+assert(bridge_full_checks==1&&bridge_subrange_checks==1&&bridge_rejections==3);
+#endif
+printf("PASS differential digest %016llx; 98 full compile sessions / 196 viewport queries, 4 compile cancel sessions, 40 edge cases\n",(unsigned long long)hash);return 0;}

@@ -2,7 +2,7 @@
   "schema": 1,
   "sourceRepository": "Live-yum/TerraWasm",
   "sourceCommit": "e2c3c817b2b482a535763695d19945971e19e41c",
-  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v8-viewport-source-cache patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; physical gate-wave policy is retained while trip-end work can yield before pixel and gate evaluation. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches. The WLD Web export list additionally exposes the existing four incremental SHA-256 functions; the C hash implementation is unchanged. Sparse READ_LAMPS reuses existing checkpoints at complete-column boundaries and yields after every restore; other command scans retain their prior behavior. Ordinary connected type-42/type-93 light footprints now have independent frame-state execution and save projection; complete unconnected decorations add no mutable retained entries. Decompiled Terraria source is used only as a behavioral oracle and is not redistributed. Bounded ordinary-wire multi-timer domains replay independent source-oracle FIFO timer order with optional evictable topology and seed-order caches. New local files carry explicit original-implementation provenance rather than fabricated upstream identities. Unsupported ordering domains reject affected commands transactionally; see the parity document for limits. Add an optional bounded viewport source-value cache for rectangles of at most 4096 cells. Cache entries retain original tiles and topology references; every query projects current circuit state. Warm immutable-source queries issue a host validation read without changing scan input state. Pinned entries survive active query work; cancellation, errors, close and optimization changes discard them. Owner and private VM allocation paths may reclaim unpinned entries while preserving the total memory ceiling. Public ABI and exports remain unchanged. This provenance update identifies source only; a rebuilt runtime must be recorded and verified separately.",
+  "sourceState": "Locally patched for native pointer-width safety, persistent circuit allocation and abc host integration. Hashes identify the distributed patched source, not unmodified upstream commit blobs. The cumulative full-world-pixels-v9-batched-stream-reader patch records WLD-only ABI 2, retained-pixel queries, default-OFF vanilla PixelBox rules, explicitly enabled restricted WireHead-style ordinary-pixel wave pairing with topology rejection, device dedup and semantics-preserving cold-load compile/read optimizations. OFF and ON have distinct pixel execution boundaries; physical gate-wave policy is retained while trip-end work can yield before pixel and gate evaluation. Original/current hashes, removed-file identities, reference attribution and the reviewed diff are distributed under native/patches. The WLD Web export list additionally exposes the existing four incremental SHA-256 functions; the C hash implementation is unchanged. Sparse READ_LAMPS reuses existing checkpoints at complete-column boundaries and yields after every restore; other command scans retain their prior behavior. Ordinary connected type-42/type-93 light footprints now have independent frame-state execution and save projection; complete unconnected decorations add no mutable retained entries. Decompiled Terraria source is used only as a behavioral oracle and is not redistributed. Bounded ordinary-wire multi-timer domains replay independent source-oracle FIFO timer order with optional evictable topology and seed-order caches. New local files carry explicit original-implementation provenance rather than fabricated upstream identities. Unsupported ordering domains reject affected commands transactionally; see the parity document for limits. Add an optional bounded viewport source-value cache for rectangles of at most 4096 cells. Cache entries retain original tiles and topology references; every query projects current circuit state. Warm immutable-source queries issue a host validation read without changing scan input state. Pinned entries survive active query work; cancellation, errors, close and optimization changes discard them. Owner and private VM allocation paths may reclaim unpinned entries while preserving the total memory ceiling. Public ABI and exports remain unchanged. This provenance update identifies source only; a rebuilt runtime must be recorded and verified separately. Streamed TOPOLOGY/COUNT/WRITE stage-1 compilation binds the existing input window once per uninterrupted decode batch, preserving the original 32-byte readiness rule and per-record decoder. Every return, error, host event and column-end handler restores the original TxWorld file pointer and length; original allocation and metadata aliases remain alive. No new allocation, retained cache, ABI, export, IO or source-validation shortcut is introduced. Native-host performance evidence is separate from Web and device behavior. Runtime artifacts require an actual rebuilt and verified source-manifest chain.",
   "license": "No upstream license grant identified; inclusion is user-authorized and does not relicense upstream material.",
   "files": [
     {
@@ -237,8 +237,8 @@
     },
     {
       "path": "src/terra_circuit_compile.c",
-      "bytes": 26883,
-      "sha256": "815f8bc8babf5b19a0b75d011475d244d6a6f2dbaeaf902c7d11ad6da7e11d88"
+      "bytes": 28239,
+      "sha256": "ab7e55c0cb23f4dd011eae28d223662c18fce1f5653680ca2d90f1b573441494"
     },
     {
       "path": "src/terra_circuit_devices.c",
@@ -282,13 +282,13 @@
     },
     {
       "path": "src/terra_circuit_world.c",
-      "bytes": 21456,
-      "sha256": "213f1655cfa25f2f2aabcb07e7873ed270b5605f416fd14d2e8b156de99f96f2"
+      "bytes": 21301,
+      "sha256": "fa781591eb040859c958216894e7655b12ea26eb48d198db38d46c747d3b3ec8"
     },
     {
       "path": "src/terra_circuit_world_internal.h",
-      "bytes": 10826,
-      "sha256": "6f6792c12b1a6ab54a2344d9024e0a3b49e4c483747903ce859449ebdd0d2c3c"
+      "bytes": 11169,
+      "sha256": "22477a8dfc97b83103ef2a2734768a7245a8b1c8542b7d91da8316332d473dbf"
     },
     {
       "path": "src/terra_commands.c",
@@ -488,9 +488,9 @@
   ],
   "localPatches": [
     {
-      "id": "full-world-pixels-v8-viewport-source-cache",
+      "id": "full-world-pixels-v9-batched-stream-reader",
       "manifest": "native/patches/full-world-pixels.json",
-      "sha256": "b7c9ad0a9df85fb1108ed1abf20af5ae39f1971060e91d160c6f223af8b5bb75"
+      "sha256": "fdd0b9a84a596fd3eba949aa8f89b4a3a8bd895f43858db2934dafda724fac6c"
     }
   ]
 }

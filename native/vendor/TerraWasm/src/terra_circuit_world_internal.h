@@ -154,6 +154,11 @@ uint32_t cx_var_size(uint32_t);
 uint32_t cx_var_put(uint8_t*,uint32_t);
 uint32_t cx_var_read(const CxBytes*,uint32_t*);
 int cx_emit(CxWorld*,uint32_t,uint32_t,uint32_t,uint32_t,const void*);
+/* Shared streamed-reader readiness policy; caller first checks cursor < tile_end. */
+static inline int cx_world_window_ready(const CxWorld* w){
+    uint32_t need=w->tile_end-w->cursor;if(need>32u)need=32u;
+    return !(w->cursor<w->input_offset||w->cursor-w->input_offset>w->input_length||need>w->input_length-(w->cursor-w->input_offset));
+}
 int cx_world_tile(CxWorld*,TxTile*);
 int cx_scan_step(CxWorld*,uint32_t*);
 void cx_scan_reset(CxWorld*);
