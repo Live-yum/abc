@@ -64,6 +64,49 @@ jobs:
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
           ABC_WEB_OUTPUT="$PWD/web/engine" bash tool/build_web_engine.sh
+      - name: Check out the frozen batched-reader reference
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          path: build/batched-reader-reference
+          persist-credentials: false
+      - name: Actual WASM reader differential against frozen 9d4
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/batched-reader-reference"
+          test "$(git -C "$reference" rev-parse HEAD)" = 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          test "$(emcc -dumpversion)" = 5.0.7
+          emcmake cmake -S "$reference/native/vendor/TerraWasm" -B build/batched-reader-reference-wasm \
+            -DCMAKE_BUILD_TYPE=Release -DABC_HOST_WRAPPERS="$reference/native" \
+            -DTERRAWASM_FEATURE_SET=wld -DTERRAX_BUILD_COMMIT=e2c3c817b2b482a535763695d19945971e19e41c \
+            -DTERRAX_BUILD_DIRTY=true -DTERRAX_BUILD_COMPILER=emscripten-5.0.7 \
+            -DTERRAX_WEB_MAXIMUM_MEMORY=268435456
+          cmake --build build/batched-reader-reference-wasm --target terrax_world_wasm_web --parallel 4
+          python3 tool/test_batched_reader.py --mode wasm \
+            --reference-source "$reference/native/vendor/TerraWasm" \
+            --candidate-source native/vendor/TerraWasm \
+            --reference-web-build build/batched-reader-reference-wasm \
+            --candidate-web-build build/wasm-wld \
+            --output build/batched-reader-contracts/wasm
+      - name: Verify and remove only the temporary batched-reader reference checkout
+        if: always()
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/batched-reader-reference"
+          if [[ -d "$reference/.git" ]]; then
+            test "$(git -C "$reference" rev-parse HEAD)" = 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+            test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+            rm -rf -- "$reference"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: batched-reader-wasm-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/batched-reader-contracts/wasm/report.json
+          if-no-files-found: warn
+          retention-days: 30
       - name: Check out the frozen uncached viewport reference
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -234,6 +277,54 @@ jobs:
           quickjs="$PUB_CACHE/hosted/pub.dev/flutter_js-0.8.7/linux/shared/libquickjs_c_bridge_plugin.so"
           test -f "$quickjs"
           echo "LIBQUICKJSC_TEST_PATH=$quickjs" >> "$GITHUB_ENV"
+      - name: Check out the frozen batched-reader reference
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          path: build/batched-reader-reference
+          persist-credentials: false
+      - name: Frozen-reference reader differential in Release and ASan/UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/batched-reader-reference"
+          test "$(git -C "$reference" rev-parse HEAD)" = 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+          test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+          cmake -S "$reference/native" -B build/batched-reader-reference-release -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/batched-reader-reference-release --target terrax_world_static --parallel 2
+          cmake -S "$reference/native" -B build/batched-reader-reference-asan -DABC_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/batched-reader-reference-asan --target terrax_world_static --parallel 2
+          python3 tool/test_batched_reader.py --mode release \
+            --reference-source "$reference/native/vendor/TerraWasm" \
+            --candidate-source native/vendor/TerraWasm \
+            --reference-archive build/batched-reader-reference-release/terra/libterrax_world_static.a \
+            --candidate-archive build/native-release/terra/libterrax_world_static.a \
+            --output build/batched-reader-contracts/release
+          python3 tool/test_batched_reader.py --mode sanitized \
+            --reference-source "$reference/native/vendor/TerraWasm" \
+            --candidate-source native/vendor/TerraWasm \
+            --reference-archive build/batched-reader-reference-asan/terra/libterrax_world_static.a \
+            --candidate-archive build/native/terra/libterrax_world_static.a \
+            --output build/batched-reader-contracts/sanitized
+      - name: Verify and remove only the temporary batched-reader reference checkout
+        if: always()
+        run: |
+          set -euo pipefail
+          reference="$PWD/build/batched-reader-reference"
+          if [[ -d "$reference/.git" ]]; then
+            test "$(git -C "$reference" rev-parse HEAD)" = 9d4cd5a0f9db03042a3986689fea374ba92d78b8
+            test -z "$(git -C "$reference" status --porcelain --untracked-files=normal)"
+            rm -rf -- "$reference"
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: batched-reader-native-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/batched-reader-contracts/*/report.json
+          if-no-files-found: warn
+          retention-days: 30
       - name: Check out the frozen uncached viewport reference
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
